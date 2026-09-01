@@ -263,7 +263,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         if succ: state.show_success_modal.set(True)
         else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
    # =========================================================================
-    # HANDLER PANDUAN & LOGIC MODAL (SEMUA MENU)
+    # HANDLER PANDUAN & LOGIC (100% KATA & ISI PERSIS DARI STREAMLIT ASLI)
     # =========================================================================
     @reactive.Effect
     @reactive.event(input.btn_open_panduan_modal)
@@ -271,10 +271,13 @@ def server(input: Inputs, output: Outputs, session: Session):
         cur = state.main_menu()
         
         guides = {
+            # --- 1. STOCK MINUS ---
             "Stock Minus": """
-                <b>📋 INFORMASI FORMAT FILE:</b><br>
-                - <b>All Data Stock:</b> Download Multiple Adjustment dari Jezpro dan pilih <b>Termasuk yang sudah habis</b><br><br>
-                <b>💡 LOGIC THINKING:</b><br>
+                <b>📋 Informasi Format File</b><br>
+                <b>Format yang diharapkan:</b><br>
+                - <b>All Data Stock:</b> Download Multiple Adjusmet dari Jezpro dan pilih <b>Termasuk yang sudah habis</b><br><br>
+                <hr style='margin: 8px 0; border-color: #E2E8F0;'>
+                <b>💡 Logic Thinking</b><br>
                 <b>Alur Process Compare Stock Minus:</b><br>
                 - Mengambil SKU yang memiliki Qty System minus (-)<br>
                 - Lalu SKU yang memiliki QTY Minus (-) tersebut akan di lakukan shuffle covering Stock<br>
@@ -285,20 +288,24 @@ def server(input: Inputs, output: Outputs, session: Session):
                 - Dan jika tidak bisa diselesaikan lewat set up maka sistem akan memasukkan kedalam item need justifikasi dan perlu analisa lebih lanjut
             """,
 
+            # --- 2. PUTAWAY SYSTEM ---
             "Putaway System": """
-                <b>📋 INFORMASI FORMAT FILE:</b><br>
+                <b>📋 Informasi Format File</b><br>
+                <b>Format yang diharapkan:</b><br>
                 - <b>DATA SCAN PUTAWAY:</b> Kolom A = <b>BIN</b>, Kolom B = <b>SKU</b>, Kolom C = <b>QTY SCAN</b><br>
                 - <b>DATA PUTAWAY:</b> Sesuai yang ada pada template Jezpro.<br><br>
-                <b>💡 LOGIC THINKING:</b><br>
+                <hr style='margin: 8px 0; border-color: #E2E8F0;'>
+                <b>💡 Logic Thinking</b><br>
                 <b>Alur Compare Putaway:</b><br>
-                - SKU di file data scan akan dicompare dengan SKU yang ada di File data BIN Putaway<br>
+                - SKU di file data scan akan dicompare dengan SKU yang ada di FIle data BIN Putaway<br>
                 - Tiap unique SKU teratas di File data scan akan mendapatkan alokasi penuh<br>
                 - Untuk SKU yang tidak mendapatkan alokasi maka akan ditulis dengan note <b>PERLU CEK MANUAL</b> untuk mengetahui apakah ada double data scan atau item belum terset up di BIN PUTAWAY<br>
                 - List Set up akan dibuatkan otomatis oleh system dengan BIN awal diambil dari BIN di file Putaway dan BIN tujuan disesuaikan dengan BIN yang ada di data scan
             """,
 
+            # --- 3. COMPARE SYSTEM ---
             "Compare System": """
-                <b>📋 INFORMASI FORMAT FILE & KOLOM MAPPING:</b><br>
+                <b>📋 Informasi Format File & Kolom Mapping</b><br>
                 <b>Kondisi Stok Berkurang (Sys1 > Sys2):</b><br>
                 1. <b>Stock Tracking:</b> Kolom A=Invoice, Kolom B=SKU, Kolom G=BIN, Kolom K=Qty (Index 10).<br>
                 2. <b>RTO Out:</b> Kolom D=No TF, Kolom I=SKU, Kolom J=Qty (Index 9).<br><br>
@@ -308,215 +315,413 @@ def server(input: Inputs, output: Outputs, session: Session):
                 3. <b>Mutasi Refund:</b> Kolom D=SKU (Index 3), Kolom K=Qty (Index 10).
             """,
 
-            "List Bin Cycle Count": """
-                <b>📋 INFORMASI FORMAT FILE:</b><br>
-                - <b>FILTER:</b> SUB KATEGORI, BIN SYSTEM, BRAND.<br>
-                - <b>DATA MULTIPLE ADJUSTMENT:</b> Upload file data scan mentah (Kolom B=BIN, C=SKU, E=ITEM, F=VARIANT, G=SUB KATEGORI, H=HARGA, J=QTY).<br>
-                - Filter otomatis mengecualikan bin: DEFECT, REJECT, KARANTINA, STAG, INB, OUT, PUTAWAY.
+            # --- 4. CYCLE COUNT ANALYZER ---
+            "Cycle Count": """
+                <b>📋 Informasi Format File</b><br>
+                <b>Format yang diharapkan:</b><br>
+                - <b>FILTER</b><br>
+                    - <b>SUB KATEGORI:</b> Untuk Sub Kategori pilih sesuai dengan kategori yang sedang dianalisa<br>
+                    - <b>BIN SYSTEM:</b> Untuk BIN system pilih sesuai dengan bin yang sedang dianalisa<br>
+                    - <b>BRAND:</b> Untuk BRAND pilih sesuai dengan brand yang sedang dianalisa<br>
+                    - <b>BIN COVERAGE:</b> Untuk BIN COVERAGE sementara non aktifkan dulu dan jangan dipilih<br>
+                - <b>COMPARE DS VS STOCK SYSTEM</b><br>
+                    - <b>DATA SCAN:</b> Upload data scan SO yang sudah diberi header :<br>
+                        - <b>Kolom A</b> = BIN<br>
+                        - <b>Kolom B</b> = SKU<br>
+                        - <b>Kolom C</b> = QTY SCAN<br>
+                    - <b>STOCK SYSTEM:</b> Download All stock dari <b>Multiple Adjusment</b> dan pilih <b>Termasuk yang sudah habis</b><br>
+                - <b>BIN COVERAGE:</b> Download Bin Coverage dari <b>Multiple Adjusment</b>, Pilih stocknya <b>Hanya ada di stock</b><br>
+                - <b>RECON REAL + PROCESS:</b> Upload file Recon Real + yang sudah didownload dari step sebelumnya pastikan <b>KOLOM A</b> bukan berisi <b>NUMBER</b> ➔ jika berisi Number maka hapus dulu kolomnya sebelum diupload<br>
+                - <b>SET UP KARANTINA GENERATOR:</b><br>
+                    - <b>SYTEM + RECON:</b> Upload file Recon System + yang sudah didownload dari step sebelumnya pastikan <b>KOLOM A</b> bukan berisi <b>NUMBER</b> ➔ jika berisi Number maka hapus dulu kolomnya sebelum diupload<br>
+                    - <b>CEK STOCK ADJ -:</b> Download Stock System yang terbaru dari <b>Multiple Adjusment</b> dan pilih <b>Termasuk yang sudah habis</b><br><br>
+                <hr style='margin: 8px 0; border-color: #E2E8F0;'>
+                <b>💡 Logic Thinking</b><br>
+                <b>DS VS Stock System :</b><br>
+                - <b>REAL +:</b> Compare antara SKU dan BIN yang ada di data scan dengan SKU dan BIN yang ada di Stock System dimana logic yang digunakan menggunakan loigc rumus (SUMIFS). Fokus di file Data Scan karena yang akan menjadi acuan untuk Real +. Apabila <b>QTY SCAN > QTY SYSTEM</b> maka yang akan dijadikan sebagai Real +.<br>
+                - <b>SYSTEM +:</b> Jika tadi berfokus pada file Data maka untuk system + berfokus pada file Stock System. Apabila <b>QTY SYSTEM > QTY SCAN</b> maka akan dijadikan sebagai System +.<br><br>
+                <b>ALLOCATION REAL + :</b><br>
+                - <b>BIN COVERAGE:</b> Compare antara SKU yang ada di Real + dengan SKU yang ada BIN Coverage jika SKU ditemukan maka akan diambil untuk cover system di REAL +. Jika DIFF real + dapat tercover penuh maka akan diberi note <b>FULL ALLOCATION</b>, jika tercover sebagian <b>PARTIAL ALLOCATION</b>, dan jika tidak tercover <b>NO ALLOCATION</b>.<br>
+                - <b>SYSTEM +:</b> Item memiliki note <b>NO ALLOCATION</b> maka apabila tidak ditemukan di BIN COVERAGE akan mencari SKU yang cocok di system +.<br>
+                - <b>SET UP ALLOCATION:</b> Item dengan note <b>FULL ALLOCATION</b> dan <b>PARTIAL ALLOCATION</b> akan dibuatkan list set up dengan note Relocation.<br><br>
+                <b>RECON REAL + & SYSTEM + :</b><br>
+                - <b>RECON REAL +:</b> Item yang memiliki note <b>NO ALLOCATION</b> akan kembali di lakukan rekonsiliasi. Jika <b>Real yang ditemukan = stock system</b> maka tidak akan dimasukkan ke list adjusment. Jika <b>Real yang ditemukan > stock system</b> maka akan dimasukkan ke list adjusment.<br>
+                - <b>RECON SYSTEM +:</b> System + yang DIFF nya belum teralokasi akan dilakukan rekonsiliasi. Jika <b>Real yang ditemukan = stock system</b> maka tidak akan dimasukkan ke list adjusment. Jika <b>Real yang ditemukan < stock system</b> maka akan dimasukkan ke list adjusment.<br>
+                - <b>CEK STOCK ADJUSMENT:</b> File Cek adjusment tadi yang sudah di download bisa dimasukkan kembali dengan sumifs kemudian mengambil diffnya. Jika DIFF > 0 maka akan dilakukan mutasi ke <b>BIN KARANTINA</b>.<br>
+                - <b>SET UP KARANTINA:</b> System akan membuatkan list set up untuk DIFF > 0 dan akan diberikan note <b>MISS LOCATION</b>.<br><br>
+                <b>TOTAL MISS LOCATION :</b><br>
+                - Cek total missloc diambil dari berapa banyak SKU dan QTY yang memiliki note <b>FULL ALLOCATION & PARTIAL ALLOCATION</b> pada logic Allocation real +.
             """,
 
-            "Cycle Count": """
-                <b>📋 INFORMASI FORMAT FILE:</b><br>
-                - <b>FILTER:</b> Sub Kategori, BIN System, Brand, BIN Coverage.<br>
+            # --- 5. STOCK OPNAME ---
+            "Stock Opname": """
+                <b>📋 Informasi Format File</b><br>
+                <b>Format yang diharapkan:</b><br>
+                - <b>FILTER:</b> SUB KATEGORI, BIN SYSTEM, BIN COVERAGE (sementara non aktifkan dulu).<br>
                 - <b>COMPARE DS VS STOCK SYSTEM:</b><br>
-                  - <b>DATA SCAN:</b> Kolom A = BIN, Kolom B = SKU, Kolom C = QTY SCAN<br>
-                  - <b>STOCK SYSTEM:</b> Download All stock dari Multiple Adjustment (<b>Termasuk yang sudah habis</b>)<br>
-                - <b>BIN COVERAGE:</b> Download Bin Coverage dari Multiple Adjustment (<b>Hanya ada di stock</b>)<br>
-                - <b>RECON REAL + PROCESS:</b> Upload file Recon Real + (pastikan KOLOM A bukan berisi NUMBER)<br>
-                - <b>SET UP KARANTINA GENERATOR:</b> SYSTEM + RECON & CEK STOCK ADJ - (Termasuk yang sudah habis)<br><br>
-                <b>💡 LOGIC THINKING:</b><br>
+                    - <b>DATA SCAN:</b> Upload data scan SO (Kolom A = BIN, Kolom B = SKU, Kolom C = QTY SCAN)<br>
+                    - <b>STOCK SYSTEM:</b> Download All stock dari <b>Multiple Adjusment</b> dan pilih <b>Termasuk yang sudah habis</b><br>
+                - <b>BIN COVERAGE:</b> Download Bin Coverage (ALL BIN DEFAULT & KARANTINA) dari <b>Multiple Adjusment</b> (Pilih stocknya <b>Hanya ada di stock</b>)<br>
+                - <b>FINAL ADJUSMENT + PROCESS:</b><br>
+                    - <b>REAL + RECON:</b> Upload file Recon Real + (pastikan KOLOM A bukan berisi NUMBER)<br>
+                    - <b>CEK STOCK ADJ +:</b> Download Stock System terbaru dari <b>Multiple Adjusment</b> (Termasuk yang sudah habis)<br>
+                    - <b>File Stagging Inbound:</b> Download Stock System dan pilih hanya <i>BIN STAGGING INBOUND</i> (Termasuk yang sudah habis)<br>
+                - <b>SET UP KARANTINA GENERATOR:</b> SYTEM + RECON & CEK STOCK ADJ - (Termasuk yang sudah habis)<br>
+                - <b>SUMMARY ADJUSMENT REPORT:</b> OPSI 1 (Langsung klik tanpa upload), OPSI 2 (Gabungkan All Adj+), OPSI 3 (Gabungkan All Adj-), OPSI 4 (Gabungkan All Adj+ & -)<br><br>
+                <hr style='margin: 8px 0; border-color: #E2E8F0;'>
+                <b>💡 Logic Thinking</b><br>
                 - <b>REAL +:</b> QTY SCAN > QTY SYSTEM (Fokus Data Scan)<br>
                 - <b>SYSTEM +:</b> QTY SYSTEM > QTY SCAN (Fokus Stock System)<br>
-                - <b>ALLOCATION REAL +:</b> Cover sistem dari BIN Coverage ➔ FULL / PARTIAL / NO ALLOCATION.<br>
-                - <b>RECON REAL + & SYSTEM +:</b> Menentukan item yang perlu masuk adjustment.<br>
-                - <b>TOTAL MISS LOCATION:</b> Diambil dari SKU & QTY berstatus FULL & PARTIAL ALLOCATION.
+                - <b>ALLOCATION REAL +:</b> Cover dari BIN Coverage (FULL/PARTIAL/NO ALLOCATION) ➔ Set Up Relocation.<br>
+                - <b>FILE INBOUND:</b> Selisih dari lookup dimasukkan ke dalam file inbound untuk proses adjusment.<br>
+                - <b>SET UP KARANTINA:</b> DIFF > 0 dimutasi ke BIN KARANTINA dengan note <b>MISS LOCATION</b>.<br>
+                - <b>TOTAL MISS LOCATION:</b> Total SKU & QTY yang memiliki note FULL & PARTIAL ALLOCATION.<br>
+                - <b>VALUE ADJUSMENT:</b> Cek Value Adjusment sebagai report dan analisa SO diperiode tersebut.
             """,
 
-            "Compare RTO": """
-                <b>📋 INFORMASI FORMAT FILE:</b><br>
-                - <b>DS RTO:</b> Kolom A = <b>SKU</b>, Kolom B = <b>QTY SCAN</b><br>
-                - <b>APPSHEET RTO:</b> Download Spreadsheets Rekap Appsheet sesuai sheet RTO yang dituju<br>
-                - <b>UPLOAD HASIL CEK REAL:</b> Upload hasil rekonsiliasi RTO<br>
-                - <b>DRAFT RTO:</b> Download Draft RTO dari Purchasing<br><br>
-                <b>💡 LOGIC THINKING:</b><br>
-                - <b>DS Vs Appsheet:</b> QTY DS > APPSHEET ➔ Kelebihan Ambil. QTY DS < APPSHEET ➔ Kurang Ambil.<br>
-                - <b>Appsheet Vs Draft:</b> BIN beda ➔ Perlu Edit Draft. Qty beda ➔ Perlu Edit QTY Draft. SKU baru ➔ Tambah item Draft.
-            """,
-
-            "Stock Opname": """
-                <b>📋 INFORMASI FORMAT FILE:</b><br>
-                - <b>DATA SCAN:</b> Kolom A = BIN, Kolom B = SKU, Kolom C = QTY SCAN<br>
-                - <b>STOCK SYSTEM:</b> Download All stock Multiple Adjustment (<b>Termasuk yang sudah habis</b>)<br>
-                - <b>BIN COVERAGE:</b> Download Bin Coverage (<b>Hanya ada di stock</b>)<br>
-                - <b>FINAL ADJUSTMENT + PROCESS:</b> REAL + RECON, CEK STOCK ADJ +, & STAGGING INBOUND.<br>
-                - <b>SET UP KARANTINA GENERATOR:</b> SYSTEM + RECON & CEK STOCK ADJ -.<br>
-                - <b>SUMMARY ADJUSTMENT REPORT:</b> Menghitung nilai finansial & kuantitas selisih adjustment (+/-).
-            """,
-
+            # --- 6. JUSTIFICATION SO ---
             "Justification SO": """
-                <b>📋 INFORMASI FORMAT FILE:</b><br>
-                - <b>ADJUSTMENT FILE:</b> Gabungkan Multiple Adjustment (Plus & Minus) dalam 1 File.<br>
-                - <b>SUMMARY STOCK:</b> Dashboard Asset Jezpro (Store: <b>JEZ SURABAYA</b>).<br>
-                - <b>ALL DATA STOCK:</b> Multiple Adjustment (<b>HANYA ADA STOCK</b>).<br>
-                - <b>DATA SCAN (Opsional):</b> Menggunakan Qty fisik data scan aktual.<br><br>
-                <b>💡 LOGIC THINKING:</b><br>
-                <b>REAL QTY:</b> <code>BEGINNING STOCK + (TOTAL_STOCKIN + TOTAL TRF_IN) - (TOTAL SALES + TOTAL TRF_OUT + TOTAL DRAFT TRF_OUT)</code><br>
-                - <b>Kesalahan System (Begin Stock Minus):</b> Stok SO > Sistem (+), tetapi Beginning Stock < 0.<br>
-                - <b>Kesalahan System (Ending Stock ≠ Total Stock Multiple):</b> GAP ADJ = 0 & BEGINNING = 0, tapi QTY SYSTEM ALL lebih kecil.<br>
-                - <b>Kesalahan System (Miss Match Real QTY):</b> Hitungan manual ≠ ENDING STOCK.<br>
-                - <b>Kesalahan Adjustment (+/-):</b> Koreksi dari proses adjustment sebelumnya.<br>
-                - <b>Kesalahan RTO:</b> Terdapat transaksi draft transfer yang menggantung.
+                <b>📋 Informasi Format File</b><br>
+                <b>Format yang diharapkan:</b><br>
+                - <b>ADJUSTMENT FILE:</b> Gabungkan antara Multiple Adjustment <b>(Plus)</b> dan <b>(Minus)</b> dalam 1 File.<br>
+                - <b>SUMMARY STOCK:</b> Download dari <b>JEZPRO</b> pada menu <b>Dashboard Asset</b> (Store: <b>JEZ SURABAYA</b>).<br>
+                - <b>ALL DATA STOCK:</b> Upload file All data Stock (Multiple Adjustment) <b>HANYA ADA STOCK</b>.<br>
+                - <b>DATA SCAN (Opsional):</b> Jika diupload maka perhitungan <b>Real QTY</b> akan mengambil qty dari data scan dan apabila tidak dipload maka akan kembali perhitungan awal.<br><br>
+                <hr style='margin: 8px 0; border-color: #E2E8F0;'>
+                <b>💡 Logic Thinking (Justification)</b><br>
+                <b>REAL QTY / HITUNGAN MANUAL ➔ :</b> <code>BEGINNING STOCK + (TOTAL_STOCKIN + TOTAL TRF_IN) - (TOTAL SALES + TOTAL TRF_OUT + TOTAL DRAFT TRF_OUT)</code><br><br>
+                <b>🛑 1. Kesalahan System (Begin Stock Minus)</b><br>
+                * <b>Kondisinya:</b> Stok SO lebih besar dari stok Sistem (ADJUSMENT +), Tetapi <i>Beginning Stock</i> bernilai minus (dibawah 0).<br>
+                * <b>Artinya:</b> Sistem dari awal sudah eror/bocor datanya karena mencatat stok minus yang artinya memang perlu dilakukan <i>Adjusment +</i><br><br>
+                <b>🛡️ 2. Kesalahan System (Ending Stock ≠ Total Stock dari Multiple)</b><br>
+                * <b>Kondisinya:</b> <code>GAP ADJUSTMENT</code> dan <code>BEGINNING STOCK</code> sama-sama nol, Total stock antara (<code>Ending Stock</code>, <code>Real Qty</code>, <code>Current Stock</code>) nilainya sama (senilai), tapi total stock di multiple (<code>QTY SYSTEM ALL</code>) malah lebih kecil dari stok akhir.<br>
+                * <b>Artinya:</b> Ada miss match antara data di multiple dan summary sehingga menyebabkan adjusment +<br><br>
+                <b>⚙️ 3. Kesalahan System (Miss Match Real QTY dengan Ending Stock/Current Stock)</b><br>
+                * <b>Kondisinya:</b> Stok SO lebih besar dari stok Sistem (ADJUSMENT +), tidak ada transaksi gantung (<code>Draft TRF</code>), tidak ada <code>GAP ADJUSTMENT</code>, <b>TAPI</b> hasil hitungan manual tidak match dengan nilai <code>ENDING STOCK</code> di sistem.<br>
+                * <b>Detail Hitungan Manual:</b> <code>BEGINNING STOCK + (TOTAL_STOCKIN + TOTAL TRF_IN) - (TOTAL SALES + TOTAL TRF_OUT)</code><br>
+                * <b>Artinya:</b> Sistem salah hitung mutasi barang.<br><br>
+                <b>💻 4. Kesalahan System (Stock System Lost)</b><br>
+                * <b>Kondisinya:</b> Tidak ada <code>GAP ADJUSTMENT</code> (<code>= 0</code>), tapi ada selisih antara Sistem dan SO. Ketika selisih itu ditambah/dikurang ke master <code>QTY SYSTEM ALL</code>, hasilnya pas dengan <code>CURRENT STOCK</code>.<br>
+                * <b>Artinya:</b> Bug bawaan sistem yang bikin angka di layar tidak update.<br><br>
+                <b>🔍 5. Cek Hasil Rekonsiliasi</b><br>
+                * <b>Kondisinya:</b> Total stock di multiple (<code>QTY SYSTEM ALL</code>) ternyata pas/sama persis dengan <code>CURRENT STOCK</code> / <code>ENDING STOCK</code>.<br>
+                * <b>Artinya:</b> Data sebenarnya aman dan sinkron secara total keseluruhan.<br><br>
+                <b>⚠️ 6. Kesalahan Adjustment (+ / -)</b><br>
+                * <b>Kondisinya:</b> Stok Sistem > Stok SO, tapi ada data <code>GAP ADJUSTMENT</code> positif (+), atau Stok Sistem < Stok SO, tapi ada data <code>GAP ADJUSTMENT</code> negatif (-).<br>
+                * <b>Artinya:</b> Koreksi dari Proses Adjusment Sebelumnya (Reversal)<br><br>
+                <b>🚚 7. Kesalahan RTO (Barang Gantung)</b><br>
+                * <b>Kondisinya:</b> Masih ada angka di kolom <code>TOTAL DRAFT TRF IN</code> atau <code>TOTAL DRAFT TRF OUT</code> yang menggantung (belum di-approve/finish).<br>
+                * <b>Artinya:</b> Masalah klasik RTO/mutasi barang yang statusnya masih draf.
             """,
 
+            # --- 7. PURCHASE ORDER RECEIVING ---
             "Purchase Order Receiving": """
-                <b>📋 INFORMASI FORMAT FILE:</b><br>
-                - <b>DATA SCAN:</b> Kolom A = SKU, Kolom B = QTY SCAN<br>
-                - <b>PENERIMAAN:</b> Data Item Ordered (tambahkan Kolom A = NO PO).<br><br>
-                <b>💡 LOGIC THINKING:</b><br>
-                - SKU teratas di PO mendapat alokasi penuh dari data scan.<br>
-                - Status: <b>FULL ALLOCATION</b>, <b>PARTIAL ALLOCATION</b>, <b>NO ALLOCATION</b>, <b>OVER ALLOCATION</b>.
+                <b>📋 Informasi Format File</b><br>
+                <b>Format yang diharapkan:</b><br>
+                - <b>DATA SCAN :</b> Pastikan Formatnya headernya di <b>KOLOM A = SKU</b> dan di <b>KOLOM B = QTY SCAN</b><br>
+                - <b>PENERIMAAN:</b> Download data <b>PENERIMAAN</b> pilih yang <b>ITEM ORDERED</b><br>
+                - Pastikan setelah download <i>Penerimaan</i> pada <b>KOLOM A</b> tambahkan kolom untuk memasukkan <b>NO PO</b>. Jadi kolom A adalah NO PO dan kolom B baru NAME.<br>
+                - Jika ada lebih dari 1 NO PO maka gabungkan menjadi satu file dan tetap berikan NO PO sesuai NO PO nya di kolom A.<br><br>
+                <hr style='margin: 8px 0; border-color: #E2E8F0;'>
+                <b>💡 Logic Thinking</b><br>
+                <b>Alur Compare:</b><br>
+                - SKU di data scan akan dilakukan compare dengan SKU yang ada di File Purchase Order.<br>
+                - SKU teratas di File Purchase Order akan mendapatkan alokasi penuh dari data scan apabila ada > 1 No PO yang memiliki SKU yang sama.<br>
+                - Jika di File Penerimaan ada yang tidak mendapatkan alokasi maka akan dilakukan cek ulang dan akan di FU ke Purchasing apabila ada kesalahan input SKU PO atau QTY PO.<br>
+                - Jika di File Data Scan ada SKU yang tidak ada di PO maka akan muncul dalam <b>TAB + QTY SCAN > QTY PO</b> dan muncul keterangan <b>Wrong SKU</b>.<br>
+                - Jika di File Data Scan ada SKU yang Qty nya > daripada di PO maka akan muncul dalam <b>TAB + QTY SCAN > QTY PO</b> dan muncul keterangan <b>Over Scan</b>.<br>
+                - Jika di File Data Scan ada SKU yang Qty nya < daripada di PO maka akan muncul dalam <b>TAB - QTY PO > QTY SCAN</b>.<br><br>
+                <b>Keterangan Note:</b><br>
+                - <b>FULL ALLOCATION :</b> Kondisi dimana Qty scan dan Qty PO cocok dan sesuai.<br>
+                - <b>PARTIAL ALLOCATION :</b> Kondisi dimana Qty scan < dari Qty PO.<br>
+                - <b>NO ALLOCATION :</b> Kondisi dimana terdapat indikasi <b>BARANG TIDAK DIKIRIM / BELUM TERSCAN / SALAH INPUT QTY PO</b>.<br>
+                - <b>OVER ALLOCATION :</b> Kondisi dimana terdapat Indikasi <b>KELEBIHAN SCAN / KURANG INPUT QTY PO / ADA SUBSTITUT ANTAR SKU</b>.
             """,
 
+            # --- 8. COMPARE PENERIMAAN RTO ---
             "Compare Penerimaan RTO": """
-                <b>📋 INFORMASI FORMAT FILE:</b><br>
-                - <b>DATA SCAN:</b> Kolom A = SKU, Kolom B = QTY SCAN<br>
-                - <b>TRANSFER STOCK:</b> Download data Transfer Stock Jezpro.<br><br>
-                <b>💡 LOGIC THINKING:</b><br>
-                - Alokasi FIFO scan fisik terhadap nomor transfer sistem.<br>
-                - Deteksi item Kurang TF (Fisik > TF) dan Lebih TF (TF > Fisik).
+                <b>📋 Informasi Format File</b><br>
+                <b>Format yang diharapkan:</b><br>
+                - <b>DATA SCAN :</b> Pastikan Formatnya di <b>KOLOM A = SKU</b> dan di <b>KOLOM B = QTY SCAN</b><br>
+                - <b>TRANSFER STOCK :</b> Download data <b>Transfer Stock</b> bukan data <b>Penerimaan Transfer Stock</b><br><br>
+                <hr style='margin: 8px 0; border-color: #E2E8F0;'>
+                <b>💡 Logic Thinking</b><br>
+                <b>Alur Compare:</b><br>
+                - SKU di data scan akan dilakukan compare dengan SKU yang ada di File Transfer Stock<br>
+                - SKU teratas di File Transfer stock akan mendapatkan alokasi penuh dari data scan apabila ada > 1 No TF yang memiliki SKU yang sama<br>
+                - Jika di File Stock Transfer ada yang tidak mendapatkan alokasi maka akan dilakukan cek ulang dan akan di FU ke cabang pengirim apabila barang yang datang < TF Stock<br>
+                - Jika di File data scan ada SKU yang tidak terdapat di Stock Transfer maka akan dilakukan pengecekan ulang dan akan di FU ke cabang pengirim apabila ada item yang terkirim namun TF stock belum dibuatkan<br><br>
+                <b>Keterangan Note:</b><br>
+                - <b>FULL ALLOCATION :</b> Kondisi dimana Qty scan dan Qty tf cocok dan sesuai<br>
+                - <b>PARTIAL ALLOCATION :</b> Kondisi dimana Qty scan < dari Qty TF<br>
+                - <b>NO ALLOCATION :</b> Kondisi dimana terdapat indikasi <b>BARANG TIDAK DIKIRIM / BELUM TERSCAN / LEBIH TF</b> Sehingga di TF <i>ADA</i> Namun di Data Scan <i>TIDAK ADA</i><br>
+                - <b>OVER ALLOCATION :</b> Kondisi dimana terdapat Indikasi <b>KELEBIHAN SCAN / KURANG TF</b> Sehingga menyebabkan QTY Scan > QTY TF
             """,
 
+            # --- 9. SCAN OUT VALIDATION ---
             "Scan Out Validation": """
-                <b>📋 INFORMASI FORMAT FILE:</b><br>
-                - Data Scan Appsheet / Data PBI Moving Stock Detail, History Set Up, & Stock Tracking.<br><br>
-                <b>💡 LOGIC THINKING:</b><br>
-                - Di Mutasi ada, di Tracking tidak ada ➔ <b>DONE AND MATCH SET UP</b>.<br>
-                - Di Tracking ada, di Mutasi tidak ada ➔ <b>ITEM TELAH TERJUAL</b>.<br>
-                - Tidak ada di keduanya ➔ <b>ITEM BELUM TERSETUP & TIDAK TERJUAL</b>.
+                <b>📋 Informasi Format File</b><br>
+                <b>Format yang diharapkan :</b><br>
+                - <b>UPLOAD MENGGUNAKAN FILE DATA SCAN (APPSHEET):</b> Kolom A = <b>BIN</b>, Kolom B = <b>SKU</b> (QTY akan dihitung otomatis)<br>
+                - <b>UPLOAD MENGGUNAKAN DATA POWER BI:</b> Berikut cara download permintaan FL by PBI<br>
+                    - Buka Power BI<br>
+                    - Pilih Menu <b>Moving Stock</b><br>
+                    - Pilih Tab atau Sheet <b>Detail</b><br>
+                    - Lalu untuk Period pilih <b>YESTERDAY</b><br>
+                    - Untuk Trx Type pilih <b>Yesterday</b><br>
+                    - Untuk Store_stockadj pilih <b>JEZ SURABAYA (DC)</b><br>
+                    - Setelah itu Download filenya<br>
+                    - <b>File tidak perlu diedit dan bisa langsung di Uplaod</b><br>
+                - <b>HISTORY SET UP:</b> Sesuai yang ada pada template Mutasi Set Up Jezpro<br>
+                - <b>STOCK TRACKING:</b> Sesuai yang ada pada template Stock Tracking Jezpro<br>
+                - <b>PS ➔</b> <i>Pilih salah satu mau menggunakan file data scan dari Appsheet atau dari file PBI</i><br><br>
+                <hr style='margin: 8px 0; border-color: #E2E8F0;'>
+                <b>💡 Logic Thinking</b><br>
+                <b>Alur Compare Scan Out :</b><br>
+                - System akan melakukan compare antara BIN dan SKU yang ada di file data scan dengan file History Set Up dan Stock Tracking<br>
+                - Jika BIN dan SKU akan langsung melakukan double cek di kedua file mana yang cocok dan sesuai dengan BIN dan SKU yang ada di data scan<br>
+                - Jika ditemukan di File Mutasi dan tidak ditemukan di file Stock Tracking maka akan diberikan note <b>DONE AND MATCH SET UP</b><br>
+                - Jika ditemukan di File Mutasi dan tidak ditemukan di file Stock Tracking namun BIN tidak sesuai hanya SKUnya saja yang cocok maka akan diberikan note <b>DONE SETUP (BIN MISSMATCH)</b><br>
+                - Jika ditemukan di File Mutasi dan tidak ditemukan di file Stock Tracking namun QTY tidak sesuai hanya SKU dan BIN saja yang cocok maka akan diberikan note <b>DONE SET UP (QTY MISSMATCH)</b><br>
+                - Jika ditemukan di File Stock Tracking dan tidak ditemukan di file Mutasi maka akan diberikan note <b>ITEM TELAH TERJUAL</b><br>
+                - Jika ditemukan di File Stock Tracking dan tidak ditemukan di file Mutasi namun BIN tidak sesuai hanya SKUnya saja yang cocok maka akan diberikan note <b>ITEM TELAH TERJUAL (BIN MISSMATCH)</b><br>
+                - Jika ditemukan di File Stock Tracking dan tidak ditemukan di file Mutasi namun QTY tidak sesuai hanya SKU dan BIN saja yang cocok maka akan diberikan note <b>ITEM TELAH TERJUAL (QTY MISSMATCH)</b><br>
+                - Jika permintaan item ada > 1 item dan yang terjual hanya 1 maka akan dilakukan split row dimana akan dilakukan pengecekan di kedua file dan akan split note juga menyesuaikan kondisi hasil compare
             """,
 
+            # --- 10. REFILL & OVERSTOCK ---
             "Refill & Overstock": """
-                <b>📋 INFORMASI FORMAT FILE:</b><br>
-                - <b>ALL DATA STOCK:</b> HANYA ADA DI STOCK.<br>
-                - <b>STOCK TRACKING (Opsional):</b> JEZ SURABAYA rentang 7 hari.<br><br>
-                <b>💡 LOGIC THINKING:</b><br>
-                - <b>Refill:</b> Memicu ambil dari GL4 jika stok GL3 < 3 pcs (target max load 12 pcs).<br>
-                - <b>Overstock:</b> Memicu turun stok jika stok GL3 > 24 pcs (di luar rak).
+                <b>📋 Informasi Format File</b><br>
+                <b>Format yang diharapkan:</b><br>
+                - <b>ALL DATA STOCK:</b> Pilih <b>HANYA ADA DI STOCK</b><br>
+                - <b>STOCK TRACKING (Opsional):</b> Pilih <b>JEZ SURABAYA</b>, rentang 7 hari.<br><br>
+                <hr style='margin: 8px 0; border-color: #E2E8F0;'>
+                <b>💡 Logic Thinking</b><br>
+                <b>Alur Process Refill & Overstock (With Stock Tracking):</b><br>
+                - Melakukan Compare antara SKU yang ada di Gudang Lt.4 dengan SKU di Gudang Lt.3 dan sebaliknya<br>
+                - List akan dikumpulkan terlebih dahulu dan akan mengambil SKU dengan Qty di Gudang Lt.3 yang < 3 Pcs untuk Refill dan > 12 Pcs untuk overstock<br>
+                - Jika data sudah didapatkan maka selanjutnya adalah compare dengan Stock Tracking<br>
+                - Compare akan dilakukan dengan mempertimbangkan penjualan Online untuk SKU tersebut<br>
+                - Jika penjualan online < 7 pcs maka refill hanya akan mengambil 1/3 dari total stock di GL4 dan akan mengambil 1/3 dari total Diff total stock - 12 Pcs untuk Overstock<br>
+                - Jika penjualan online > 7 pcs maka refill akan mengambil 1/2 dari total stock di GL4 dan akan mengambil 1/2 dari total Diff total stock - 12 Pcs untuk Overstock<br>
+                - Maksimal kapasitas untuk tiap SKU di GL3 adalah 12 Pcs jadi tidak akan lebih dari 12 tiap SKU di Gl3<br><br>
+                <b>Alur Process Refill & Overstock (Without Stock Tracking):</b><br>
+                - Melakukan Compare antara SKU yang ada di Gudang Lt.4 dengan SKU di Gudang Lt.3<br>
+                - List akan dikumpulkan terlebih dahulu dan akan mengambil SKU dengan Qty di Gudang Lt.3 yang < 3 Pcs dan > 12 Pcs untuk Overstock<br>
+                - Sistem akan memksimalkan tiap SKU untuk mendapatkan total 12 Pcs di Gudang lt.3<br>
+                - Maksimal kapasitas untuk tiap SKU di GL3 adalah 12 Pcs jadi tidak akan lebih dari 12 tiap SKU di Gl3
             """,
 
+            # --- 11. BALANCING STOCK ---
             "Balancing Stock": """
-                <b>📋 INFORMASI FORMAT FILE:</b><br>
-                - Multiple Adjustment (<b>Termasuk yang sudah habis</b>). Dihitung dari unique SKU.<br>
-                - Persentase minimal <b>GL4 ➔ GL3: 100%</b>, <b>DC ➔ Store: 98%</b>.<br><br>
-                <b>💡 LOGIC THINKING:</b><br>
-                - <b>GL4 ➔ GL3:</b> <code>(TOTAL STOCK GL4 - BELUM TEREFILL) / TOTAL STOCK GL4</code>.<br>
-                - <b>DC ➔ STORE:</b> <code>(TOTAL STOCK DC - BELUM TEREFILL) / TOTAL STOCK DC</code> (Stok DC > 1 pcs).
+                <b>📋 Informasi Format File</b><br>
+                <b>Format File :</b><br>
+                - Download Multiple Adjusment dan pastikan pilih <b>Termasuk yang sudah habis</b><br>
+                - Data yang dihasilkan adalah data dari total SKU bukan total QTY jadi yang dihitung adalah unique SKU nya<br>
+                - Presentase minimal untuk <b>GL4 ➔ GL3 adalah 100%</b><br>
+                - Presentase minimal untuk <b>ALL DC ➔ Store adalah 98%</b><br><br>
+                <hr style='margin: 8px 0; border-color: #E2E8F0;'>
+                <b>💡 Logic Thinking</b><br>
+                <b>Alur Compare :</b><br>
+                - <b>GL3 ➔ GL4:</b> Compare akan dilakukan dengan acuan SKU dan QTY SYSTEM yang ada di GL4. SKU dan QTY SYSTEM yang ada di GL4 namun tidak ada di GL3 akan dilakukan presentase dengan Rumus <code>(TOTAL STOCK GL4 - TOTAL STOCK BELUM TEREFILL)/TOTAL STOCK GL4</code>. Dan akan mengecualikan BIN REJECT, DEFECT, LIVE, ONLINE, STAGGING, PUTAWAY.<br>
+                - <b>DC ➔ STORE:</b> Compare akan dilakukan dengan acuan SKU dan QTY SYSTEM yang ada di Gudang DC. SKU dan QTY SYSTEM yang ada di Gudang DC namun tidak ada di Store akan dilakukan presentase dengan Rumus <code>(TOTAL STOCK DC - TOTAL STOCK BELUM TEREFILL)/TOTAL STOCK DC</code>. Dan akan mengecualikan BIN REJECT, DEFECT, LIVE, ONLINE, MARKOM, STAGGING, KARANTINA, OUT
             """,
 
+            # --- 12. PERCENTAGE REQUEST FL TO STORE STOCK ---
             "Precentage Request FL to Store Stock": """
-                <b>📋 INFORMASI FORMAT FILE:</b><br>
-                - <b>All Stock:</b> B=Bin, C=SKU, J=Qty (Area Store Surabaya).<br>
-                - <b>Permintaan FL:</b> E=SKU, V=Kriteria, W=Qty.<br><br>
-                <b>💡 LOGIC THINKING:</b><br>
-                - Indikasi Over-Request: Permintaan ke DC saat stok di Store masih ≥ 2 pcs.<br>
-                - Rumus: <code>(Total Over-Request / Total Permintaan Valid) × 100%</code>.
+                <b>📋 Informasi Format File</b><br>
+                Mapping Kolom:<br>
+                - <b>All Stock:</b> B(Bin)=1, C(SKU)=2, J(Qty)=9 (Area Store Surabaya: TOKO, GUDANG, STR, STORE)<br>
+                - <b>Permintaan FL:</b> E(SKU)=4, V(Kriteria)=21, W(Qty)=22. Eliminasi Kolom V yang Blank / Empty.<br><br>
+                <hr style='margin: 8px 0; border-color: #E2E8F0;'>
+                <b>💡 Logic Thinking</b><br>
+                - <b>Indikasi Over-Request:</b> Permintaan Stock to DC saat Qty stock di store ≥ 2 Pcs.<br>
+                - <b>Rumus Persentase:</b> <code>(Total Bad Qty Requests / Total Qty Permintaan Valid) × 100%</code>.
             """,
 
+            # --- 13. REFILL TOKO ---
             "Refill Toko": """
-                <b>💡 CARA KERJA & LOGIKA:</b><br>
-                1. <b>Filter:</b> Mengabaikan kategori Shoes, Sandals, Footwear.<br>
-                2. <b>Aturan Refill:</b> Hanya muncul jika stok gudang > 0.<br>
-                   - <b>Lower Body:</b> Refill jika stok toko < 6 pcs.<br>
-                   - <b>Kategori Lain:</b> Refill jika stok toko < 2 pcs.
+                <b>💡 Cara Kerja & Logika</b><br>
+                <b>Logika Refill:</b><br>
+                1. <b>Filter Data:</b> Mengabaikan kategori: <b>Shoes, Sandals, Footwear</b>.<br>
+                2. <b>Identifikasi Stok:</b><br>
+                   - <b>Stok Toko:</b> Total qty di lokasi 'TOKO'.<br>
+                   - <b>Stok Gudang/Cadangan:</b> Total qty di semua lokasi selain 'TOKO' yang bukan bin Defect/Reject/Staging/dll.<br>
+                3. <b>Aturan Refill:</b><br>
+                   - Hanya muncul jika stok di gudang > 0.<br>
+                   - <b>Lower Body:</b> Refill jika stok toko < 6.<br>
+                   - <b>Kategori Lain:</b> Refill jika stok toko < 2.
             """,
 
+            # --- 14. MATCH REAL & SYSTEM ---
             "Match Real & System": """
-                <b>📋 INFORMASI FORMAT FILE:</b><br>
-                - <b>FILE SYSTEM (+):</b> Kolom A = Cabang, Kolom D = SKU System, Kolom K = Qty System.<br>
-                - <b>FILE REAL (+):</b> Kolom A = Cabang, Kolom E = SKU Real, Kolom M = Qty Real.<br><br>
-                <b>💡 LOGIC THINKING:</b><br>
-                - Prioritas mencari kecocokan di cabang asal (<b>MATCH PERFECT</b>).<br>
-                - Jika kuota cabang asal habis, mencari ke cabang lain (<b>MATCH CROSS-BRANCH</b>).
+                <b>📋 Informasi Format File</b><br>
+                <b>Ketentuan Kolom untuk Masing-masing File Uploader:</b><br>
+                * <b>📂 FILE SYSTEM (+)</b><br>
+                    * <b>Kolom A:</b> Cabang<br>
+                    * <b>Kolom D:</b> SKU System<br>
+                    * <b>Kolom K:</b> Qty System<br><br>
+                * <b>📂 FILE REAL (+)</b><br>
+                    * <b>Kolom A:</b> Cabang<br>
+                    * <b>Kolom E:</b> SKU Real<br>
+                    * <b>Kolom M:</b> Qty Real<br><br>
+                <hr style='margin: 8px 0; border-color: #E2E8F0;'>
+                <b>💡 Logic Thinking</b><br>
+                <b>Alur Alokasi Stok Lintas Cabang (Cross-Branch):</b><br>
+                1. <b>Pool Lock System:</b> Seluruh data dari <i>Uploader System</i> akan dikunci kuotanya berdasarkan kombinasi <b>Cabang + SKU System</b>.<br>
+                2. <b>Pencarian Pasangan:</b> Data dari <i>Uploader Real</i> akan discan baris demi baris, lalu diprioritaskan mencari kecocokan di cabang asalnya dulu (<b>MATCH PERFECT</b>).<br>
+                3. <b>Alokasi Lintas Cabang:</b> Jika kuota system di cabang asalnya habis, sistem akan otomatis mencarikan sisa kuota ke cabang lain (<b>MATCH CROSS-BRANCH</b>).<br>
+                4. <b>Kontrol Kuota:</b> Jika kuota system di semua cabang sudah habis, sisa qty real tidak dialokasikan lagi (<b>UNMATCHED / SYSTEM HABIS</b>).
             """,
 
+            # --- 15. REFILL KOLI TO KOLI / REFILL ---
             "Refill Koli to Koli/Refill": """
-                <b>💡 INFORMASI & RULES MUTASI GUDANG (KL1 / KL2 / LT.3):</b><br>
-                - <b>Konsolidasi:</b> Penggenapan BIN KL1 (max 6) & KL2 (max 12) dengan max 2 SKU campuran.<br>
-                - <b>Mutasi Refill (Stok < 9):</b> Qty 6-8 diambil 6 unit untuk KL1 (sisa ke Lt.3). Qty < 6 seluruhnya disapu bersih ke Gudang Lt.3.
+                <b>💡 INFORMASI & RULES MUTASI GUDANG (KL1 / KL2 / LT.3)</b><br>
+                <b>1. Aturan Penggenapan & Konsolidasi:</b><br>
+                * BIN <code>KL1</code> (Max Cap: 6) dan <code>KL2</code> (Max Cap: 12) yang sudah genap atau sukses dipasangkan <b>otomatis hilang</b> dari daftar kerja.<br>
+                * Konsolidasi strictly dibatasi <b>maksimal 2 SKU campuran</b> dalam satu BIN.<br><br>
+                <b>2. Aturan Mutasi & Refill (Khusus Stok di bawah 9):</b><br>
+                * <b>QTY 6 sampai 8:</b> Diambil <b>6 unit</b> untuk diturunkan fungsinya mengisi full 1 Koli <code>KL1</code>. Sisa barangnya (<code>QTY Sekarang - 6</code>) dilempar ke <b>Gudang Lt.3</b>.<br>
+                * <b>QTY di bawah 6 (3, 4, 5):</b> Karena tidak cukup barang untuk membuat 1 koli <code>KL1</code> full, maka <b>seluruh isi barang disapu bersih ke Gudang Lt.3</b> agar BIN tersebut kosong/reset.<br>
+                * Sisa BIN yang total gabungan QTY-nya masih <b>9 ke atas</b> tidak akan muncul di list karena dianggap masih aman/mendekati kapasitas.
             """,
 
+            # --- 16. DYNAMIC STOCK ALLOCATION ---
             "Stock Allocation": """
-                <b>💡 LOGIC THINKING (PROPORSI SALES 90 HARI):</b><br>
-                - <b>0 Sales:</b> Online 10% | Offline 10% | Logistik 80%<br>
-                - <b>Dominan Online (> 70%):</b> Online 70% | Offline 15% | Logistik 15%<br>
-                - <b>Dominan Offline (> 70%):</b> Online 15% | Offline 70% | Logistik 15%<br>
-                - <b>Balanced / Normal:</b> Online 40% | Offline 40% | Logistik 20%
+                <b>💡 Logic Thinking</b><br>
+                <b>KLASIFIKASI SALES & PROPORSI PEMBAGIAN:</b><br>
+                Sistem menentukan persentase alokasi tiap SKU berdasarkan performa rasio penjualan 90 hari terakhir.<br><br>
+                <table style='width:100%; border-collapse: collapse; font-size:12px;' border='1'>
+                    <tr style='background:#EDF2F7;'><th>Kondisi Performa SKU</th><th>Alokasi Online</th><th>Alokasi Offline</th><th>Alokasi Logistik</th></tr>
+                    <tr><td>Tidak Ada Histori Sales (0 Unit)</td><td>10%</td><td>10%</td><td>80%</td></tr>
+                    <tr><td>Dominan Online (> 70% Penjualan)</td><td>70%</td><td>15%</td><td>15%</td></tr>
+                    <tr><td>Dominan Offline (> 70% Penjualan)</td><td>15%</td><td>70%</td><td>15%</td></tr>
+                    <tr><td>Balanced / Imbang (Rasio Normal)</td><td>40%</td><td>40%</td><td>20%</td></tr>
+                </table>
             """,
 
+            # --- 17. REFILL & WITHDRAW ---
             "Refill & Withdraw": """
-                <b>📋 INFORMASI FORMAT FILE:</b> All Data Stock & Stock Tracking 7 hari terakhir.<br><br>
-                <b>💡 LOGIC THINKING:</b> Mengatur keseimbangan stok DC vs Store (02) dengan batas maksimal 6 pcs per SKU di Store.
+                <b>📋 Informasi Format File</b><br>
+                <b>Format yang diharapkan:</b><br>
+                - <b>ALL DATA STOCK:</b> Download All Data Stock di Jezpro dan pilh <b>HANYA ADA DI STOCK</b><br>
+                - <b>STOCK TRACKING:</b> Download Stock Tracking di Jezpro dan pilih <b>JEZ SURABAYA</b> lalu pilih rentang waktu <b>7 HARI SEBELUMNYA</b><br><br>
+                <hr style='margin: 8px 0; border-color: #E2E8F0;'>
+                <b>💡 Logic Thinking</b><br>
+                <b>Alur Process Refill & Withdraw (With Stock Tracking):</b><br>
+                - Melakukan Compare antara SKU yang ada di Gudang DC dengan Store dan sebaliknya<br>
+                - List akan dikumpulkan terlebih dahulu dan akan mengambil SKU dengan Qty di Store yang < 3 Pcs untuk Refill dan > 6 Pcs untuk Withdraw<br>
+                - Jika data sudah didapatkan maka selanjutnya adalah compare dengan Stock Tracking<br>
+                - Compare akan dilakukan dengan mempertimbangkan penjualan Offline untuk SKU tersebut<br>
+                - Jika penjualan offline < 7 pcs maka refill hanya akan mengambil 1/3 dari total stock di DC dan akan mengambil 1/3 dari total Diff total stock - 12 Pcs untuk Withdraw<br>
+                - Jika penjualan offline > 7 pcs maka refill akan mengambil 1/2 dari total stock di DC dan akan mengambil 1/2 dari total Diff total stock - 12 Pcs untuk Withdraw<br>
+                - Maksimal kapasitas untuk tiap SKU di STORE adalah 6 Pcs jadi tidak akan lebih dari 6 tiap SKU di Gl3<br><br>
+                <b>Alur Process Refill & Withdraw (Without Stock Tracking):</b><br>
+                - Melakukan Compare antara SKU yang ada di Gudang DC dengan SKU di Gudang STORE<br>
+                - List akan dikumpulkan terlebih dahulu dan akan mengambil SKU dengan Qty di Gudang DC yang < 3 Pcs dan > 6 Pcs untuk Withdraw<br>
+                - Sistem akan memksimalkan tiap SKU untuk mendapatkan total 6 Pcs di Gudang Store<br>
+                - Maksimal kapasitas untuk tiap SKU di Store adalah 6 Pcs jadi tidak akan lebih dari 6 tiap SKU di Gl3
             """,
 
+            # --- 18. PERCENTAGE DISPLAY CONTROL ---
             "Precentage Display": """
-                <b>📋 LOGIKA PENARIKAN DISPLAY:</b><br>
-                - Eksklusi: OFFLINE, ONLINE, AMP, MARKOM, DEFECT, REJECT, STAGING, KARANTINA, EVENT, INB, OUT, PUTAWAY.<br>
-                - Deteksi SKU yang ada di Gudang/DC (> 0) tapi kosong di Toko (0) untuk dipajang.
+                <b>📋 Logika Penarikan Display</b><br>
+                <b>Filter Eksklusi (Tidak Dihitung di List Refill Utama):</b><br>
+                - Bin mengandung: <i>OFFLINE, ONLINE, AMP, MARKOM, DEFECT, REJECT, STAGING, STAGGING, KARANTINA, EVENT, BANDING, INB, OUT, PUTAWAY</i>.<br><br>
+                <b>Cara Kerja Pemantauan :</b><br>
+                - <b>Source (Gudang Store / DC):</b> Semua BIN aktif selain area Toko & Eksklusi.<br>
+                  - <b>Gudang Lt. 2 Store:</b> BIN mengandung kata <code>STR</code>, <code>STORE</code>, atau <code>GUDANG</code>.<br>
+                  - <b>DC (Distribution Center):</b> BIN mengandung kata <code>DC</code>.<br>
+                - <b>Target (Toko):</b> BIN yang mengandung kata <code>TOKO</code> atau <code>DISPLAY</code>.<br>
+                - <b>Aturan Proteksi OUT:</b> Jika Article / SKU sudah berada di bin <b>'OUT'</b> dengan Qty > 0, otomatis <b>dihapus dari list penarikan</b>.<br>
+                - <b>Logic:</b> Jika SKU memiliki <b>Stok > 0 di Gudang/DC</b> tapi <b>Stok = 0 di Toko</b>, maka SKU wajib tambah display.
             """,
 
+            # --- 19. STOCK TRACKING TIMELINE ---
             "Stock Tracking Timeline": """
-                <b>📋 INFORMASI FORMAT FILE:</b> Kompilasi 5 file transaksi dari Power BI (Purchase Order, Mutation Stock, Adjustment, Transfer Stock RTO, Sales Tracking).
+                <b>📋 Informasi Format File</b><br>
+                <b>Format yang diharapkan:</b><br>
+                - <b>File Multiple Adjusment:</b> Download File Multiple adjusment yang akan dianalisa SKU nya<br>
+                - <b>File Purchase Order:</b> Download File Purchase Order dari Power BI dengan ketentuan : Buka Power BI ➔ Menu <b>LEADER</b> ➔ Menu <b>Inventory_Processing</b> ➔ Tab <b>Purchase Order</b> (Periode Invoice: All time, ReceivedIN: All time, Store: Jez Surabaya)<br>
+                - <b>File Mutasi:</b> Buka Power BI ➔ Menu <b>LEADER</b> ➔ Menu <b>Inventory_Processing</b> ➔ Tab <b>Mutation Stock</b> (Store: Jez Surabaya, Period: All Time)<br>
+                - <b>File Adjusment:</b> Buka Power BI ➔ Menu <b>LEADER</b> ➔ Menu <b>Inventory_Processing</b> ➔ Tab <b>Adjusment</b> (Period: All time, Warehouses: Jez Surabaya)<br>
+                - <b>File RTO:</b> Buka Power BI ➔ Menu <b>LEADER</b> ➔ Menu <b>Inventory_Processing</b> ➔ Tab <b>Transfer Stock</b> (Status: All, Period: All time, Departure/Destination: ALL)<br>
+                - <b>File Stock Tracking:</b> Buka Power BI ➔ Menu <b>LEADER</b> ➔ Menu <b>Sales_Transactions</b> ➔ Tab <b>Cek Trx</b> (Period: All Time, Warehouse: Jez Surabaya, Store Adj: All). <i>*PS: Setelah Download Stock Tracking pastikan COPY & PASTE di file yang baru karena file bawaan dari PBI akan Corrupt dan tidak bisa terbaca.</i>
             """,
 
+            # --- 20. LIST RETUR OUT ---
             "List Retur Out": """
-                <b>📋 INFORMASI FORMAT FILE:</b> Multiple Adjustment (Hanya ada di stok) yang difilter khusus BIN & SKU yang akan diretur. Data otomatis tersimpan di cloud database.
+                <b>📋 Informasi Format File</b><br>
+                <b>Format yang diharapkan:</b><br>
+                - <b>MULTIPLE ADJUSTMENT:</b> Download Multiple Adjusment dimana pilih saja yang <b>hanya ada di stok</b> Lalu filter sesuai dengan BIN dan SKU yang ingin di retur<br>
+                - Lalu Upload ke WEB dan setelah upload maka data akan tersimpan secara otomatis di WEB<br>
+                - Apabila tidak semua stock dari SKU tersebut diretur maka <b>Pastikan QTY SYSTEM yang ada di file Multiple tersebut di edit dan disesuaikan dengan Realnya</b>
             """,
 
+            # --- 21. FDR UPDATE ---
             "FDR Update": """
-                <b>📋 INFORMASI FORMAT FILE:</b> Manifest Transaksi Online V2 status Done Online 30 hari terakhir.<br><br>
-                <b>💡 LOGIC THINKING:</b> Memisahkan transaksi ke dalam <b>NEED FU IT</b> dan <b>BRANCH</b>.
+                <b>📋 Informasi Format File</b><br>
+                <b>Format yang diharapkan:</b><br>
+                - <b>FILE MANIFEST:</b> Download Manifest dari jezpro pada menu <b>TRANSAKSI ONLINE V2</b>, pilih Cabang <b>ONLINE SURABAYA</b>, pilih Status Jezpro <b>DONE ONLINE</b>, dan rentang waktunya pilih <b>30 HARI TERAKHIR</b><br><br>
+                <hr style='margin: 8px 0; border-color: #E2E8F0;'>
+                <b>💡 Logic Thinking</b><br>
+                <b>Alur Compare :</b><br>
+                - File yang telah diupload hanya akan di split berdasarkan 2 Kategori yaitu <b>NEED FU IT</b> dan <b>BRANCH</b><br>
+                - Untuk Need FU IT adalah kondisi dimana ketika kolom No Manifest telah terisi namun status masih <b>DONE ONLINE</b><br>
+                - Untuk Branch adalah disesuaikan dan di split berdasarkan cabang dari masing-masing transaksi yang masih berstatus <b>DONE ONLINE</b>
             """,
 
+            # --- 22. STORE LEADER RTO DECISION ---
             "Store Leader RTO Decission": """
-                <b>💡 LOGIC THINKING:</b> Mengintegrasikan stok Surabaya, stok Semarang, performa sales 60 hari, dan target ToC untuk keputusan transfer retur.
+                <b>🏬 STORE LEADER RTO DECISSION</b><br>
+                <b>Ketentuan 4 File Logistik:</b><br>
+                1. <b>Stock Surabaya:</b> Master SKU (Kolom C=SKU, E=Item Name, F=Variant, J=Qty)<br>
+                2. <b>Stock Semarang:</b> Kolom C=SKU, Kolom J=Qty<br>
+                3. <b>Sales 60d Report:</b> Kolom R=SKU, Kolom Z=Sales Qty<br>
+                4. <b>ToC Master Sheet:</b> Kolom C=Article/Item Name, Kolom H=ToC (Last Row Win)<br><br>
+                <hr style='margin: 8px 0; border-color: #E2E8F0;'>
+                <b>💡 Logic Thinking:</b><br>
+                - Left join data Surabaya dengan Semarang dan Sales 60d.<br>
+                - Filter mengabaikan baris jika QTY Surabaya dan QTY Semarang keduanya bernilai 0.
             """,
 
+            # --- 23. DATA TIMBANG ONGKIR ---
             "Data Timbang Ongkir": """
-                <b>⚖️ RUMUS TARIF TIMBANG:</b><br>
-                - ACCESS ➔ SEMARANG: Koli × 40.000 × 3.2<br>
-                - ACCESS ➔ HUB JAKARTA: Kg × 2.500 × 3.2<br>
-                - ADEX ➔ SEMARANG / MALANG: Kg × 1.000 × 3.2<br>
-                - ADEX ➔ HUB JAKARTA: Kg × 2.000 × 3.2
+                <b>⚖️ SISTEM TIMBANG KOLIAN</b><br><br>
+                <b>Logikal Perhitungan Harga Tarif:</b><br>
+                - <b>ACCESS + SEMARANG:</b> Total Koli × 40.000 × 3.2<br>
+                - <b>ACCESS + HUB JAKARTA:</b> Berat (Kg) × 2.500 × 3.2<br>
+                - <b>ADEX + SEMARANG / MALANG:</b> Berat (Kg) × 1.000 × 3.2<br>
+                - <b>ADEX + HUB JAKARTA:</b> Berat (Kg) × 2.000 × 3.2
             """,
 
+            # --- 24. DATABASE ONGKIR IN/OUT ---
             "Database Ongkir In/Out": """
-                <b>📊 LOGIKA PERHITUNGAN:</b> Pencatatan transaksi biaya ongkir supplier & ekspedisi (Biaya Datang, Biaya RTO, Avg Cost/Koli).
+                <b>🛻 DATABASE ONGKIR IN/OUT</b><br><br>
+                - <b>Single Input:</b> Form input manual transaksi ongkir.<br>
+                - <b>Batch Ops (Upload Massal):</b> Upload file CSV dengan kolom <code>SUPPLIER, EKSPEDISI, TOTAL KOLI, ONGKIR, TANGGAL_JAM</code>.<br>
+                - <b>Summary Metrics:</b> Total Biaya All, Total Koli All, Avg Cost/Koli All, Biaya & Koli Barang Datang (Non-RTO), dan Biaya & Koli RTO.
             """,
 
-            "Reject/Defect List": """
-                <b>👟 LOGIKA MATCH:</b> Mencari pasangan SKU kategori 'HANYA SEBELAH KIRI' dan 'HANYA SEBELAH KANAN' lintas cabang untuk dipasangkan utuh.
-            """,
-
-            "Pengajuan Reject/Defect": """
-                <b>🔄 ALUR PROGRES:</b> Status 1 (Pengajuan) ➔ Status 2 (Approved Purchasing) ➔ Status 3 (Done Set Up).
-            """,
-
+            # --- 25. PENGAJUAN MUTASI KARANTINA ---
             "Pengajuan Mutasi Karantina": """
-                <b>🔄 ALUR MONITORING:</b> Status 1 (Belum Approved) ➔ Status 2 (Done Approval / Working List) ➔ Status 3 (Final Done).
-            """,
-
-            "Logistic Schedule": """
-                <b>📅 ATURAN LOGIKA:</b> Target kerja Full-Time 6 hari, Part-Full 9 hari, plot Shift 3 (SO), dan proteksi jeda istirahat antar shift.
-            """,
-
-            "Reporting & PIC": """
-                <b>📌 FUNGSI:</b> Dashboard checklist PIC & to-do list operasional harian yang otomatis ter-reset harian.
+                <b>📋 Informasi Format File</b><br>
+                <b>UNTUK BULK / MULTIPLE UPLOAD:</b><br>
+                Pastikan file Excel memiliki kolom dengan urutan dan nama berikut:<br>
+                1. <b>BIN AWAL</b><br>
+                2. <b>BIN TUJUAN</b><br>
+                3. <b>SKU</b><br>
+                4. <b>ARTICLE NAME</b><br>
+                5. <b>QUANTITY</b><br>
+                6. <b>NOTES</b><br>
+                7. <b>ALASAN</b><br><br>
+                <i>*Pastikan tidak ada kolom yang kosong atau nama kolom yang typo agar terbaca sistem.*</i>
             """
         }
 
         guide_content = guides.get(
             cur, 
-            f"<b>📌 MENU: {cur}</b><br><br>Menu ini digunakan untuk operasional warehouse Surabaya. Pastikan format file yang diunggah sesuai template standar."
+            f"<b>📌 MENU: {cur}</b><br><br>Menu ini digunakan untuk operasional warehouse Surabaya. Pastikan format file yang diunggah sesuai dengan template standar sistem."
         )
 
         ui.modal_show(ui.modal(
