@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).parent.resolve()))
 import io
 import uuid
 import pandas as pd
+from datetime import datetime, timedelta
 from shiny import App, Inputs, Outputs, Session, reactive, render, ui
 
 
@@ -143,395 +144,243 @@ def server(input: Inputs, output: Outputs, session: Session):
     @reactive.event(input.toggle_dropdown_section)
     def _drop_toggle(): state.toggle_dropdown(input.toggle_dropdown_section())
 
-    # Panduan & Logic Modal
-   # ==========================================================================
-    # MODAL PANDUAN & LOGIC LENGKAP UNTUK SELURUH MENU
-    # ==========================================================================
+    # =========================================================================
+    # ACTION LISTENERS TOMBOL "RUN / PROSES" MENU BARU
+    # =========================================================================
+
+    # 1. PO Receiving
     @reactive.Effect
-    @reactive.event(input.btn_open_panduan_modal)
-    def _panduan_modal():
-        cur = state.main_menu()
+    @reactive.event(input.btn_run_po_rec)
+    def _proc_po_rec():
+        succ, msg = state.run_po_receiving(input.uploader_po_scan(), input.uploader_po_file())
+        if succ: state.show_success_modal.set(True)
+        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
 
-        # 1. PANDUAN: CYCLE COUNT (ANALYZER)
-        if cur == "Cycle Count":
-            guide_body = ui.div(
-                ui.tags.details(
-                    ui.tags.summary("📋 Informasi Format File"),
-                    ui.div(
-                        ui.tags.strong("Format yang diharapkan:"),
-                        ui.tags.ul(
-                            ui.tags.li(ui.strong("FILTER:"), " Pilih Cabang, Sub Kategori, Brand, dan BIN System sesuai data yang dianalisa."),
-                            ui.tags.li(ui.strong("1. DATA SCAN:"), " Kolom A = BIN, Kolom B = SKU, Kolom C = QTY SCAN."),
-                            ui.tags.li(ui.strong("2. STOCK SYSTEM:"), " Download All Stock dari Multiple Adjustment (Pilih 'Termasuk yang sudah habis')."),
-                            ui.tags.li(ui.strong("3. BIN COVERAGE:"), " Download dari Multiple Adjustment (Pilih 'Hanya ada di stock')."),
-                            ui.tags.li(ui.strong("4. RECON REAL +:"), " Upload file hasil recon (Pastikan Kolom A bukan Number)."),
-                            ui.tags.li(ui.strong("5. SYSTEM + RECON:"), " Upload file master audit hasil rekonsiliasi untuk generate Karantina.")
-                        ),
-                        class_="accordion-content"
-                    ), open=True
-                ),
-                ui.tags.details(
-                    ui.tags.summary("💡 Logic Thinking"),
-                    ui.div(
-                        ui.tags.strong("Alur Logika Cycle Count Analyzer:"),
-                        ui.tags.ol(
-                            ui.tags.li(ui.strong("REAL +:"), " QTY SCAN > QTY SYSTEM (Fokus pada data scan aktual fisik)."),
-                            ui.tags.li(ui.strong("SYSTEM +:"), " QTY SYSTEM > QTY SCAN (Fokus pada data sistem yang belum terscan)."),
-                            ui.tags.li(ui.strong("ALOKASI REAL +:"), " Mencari kover stok dari System + dan BIN Coverage (Status: FULL, PARTIAL, atau NO ALLOCATION)."),
-                            ui.tags.li(ui.strong("RECON REPORT:"), " Item NO ALLOCATION otomatis ditarik untuk investigasi rekonsiliasi lanjutan."),
-                            ui.tags.li(ui.strong("SET UP KARANTINA:"), " Item selisih (DIFF > 0) dimutasi ke BIN KARANTINA dengan note MISS LOCATION."),
-                            ui.tags.li(ui.strong("MISS LOCATION REPORT:"), " Rekapitulasi total SKU & QTY yang mengalami salah letak lokasi.")
-                        ),
-                        class_="accordion-content"
-                    ), open=True
-                )
-            )
+    # 2. Penerimaan RTO
+    @reactive.Effect
+    @reactive.event(input.btn_run_penerimaan_rto)
+    def _proc_rto_rec():
+        succ, msg = state.run_penerimaan_rto(input.uploader_rto_rec_scan(), input.uploader_rto_rec_tf())
+        if succ: state.show_success_modal.set(True)
+        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
 
-        # 2. PANDUAN: COMPARE SYSTEM
-        elif cur == "Compare System":
-            guide_body = ui.div(
-                ui.tags.details(
-                    ui.tags.summary("📋 Informasi Format File & Mapping"),
-                    ui.div(
-                        ui.tags.strong("Kondisi Stok Berkurang (Sys1 > Sys2):"),
-                        ui.tags.ul(
-                            ui.tags.li(ui.strong("Stock Tracking:"), " Kolom A=Invoice, Kolom B=SKU, Kolom G=BIN, Kolom K=Qty (Index 10)."),
-                            ui.tags.li(ui.strong("RTO Out:"), " Kolom A=No TF, Kolom D=SKU (Index 3), Kolom H=Qty (Index 7).")
-                        ),
-                        ui.tags.strong("Kondisi Stok Bertambah (Sys2 > Sys1):"),
-                        ui.tags.ul(
-                            ui.tags.li(ui.strong("Purchase Order:"), " Kolom A=No PO, Kolom E=SKU (Index 4), Kolom M=Qty (Index 12)."),
-                            ui.tags.li(ui.strong("RTO In:"), " Kolom A=No TF, Kolom D=SKU (Index 3), Kolom H=Qty (Index 7)."),
-                            ui.tags.li(ui.strong("Mutasi Refund:"), " Kolom D=SKU (Index 3), Kolom K=Qty (Index 10).")
-                        ),
-                        class_="accordion-content"
-                    ), open=True
-                )
-            )
+    # 3. Scan Out Validation
+    @reactive.Effect
+    @reactive.event(input.btn_run_scan_out)
+    def _proc_scan_out():
+        succ, msg = state.run_scan_out(input.uploader_so_scan(), input.uploader_so_hist(), input.uploader_so_track())
+        if succ: state.show_success_modal.set(True)
+        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
 
-        # 3. PANDUAN: LIST BIN CYCLE COUNT
-        elif cur == "List Bin Cycle Count":
-            guide_body = ui.div(
-                ui.tags.details(
-                    ui.tags.summary("📋 Informasi Format File"),
-                    ui.div(
-                        ui.tags.strong("Format yang diharapkan:"),
-                        ui.tags.ul(
-                            ui.tags.li("Upload file ", ui.strong("Multiple Adjustment"), " dari Jezpro."),
-                            ui.tags.li("File minimal memiliki 10 kolom: Kolom B (BIN), Kolom C (SKU), Kolom G (Sub Kategori), Kolom H (Harga Jual), dan Kolom J (Qty System)."),
-                            ui.tags.li("Gunakan filter interaktif untuk memilah berdasarkan Sub Kategori, Brand, atau Tiering Kategori Harga.")
-                        ),
-                        class_="accordion-content"
-                    ), open=True
-                )
-            )
+    # 4. Refill & Overstock
+    @reactive.Effect
+    @reactive.event(input.btn_run_rf_os)
+    def _proc_rf_os():
+        succ, msg = state.run_refill_overstock(input.uploader_rf_os_stock())
+        if succ: state.show_success_modal.set(True)
+        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
 
-        # 4. PANDUAN: PUTAWAY & PICKING AUDIT LIST
-        elif cur in ["Putaway & Picking Audit List", "Putaway & Picking Audit"]:
-            guide_body = ui.div(
-                ui.tags.details(
-                    ui.tags.summary("📋 Format Dokumen Audit"),
-                    ui.div(
-                        ui.tags.ul(
-                            ui.tags.li(ui.strong("1. File Sales:"), " Memeriksa data penjualan (Minimal hingga Kolom K / Qty Sales)."),
-                            ui.tags.li(ui.strong("2. File RTO:"), " Memeriksa data retur keluar (Minimal hingga Kolom I / Qty RTO)."),
-                            ui.tags.li(ui.strong("3. File Mutasi:"), " Memeriksa rantai perjalanan perpindahan BIN secara kronologis (Kolom A=Waktu, D=SKU, I=Bin Awal, M=Bin Tujuan)."),
-                            ui.tags.li(ui.strong("4. Final Match BIN:"), " Menghasilkan irisan BIN yang mengalami Picking dan Putaway secara bersamaan.")
-                        ),
-                        class_="accordion-content"
-                    ), open=True
-                )
-            )
+    # 5. Balancing Stock
+    @reactive.Effect
+    @reactive.event(input.btn_run_bal_stock)
+    def _proc_bal_stock():
+        succ, msg = state.run_balancing_stock(input.uploader_bal_stock())
+        if succ: state.show_success_modal.set(True)
+        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
 
-        # 5. PANDUAN: STOCK MINUS
-        elif cur == "Stock Minus":
-            guide_body = ui.div(
-                ui.tags.details(
-                    ui.tags.summary("📋 Informasi Format File & Logic"),
-                    ui.div(
-                        ui.tags.ul(
-                            ui.tags.li("Download file ", ui.strong("Multiple Adjustment"), " dari Jezpro dan pilih ", ui.strong("'Termasuk yang sudah habis'"), "."),
-                            ui.tags.li("Sistem akan mendeteksi seluruh SKU dengan Qty System minus (-)."),
-                            ui.tags.li("Sistem memprioritaskan penutupan stok minus dari BIN Prioritas (Staging Inbound/Outbound, Karantina, dll)."),
-                            ui.tags.li("Jika stok minus terjadi di Toko, sistem akan memprioritaskan kover dari Gudang Lt.2, begitupun sebaliknya.")
-                        ),
-                        class_="accordion-content"
-                    ), open=True
-                )
-            )
+    # 6. Permintaan FL
+    @reactive.Effect
+    @reactive.event(input.btn_run_fl_req)
+    def _proc_fl_req():
+        succ, msg = state.run_fl_request(input.uploader_fl_stock(), input.uploader_fl_req())
+        if succ: state.show_success_modal.set(True)
+        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
 
-        # 6. PANDUAN: PUTAWAY SYSTEM
-        elif cur == "Putaway System":
-            guide_body = ui.div(
-                ui.tags.details(
-                    ui.tags.summary("📋 Format File Putaway"),
-                    ui.div(
-                        ui.tags.ul(
-                            ui.tags.li(ui.strong("DATA SCAN PUTAWAY:"), " Kolom A = BIN, Kolom B = SKU, Kolom C = QTY SCAN."),
-                            ui.tags.li(ui.strong("DATA ASAL BIN:"), " Sesuai format template Jezpro."),
-                            ui.tags.li("Pilih Area Putaway terlebih dahulu (DC Lt.1, Lt.2, Lt.3, atau Jersey Zone) sebelum komparasi.")
-                        ),
-                        class_="accordion-content"
-                    ), open=True
-                )
-            )
+    # 7. Refill Toko
+    @reactive.Effect
+    @reactive.event(input.btn_run_refill_toko)
+    def _proc_refill_toko():
+        f = input.uploader_refill_stock()
+        succ, msg = state.process_refill_toko(f)
+        if succ: state.show_success_modal.set(True)
+        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
 
-        # 7. PANDUAN: DATABASE ONGKIR
-        elif cur in ["Database Ongkir In/Out", "Database Ongkir", "dashboard_ongkir"]:
-            guide_body = ui.div(
-                ui.tags.details(
-                    ui.tags.summary("📋 Panduan Input & Upload Ongkir"),
-                    ui.div(
-                        ui.tags.ul(
-                            ui.tags.li(ui.strong("Input Manual:"), " Masukkan Supplier, Ekspedisi, Total Koli, Total Biaya Ongkir, dan Tanggal Transaksi."),
-                            ui.tags.li(ui.strong("Batch CSV Upload:"), " Format header CSV wajib: SUPPLIER, EKSPEDISI, TOTAL KOLI, ONGKIR, TANGGAL_JAM.")
-                        ),
-                        class_="accordion-content"
-                    ), open=True
-                )
-            )
+    # 8. Store Leader RTO Decision
+    @reactive.Effect
+    @reactive.event(input.btn_run_rto_decision)
+    def _proc_rto_dec():
+        f1, f2 = input.uploader_rto_sby(), input.uploader_rto_smg()
+        f3, f4 = input.uploader_rto_sales(), input.uploader_rto_toc()
+        succ, msg = state.process_rto_decision(f1, f2, f3, f4)
+        if succ: state.show_success_modal.set(True)
+        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
 
-        elif cur == "Compare RTO":
-            guide_body = ui.div(
-                ui.tags.details(
-                    ui.tags.summary("📋 Informasi Format File"),
-                    ui.div(
-                        ui.tags.strong("Format yang diharapkan:"),
-                        ui.tags.ul(
-                            ui.tags.li(ui.strong("DS RTO:"), " Kolom A = SKU, Kolom B = QTY SCAN."),
-                            ui.tags.li(ui.strong("APPSHEET RTO:"), " Download Spreadsheet Rekap AppSheet sesuai sheet RTO yang dituju."),
-                            ui.tags.li(ui.strong("UPLOAD HASIL CEK REAL:"), " Upload hasil rekonsiliasi yang sudah diisi real fisik."),
-                            ui.tags.li(ui.strong("DRAFT RTO:"), " Download Draft RTO yang dibuat purchasing di awal.")
-                        ),
-                        class_="accordion-content"
-                    ), open=True
-                ),
-                ui.tags.details(
-                    ui.tags.summary("💡 Logic Thinking"),
-                    ui.div(
-                        ui.tags.strong("Alur Process Compare RTO (DS vs AppSheet vs Draft):"),
-                        ui.tags.ol(
-                            ui.tags.li("Compare SKU & QTY antara Data Scan (DS) vs AppSheet."),
-                            ui.tags.li(ui.strong("Kelebihan Ambil:"), " QTY di DS > AppSheet. ", ui.strong("Kurang Ambil:"), " QTY di DS < AppSheet."),
-                            ui.tags.li("Hasil rekonsiliasi dimasukkan untuk refresh sinkronisasi."),
-                            ui.tags.li("Compare hasil AppSheet dengan Draft RTO Jezpro (Validasi QTY & BIN)."),
-                            ui.tags.li("Status: ", ui.strong("OK"), ", ", ui.strong("Perlu Edit QTY Draft"), ", ", ui.strong("Perlu Edit BIN Draft"), ", ", ui.strong("Delete Item"), ", dan ", ui.strong("Add New"), "."),
-                            ui.tags.li("Generate New Draft otomatis untuk upload balik ke Jezpro.")
-                        ),
-                        class_="accordion-content"
-                    ), open=True
-                )
-            )
+    # 9. Match Real & System
+    @reactive.Effect
+    @reactive.event(input.btn_run_match_ks)
+    def _proc_match_ks():
+        succ, msg = state.run_match_karantina(input.uploader_match_sys(), input.uploader_match_real())
+        if succ: state.show_success_modal.set(True)
+        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
 
-        elif cur == "Stock Opname":
-            guide_body = ui.div(
-                ui.tags.details(
-                    ui.tags.summary("📋 Informasi Format File"),
-                    ui.div(
-                        ui.tags.strong("Format yang diharapkan:"),
-                        ui.tags.ul(
-                            ui.tags.li(ui.strong("FILTER:"), " Pilih Cabang, Sub Kategori, dan BIN System."),
-                            ui.tags.li(ui.strong("1. DATA SCAN:"), " Kolom A = BIN, Kolom B = SKU, Kolom C = QTY SCAN."),
-                            ui.tags.li(ui.strong("2. STOCK SYSTEM:"), " Download All Stock dari Multiple Adjustment (Termasuk yang sudah habis)."),
-                            ui.tags.li(ui.strong("3. BIN COVERAGE:"), " Download All BIN & Karantina (Hanya ada di stock)."),
-                            ui.tags.li(ui.strong("4. FINAL ADJ +:"), " Upload Real+ Recon, Cek Stock Adj+, dan File Staging Inbound."),
-                            ui.tags.li(ui.strong("5. KARANTINA:"), " Upload System+ Recon dan Stock Cek Adj (-)."),
-                            ui.tags.li(ui.strong("6. SUMMARY ADJ:"), " Laporan rekapitulasi finansial & QTY adjustment.")
-                        ),
-                        class_="accordion-content"
-                    ), open=True
-                ),
-                ui.tags.details(
-                    ui.tags.summary("💡 Logic Thinking"),
-                    ui.div(
-                        ui.tags.strong("Alur Logika Stock Opname Analyzer:"),
-                        ui.tags.ol(
-                            ui.tags.li(ui.strong("DS VS Stock System:"), " Real + (QTY Scan > Qty System), System + (Qty System > Qty Scan)."),
-                            ui.tags.li(ui.strong("Alokasi Real +:"), " Cover stok ke BIN Coverage & System +."),
-                            ui.tags.li(ui.strong("Recon Reports:"), " Validasi rekonsiliasi Real + & System Outstanding."),
-                            ui.tags.li(ui.strong("Final Adjustment:"), " Sinkronisasi ke Staging Inbound untuk Multiple & Single Adj +."),
-                            ui.tags.li(ui.strong("Set Up Karantina:"), " Selisih fisik positif (DIFF > 0) dimutasi ke BIN Karantina (Note: NOT FOUND)."),
-                            ui.tags.li(ui.strong("Miss Location & Summary:"), " Evaluasi rekapitulasi salah letak dan net finansial value adjustment.")
-                        ),
-                        class_="accordion-content"
-                    ), open=True
-                )
-            )
+    # 10. Refill Koli
+    @reactive.Effect
+    @reactive.event(input.btn_run_koli_conso)
+    def _proc_koli():
+        succ, msg = state.run_koli_consolidation(input.uploader_koli_file())
+        if succ: state.show_success_modal.set(True)
+        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
 
-        elif cur == "Justification SO":
-            # Helper untuk membuat tabel mini contoh kasus yang rapi
-            def mini_tbl(headers, rows):
-                th_list = [ui.tags.th(h, style="background: #E2E8F0; padding: 6px 10px; border: 1px solid #CBD5E0; font-size: 11px; text-align: center; color: #1A202C;") for h in headers]
-                tr_list = []
-                for r in rows:
-                    td_list = [ui.tags.td(ui.HTML(str(c)), style="padding: 6px 10px; border: 1px solid #E2E8F0; font-size: 11px; text-align: center; color: #2D3748;") for c in r]
-                    tr_list.append(ui.tags.tr(*td_list))
-                return ui.tags.table(
-                    ui.tags.thead(ui.tags.tr(*th_list)),
-                    ui.tags.tbody(*tr_list),
-                    style="border-collapse: collapse; width: 100%; margin: 8px 0; background: white; border-radius: 6px; overflow: hidden;"
-                )
+    # 11. Stock Allocation
+    @reactive.Effect
+    @reactive.event(input.btn_run_stk_alloc)
+    def _proc_stk_alloc():
+        succ, msg = state.process_stock_allocation(input.uploader_alloc_stock(), input.uploader_alloc_sales())
+        if succ: state.show_success_modal.set(True)
+        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
 
-            guide_body = ui.div(
-                # --- SECTION 1: FORMAT FILE ---
-                ui.tags.details(
-                    ui.tags.summary("📋 Informasi Format File"),
-                    ui.div(
-                        ui.tags.strong("Format yang diharapkan:"),
-                        ui.tags.ul(
-                            ui.tags.li(ui.strong("ADJUSTMENT FILE:"), " Gabungkan antara Multiple Adjustment ", ui.strong("(Plus)"), " dan ", ui.strong("(Minus)"), " dalam 1 File."),
-                            ui.tags.li(ui.strong("SUMMARY STOCK:"), " Download dari ", ui.strong("JEZPRO"), " pada menu ", ui.strong("Dashboard Asset"), " (Store: ", ui.strong("JEZ SURABAYA"), ")."),
-                            ui.tags.li(ui.strong("ALL DATA STOCK:"), " Upload file All data Stock (Multiple Adjustment) ", ui.strong("HANYA ADA STOCK"), "."),
-                            ui.tags.li(ui.strong("DATA SCAN (Opsional):"), " Jika diupload maka perhitungan ", ui.strong("Real QTY"), " akan mengambil qty dari data scan dan apabila tidak diupload maka akan kembali ke perhitungan awal.")
-                        ),
-                        class_="accordion-content"
-                    ), open=True
-                ),
+    # 12. Refill & Withdraw
+    @reactive.Effect
+    @reactive.event(input.btn_run_rf_wd)
+    def _proc_rf_wd():
+        succ, msg = state.run_refill_withdraw(input.uploader_rwd_stock(), input.uploader_rwd_trx())
+        if succ: state.show_success_modal.set(True)
+        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
 
-                # --- SECTION 2: 7 ATURAN LOGIKA LENGKAP & CONTOH KASUS ---
-                ui.tags.details(
-                    ui.tags.summary("💡 Logic Thinking (Justification) - 7 Aturan Lengkap"),
-                    ui.div(
-                        # Rumus Banner
-                        ui.div(
-                            ui.span("REAL QTY / HITUNGAN MANUAL ➡️ : ", style="font-weight: 800; color: #2C5282;"),
-                            ui.span("BEGINNING STOCK + (TOTAL_STOCKIN + TOTAL TRF_IN) - (TOTAL SALES + TOTAL TRF_OUT + TOTAL DRAFT TRF_OUT)", style="font-weight: bold; font-family: monospace; color: #1A365D;"),
-                            style="background: #EBF8FF; border-left: 4px solid #3182CE; padding: 10px 14px; border-radius: 6px; margin-bottom: 1rem;"
-                        ),
+    # 13. FDR Update
+    @reactive.Effect
+    @reactive.event(input.btn_run_fdr)
+    def _proc_fdr():
+        succ, msg = state.run_fdr_update(input.uploader_fdr_file())
+        if succ: state.show_success_modal.set(True)
+        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
 
-                        # 1. Kesalahan System (Begin Stock Minus)
-                        ui.div(
-                            ui.h5("🛑 1. Kesalahan System (Begin Stock Minus)", style="font-weight: 800; color: #C53030; font-size: 13px; margin: 0 0 4px 0;"),
-                            ui.tags.ul(
-                                ui.tags.li(ui.strong("Kondisinya:"), " Stok SO lebih besar dari stok Sistem (ADJUSTMENT +), Tetapi ", ui.strong("Beginning Stock bernilai minus (di bawah 0)"), "."),
-                                ui.tags.li(ui.strong("Artinya:"), " Sistem dari awal sudah error/bocor datanya karena mencatat stok minus yang artinya memang perlu dilakukan Adjustment +.")
-                            ),
-                            ui.p("Contoh Kasus:", style="font-weight: bold; margin: 4px 0 2px 0; font-size: 11px;"),
-                            mini_tbl(
-                                ["Stok SO", "Stok Sistem", "BEGINNING STOCK", "GAP ADJUSTMENT"],
-                                [["10", "5", "<b style='color: #E53E3E;'>-2</b>", "0"]]
-                            ),
-                            style="background: #FFF5F5; padding: 10px; border-radius: 8px; border: 1px solid #FED7D7; margin-bottom: 0.75rem;"
-                        ),
+    # 14. Percentage Display
+    @reactive.Effect
+    @reactive.event(input.btn_run_disp_ctrl)
+    def _proc_disp_ctrl():
+        succ, msg = state.run_percentage_display(input.uploader_disp_stock())
+        if succ: state.show_success_modal.set(True)
+        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
+    # Panduan & Logic Modal
+   # =========================================================================
+    # ACTION LISTENERS TOMBOL "RUN / PROSES" MENU BARU
+    # =========================================================================
 
-                        # 2. Kesalahan System (Ending Stock != Total Stock Multiple)
-                        ui.div(
-                            ui.h5("🛡️ 2. Kesalahan System (Ending Stock ≠ Total Stock dari Multiple)", style="font-weight: 800; color: #DD6B20; font-size: 13px; margin: 0 0 4px 0;"),
-                            ui.tags.ul(
-                                ui.tags.li(ui.strong("Kondisinya:"), " ", ui.code("GAP ADJUSTMENT"), " dan ", ui.code("BEGINNING STOCK"), " sama-sama nol. Total stock antara (", ui.strong("Ending Stock, Real Qty, Current Stock"), ") nilainya sama (senilai), tapi total stock di multiple (", ui.strong("QTY SYSTEM ALL"), ") malah lebih kecil dari stok akhir."),
-                                ui.tags.li(ui.strong("Artinya:"), " Ada mismatch antara data di multiple dan summary sehingga menyebabkan adjustment +.")
-                            ),
-                            ui.p("Contoh Kasus:", style="font-weight: bold; margin: 4px 0 2px 0; font-size: 11px;"),
-                            mini_tbl(
-                                ["GAP ADJ", "BEGINNING STOCK", "ENDING / REAL / CURR STOCK", "QTY SYSTEM ALL"],
-                                [["0", "0", "<b style='color: #3182CE;'>10 (Kembar)</b>", "<b style='color: #E53E3E;'>3 (Lebih Kecil)</b>"]]
-                            ),
-                            style="background: #FFFAF0; padding: 10px; border-radius: 8px; border: 1px solid #FEEBC8; margin-bottom: 0.75rem;"
-                        ),
+    # 1. PO Receiving
+    @reactive.Effect
+    @reactive.event(input.btn_run_po_rec)
+    def _proc_po_rec():
+        succ, msg = state.run_po_receiving(input.uploader_po_scan(), input.uploader_po_file())
+        if succ: state.show_success_modal.set(True)
+        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
 
-                        # 3. Kesalahan System (Miss Match Real QTY Manual dengan Ending Stock)
-                        ui.div(
-                            ui.h5("⚙️ 3. Kesalahan System (Miss Match Real QTY dengan Ending Stock/Current Stock)", style="font-weight: 800; color: #2B6CB0; font-size: 13px; margin: 0 0 4px 0;"),
-                            ui.tags.ul(
-                                ui.tags.li(ui.strong("Kondisinya:"), " Stok SO lebih besar dari stok Sistem (ADJUSTMENT +), tidak ada transaksi gantung (Draft TRF), tidak ada GAP ADJUSTMENT, ", ui.strong("TAPI hasil hitungan manual tidak match dengan nilai ENDING STOCK"), " di sistem."),
-                                ui.tags.li(ui.strong("Detail Hitungan Manual:"), " BEGINNING STOCK + (TOTAL_STOCKIN + TOTAL TRF_IN) - (TOTAL SALES + TOTAL TRF_OUT)."),
-                                ui.tags.li(ui.strong("Artinya:"), " Sistem salah hitung mutasi barang (hasil gabungan barang masuk dan keluar tidak sinkron dengan stok akhir).")
-                            ),
-                            ui.p("Contoh Kasus:", style="font-weight: bold; margin: 4px 0 2px 0; font-size: 11px;"),
-                            mini_tbl(
-                                ["BEGINNING", "STOCKIN + TRF_IN", "SALES + TRF_OUT", "Hitungan Manual", "ENDING STOCK"],
-                                [["10", "5", "2", "<b style='color: #276749;'>13</b>", "<b style='color: #E53E3E;'>15 (Gak Match!)</b>"]]
-                            ),
-                            style="background: #EBF8FF; padding: 10px; border-radius: 8px; border: 1px solid #BEE3F8; margin-bottom: 0.75rem;"
-                        ),
+    # 2. Penerimaan RTO
+    @reactive.Effect
+    @reactive.event(input.btn_run_penerimaan_rto)
+    def _proc_rto_rec():
+        succ, msg = state.run_penerimaan_rto(input.uploader_rto_rec_scan(), input.uploader_rto_rec_tf())
+        if succ: state.show_success_modal.set(True)
+        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
 
-                        # 4. Kesalahan System (Stock System Lost)
-                        ui.div(
-                            ui.h5("💻 4. Kesalahan System (Stock System Lost)", style="font-weight: 800; color: #805AD5; font-size: 13px; margin: 0 0 4px 0;"),
-                            ui.tags.ul(
-                                ui.tags.li(ui.strong("Kondisinya:"), " Tidak ada GAP ADJUSTMENT (= 0), tapi ada selisih antara Sistem dan SO. Ketika selisih itu ditambah/dikurang ke master QTY SYSTEM ALL, hasilnya pas dengan CURRENT STOCK."),
-                                ui.tags.li(ui.strong("Artinya:"), " Bug bawaan sistem yang membuat angka di layar tidak ter-update.")
-                            ),
-                            ui.p("Contoh Kasus:", style="font-weight: bold; margin: 4px 0 2px 0; font-size: 11px;"),
-                            mini_tbl(
-                                ["QTY SO", "QTY System", "Selisih (Diff)", "QTY SYSTEM ALL", "CURRENT STOCK"],
-                                [
-                                    ["12", "10", "<b>+2</b>", "15", "<b style='color: #276749;'>17 (15 + 2 Pas!)</b>"],
-                                    ["8", "10", "<b>-2</b>", "15", "<b style='color: #276749;'>13 (15 - 2 Pas!)</b>"]
-                                ]
-                            ),
-                            style="background: #FAF5FF; padding: 10px; border-radius: 8px; border: 1px solid #E9D8FD; margin-bottom: 0.75rem;"
-                        ),
+    # 3. Scan Out Validation
+    @reactive.Effect
+    @reactive.event(input.btn_run_scan_out)
+    def _proc_scan_out():
+        succ, msg = state.run_scan_out(input.uploader_so_scan(), input.uploader_so_hist(), input.uploader_so_track())
+        if succ: state.show_success_modal.set(True)
+        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
 
-                        # 5. Cek Hasil Rekonsiliasi
-                        ui.div(
-                            ui.h5("🔍 5. Cek Hasil Rekonsiliasi", style="font-weight: 800; color: #D69E2E; font-size: 13px; margin: 0 0 4px 0;"),
-                            ui.tags.ul(
-                                ui.tags.li(ui.strong("Kondisinya:"), " Total stock di multiple (", ui.strong("QTY SYSTEM ALL"), ") ternyata pas/sama persis dengan ", ui.strong("CURRENT STOCK / ENDING STOCK"), "."),
-                                ui.tags.li(ui.strong("Artinya:"), " Data sebenarnya aman dan sinkron secara total keseluruhan.")
-                            ),
-                            ui.p("Contoh Kasus:", style="font-weight: bold; margin: 4px 0 2px 0; font-size: 11px;"),
-                            mini_tbl(
-                                ["QTY SYSTEM ALL", "CURRENT STOCK", "ENDING STOCK"],
-                                [["<b style='color: #276749;'>25</b>", "<b style='color: #276749;'>25</b>", "<b style='color: #276749;'>25</b>"]]
-                            ),
-                            style="background: #FFFFF0; padding: 10px; border-radius: 8px; border: 1px solid #FEFCBF; margin-bottom: 0.75rem;"
-                        ),
+    # 4. Refill & Overstock
+    @reactive.Effect
+    @reactive.event(input.btn_run_rf_os)
+    def _proc_rf_os():
+        succ, msg = state.run_refill_overstock(input.uploader_rf_os_stock())
+        if succ: state.show_success_modal.set(True)
+        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
 
-                        # 6. Kesalahan Adjustment (+ / -)
-                        ui.div(
-                            ui.h5("⚠️ 6. Kesalahan Adjustment (+ / -)", style="font-weight: 800; color: #C53030; font-size: 13px; margin: 0 0 4px 0;"),
-                            ui.tags.ul(
-                                ui.tags.li("Stok Sistem > Stok SO, tapi ada data GAP ADJUSTMENT positif (+)."),
-                                ui.tags.li("Stok Sistem < Stok SO, tapi ada data GAP ADJUSTMENT negatif (-)."),
-                                ui.tags.li(ui.strong("Artinya:"), " Koreksi dari Proses Adjustment Sebelumnya (Reversal).")
-                            ),
-                            ui.p("Contoh Kasus:", style="font-weight: bold; margin: 4px 0 2px 0; font-size: 11px;"),
-                            mini_tbl(
-                                ["Kondisi Lapangan", "GAP ADJUSTMENT di Sistem", "Keterangan"],
-                                [
-                                    ["QTY Sistem (10) > QTY SO (5)", "<b style='color: #276749;'>+5</b>", "Ada Koreksi (Reversal)"],
-                                    ["QTY Sistem (5) < QTY SO (10)", "<b style='color: #E53E3E;'>-5</b>", "Ada Koreksi (Reversal)"]
-                                ]
-                            ),
-                            style="background: #FFF5F5; padding: 10px; border-radius: 8px; border: 1px solid #FED7D7; margin-bottom: 0.75rem;"
-                        ),
+    # 5. Balancing Stock
+    @reactive.Effect
+    @reactive.event(input.btn_run_bal_stock)
+    def _proc_bal_stock():
+        succ, msg = state.run_balancing_stock(input.uploader_bal_stock())
+        if succ: state.show_success_modal.set(True)
+        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
 
-                        # 7. Kesalahan RTO (Barang Gantung)
-                        ui.div(
-                            ui.h5("🚚 7. Kesalahan RTO (Barang Gantung)", style="font-weight: 800; color: #2B6CB0; font-size: 13px; margin: 0 0 4px 0;"),
-                            ui.tags.ul(
-                                ui.tags.li(ui.strong("Kondisinya:"), " Masih ada angka di kolom TOTAL DRAFT TRF IN atau TOTAL DRAFT TRF OUT yang menggantung (belum di-approve/finish)."),
-                                ui.tags.li(ui.strong("Artinya:"), " Masalah klasik RTO/mutasi barang yang statusnya masih draf.")
-                            ),
-                            ui.p("Contoh Kasus:", style="font-weight: bold; margin: 4px 0 2px 0; font-size: 11px;"),
-                            mini_tbl(
-                                ["TOTAL DRAFT TRF IN", "TOTAL DRAFT TRF OUT", "Status"],
-                                [
-                                    ["<b style='color: #DD6B20;'>5</b>", "0", "Ada barang gantung"],
-                                    ["0", "<b style='color: #DD6B20;'>3</b>", "Ada barang gantung"]
-                                ]
-                            ),
-                            style="background: #EBF8FF; padding: 10px; border-radius: 8px; border: 1px solid #BEE3F8; margin-bottom: 0.75rem;"
-                        ),
+    # 6. Permintaan FL
+    @reactive.Effect
+    @reactive.event(input.btn_run_fl_req)
+    def _proc_fl_req():
+        succ, msg = state.run_fl_request(input.uploader_fl_stock(), input.uploader_fl_req())
+        if succ: state.show_success_modal.set(True)
+        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
 
-                        # Catatan Tambahan (Undefined & Error Data)
-                        ui.div(
-                            ui.p("❓ Kenapa muncul UNDEFINED? ➔ Berarti kasus item tersebut tidak masuk ke dalam 7 kondisi di atas (butuh dicek manual).", style="margin: 0 0 4px 0; font-weight: bold; color: #4A5568; font-size: 12px;"),
-                            ui.p("❓ Kenapa muncul ERROR DATA? ➔ Ada kolom yang isinya kosong, teks rusak, atau tidak bisa dihitung angka.", style="margin: 0; font-weight: bold; color: #E53E3E; font-size: 12px;"),
-                            style="background: #EDF2F7; padding: 10px 14px; border-radius: 6px; margin-top: 0.5rem;"
-                        ),
-                        class_="accordion-content"
-                    ), open=True
-                )
-            )
-        # FALLBACK JIKA MENU LAIN
-        else:
-            guide_body = ui.div(
-                ui.tags.i(class_="fa-regular fa-folder-open", style="font-size: 40px; color: #CBD5E0; margin-bottom: 8px;"),
-                ui.p(f"Panduan dan Logic untuk halaman '{cur}' belum tersedia.", style="color: #718096; font-style: italic;"),
-                style="text-align: center; padding: 2rem;"
-            )
+    # 7. Refill Toko
+    @reactive.Effect
+    @reactive.event(input.btn_run_refill_toko)
+    def _proc_refill_toko():
+        f = input.uploader_refill_stock()
+        succ, msg = state.process_refill_toko(f)
+        if succ: state.show_success_modal.set(True)
+        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
+
+    # 8. Store Leader RTO Decision
+    @reactive.Effect
+    @reactive.event(input.btn_run_rto_decision)
+    def _proc_rto_dec():
+        f1, f2 = input.uploader_rto_sby(), input.uploader_rto_smg()
+        f3, f4 = input.uploader_rto_sales(), input.uploader_rto_toc()
+        succ, msg = state.process_rto_decision(f1, f2, f3, f4)
+        if succ: state.show_success_modal.set(True)
+        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
+
+    # 9. Match Real & System
+    @reactive.Effect
+    @reactive.event(input.btn_run_match_ks)
+    def _proc_match_ks():
+        succ, msg = state.run_match_karantina(input.uploader_match_sys(), input.uploader_match_real())
+        if succ: state.show_success_modal.set(True)
+        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
+
+    # 10. Refill Koli
+    @reactive.Effect
+    @reactive.event(input.btn_run_koli_conso)
+    def _proc_koli():
+        succ, msg = state.run_koli_consolidation(input.uploader_koli_file())
+        if succ: state.show_success_modal.set(True)
+        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
+
+    # 11. Stock Allocation
+    @reactive.Effect
+    @reactive.event(input.btn_run_stk_alloc)
+    def _proc_stk_alloc():
+        succ, msg = state.process_stock_allocation(input.uploader_alloc_stock(), input.uploader_alloc_sales())
+        if succ: state.show_success_modal.set(True)
+        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
+
+    # 12. Refill & Withdraw
+    @reactive.Effect
+    @reactive.event(input.btn_run_rf_wd)
+    def _proc_rf_wd():
+        succ, msg = state.run_refill_withdraw(input.uploader_rwd_stock(), input.uploader_rwd_trx())
+        if succ: state.show_success_modal.set(True)
+        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
+
+    # 13. FDR Update
+    @reactive.Effect
+    @reactive.event(input.btn_run_fdr)
+    def _proc_fdr():
+        succ, msg = state.run_fdr_update(input.uploader_fdr_file())
+        if succ: state.show_success_modal.set(True)
+        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
+
+    # 14. Percentage Display
+    @reactive.Effect
+    @reactive.event(input.btn_run_disp_ctrl)
+    def _proc_disp_ctrl():
+        succ, msg = state.run_percentage_display(input.uploader_disp_stock())
+        if succ: state.show_success_modal.set(True)
+        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
 
         ui.modal_show(ui.modal(
             guide_body, 
