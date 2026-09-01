@@ -2526,7 +2526,7 @@ def timbang_ongkir_server(input, output, session, state: AppState):
     # Trigger reaktif untuk auto-refresh tabel/metrik setelah save/delete
     refresh_trigger = reactive.Value(0)
 
-    # A. SIMPAN DATA MANUAL KE SUPABASE
+    # A. SIMPAN DATA MANUAL KE SUPABASE LAMA
     @reactive.Effect
     @reactive.event(input.btn_save_timbang)
     def _save_timbang():
@@ -2542,27 +2542,24 @@ def timbang_ongkir_server(input, output, session, state: AppState):
                 "berat_total_timbang": float(input.tb_berat()),
                 "created_at": now_str
             }).execute()
-            
-            # Refresh data tampilan
-            refresh_trigger.set(refresh_trigger() + 1)
             state.show_success_modal.set(True)
         except Exception as e:
             state.error_modal_message.set(f"Gagal simpan data: {e}")
             state.show_error_modal.set(True)
 
-    # B. HAPUS DATA SATUAN DARI TABEL
+    # B. HAPUS DATA SATUAN PER BARIS DARI TABEL
     @reactive.Effect
-    @reactive.event(input.btn_delete_timbang_item)
-    def _delete_timbang_item():
-        target_id = input.btn_delete_timbang_item()
+    @reactive.event(input.btn_delete_timbang_single)
+    def _delete_timbang_single():
+        target_id = input.btn_delete_timbang_single()
         if not target_id:
             return
         try:
             sb = config.get_supabase_old()
             sb.table("timbang_kolian").delete().eq("id", target_id).execute()
-            
-            # Refresh tabel & metrik otomatis
-            refresh_trigger.set(refresh_trigger() + 1)
+            # Trigger refresh dengan update filter state
+            current_flt = state.timbang_filter_periode() or "ALL"
+            state.timbang_filter_periode.set(current_flt)
         except Exception as e:
             state.error_modal_message.set(f"Gagal menghapus data: {e}")
             state.show_error_modal.set(True)
@@ -2573,7 +2570,7 @@ def timbang_ongkir_server(input, output, session, state: AppState):
     def _chg_flt_timbang():
         state.timbang_filter_periode.set(str(input.change_filter_timbang_periode()))
 
-    # D. HELPER: RUMUS TARIF HARGA
+    # D. HELPER: 4 RUMUS TARIF HARGA
     def _hitung_harga_timbang(row):
         try:
             eksp = str(row.get('ekspedisi', '') or '').upper()
@@ -2595,11 +2592,8 @@ def timbang_ongkir_server(input, output, session, state: AppState):
         except Exception:
             return 0.0
 
-    # E. HELPER: TARIK DATA DARI SUPABASE + FILTER BULAN LALU
+    # E. HELPER: TARIK DATA + FILTER PERIODE (TERMASUK BULAN LALU)
     def _get_filtered_timbang_data():
-        # Baca trigger agar ikut ter-refresh saat data bertambah/terhapus
-        _ = refresh_trigger()
-
         try:
             sb = config.get_supabase_old()
             res = sb.table("timbang_kolian").select("*").execute()
@@ -2612,27 +2606,26 @@ def timbang_ongkir_server(input, output, session, state: AppState):
             # Hitung Estimasi Harga
             df['Estimasi Harga'] = df.apply(_hitung_harga_timbang, axis=1)
 
-            # Filter Berdasarkan Tanggal
+            # Format Tanggal & Filter
             if "created_at" in df.columns:
                 df['created_at_dt'] = pd.to_datetime(df['created_at'], errors='coerce')
                 df = df.sort_values(by="created_at_dt", ascending=False).reset_index(drop=True)
 
                 flt = str(state.timbang_filter_periode() or "ALL").upper()
                 now_dt = datetime.now()
-
+                
                 if flt == "TODAY":
                     df = df[df['created_at_dt'].dt.date == now_dt.date()]
                 elif flt == "MONTH":
                     df = df[(df['created_at_dt'].dt.year == now_dt.year) & (df['created_at_dt'].dt.month == now_dt.month)]
                 elif flt == "PAST_MONTH":
-                    # Logika perhitungan bulan sebelumnya (termasuk handle Januari ke Desember tahun lalu)
+                    # Hitung bulan lalu & tangani jika Januari -> mundur ke Desember tahun sebelumnya
                     if now_dt.month == 1:
                         past_year = now_dt.year - 1
                         past_month = 12
                     else:
                         past_year = now_dt.year
                         past_month = now_dt.month - 1
-
                     df = df[(df['created_at_dt'].dt.year == past_year) & (df['created_at_dt'].dt.month == past_month)]
 
             return df
@@ -2666,7 +2659,7 @@ def timbang_ongkir_server(input, output, session, state: AppState):
             style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;"
         )
 
-    # G. RENDER TABEL RIWAYAT BESERTA TOMBOL HAPUS SATUAN
+    # G. RENDER TABEL RIWAYAT DENGAN TOMBOL HAPUS PER BARIS
     @render.ui
     def timbang_ongkir_table_ui():
         df = _get_filtered_timbang_data()
@@ -2682,9 +2675,9 @@ def timbang_ongkir_server(input, output, session, state: AppState):
         display_df['Berat (Kg)'] = display_df['berat_total_timbang'].apply(lambda x: f"{float(x):,.2f} Kg" if pd.notna(x) else "-")
         display_df['Estimasi Harga (Rp)'] = display_df['Estimasi Harga'].apply(lambda x: f"Rp {float(x):,.0f}" if pd.notna(x) else "Rp 0")
 
-        # Tombol aksi hapus satuan per baris
+        # Tombol hapus satuan
         display_df['Aksi'] = display_df['id'].apply(
-            lambda x: f'<button type="button" onclick="if(confirm(\'Apakah Anda yakin ingin menghapus data timbang ini (ID: {x})?\')) {{ Shiny.setInputValue(\'btn_delete_timbang_item\', \'{x}\', {{priority: \'event\'}}); }}" style="background: #FFF5F5; color: #E53E3E; border: 1.5px solid #FEB2B2; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer; transition: all 0.2s;">🗑️ Hapus</button>'
+            lambda x: f'<button type="button" onclick="if(confirm(\'Hapus data baris ID: {x}?\')) {{ Shiny.setInputValue(\'btn_delete_timbang_single\', \'{x}\', {{priority: \'event\'}}); }}" style="background: #FFF5F5; color: #E53E3E; border: 1px solid #FEB2B2; padding: 3px 8px; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer;">🗑️ Hapus</button>'
         )
 
         cols_show = ['id', 'Waktu', 'ekspedisi', 'jenis_pengiriman', 'total_koli', 'Berat (Kg)', 'pengiriman_dari', 'pengiriman_ke', 'Estimasi Harga (Rp)', 'Aksi']
