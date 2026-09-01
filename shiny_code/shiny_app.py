@@ -1,17 +1,29 @@
+import sys
+from pathlib import Path
+
+# 1. WAJIB DI PALING ATAS (Sebelum import file lokal manapun)
+sys.path.insert(0, str(Path(__file__).parent.resolve()))
+
+# 2. Package Library
 import io
 import pandas as pd
-import state
-import config
-from shiny import App, render, Session
-from view import create_ui
 from shiny import App, Inputs, Outputs, Session, reactive, render, ui
-from state import AppState
-from views import (
+
+# 3. File Lokal Proyek Anda
+import config
+import state
+from state import AppState, active_users
+
+# 4. Import komponen UI dari view.py (PASTIKAN TANPA 's')
+from view import (
     CUSTOM_HEAD, static_loading_spinner, success_modal, error_modal,
-    render_clean_table, metric_box, dark_metric_box,  BRANCH_BIN_MAPPING, 
+    render_clean_table, metric_box, dark_metric_box, BRANCH_BIN_MAPPING, 
     custom_uploader_box, compare_system_view, stock_minus_view, stock_opname_view,
-    putaway_view, main_dashboard_view, sidebar, ongkir_tab2_view, compare_rto_view, justification_so_view, cycle_count_view, login_page, ppa_audit_view, cycle_count_analyzer_view, global_header
+    putaway_view, main_dashboard_view, sidebar, ongkir_tab2_view, compare_rto_view, 
+    justification_so_view, cycle_count_view, login_page, ppa_audit_view, 
+    cycle_count_analyzer_view, global_header, create_ui
 )
+
 
 app_ui = ui.page_fluid(
     CUSTOM_HEAD,
