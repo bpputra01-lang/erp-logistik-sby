@@ -2266,6 +2266,216 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         yield buf.getvalue()
         
+    # =========================================================================
+    # ➕ TAMBAHAN: SERVER HANDLERS UNTUK 4 MENU SUPABASE LAMA
+    # =========================================================================
+
+    # 1. DATA TIMBANG ONGKIR
+    @reactive.Effect
+    @reactive.event(input.btn_save_timbang)
+    def _save_timbang():
+        try:
+            sb = config.get_supabase_old()
+            sb.table("timbang_kolian").insert({
+                "ekspedisi": str(input.tb_ekspedisi()).upper(),
+                "jenis_pengiriman": str(input.tb_jenis()),
+                "pengiriman_dari": str(input.tb_dari()).upper(),
+                "pengiriman_ke": str(input.tb_ke()).upper(),
+                "total_koli": int(input.tb_koli()),
+                "berat_total_timbang": float(input.tb_berat()),
+                "created_at": datetime.now().isoformat()
+            }).execute()
+            state.show_success_modal.set(True)
+        except Exception as e:
+            state.error_modal_message.set(f"Gagal simpan: {e}")
+            state.show_error_modal.set(True)
+
+    @render.ui
+    def timbang_ongkir_metrics_ui():
+        try:
+            sb = config.get_supabase_old()
+            res = sb.table("timbang_kolian").select("*").execute()
+            df = pd.DataFrame(res.data) if res and res.data else pd.DataFrame()
+            if df.empty: return ui.div("Belum ada data timbang.")
+            
+            tot_koli = int(pd.to_numeric(df.get('total_koli', 0), errors='coerce').sum())
+            tot_berat = float(pd.to_numeric(df.get('berat_total_timbang', 0), errors='coerce').sum())
+            return ui.div(
+                dark_metric_box("📦 TOTAL KOLI", f"{tot_koli:,}", "#FFD700"),
+                dark_metric_box("⚖️ TOTAL BERAT", f"{tot_berat:,.2f} Kg", "#FFD700"),
+                dark_metric_box("📝 TOTAL DATA", f"{len(df):,}", "#10B981"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;"
+            )
+        except Exception: return ui.div()
+
+    @render.ui
+    def timbang_ongkir_table_ui():
+        try:
+            sb = config.get_supabase_old()
+            res = sb.table("timbang_kolian").select("*").order("created_at", desc=True).execute()
+            df = pd.DataFrame(res.data) if res and res.data else pd.DataFrame()
+            if df.empty: return ui.div("Tidak ada riwayat timbang.")
+            if "created_at" in df.columns:
+                df = config.format_datetime_wib(df, "created_at")
+            return render_clean_table(df.columns.tolist(), df.fillna("").astype(str).values.tolist(), "tbl_timbang")
+        except Exception as e: return ui.div(f"Error load data: {e}")
+
+    # 2. REPORTING & PIC
+    current_pic = reactive.Value("VERREL & GALIH")
+
+    @reactive.Effect
+    @reactive.event(input.change_pic_user)
+    def _chg_pic():
+        current_pic.set(input.change_pic_user())
+
+    @render.ui
+    def reporting_pic_status_ui():
+        try:
+            sb = config.get_supabase_old()
+            res = sb.table("reports").select("*").execute()
+            df = pd.DataFrame(res.data) if res and res.data else pd.DataFrame()
+            
+            if df.empty:
+                default_reports = [
+                    {"laporan": "REJECT & DEFECT", "pic": "VERREL & GALIH", "status": "❌ Belum"},
+                    {"laporan": "KERAPIHAN STOCK", "pic": "VERREL & GALIH", "status": "❌ Belum"},
+                    {"laporan": "CEK STOCK MINUS", "pic": "VERREL & GALIH", "status": "❌ Belum"},
+                    {"laporan": "BALANCING STOCK", "pic": "FARIL & YUDI", "status": "❌ Belum"},
+                    {"laporan": "CEK RTO", "pic": "FARIL & YUDI", "status": "❌ Belum"},
+                    {"laporan": "DASHBOARD SURABAYA", "pic": "HAMZAH", "status": "❌ Belum"},
+                    {"laporan": "REFILL GL4 TO GL3", "pic": "KRISNA & DHIVA", "status": "❌ Belum"}
+                ]
+                sb.table("reports").insert(default_reports).execute()
+                res = sb.table("reports").select("*").execute()
+                df = pd.DataFrame(res.data)
+
+            pic = current_pic()
+            my_tasks = df[df['pic'] == pic] if not df.empty and 'pic' in df.columns else pd.DataFrame()
+            
+            cards = []
+            for _, r in my_tasks.iterrows():
+                stat_col = "#10B981" if "Selesai" in str(r.get('status', '')) else "#EF4444"
+                cards.append(ui.div(
+                    ui.div(
+                        ui.span(str(r.get('laporan', '')), style="font-weight: 800; font-size: 14px; color: #1A202C;"),
+                        ui.span(f"Status: {r.get('status', '')}", style=f"font-size: 12px; font-weight: 700; color: {stat_col}; margin-top: 4px; display: block;"),
+                    ),
+                    ui.tags.button("Update Selesai", onclick=f"Shiny.setInputValue('btn_finish_report', '{r.get('laporan', '')}', {{priority: 'event'}})", class_="btn-page-nav", style="background-color: #10B981; color: white; border: none;"),
+                    style="background: #F8FAFC; border: 1.5px solid #E2E8F0; padding: 12px 18px; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;"
+                ))
+            return ui.div(*cards) if cards else ui.div("Tidak ada tugas untuk PIC ini.")
+        except Exception as e: return ui.div(f"Error PIC: {e}")
+
+    @reactive.Effect
+    @reactive.event(input.btn_finish_report)
+    def _finish_report():
+        try:
+            lap = input.btn_finish_report()
+            sb = config.get_supabase_old()
+            sb.table("reports").update({"status": "✅ Selesai"}).eq("laporan", lap).execute()
+        except Exception: pass
+
+    # 3. REJECT/DEFECT LIST
+    @reactive.Effect
+    @reactive.event(input.btn_submit_single_reject)
+    def _save_reject_single():
+        try:
+            sb = config.get_supabase_old()
+            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            sb.table("reject_list").insert({
+                "cabang": str(input.rj_cabang()),
+                "bin_awal": str(input.rj_bin_awal()),
+                "bin": str(input.rj_bin_tujuan()),
+                "sku": str(input.rj_sku()).upper().strip(),
+                "article_name": str(input.rj_nama()),
+                "size": str(input.rj_size()),
+                "kategori": str(input.rj_kategori()),
+                "keterangan": str(input.rj_ket()),
+                "tanggal_input": now_str,
+                "status": "PENDING"
+            }).execute()
+            state.show_success_modal.set(True)
+        except Exception as e:
+            state.error_modal_message.set(f"Gagal simpan reject: {e}")
+            state.show_error_modal.set(True)
+
+    @render.ui
+    def reject_list_metrics_ui():
+        try:
+            sb = config.get_supabase_old()
+            res = sb.table("reject_list").select("*").execute()
+            df = pd.DataFrame(res.data) if res and res.data else pd.DataFrame()
+            tot = len(df)
+            defect = len(df[df['bin'].str.contains('DEFECT', case=False, na=False)]) if not df.empty and 'bin' in df.columns else 0
+            reject = len(df[df['bin'].str.contains('REJECT', case=False, na=False)]) if not df.empty and 'bin' in df.columns else 0
+            return ui.div(
+                dark_metric_box("TOTAL ITEMS", f"{tot} SKU", "#3182CE"),
+                dark_metric_box("📦 DEFECT (D)", f"{defect}", "#FFA500"),
+                dark_metric_box("❌ REJECT (R)", f"{reject}", "#FF4B4B"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;"
+            )
+        except Exception: return ui.div()
+
+    @render.ui
+    def reject_list_table_ui():
+        try:
+            sb = config.get_supabase_old()
+            res = sb.table("reject_list").select("*").order("id", desc=True).execute()
+            df = pd.DataFrame(res.data) if res and res.data else pd.DataFrame()
+            if df.empty: return ui.div("Database Reject/Defect kosong.")
+            return render_clean_table(df.columns.tolist(), df.fillna("").astype(str).values.tolist(), "tbl_reject")
+        except Exception as e: return ui.div(f"Error database: {e}")
+
+    # 4. LOGISTIC SCHEDULE
+    df_schedule_res = reactive.Value(pd.DataFrame())
+
+    @reactive.Effect
+    @reactive.event(input.btn_run_schedule)
+    def _gen_schedule():
+        try:
+            import random
+            start_date_val = pd.to_datetime(input.sc_start_date()).date()
+            day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
+            
+            sb = config.get_supabase_old()
+            res_k = sb.table("karyawan").select("*").execute()
+            df_k = pd.DataFrame(res_k.data) if res_k and res_k.data else pd.DataFrame()
+            
+            if df_k.empty:
+                default_staff = [
+                    {"nama": "ANDI", "posisi": "LOG-ADMIN", "tipe": "Full-Time"},
+                    {"nama": "BUDI", "posisi": "LOG-LOADER", "tipe": "Full-Time"},
+                    {"nama": "CITRA", "posisi": "WF-PICKER", "tipe": "Full-Time"},
+                    {"nama": "DONI", "posisi": "LOG-STORE", "tipe": "Full-Time"}
+                ]
+                sb.table("karyawan").insert(default_staff).execute()
+                res_k = sb.table("karyawan").select("*").execute()
+                df_k = pd.DataFrame(res_k.data)
+
+            staff_list = df_k['nama'].tolist() if not df_k.empty else ["STAF 1", "STAF 2"]
+            roles = [
+                "SHIFT 0 - WF-PICKER", "SHIFT 1 - LOG-ADMIN", "SHIFT 1 - LOG-LOADER",
+                "SHIFT 1 - LOG-STORE", "SHIFT 2 - LOG-ADMIN", "SHIFT 2 - LOG-LOADER", "SHIFT 2 - SPV"
+            ]
+            
+            schedule_data = []
+            for r in roles:
+                row_item = {"SHIFT - ROLE": r}
+                for d in day_names:
+                    row_item[d] = random.choice(staff_list)
+                schedule_data.append(row_item)
+
+            df_schedule_res.set(pd.DataFrame(schedule_data))
+            state.show_success_modal.set(True)
+        except Exception as e:
+            state.error_modal_message.set(f"Gagal generate jadwal: {e}")
+            state.show_error_modal.set(True)
+
+    @render.ui
+    def schedule_table_ui():
+        df = df_schedule_res()
+        if df.empty: return ui.div("Klik tombol GENERATE JADWAL SHIFT di atas untuk membuat jadwal.")
+        return render_clean_table(df.columns.tolist(), df.values.tolist(), "tbl_schedule")
 
 
 app = App(app_ui, server)

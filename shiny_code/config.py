@@ -13,13 +13,18 @@ APP_HOST = "127.0.0.1"
 APP_PORT = 8000
 
 # ==============================================================================
-# 2. KONFIGURASI SUPABASE
+# 2. KONFIGURASI SUPABASE (2 KONEKSI: BARU & LAMA)
 # ==============================================================================
+# A. Supabase Baru (Ongkir & User Aktif)
 SUPABASE_URL = "https://fanzsmghhbefhhaicrok.supabase.co"
 SUPABASE_KEY = "sb_publishable_pKXe0FX4YxwNhuqD1saHaw_NORud8cJ"
 
+# B. Supabase Lama (Dari Streamlit untuk 4 Menu Cloud)
+SUPABASE_OLD_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
+SUPABASE_OLD_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmaGpyc3h6Y2ZmZGZzd2ZxbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTI5NjgsImV4cCI6MjA5MTcyODk2OH0.DDlKkXU5-nVvNYK_uLYzXLgaj8oDT4s8vbjAoWMWacI"
+
 # ==============================================================================
-# 3. SUPABASE MINI CLIENT (REST API POSTGREST)
+# 3. SUPABASE MINI CLIENT (REST API POSTGREST LENGKAP)
 # ==============================================================================
 class SimpleSupabaseTable:
     def __init__(self, base_url, key, table_name):
@@ -43,13 +48,27 @@ class SimpleSupabaseTable:
         self.body = payload if isinstance(payload, list) else [payload]
         return self
 
+    def update(self, payload):
+        self.method = "PATCH"
+        self.body = payload
+        return self
+
     def delete(self):
         self.method = "DELETE"
+        return self
+
+    def eq(self, column, value):
+        self.params.append(f"{column}=eq.{value}")
         return self
 
     def in_(self, column, values):
         val_str = ",".join(map(str, values))
         self.params.append(f"{column}=in.({val_str})")
+        return self
+
+    def order(self, column, desc=False):
+        direction = "desc" if desc else "asc"
+        self.params.append(f"order={column}.{direction}")
         return self
 
     def execute(self):
@@ -76,8 +95,12 @@ class SimpleSupabaseClient:
     def table(self, table_name):
         return SimpleSupabaseTable(self.url, self.key, table_name)
 
+# Helper Instance Supabase
 def get_supabase() -> SimpleSupabaseClient:
     return SimpleSupabaseClient(SUPABASE_URL, SUPABASE_KEY)
+
+def get_supabase_old() -> SimpleSupabaseClient:
+    return SimpleSupabaseClient(SUPABASE_OLD_URL, SUPABASE_OLD_KEY)
 
 # ==============================================================================
 # 4. TRACKER USER AKTIF / ONLINE (HEARTBEAT SUPABASE)
@@ -87,7 +110,6 @@ def ping_active_user(session_id: str, user_name: str = "Anonymous"):
     try:
         sb = get_supabase()
         now_iso = datetime.now(timezone.utc).isoformat()
-        # Hapus dulu session lama lalu insert update terbaru
         sb.table("active_sessions").in_("session_id", [session_id]).delete().execute()
         sb.table("active_sessions").insert({
             "session_id": session_id,
@@ -120,7 +142,6 @@ def count_online_users() -> int:
                 ping_time = pd.to_datetime(ping_str).to_pydatetime()
                 if ping_time.tzinfo is None:
                     ping_time = ping_time.replace(tzinfo=timezone.utc)
-                # Jika ping masih dalam rentang 45 detik terakhir
                 if (now - ping_time).total_seconds() <= 45:
                     active_count += 1
         return max(1, active_count)
