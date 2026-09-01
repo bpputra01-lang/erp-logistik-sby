@@ -31,11 +31,16 @@ def server(input: Inputs, output: Outputs, session: Session):
     @reactive.event(input.change_filter_periode)
     def _update_filter_periode():
         state.filter_periode.set(input.change_filter_periode())
-
     @reactive.Effect
-    @reactive.event(input.btn_fetch_stock_minus_jezpro)
-    def _fetch_stock_minus_jezpro():
-        succ, msg = state.trigger_pc_sync_and_load()
+    @reactive.event(input.btn_process_stock_minus)
+    def _proc_stock_file():
+        f = input.upload_stock_file()
+        if not f:
+            state.error_modal_message.set("Pilih file Stock Minus terlebih dahulu!")
+            state.show_error_modal.set(True)
+            return
+        with open(f[0]["datapath"], "rb") as fp:
+            succ, msg = state.process_stock_minus_file(fp.read(), f[0]["name"])
         if succ:
             state.show_success_modal.set(True)
         else:
