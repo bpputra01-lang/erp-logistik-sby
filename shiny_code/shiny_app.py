@@ -37,24 +37,29 @@ app_ui = ui.page_fluid(
 def server(input: Inputs, output: Outputs, session: Session):
     state = AppState()
 
-    # ✅ TARUH LOGIKA USER AKTIF DI SINI (DI SERVER UTAMA):
-    active_users.set(active_users.get() + 1)
+    # =========================================================================
+    # LOGIKA USER AKTIF (DIPERBAIKI DENGAN ISOLATE)
+    # =========================================================================
+    with reactive.isolate():
+        active_users.set(active_users.get() + 1)
 
     @session.on_ended
     def _on_session_ended():
-        current_count = active_users.get()
-        active_users.set(max(0, current_count - 1))
+        with reactive.isolate():
+            current_count = active_users.get()
+            active_users.set(max(0, current_count - 1))
 
     @render.text
     def txt_active_users():
         return f"{active_users.get()} User Aktif"
+    # =========================================================================
 
-    # Lanjut ke listeners Anda seperti biasa:
     # Modal Dismiss Listeners
     @reactive.Effect
     @reactive.event(input.close_success_modal_event)
     def _on_close_success_modal():
         state.show_success_modal.set(False)
+
     
 
     @reactive.Effect
