@@ -15,7 +15,7 @@ import state
 from state import AppState, active_users
 
 # 4. Import komponen UI dari view.py (PASTIKAN TANPA 's')
-from view import (
+from views import (
     CUSTOM_HEAD, static_loading_spinner, success_modal, error_modal,
     render_clean_table, metric_box, dark_metric_box, BRANCH_BIN_MAPPING, 
     custom_uploader_box, compare_system_view, stock_minus_view, stock_opname_view,
