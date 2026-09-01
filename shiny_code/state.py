@@ -2676,11 +2676,11 @@ class AppState:
             return False, f"Gagal Match Real & System: {e}"
 
 # ==========================================================================
-    # BALANCING STOCK & DYNAMIC ALLOCATION HYBRID ENGINE
+    # BALANCING STOCK & DYNAMIC ALLOCATION HYBRID ENGINE (FIXED)
     # ==========================================================================
     def process_balancing_stock(self, f_stock, f_sales):
         try:
-            # 1. Helper Fast Reader
+            # 1. Helper Pembaca File Bersih & Cepat
             def fast_read(file_info):
                 if not file_info: return pd.DataFrame()
                 path = file_info[0]["datapath"]
@@ -2689,7 +2689,7 @@ class AppState:
                     try:
                         return pd.read_excel(path, engine='calamine')
                     except Exception:
-                        return pd.read_excel(path, engine='openpyxl', data_only=True)
+                        return pd.read_excel(path, engine='openpyxl')
                 elif name.endswith('.csv'):
                     return pd.read_csv(path)
                 return pd.DataFrame()
@@ -2702,13 +2702,11 @@ class AppState:
 
             if df_stk_raw.shape[1] < 10:
                 return False, "File All Stock minimal harus 10 kolom (Kolom B=BIN, C=SKU, E=Nama, J=Qty)!"
-            if df_sls_raw.shape[1] < 19:
-                return False, "File Sales minimal harus memiliki Kolom A (Store), S/19 (Qty), dan AA/27 (SKU)!"
 
             # 2. Proses Data Sales (Histori Online vs Offline)
             col_store_idx = 0
             col_qty_sls_idx = 18 if df_sls_raw.shape[1] > 18 else df_sls_raw.shape[1] - 1
-            col_sku_sls_idx = 26 if df_sls_raw.shape[1] > 26 else 1
+            col_sku_sls_idx = 26 if df_sls_raw.shape[1] > 26 else (1 if df_sls_raw.shape[1] > 1 else 0)
 
             store_series = df_sls_raw.iloc[:, col_store_idx].astype(str).str.upper()
             sku_sls_series = df_sls_raw.iloc[:, col_sku_sls_idx].astype(str).str.strip().str.upper()
@@ -2764,7 +2762,7 @@ class AppState:
                 STOCK_ON_ACTUAL=('QTY', lambda x: x[df_valid_stk.loc[x.index, 'IS_ON'] & (x > 0)].sum())
             ).reset_index()
 
-            # Simpan detail lokasi BIN asal untuk instruksi mutasi
+            # Simpan detail lokasi BIN asal
             source_bins_detail = df_valid_stk[df_valid_stk['IS_SOURCE'] & (df_valid_stk['QTY'] > 0)].groupby(['SKU', 'BIN'])['QTY'].sum().to_dict()
 
             allocation_rows = []
@@ -2838,8 +2836,6 @@ class AppState:
 
                 # Logika Balancing & Refill dari BIN Acuan (LOG / INB)
                 sisa_source_refill = stk_src
-
-                # Cari nama BIN fisik sumber
                 available_bins = [b for (s, b), q in source_bins_detail.items() if s == sku and q > 0]
                 bin_asal_utama = available_bins[0] if available_bins else "LOGISTIK / INBOUND"
 
@@ -2911,7 +2907,6 @@ class AppState:
             need_on_sku = len(df_on_miss)
             total_refill_qty = int(df_refill['QTY REFILL'].sum()) if not df_refill.empty else 0
 
-            # Persentase Balancing Compliance
             ready_off = tot_sku_count - need_off_sku
             ready_on = tot_sku_count - need_on_sku
             perc_off = (ready_off / tot_sku_count * 100) if tot_sku_count > 0 else 0.0
