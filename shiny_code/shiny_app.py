@@ -2163,8 +2163,7 @@ def server(input, output, session: Session):
     # 3. Output reactive (otomatis terupdate di semua user saat ada yang masuk/keluar)
     @render.text
     def txt_active_users():
-        count = state.active_users.get()
-        return f"{count} User Online"
+        return f"{state.active_users.get()} User Aktif"
 
 app = App(app_ui, server)
 
