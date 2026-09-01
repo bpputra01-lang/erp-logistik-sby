@@ -1111,7 +1111,223 @@ def fl_request_view(state: AppState):
             style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
         ), results_ui, style="width: 100%; padding: 1rem;"
     )
-    
+    # ==============================================================================
+# VIEW 7: REFILL TOKO
+# ==============================================================================
+def refill_toko_view(state: AppState):
+    results_ui = ui.div()
+    if state.refill_toko_done():
+        df = state._df_refill_toko
+        priority_sku = len(df[df["QTY TOKO"] == 0]) if not df.empty and "QTY TOKO" in df.columns else 0
+        results_ui = ui.div(
+            ui.hr(),
+            ui.div(
+                dark_metric_box("📦 SKU PERLU REFILL", f"{len(df):,}", "#2BEBFA"),
+                dark_metric_box("📈 PRIORITY (QTY TOKO 0)", f"{priority_sku:,}", "#FACA2B"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;"
+            ),
+            ui.div(
+                ui.download_button("btn_dl_refill_toko", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px;"), "Download Refill Toko (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
+            ),
+            render_clean_table(df.columns.tolist(), df.values.tolist(), "tbl_refill_toko")
+        )
+    return ui.div(
+        ui.div(
+            ui.h4("📥 Upload Stock System (Multiple Adjustment)", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
+            custom_uploader_box("uploader_refill_stock", "Stock System All"),
+            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px;"), "PROSES REFILL TOKO"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_refill_toko', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
+            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+        ), results_ui, style="width: 100%; padding: 1rem;"
+    )
+
+# ==============================================================================
+# VIEW 8: STORE LEADER RTO DECISSION
+# ==============================================================================
+def rto_decision_view(state: AppState):
+    results_ui = ui.div()
+    if state.rto_dec_done():
+        df = state._df_rto_dec
+        results_ui = ui.div(
+            ui.hr(),
+            ui.div(
+                dark_metric_box("Total Unique SKU", f"{len(df):,}", "#C5A059"),
+                dark_metric_box("Total Qty Surabaya", f"{df['QTY SURABAYA'].sum():,}", "#3182CE"),
+                dark_metric_box("Total Qty Semarang", f"{df['QTY SEMARANG'].sum():,}", "#10B981"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;"
+            ),
+            ui.div(
+                ui.download_button("btn_dl_rto_dec", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px;"), "Download Hasil Compare (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
+            ),
+            render_clean_table(df.columns.tolist(), df.values.tolist(), "tbl_rto_decision")
+        )
+    return ui.div(
+        ui.div(
+            ui.h4("📤 Upload 4 File Logistik (SBY, SMG, Sales 60d, ToC)", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
+            ui.div(
+                custom_uploader_box("uploader_rto_sby", "1. Stock Surabaya"),
+                custom_uploader_box("uploader_rto_smg", "2. Stock Semarang"),
+                custom_uploader_box("uploader_rto_sales", "3. Sales 60d"),
+                custom_uploader_box("uploader_rto_toc", "4. ToC Master"),
+                style="display: flex; gap: 1rem; width: 100%; margin-bottom: 0.5rem; flex-wrap: wrap;"
+            ),
+            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px;"), "INTEGRATE & COMPARE DATA"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_rto_decision', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
+            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+        ), results_ui, style="width: 100%; padding: 1rem;"
+    )
+
+# ==============================================================================
+# VIEW 9: MATCH REAL & SYSTEM (CROSS-BRANCH)
+# ==============================================================================
+def match_karantina_view(state: AppState):
+    m = state.match_ks_metrics()
+    results_ui = ui.div()
+    if state.match_ks_done():
+        results_ui = ui.div(
+            ui.hr(),
+            ui.div(
+                dark_metric_box("📦 Total Qty Real +", f"{m.get('total_real', 0):,}", "#C5A059"),
+                dark_metric_box("✅ Total Match", f"{m.get('total_match', 0):,}", "#2ecc71"),
+                dark_metric_box("⚠️ Total Unmatched", f"{m.get('total_unmatch', 0):,}", "#e74c3c"),
+                dark_metric_box("🏪 Sisa System (Karantina)", f"{m.get('sys_left', 0):,}", "#3498db"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;"
+            ),
+            render_clean_table(state._df_match_ks.columns.tolist(), state._df_match_ks.values.tolist(), "tbl_match_ks")
+        )
+    return ui.div(
+        ui.div(
+            ui.h4("📥 Upload Data System (+) & Data Real (+)", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
+            ui.div(custom_uploader_box("uploader_match_sys", "1. Laporan System (+)"), custom_uploader_box("uploader_match_real", "2. Laporan Real (+)"), style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem;"),
+            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px;"), "RUN CROSS-BRANCH MATCH"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_match_ks', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
+            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+        ), results_ui, style="width: 100%; padding: 1rem;"
+    )
+
+# ==============================================================================
+# VIEW 10: REFILL KOLI TO KOLI / REFILL
+# ==============================================================================
+def koli_consolidation_view(state: AppState):
+    results_ui = ui.div()
+    if state.koli_done():
+        results_ui = ui.div(
+            ui.hr(),
+            ui.h4("🚨 JOB DELEGATION: ACTION REFILL / MUTASI", style="font-size: 15px; font-weight: 800; margin-bottom: 0.75rem;"),
+            render_clean_table(state._df_koli_refill.columns.tolist(), state._df_koli_refill.values.tolist(), "tbl_koli_refill")
+        )
+    return ui.div(
+        ui.div(
+            ui.h4("📥 Upload Excel Gudang Koli (KL1/KL2)", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
+            custom_uploader_box("uploader_koli_file", "Upload Excel Gudang"),
+            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px;"), "PROSES KONSOLIDASI KOLI"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_koli_conso', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
+            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+        ), results_ui, style="width: 100%; padding: 1rem;"
+    )
+
+# ==============================================================================
+# VIEW 11: DYNAMIC STOCK ALLOCATION
+# ==============================================================================
+def stock_allocation_view(state: AppState):
+    results_ui = ui.div()
+    if state.stk_alloc_done():
+        df = state._raw_df_stk_alloc
+        results_ui = ui.div(
+            ui.hr(),
+            ui.div(
+                dark_metric_box("Total Stock Master", f"{df.iloc[:, 1].sum():,.0f} Pcs", "#ffc107"),
+                dark_metric_box("Alokasi Online", f"{df['QTY_ONLINE'].sum():,.0f} Pcs", "#10b981"),
+                dark_metric_box("Alokasi Offline", f"{df['QTY_OFFLINE'].sum():,.0f} Pcs", "#3b82f6"),
+                dark_metric_box("Alokasi Logistik", f"{df['QTY_LOGISTIK'].sum():,.0f} Pcs", "#e74c3c"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;"
+            ),
+            render_clean_table(df.columns.tolist(), df.values.tolist(), "tbl_stk_alloc")
+        )
+    return ui.div(
+        ui.div(
+            ui.h4("📥 Upload Stock & Sales Report", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
+            ui.div(custom_uploader_box("uploader_alloc_stock", "1. File Stock (.xlsx)"), custom_uploader_box("uploader_alloc_sales", "2. File Sales (.xlsx)"), style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem;"),
+            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px;"), "RUN DYNAMIC ALLOCATION"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_stk_alloc', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
+            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+        ), results_ui, style="width: 100%; padding: 1rem;"
+    )
+
+# ==============================================================================
+# VIEW 12: REFILL & WITHDRAW SYSTEM
+# ==============================================================================
+def refill_withdraw_view(state: AppState):
+    results_ui = ui.div()
+    if state.rf_wd_done():
+        results_ui = ui.div(
+            ui.hr(),
+            ui.navset_card_tab(
+                ui.nav_panel("♻️ Summary Refill", ui.div(render_clean_table(state._df_rf_summary.columns.tolist(), state._df_rf_summary.values.tolist(), "tbl_rf_sum"), style="padding: 0.75rem 0;")),
+                ui.nav_panel("♻️ Summary Withdraw", ui.div(render_clean_table(state._df_wd_summary.columns.tolist(), state._df_wd_summary.values.tolist(), "tbl_wd_sum"), style="padding: 0.75rem 0;"))
+            )
+        )
+    return ui.div(
+        ui.div(
+            ui.h4("📥 Upload Stock Surabaya & Stock Tracking", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
+            ui.div(custom_uploader_box("uploader_rwd_stock", "1. All Stock SBY"), custom_uploader_box("uploader_rwd_trx", "2. Stock Tracking"), style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem;"),
+            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px;"), "GENERATE SUMMARY REFILL/WITHDRAW"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_rf_wd', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
+            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+        ), results_ui, style="width: 100%; padding: 1rem;"
+    )
+
+# ==============================================================================
+# VIEW 13: FDR UPDATE (MANIFEST CHECKER)
+# ==============================================================================
+def fdr_update_view(state: AppState):
+    results_ui = ui.div()
+    if state.fdr_done():
+        m = state.fdr_metrics()
+        results_ui = ui.div(
+            ui.hr(),
+            ui.div(
+                dark_metric_box("TOTAL MANIFEST", f"{m.get('total', 0):,}", "#3182CE"),
+                dark_metric_box("FU IT", f"{m.get('fu', 0):,}", "#FFA500"),
+                dark_metric_box("NEED CHECK BRANCH", f"{m.get('sisa', 0):,}", "#FF4B4B"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;"
+            ),
+            ui.navset_card_tab(
+                ui.nav_panel("📥 MANIFEST", ui.div(render_clean_table(state._df_fdr_manifest.columns.tolist(), state._df_fdr_manifest.values.tolist(), "tbl_fdr_m"), style="padding: 0.75rem 0;")),
+                ui.nav_panel("📋 FU IT", ui.div(render_clean_table(state._df_fdr_fu.columns.tolist(), state._df_fdr_fu.values.tolist(), "tbl_fdr_fu"), style="padding: 0.75rem 0;"))
+            )
+        )
+    return ui.div(
+        ui.div(
+            ui.h4("📂 Upload File Manifest Jezpro", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
+            custom_uploader_box("uploader_fdr_file", "Upload Manifest"),
+            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px;"), "PROCESS MANIFEST"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_fdr', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
+            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+        ), results_ui, style="width: 100%; padding: 1rem;"
+    )
+
+# ==============================================================================
+# VIEW 14: PERCENTAGE DISPLAY CONTROL
+# ==============================================================================
+def percentage_display_view(state: AppState):
+    results_ui = ui.div()
+    if state.disp_ctrl_done():
+        m = state.disp_ctrl_metrics()
+        results_ui = ui.div(
+            ui.hr(),
+            ui.div(
+                dark_metric_box("🧥 Total Article", f"{m.get('total_art', 0):,}", "#7B61FF"),
+                dark_metric_box("✅ On Display", f"{m.get('on_display', 0):,}", "#00C853"),
+                dark_metric_box("⚠️ Need Display", f"{m.get('need_display', 0):,}", "#FF5252"),
+                dark_metric_box("🏬 From Store", f"{m.get('need_gudang', 0):,}", "#FF9800"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;"
+            ),
+            render_clean_table(state._df_disp_detail.columns.tolist(), state._df_disp_detail.values.tolist(), "tbl_disp_detail")
+        )
+    return ui.div(
+        ui.div(
+            ui.h4("📥 Upload All Stock Display", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
+            custom_uploader_box("uploader_disp_stock", "All Stock"),
+            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px;"), "ANALISIS DISPLAY AVAILABILITY"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_disp_ctrl', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
+            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+        ), results_ui, style="width: 100%; padding: 1rem;"
+    )
 # Navigation Components
 def menu_item(label: str, target_menu: str, current_menu: str):
     is_active = (current_menu == target_menu)
