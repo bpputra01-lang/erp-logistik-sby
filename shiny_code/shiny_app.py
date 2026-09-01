@@ -37,31 +37,25 @@ app_ui = ui.page_fluid(
 def server(input: Inputs, output: Outputs, session: Session):
     state = AppState()
 
+    # ✅ TARUH LOGIKA USER AKTIF DI SINI (DI SERVER UTAMA):
+    active_users.set(active_users.get() + 1)
+
+    @session.on_ended
+    def _on_session_ended():
+        current_count = active_users.get()
+        active_users.set(max(0, current_count - 1))
+
+    @render.text
+    def txt_active_users():
+        return f"{active_users.get()} User Aktif"
+
+    # Lanjut ke listeners Anda seperti biasa:
     # Modal Dismiss Listeners
     @reactive.Effect
     @reactive.event(input.close_success_modal_event)
     def _on_close_success_modal():
         state.show_success_modal.set(False)
-
-    @reactive.Effect
-    @reactive.event(input.change_filter_periode)
-    def _update_filter_periode():
-        state.filter_periode.set(input.change_filter_periode())
-    @reactive.Effect
-    @reactive.event(input.btn_process_stock_minus)
-    def _proc_stock_file():
-        f = input.upload_stock_file()
-        if not f:
-            state.error_modal_message.set("Pilih file Stock Minus terlebih dahulu!")
-            state.show_error_modal.set(True)
-            return
-        with open(f[0]["datapath"], "rb") as fp:
-            succ, msg = state.process_stock_minus_file(fp.read(), f[0]["name"])
-        if succ:
-            state.show_success_modal.set(True)
-        else:
-            state.error_modal_message.set(msg)
-            state.show_error_modal.set(True)
+    
 
     @reactive.Effect
     @reactive.event(input.close_error_modal_event)
@@ -2159,28 +2153,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             state._raw_df_jso_res.to_excel(writer, sheet_name='Summary', index=False)
         buf.seek(0)
         yield buf.getvalue()
+        
 
-app_ui = create_ui()
-
-def server(input, output, session: Session):
-    # 1. Ketika user membuka browser/tab, tambah user aktif (+1)
-    state.active_users.set(state.active_users.get() + 1)
-
-    # 2. Ketika user menutup browser/tab (sesi putus), kurangi user aktif (-1)
-    @session.on_ended
-    def _on_session_ended():
-        current_count = state.active_users.get()
-        state.active_users.set(max(0, current_count - 1))
-
-    # 3. Output reactive (otomatis terupdate di semua user saat ada yang masuk/keluar)
-    @render.text
-    def txt_active_users():
-        return f"{state.active_users.get()} User Aktif"
-
-app = App(app_ui, server)
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("shiny_app:app", host=config.APP_HOST, port=config.APP_PORT, reload=True)
 
 app = App(app_ui, server)

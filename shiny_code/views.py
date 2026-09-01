@@ -891,51 +891,15 @@ def justification_so_view(state: AppState):
     )
 
 
+# ✅ GANTI DENGAN INI:
 def create_ui():
     return ui.page_fluid(
-        # Styling sederhana untuk badge user aktif
-        ui.tags.style("""
-            .active-user-badge {
-                display: inline-flex;
-                align-items: center;
-                gap: 8px;
-                background: #e8f5e9;
-                color: #2e7d32;
-                border: 1px solid #c8e6c9;
-                padding: 6px 14px;
-                border-radius: 20px;
-                font-weight: 600;
-                font-size: 14px;
-                margin-bottom: 15px;
-            }
-            .pulse-dot {
-                width: 10px;
-                height: 10px;
-                background-color: #4caf50;
-                border-radius: 50%;
-                box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
-                animation: pulse 1.6s infinite;
-            }
-            @keyframes pulse {
-                0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }
-                70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(76, 175, 80, 0); }
-                100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
-            }
-        """),
-        
-        ui.h2(config.APP_TITLE),
-        
-        # Komponen User Aktif
-        ui.div(
-            ui.div(class_="pulse-dot"),
-            ui.output_text("txt_active_users", inline=True),
-            class_="active-user-badge"
-        ),
-        
-        ui.hr(),
-        ui.h4("Konten Dashboard"),
-        ui.p("Isi dashboard aplikasi logistic Anda di sini...")
+        CUSTOM_HEAD,
+        static_loading_spinner(),
+        ui.output_ui("app_root_ui"),
+        style="padding: 0; margin: 0; background-color: #111318; min-height: 100vh;"
     )
+    
 # Navigation Components
 def menu_item(label: str, target_menu: str, current_menu: str):
     is_active = (current_menu == target_menu)
