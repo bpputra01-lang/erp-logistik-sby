@@ -920,6 +920,28 @@ def cross_check_real_system_view(state: AppState):
         style="width: 100%; padding: 1rem;"
     )
 
+# ==============================================================================
+# VIEW: BALANCING STOCK & DYNAMIC ALLOCATION
+# ==============================================================================
+def balancing_stock_view(state: AppState):
+    upload_section = ui.div(
+        ui.h4("📥 Upload Data All Stock & Histori Penjualan (Sales)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+        ui.div(
+            custom_uploader_box("uploader_bs_stock", "1. File ALL DATA STOCK (Multiple Adj.)"),
+            custom_uploader_box("uploader_bs_sales", "2. File SALES REPORT (90 Hari Terakhir)"),
+            style="display: flex; gap: 1rem; width: 100%; margin-bottom: 0.5rem; flex-wrap: wrap;"
+        ),
+        ui.output_ui("balancing_stock_action_btn_ui"),
+        style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+    )
+
+    results_section = ui.output_ui("balancing_stock_results_container")
+
+    return ui.div(
+        upload_section,
+        results_section,
+        style="width: 100%; padding: 1rem;"
+    )
 # Navigation Components
 def menu_item(label: str, target_menu: str, current_menu: str):
     is_active = (current_menu == target_menu)

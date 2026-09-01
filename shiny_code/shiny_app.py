@@ -8,7 +8,8 @@ from views import (
     custom_uploader_box, compare_system_view, stock_minus_view, stock_opname_view,
     putaway_view, main_dashboard_view, sidebar, ongkir_tab2_view, compare_rto_view, 
     justification_so_view, cycle_count_view, login_page, ppa_audit_view, 
-    cycle_count_analyzer_view, global_header, cross_check_real_system_view
+    cycle_count_analyzer_view, global_header, cross_check_real_system_view,
+    balancing_stock_view
 )
 
 app_ui = ui.page_fluid(
@@ -512,6 +513,44 @@ def server(input: Inputs, output: Outputs, session: Session):
                     ), open=True
                 )
             )
+
+            # 9. PANDUAN: BALANCING STOCK & DYNAMIC ALLOCATION
+        elif cur in ["Balancing Stock", "Stock Allocation"]:
+            guide_body = ui.div(
+                ui.tags.details(
+                    ui.tags.summary("📋 Informasi Format Dokumen & Kolom Wajib"),
+                    ui.div(
+                        ui.tags.strong("Format File yang Dibutuhkan:"),
+                        ui.tags.ul(
+                            ui.tags.li(ui.strong("1. FILE ALL STOCK (Multiple Adjustment):"), " Download dari Jezpro dan pastikan mencentang ", ui.strong("'Termasuk yang sudah habis'"), ". File wajib memuat Kolom B (BIN), Kolom C (SKU), Kolom E (Item Name/Deskripsi), dan Kolom J (Qty System)."),
+                            ui.tags.li(ui.strong("2. FILE SALES REPORT (Histori Penjualan 90 Hari):"), " Download data penjualan lengkap dari Jezpro. File wajib memuat Kolom A (Nama Store/Cabang), Kolom S (Quantity Sales), dan Kolom AA (SKU).")
+                        ),
+                        class_="accordion-content"
+                    ), open=True
+                ),
+                ui.tags.details(
+                    ui.tags.summary("💡 Logic Thinking - Hybrid Balancing & Dynamic Stock Allocation"),
+                    ui.div(
+                        ui.tags.strong("1. Klasifikasi Performa Sales & Rasio Alokasi Dinamis:"),
+                        ui.tags.ul(
+                            ui.tags.li(ui.strong("Tanpa Histori Sales (0 Unit):"), " Alokasi 10% Online, 10% Offline, dan ", ui.strong("80% Disimpan di Buffer Logistik"), "."),
+                            ui.tags.li(ui.strong("Dominan Online (> 70% Sales):"), " Alokasi ", ui.strong("70% Online"), ", 15% Offline, 15% Logistik."),
+                            ui.tags.li(ui.strong("Dominan Offline (> 70% Sales):"), " Alokasi 15% Online, ", ui.strong("70% Offline"), ", 15% Logistik."),
+                            ui.tags.li(ui.strong("Balanced / Imbang (Rasio Normal):"), " Alokasi ", ui.strong("40% Online, 40% Offline, 20% Logistik"), ".")
+                        ),
+                        ui.hr(style="margin: 8px 0; border-color: #CBD5E0;"),
+                        ui.tags.strong("2. Logika Penentuan BIN Acuan & Trigger Refill:"),
+                        ui.tags.ol(
+                            ui.tags.li(ui.strong("BIN Acuan Sumber (Source):"), " Seluruh BIN yang mengandung kata ", ui.code("LOG"), " (Logistik/Koli) atau ", ui.code("INB"), " (Staging Inbound/Penerimaan) serta area DC Buffer."),
+                            ui.tags.li(ui.strong("BIN Target Penjualan:"), " BIN Offline (mengandung kata ", ui.code("OFF"), ", ", ui.code("TOKO"), ", ", ui.code("STORE"), ", atau ", ui.code("GUDANG LT.2"), ") dan BIN Online (mengandung kata ", ui.code("ONL"), ", ", ui.code("ONLINE"), ", atau ", ui.code("HUB"), ")."),
+                            ui.tags.li(ui.strong("Pengecekan Defisit Stok:"), " Jika suatu SKU memiliki stok di BIN Acuan Sumber (> 0), namun stok aktual di BIN Offline atau Online ", ui.strong("bernilai 0 atau kurang dari Target Ideal Alokasi"), ", maka SKU tersebut otomatis masuk ke dalam antrean ", ui.strong("Balancing Stock Need Refill"), "."),
+                            ui.tags.li(ui.strong("Kalkulasi Kuota Refill Maksimal:"), " Jumlah Qty Refill dihitung presisi berdasarkan defisit stok terhadap target ideal dan dibatasi maksimal sebanyak stok sumber yang tersedia (tidak akan over-refill)."),
+                            ui.tags.li(ui.strong("Instruksi Mutasi Otomatis:"), " Sistem otomatis membuat Template Mutasi Perpindahan (BIN Awal ➔ BIN Tujuan, SKU, dan Qty) siap pakai untuk operasional gudang.")
+                        ),
+                        class_="accordion-content"
+                    ), open=True
+                )
+            )
         # FALLBACK JIKA MENU LAIN
         else:
             guide_body = ui.div(
@@ -779,6 +818,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         elif content_type == "stock_opname": page_content = stock_opname_view(state)
         elif content_type == "justification_so": page_content = justification_so_view(state)
         elif content_type == "cross_check_real_sys": page_content = cross_check_real_system_view(state)
+        elif content_type == "balancing_stock": page_content = balancing_stock_view(state)
         elif content_type == "access_denied":
             page_content = ui.div(ui.h2("⛔ Akses Ditolak", style="font-size: 28px; color: #E53E3E; font-weight: bold;"), ui.p("Maaf, halaman ini dibatasi hak aksesnya.", style="color: #718096; font-size: 15px;"), style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;")
         else:
@@ -2253,6 +2293,109 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine='openpyxl') as writer:
             state._raw_df_crs_all.to_excel(writer, sheet_name='MATCHING_RESULT', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+        # ==========================================================================
+    # BALANCING STOCK CONTROLLER & HANDLERS
+    # ==========================================================================
+    @render.ui
+    def balancing_stock_action_btn_ui():
+        f1 = input.uploader_bs_stock() if "uploader_bs_stock" in input else None
+        f2 = input.uploader_bs_sales() if "uploader_bs_sales" in input else None
+
+        if (f1 and len(f1) > 0) and (f2 and len(f2) > 0):
+            return ui.div(
+                ui.tags.button(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "RUN BALANCING PROCESS"),
+                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_balancing_stock', Math.random(), {priority: 'event'});",
+                    class_="btn-red-gradient"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+            )
+        return ui.div(
+            ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"),
+                "UPLOAD KEDUA FILE UNTUK MEMULAI",
+                disabled=True,
+                class_="btn-locked"
+            ),
+            style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+        )
+
+    @reactive.Effect
+    @reactive.event(input.btn_run_balancing_stock)
+    def _proc_balancing_stock():
+        f_stock = input.uploader_bs_stock()
+        f_sales = input.uploader_bs_sales()
+        if not f_stock or not f_sales:
+            state.error_modal_message.set("Pilih kedua file (All Stock & Sales Report) terlebih dahulu!")
+            state.show_error_modal.set(True)
+            return
+
+        succ, msg = state.process_balancing_stock(f_stock, f_sales)
+        if succ:
+            state.show_success_modal.set(True)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+
+    @render.ui
+    def balancing_stock_results_container():
+        if not state.bs_processed():
+            return ui.div()
+
+        color_off = "#10B981" if state.bs_perc_offline() >= 98.0 else "#DD6B20"
+        color_on = "#10B981" if state.bs_perc_online() >= 95.0 else "#DD6B20"
+
+        return ui.div(
+            ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
+            ui.h4("📋 RINGKASAN DISTRIBUSI & BALANCING STOCK", style="font-size: 16px; color: #010B13; font-weight: 800; margin-bottom: 1rem;"),
+            
+            # --- 4 KOTAK METRIK UTAMA ---
+            ui.div(
+                dark_metric_box("📦 TOTAL SKU AKTIF", f"{state.bs_total_sku():,} SKU", "#C5A059"),
+                dark_metric_box("🏬 REFILL TO STORE / OFFLINE", f"{state.bs_sku_need_off():,} SKU", "#E53E3E"),
+                dark_metric_box("🌐 REFILL TO ONLINE / HUB", f"{state.bs_sku_need_on():,} SKU", "#3182CE"),
+                dark_metric_box("🔄 TOTAL QTY REFILL RECOM.", f"{state.bs_qty_refill_total():,} PCS", "#10B981"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
+            ),
+
+            # --- 2 KOTAK COMPLIANCE PERSENTASE ---
+            ui.div(
+                dark_metric_box("🏪 COMPLIANCE OFFLINE STOCK", f"{state.bs_perc_offline():.1f}% TERSEDIA", color_off),
+                dark_metric_box("🌐 COMPLIANCE ONLINE STOCK", f"{state.bs_perc_online():.1f}% TERSEDIA", color_on),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+            ),
+
+            # --- TOMBOL DOWNLOAD LAPORAN LENGKAP ---
+            ui.div(
+                ui.download_button(
+                    "btn_dl_balancing_stock_all",
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD HASIL BALANCING (.XLSX)"),
+                    style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
+            ),
+
+            # --- 4 TAB DETAIL HASIL ---
+            ui.navset_card_tab(
+                ui.nav_panel("📝 TEMPLATE REFILL MUTASI", ui.div(render_clean_table(state.df_bs_refill_headers(), state.df_bs_refill_rows()), style="padding: 0.75rem 0;")),
+                ui.nav_panel("📊 DYNAMIC ALLOCATION MATRIX", ui.div(render_clean_table(state.df_bs_alloc_headers(), state.df_bs_alloc_rows()), style="padding: 0.75rem 0;")),
+                ui.nav_panel("🏪 DEFISIT OFFLINE (STORE)", ui.div(render_clean_table(state.df_bs_off_missing_headers(), state.df_bs_off_missing_rows()), style="padding: 0.75rem 0;")),
+                ui.nav_panel("🌐 DEFISIT ONLINE (HUB)", ui.div(render_clean_table(state.df_bs_on_missing_headers(), state.df_bs_on_missing_rows()), style="padding: 0.75rem 0;"))
+            ),
+            style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
+        )
+
+    @render.download(filename="REPORT_BALANCING_STOCK.xlsx")
+    def btn_dl_balancing_stock_all():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_bs_refill.to_excel(writer, sheet_name='TEMPLATE_REFILL', index=False)
+            state._raw_df_bs_alloc.to_excel(writer, sheet_name='ALLOCATION_MATRIX', index=False)
+            state._raw_df_bs_off_missing.to_excel(writer, sheet_name='DEFISIT_OFFLINE', index=False)
+            state._raw_df_bs_on_missing.to_excel(writer, sheet_name='DEFISIT_ONLINE', index=False)
         buf.seek(0)
         yield buf.getvalue()
 
