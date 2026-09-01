@@ -3,7 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Shiny App</title>
+    <title>ZKN WAREHOUSE ERP</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>" />
+    
     <script
       src="./shinylive/load-shinylive-sw.js"
       type="module"
@@ -18,11 +20,198 @@
     </script>
     <link rel="stylesheet" href="./shinylive/style-resets.css" />
     <link rel="stylesheet" href="./shinylive/shinylive.css" />
-    
+
+    <!-- =====================================================================
+         CSS CUSTOM PREMIUM SPLASH SCREEN (MENUTUPI LOADER HEXAGON MADU)
+    ====================================================================== -->
+    <style>
+      /* 1. Sembunyikan semua default loader & SVG hexagon bawaan Shinylive */
+      .shinylive-loading, 
+      .pyodide-loading, 
+      .loading-spinner, 
+      .loading-container,
+      #root > div[class*="loading"],
+      #root svg {
+        display: none !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+      }
+
+      /* 2. Fullscreen Splash Screen Container */
+      #zkn-splash-screen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: radial-gradient(circle at center, #1A1D24 0%, #0D0F12 100%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 999999999;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        color: #FFFFFF;
+        transition: opacity 0.6s ease, visibility 0.6s ease;
+      }
+
+      /* 3. Logo & Glow Box Denyut */
+      .zkn-splash-logo-box {
+        width: 80px;
+        height: 80px;
+        background: linear-gradient(135deg, #E50914 0%, #B20710 100%);
+        border-radius: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 40px;
+        box-shadow: 0 0 40px rgba(229, 9, 20, 0.6);
+        margin-bottom: 22px;
+        animation: zknPulse 2s infinite ease-in-out;
+      }
+
+      @keyframes zknPulse {
+        0% { transform: scale(1); box-shadow: 0 0 25px rgba(229, 9, 20, 0.4); }
+        50% { transform: scale(1.08); box-shadow: 0 0 50px rgba(229, 9, 20, 0.85); }
+        100% { transform: scale(1); box-shadow: 0 0 25px rgba(229, 9, 20, 0.4); }
+      }
+
+      .zkn-splash-title {
+        font-size: 26px;
+        font-weight: 900;
+        letter-spacing: 2px;
+        margin: 0 0 4px 0;
+        color: #FFFFFF;
+        text-transform: uppercase;
+      }
+
+      .zkn-splash-title span {
+        color: #E50914;
+      }
+
+      .zkn-splash-subtitle {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 3px;
+        color: #C5A059;
+        text-transform: uppercase;
+        margin: 0 0 30px 0;
+      }
+
+      /* 4. Animated Glowing Progress Bar (Gradasi Emas - Merah) */
+      .zkn-progress-track {
+        width: 290px;
+        height: 6px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+        overflow: hidden;
+        position: relative;
+        margin-bottom: 15px;
+      }
+
+      .zkn-progress-fill {
+        width: 45%;
+        height: 100%;
+        background: linear-gradient(90deg, #C5A059, #E50914, #C5A059);
+        background-size: 200% 100%;
+        border-radius: 10px;
+        position: absolute;
+        animation: zknBarMove 1.6s infinite linear;
+      }
+
+      @keyframes zknBarMove {
+        0% { left: -45%; background-position: 0% 50%; }
+        100% { left: 100%; background-position: 100% 50%; }
+      }
+
+      .zkn-splash-status {
+        font-size: 12px;
+        color: #A0AEC0;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        transition: opacity 0.3s ease;
+      }
+
+      .zkn-version-badge {
+        position: absolute;
+        bottom: 25px;
+        font-size: 11px;
+        color: #4A5568;
+        font-weight: 700;
+        letter-spacing: 1px;
+      }
+    </style>
   </head>
   <body>
     
+    <!-- TEMPAT SHINY BERJALAN -->
     <div style="height: 100vh; width: 100vw" id="root"></div>
+
+    <!-- STRUKTUR SPLASH SCREEN ZKN LOGISTIC -->
+    <div id="zkn-splash-screen">
+      <div class="zkn-splash-logo-box">📦</div>
+      <div class="zkn-splash-title">ZKN <span>LOGISTIC</span></div>
+      <div class="zkn-splash-subtitle">CENTER WAREHOUSE SYSTEM • SURABAYA</div>
+      
+      <div class="zkn-progress-track">
+        <div class="zkn-progress-fill"></div>
+      </div>
+      
+      <div id="zkn-status-text" class="zkn-splash-status">Menginisialisasi Engine WebAssembly Python...</div>
+      <div class="zkn-version-badge">ERP WAREHOUSE SUPPORTING TOOLS v2.0</div>
+    </div>
+
+    <!-- SCRIPT DETEKTOR OTOMATIS: FADE OUT BEGITU SHINY READY -->
+    <script>
+      (function() {
+        const statusMessages = [
+          "Menginisialisasi Engine WebAssembly Python...",
+          "Memuat Library Pandas, NumPy & Engine Data...",
+          "Menghubungkan Database & Modul Warehouse...",
+          "Menyiapkan Antarmuka Sistem ERP...",
+          "Selesai! Membuka Sistem..."
+        ];
+        
+        let msgIdx = 0;
+        const statusEl = document.getElementById("zkn-status-text");
+        
+        const msgInterval = setInterval(function() {
+          msgIdx = (msgIdx + 1) % statusMessages.length;
+          if (statusEl) {
+            statusEl.style.opacity = "0";
+            setTimeout(function() {
+              statusEl.innerText = statusMessages[msgIdx];
+              statusEl.style.opacity = "1";
+            }, 300);
+          }
+        }, 1800);
+
+        // Deteksi secara real-time kapan Shiny selesai merender UI ke #root
+        const checkReady = setInterval(function() {
+          const root = document.getElementById("root");
+          const hasContent = root && (
+            root.querySelector("#login_username_field") ||
+            root.querySelector("#main-scroll-container") ||
+            root.querySelector(".container-fluid, .page-fluid, form, button, table") ||
+            (root.children.length > 0 && !root.querySelector(".shinylive-loading"))
+          );
+
+          if (hasContent) {
+            clearInterval(checkReady);
+            clearInterval(msgInterval);
+
+            const splash = document.getElementById("zkn-splash-screen");
+            if (splash) {
+              splash.style.opacity = "0";
+              setTimeout(function() {
+                splash.style.display = "none";
+                splash.remove();
+              }, 600);
+            }
+          }
+        }, 100);
+      })();
+    </script>
     
   </body>
 </html>

@@ -19,10 +19,10 @@ def get_image_base64(filename):
     return f"./{filename}"
 
 # ==============================================================================
-# CSS & JAVASCRIPT ASSETS (LENGKAP DENGAN SMART SCROLL LOCK & AUTO-DISMISS)
+# CSS & JAVASCRIPT ASSETS (LENGKAP DENGAN ROUTING URL & AUTO-DISMISS SPINNER)
 # ==============================================================================
 CUSTOM_HEAD = ui.head_content(
-    # --- 1. SCRIPT UTAMA (PAGINASI, DRAG & DROP, ZERO-GLITCH SCROLL, & AUTO-DISMISS SPINNER) ---
+    # --- 1. SCRIPT UTAMA (PAGINASI, DRAG & DROP, SCROLL LOCK, AUTO-DISMISS, & URL ROUTING) ---
     ui.tags.script("""
         document.title = "ZKN WAREHOUSE ERP";
         let favicon = document.querySelector("link[rel~='icon']");
@@ -177,11 +177,11 @@ CUSTOM_HEAD = ui.head_content(
                 }
             });
 
-            // --- AUTO-DISMISS SPINNER BEGITU PROSES SELESAI ---
+            // --- 4. AUTO-DISMISS SPINNER BEGITU SHINY SELESAI PROSES ---
             $(document).on('shiny:idle shiny:value shiny:recalculated', function() {
                 document.body.classList.remove('process-running');
                 let spinner = document.getElementById('global_reflex_loading');
-                if (spinner) spinner.style.display = 'none';
+                if (spinner) spinner.style.setProperty('display', 'none', 'important');
             });
         }
 
@@ -192,10 +192,28 @@ CUSTOM_HEAD = ui.head_content(
             }
         });
 
+        // --- 5. SINKRONISASI URL ROUTING MENU OTOMATIS ---
+        window.updateUrlMenu = function(menuName) {
+            let slug = menuName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+            if (window.history.pushState) {
+                window.history.pushState(null, null, '#' + slug);
+            } else {
+                window.location.hash = '#' + slug;
+            }
+        };
+
+        // BACA URL SAAT PERTAMA KALI HALAMAN DIBUKA
         document.addEventListener("DOMContentLoaded", function() {
             let c = getContainer();
             if (c) {
                 domWatcher.observe(c, { childList: true, subtree: true });
+            }
+
+            let h = window.location.hash.replace('#', '').trim();
+            if (h) {
+                setTimeout(function() {
+                    Shiny.setInputValue('initial_url_hash', h, {priority: 'event'});
+                }, 500);
             }
         });
     """),
@@ -257,8 +275,17 @@ CUSTOM_HEAD = ui.head_content(
         body.process-running #global_reflex_loading {
             display: flex !important; position: fixed !important;
             top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important;
-            background: rgba(0, 0, 0, 0.5) !important; z-index: 99999 !important;
+            background: rgba(0, 0, 0, 0.5) !important; z-index: 99990 !important;
             align-items: center !important; justify-content: center !important;
+        }
+
+        body:has(#success-modal-overlay) #global_reflex_loading,
+        body:has(#error-modal-overlay) #global_reflex_loading {
+            display: none !important;
+        }
+
+        #success-modal-overlay, #error-modal-overlay {
+            z-index: 999999 !important;
         }
 
         @keyframes popIn { 0% { transform: scale(0.5); opacity: 0; } 70% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
@@ -356,7 +383,6 @@ CUSTOM_HEAD = ui.head_content(
         }, 1000);
     """)
 )
-
 # ==============================================================================
 # MAPPING CABANG & BIN
 # ==============================================================================

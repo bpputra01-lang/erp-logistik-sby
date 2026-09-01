@@ -88,9 +88,40 @@ def server(input: Inputs, output: Outputs, session: Session):
         state.logout()
         ui.notification_show("Anda telah keluar dari sistem.", type="warning", duration=4)
 
+    SLUG_TO_MENU = {
+        "database-ongkir-in-out": "Database Ongkir In/Out",
+        "stock-minus": "Stock Minus",
+        "putaway-system": "Putaway System",
+        "compare-system": "Compare System",
+        "cycle-count": "Cycle Count",
+        "compare-rto": "Compare RTO",
+        "stock-opname": "Stock Opname",
+        "justification-so": "Justification SO",
+        "cross-check-real-system": "Cross Check Real & System",
+        "balancing-stock": "Balancing Stock",
+        "physical-inventory-list": "Physical Inventory List"
+    }
+
+    # 1. Saat menu diklik di sidebar -> URL di browser otomatis berubah
     @reactive.Effect
     @reactive.event(input.select_menu_item)
-    def _nav_event(): state.set_main_menu(input.select_menu_item())
+    def _nav_event():
+        menu = input.select_menu_item()
+        state.set_main_menu(menu)
+        # Update URL address bar tanpa refresh
+        ui.insert_ui(
+            ui.tags.script(f"window.updateUrlMenu('{menu}');"),
+            selector="head",
+            where="beforeEnd"
+        )
+
+    # 2. Saat web dibuka langsung lewat link spesifik (misal: #balancing-stock)
+    @reactive.Effect
+    @reactive.event(input.initial_url_hash)
+    def _on_initial_hash_load():
+        slug = input.initial_url_hash().lower().strip()
+        if slug in SLUG_TO_MENU:
+            state.set_main_menu(SLUG_TO_MENU[slug])
 
     
 
