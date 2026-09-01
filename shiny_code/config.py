@@ -2,6 +2,8 @@ import io
 import json
 import urllib.request
 import pandas as pd
+import uuid
+from datetime import datetime, timezone, timedelta
 
 # ==============================================================================
 # 1. KONFIGURASI UMUM APLIKASI
@@ -46,7 +48,6 @@ class SimpleSupabaseTable:
         return self
 
     def in_(self, column, values):
-        # Format list value ke syntax postgREST: in.(val1,val2)
         val_str = ",".join(map(str, values))
         self.params.append(f"{column}=in.({val_str})")
         return self
@@ -79,7 +80,55 @@ def get_supabase() -> SimpleSupabaseClient:
     return SimpleSupabaseClient(SUPABASE_URL, SUPABASE_KEY)
 
 # ==============================================================================
-# 4. HELPER UTILITY (PANDAS & PARSER)
+# 4. TRACKER USER AKTIF / ONLINE (HEARTBEAT SUPABASE)
+# ==============================================================================
+def ping_active_user(session_id: str, user_name: str = "Anonymous"):
+    """Mengirim sinyal online ke Supabase"""
+    try:
+        sb = get_supabase()
+        now_iso = datetime.now(timezone.utc).isoformat()
+        # Hapus dulu session lama lalu insert update terbaru
+        sb.table("active_sessions").in_("session_id", [session_id]).delete().execute()
+        sb.table("active_sessions").insert({
+            "session_id": session_id,
+            "user_name": user_name,
+            "last_ping": now_iso
+        }).execute()
+    except Exception as e:
+        print(f"Ping error: {e}")
+
+def remove_active_user(session_id: str):
+    """Menghapus session saat user menutup browser"""
+    try:
+        sb = get_supabase()
+        sb.table("active_sessions").in_("session_id", [session_id]).delete().execute()
+    except Exception:
+        pass
+
+def count_online_users() -> int:
+    """Menghitung user yang masih aktif dalam 45 detik terakhir"""
+    try:
+        sb = get_supabase()
+        res = sb.table("active_sessions").select("*").execute()
+        data = res.data if hasattr(res, "data") else []
+        
+        now = datetime.now(timezone.utc)
+        active_count = 0
+        for row in data:
+            ping_str = row.get("last_ping")
+            if ping_str:
+                ping_time = pd.to_datetime(ping_str).to_pydatetime()
+                if ping_time.tzinfo is None:
+                    ping_time = ping_time.replace(tzinfo=timezone.utc)
+                # Jika ping masih dalam rentang 45 detik terakhir
+                if (now - ping_time).total_seconds() <= 45:
+                    active_count += 1
+        return max(1, active_count)
+    except Exception:
+        return 1
+
+# ==============================================================================
+# 5. HELPER UTILITY (PANDAS & PARSER)
 # ==============================================================================
 def safe_int(val, default=0) -> int:
     try:
@@ -109,13 +158,9 @@ def load_data_from_info(file_info) -> pd.DataFrame:
         return pd.DataFrame()
 
 def format_datetime_wib(df: pd.DataFrame, kolom: str, format_tampilan: str = "%d-%m-%Y %H:%M") -> pd.DataFrame:
-    """
-    Mengubah format ISO Supabase (UTC) ke waktu Indonesia Barat (WIB).
-    Contoh output: 08-07-2026 02:38
-    """
+    """Mengubah format ISO Supabase (UTC) ke waktu Indonesia Barat (WIB)"""
     if df is not None and not df.empty and kolom in df.columns:
         try:
-            # Gunakan .copy() agar tidak terkena SettingWithCopyWarning
             df = df.copy()
             converted = pd.to_datetime(df[kolom], errors="coerce")
             
