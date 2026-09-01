@@ -2198,62 +2198,62 @@ def cross_check_action_btn_ui():
         style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
     )
 
-@reactive.Effect
-@reactive.event(input.btn_run_cross_check)
-def _proc_cross_check():
-    f_sys = input.uploader_crs_sys()
-    f_real = input.uploader_crs_real()
-    if not f_sys or not f_real:
-        state.error_modal_message.set("Pilih kedua file (Laporan System & Real Aktual) terlebih dahulu!")
-        state.show_error_modal.set(True)
-        return
+    @reactive.Effect
+    @reactive.event(input.btn_run_cross_check)
+    def _proc_cross_check():
+        f_sys = input.uploader_crs_sys()
+        f_real = input.uploader_crs_real()
+        if not f_sys or not f_real:
+            state.error_modal_message.set("Pilih kedua file (Laporan System & Real Aktual) terlebih dahulu!")
+            state.show_error_modal.set(True)
+            return
 
-    succ, msg = state.process_cross_check_real_system(f_sys, f_real)
-    if succ:
-        state.show_success_modal.set(True)
-    else:
-        state.error_modal_message.set(msg)
-        state.show_error_modal.set(True)
+        succ, msg = state.process_cross_check_real_system(f_sys, f_real)
+        if succ:
+            state.show_success_modal.set(True)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
 
-@render.ui
-def cross_check_results_container():
-    if not state.crs_processed():
-        return ui.div()
+    @render.ui
+    def cross_check_results_container():
+        if not state.crs_processed():
+            return ui.div()
 
-    return ui.div(
-        ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
-        ui.h4("📋 RINGKASAN HASIL MATCHING LINTAS CABANG", style="font-size: 16px; color: #010B13; font-weight: 800; margin-bottom: 1rem;"),
-        
-        # 4 KOTAK METRIK DARK THEME
-        ui.div(
-            dark_metric_box("📦 TOTAL QTY REAL +", f"{state.crs_total_real():,} QTY", "#C5A059"),
-            dark_metric_box("✅ TOTAL MATCHED", f"{state.crs_total_matched():,} QTY", "#10B981"),
-            dark_metric_box("⚠️ TOTAL UNMATCHED", f"{state.crs_total_unmatched():,} QTY", "#E53E3E"),
-            dark_metric_box("🏪 SISA QTY SYSTEM", f"{state.crs_system_left():,} QTY", "#3182CE"),
-            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
-        ),
-
-        # TOMBOL DOWNLOAD DI KANAN ATAS (SEPERTI COMPARE SYSTEM)
-        ui.div(
-            ui.download_button(
-                "btn_dl_cross_check",
-                ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "Download Hasil Matching (.xlsx)"),
-                style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
+        return ui.div(
+            ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
+            ui.h4("📋 RINGKASAN HASIL MATCHING LINTAS CABANG", style="font-size: 16px; color: #010B13; font-weight: 800; margin-bottom: 1rem;"),
+            
+            # 4 KOTAK METRIK DARK THEME
+            ui.div(
+                dark_metric_box("📦 TOTAL QTY REAL +", f"{state.crs_total_real():,} QTY", "#C5A059"),
+                dark_metric_box("✅ TOTAL MATCHED", f"{state.crs_total_matched():,} QTY", "#10B981"),
+                dark_metric_box("⚠️ TOTAL UNMATCHED", f"{state.crs_total_unmatched():,} QTY", "#E53E3E"),
+                dark_metric_box("🏪 SISA QTY SYSTEM", f"{state.crs_system_left():,} QTY", "#3182CE"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
             ),
-            style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
-        ),
 
-        # TABEL BERSIH (PERSIS SEPERTI COMPARE SYSTEM)
-        render_clean_table(state.df_crs_headers(), state.df_crs_rows()),
-        style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
-    )
+            # TOMBOL DOWNLOAD DI KANAN ATAS (SEPERTI COMPARE SYSTEM)
+            ui.div(
+                ui.download_button(
+                    "btn_dl_cross_check",
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "Download Hasil Matching (.xlsx)"),
+                    style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
+            ),
 
-@render.download(filename="Hasil_Matching_Real_vs_System.xlsx")
-def btn_dl_cross_check():
-    buf = io.BytesIO()
-    with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-        state._raw_df_crs_all.to_excel(writer, sheet_name='MATCHING_RESULT', index=False)
-    buf.seek(0)
-    yield buf.getvalue()
+            # TABEL BERSIH (PERSIS SEPERTI COMPARE SYSTEM)
+            render_clean_table(state.df_crs_headers(), state.df_crs_rows()),
+            style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
+        )
+
+    @render.download(filename="Hasil_Matching_Real_vs_System.xlsx")
+    def btn_dl_cross_check():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_crs_all.to_excel(writer, sheet_name='MATCHING_RESULT', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
 
 app = App(app_ui, server)
