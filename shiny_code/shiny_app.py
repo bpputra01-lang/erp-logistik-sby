@@ -2518,7 +2518,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             df['Harga (Rp)'] = df.apply(_hitung_harga_timbang, axis=1)
         return df
 
-   def timbang_ongkir_server(input, output, session, state: AppState):
+    def timbang_ongkir_server(input, output, session, state: AppState):
     # Trigger reaktif untuk reload otomatis saat simpan/hapus
     reload_trigger = reactive.Value(0)
 
