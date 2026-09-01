@@ -1,3 +1,6 @@
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.resolve()))
 import os
 import json
 import random
@@ -374,17 +377,6 @@ BRANCH_BIN_MAPPING = {
     "HUB JAKARTA": ["GL1-JKT-A", "GL1-JKT-B", "GL1-JKT-C", "GL1-JKT-D", "GL1-JKT-E", "INBOUND", "PUTAWAY", "REFUND", "GAGAL QC", "RU HUB"]
 }
 
-
-# Helper membaca gambar otomatis agar tidak pernah broken/gagal load
-def get_image_base64(filename):
-    try:
-        if os.path.exists(filename):
-            with open(filename, "rb") as f:
-                encoded = base64.b64encode(f.read()).decode("utf-8")
-                return f"data:image/png;base64,{encoded}"
-    except Exception:
-        pass
-    return f"./{filename}"
 # Helper UI Components
 def metric_box(title: str, val_str: str, text_color: str, bg_gradient: str):
     return ui.div(
@@ -1009,15 +1001,39 @@ def login_page():
 
 def global_header(state: AppState):
     return ui.div(
-        ui.div(ui.div(style="width: 10px; height: 32px; background: #E50914; border-radius: 4px; margin-right: 12px;"), ui.div(ui.h3(state.main_menu(), style="font-size: 18px; color: #111111; font-weight: 800; margin: 0; line-height: 1.2;"), ui.span(f"Logged in as: {state.user_display_name()} ({state.role()})", style="font-size: 12px; color: #4A5568;"), style="display: flex; flex-direction: column; align-items: flex-start;"), style="display: flex; align-items: center;"),
+        # SISI KIRI: Title & User Info
         ui.div(
-            ui.tags.button(ui.tags.i(class_="fa-solid fa-bullhorn", style="margin-right: 6px; color: #1A202C; font-size: 14px;"), "Panduan & Logic", onclick="Shiny.setInputValue('btn_open_panduan_modal', Math.random(), {priority: 'event'})", style="background: #E2E8F0; color: #1A202C; border: none; padding: 6px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px;"
+            ui.div(style="width: 10px; height: 32px; background: #E50914; border-radius: 4px; margin-right: 12px;"),
+            ui.div(
+                ui.h3(state.main_menu(), style="font-size: 18px; color: #111111; font-weight: 800; margin: 0; line-height: 1.2;"),
+                ui.span(f"Logged in as: {state.user_display_name()} ({state.role()})", style="font-size: 12px; color: #4A5568;"),
+                style="display: flex; flex-direction: column; align-items: flex-start;"
             ),
+            style="display: flex; align-items: center;"
+        ),
+        
+        # SISI KANAN: Active User, Tombol Panduan, & Status Online
+        ui.div(
+            # 1. BADGE ACTIVE USER (Baru di sebelah Panduan & Logic)
+            ui.div(
+                ui.tags.i(class_="fa-solid fa-users", style="margin-right: 6px; color: #15803D; font-size: 13px;"),
+                ui.output_text("txt_active_users", inline=True),
+                style="background: #FFFFFF; border: 1.5px solid #A7F3D0; color: #065F46; padding: 6px 12px; border-radius: 6px; font-weight: 800; font-size: 12px; display: flex; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);"
+            ),
+
+            # 2. TOMBOL PANDUAN & LOGIC
+            ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-bullhorn", style="margin-right: 6px; color: #1A202C; font-size: 14px;"),
+                "Panduan & Logic",
+                onclick="Shiny.setInputValue('btn_open_panduan_modal', Math.random(), {priority: 'event'})",
+                style="background: #E2E8F0; color: #1A202C; border: none; padding: 6px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px;"
+            ),
+
+            # 3. STATUS ONLINE & LIVE TIMER (Tetap Utuh)
             ui.div(
                 ui.div(
-                    # --- TITIK HIJAU BERKEDIP ---
                     ui.div(
-                        style="width: 8px; height: 8px; background: #10B981; border-radius: 50%; margin-right: 6px; animation: blinkAnimation 1.5s infinite ease-in-out;",
+                        style="width: 8px; height: 8px; background: #10B981; border-radius: 50%; margin-right: 6px;",
                         class_="blink-online"
                     ),
                     ui.span("ONLINE", style="font-size: 12px; font-weight: 800; color: #065F46;"),
@@ -1031,7 +1047,7 @@ def global_header(state: AppState):
                 ),
                 style="display: flex; flex-direction: column; align-items: center; gap: 2px;"
             ),
-            style="display: flex; align-items: center; gap: 1.25rem;"
+            style="display: flex; align-items: center; gap: 10px;"
         ),
         style="padding: 12px 20px; background: #D1FAE5; border: 1.5px solid #A7F3D0; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 1rem;"
     )
