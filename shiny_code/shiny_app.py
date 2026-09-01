@@ -2172,104 +2172,88 @@ def server(input: Inputs, output: Outputs, session: Session):
         yield buf.getvalue()
 
 # ==========================================================================
-    # CROSS CHECK REAL & SYSTEM CONTROLLER & HANDLERS
-    # ==========================================================================
-    @render.ui
-    def cross_check_action_btn_ui():
-        f1 = input.uploader_crs_sys() if "uploader_crs_sys" in input else None
-        f2 = input.uploader_crs_real() if "uploader_crs_real" in input else None
+# CROSS CHECK REAL & SYSTEM CONTROLLER & HANDLERS (PERSIS COMPARE SYSTEM)
+# ==========================================================================
+@render.ui
+def cross_check_action_btn_ui():
+    f1 = input.uploader_crs_sys() if "uploader_crs_sys" in input else None
+    f2 = input.uploader_crs_real() if "uploader_crs_real" in input else None
 
-        if (f1 and len(f1) > 0) and (f2 and len(f2) > 0):
-            return ui.div(
-                ui.tags.button(
-                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "RUN MATCHING PROCESS"),
-                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_cross_check', Math.random(), {priority: 'event'});",
-                    class_="btn-red-gradient"
-                ),
-                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
-            )
+    if (f1 and len(f1) > 0) and (f2 and len(f2) > 0):
         return ui.div(
             ui.tags.button(
-                ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"),
-                "UPLOAD KEDUA FILE UNTUK MEMULAI",
-                disabled=True,
-                class_="btn-locked"
+                ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "RUN MATCHING PROCESS"),
+                onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_cross_check', Math.random(), {priority: 'event'});",
+                class_="btn-red-gradient"
             ),
             style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
         )
+    return ui.div(
+        ui.tags.button(
+            ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"),
+            "UPLOAD KEDUA FILE UNTUK MEMULAI",
+            disabled=True,
+            class_="btn-locked"
+        ),
+        style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+    )
 
-    @reactive.Effect
-    @reactive.event(input.btn_run_cross_check)
-    def _proc_cross_check():
-        f_sys = input.uploader_crs_sys()
-        f_real = input.uploader_crs_real()
-        if not f_sys or not f_real:
-            state.error_modal_message.set("Pilih kedua file (Laporan System & Real Aktual) terlebih dahulu!")
-            state.show_error_modal.set(True)
-            return
+@reactive.Effect
+@reactive.event(input.btn_run_cross_check)
+def _proc_cross_check():
+    f_sys = input.uploader_crs_sys()
+    f_real = input.uploader_crs_real()
+    if not f_sys or not f_real:
+        state.error_modal_message.set("Pilih kedua file (Laporan System & Real Aktual) terlebih dahulu!")
+        state.show_error_modal.set(True)
+        return
 
-        succ, msg = state.process_cross_check_real_system(f_sys, f_real)
-        if succ:
-            state.show_success_modal.set(True)
-        else:
-            state.error_modal_message.set(msg)
-            state.show_error_modal.set(True)
+    succ, msg = state.process_cross_check_real_system(f_sys, f_real)
+    if succ:
+        state.show_success_modal.set(True)
+    else:
+        state.error_modal_message.set(msg)
+        state.show_error_modal.set(True)
 
-    @reactive.Effect
-    def _on_crs_filter_change():
-        if state.crs_processed():
-            st_filter = input.crs_status_filter() if "crs_status_filter" in input else []
-            state.filter_cross_check_status(st_filter)
+@render.ui
+def cross_check_results_container():
+    if not state.crs_processed():
+        return ui.div()
 
-    @render.ui
-    def cross_check_results_container():
-        if not state.crs_processed():
-            return ui.div()
+    return ui.div(
+        ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
+        ui.h4("📋 RINGKASAN HASIL MATCHING LINTAS CABANG", style="font-size: 16px; color: #010B13; font-weight: 800; margin-bottom: 1rem;"),
+        
+        # 4 KOTAK METRIK DARK THEME
+        ui.div(
+            dark_metric_box("📦 TOTAL QTY REAL +", f"{state.crs_total_real():,} QTY", "#C5A059"),
+            dark_metric_box("✅ TOTAL MATCHED", f"{state.crs_total_matched():,} QTY", "#10B981"),
+            dark_metric_box("⚠️ TOTAL UNMATCHED", f"{state.crs_total_unmatched():,} QTY", "#E53E3E"),
+            dark_metric_box("🏪 SISA QTY SYSTEM", f"{state.crs_system_left():,} QTY", "#3182CE"),
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+        ),
 
-        return ui.div(
-            ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
-            ui.h4("📋 RINGKASAN HASIL MATCHING LINTAS CABANG", style="font-size: 16px; color: #010B13; font-weight: 800; margin-bottom: 1rem;"),
-            
-            # 4 KOTAK METRIK DARK THEME
-            ui.div(
-                dark_metric_box("📦 TOTAL QTY REAL +", f"{state.crs_total_real():,} QTY", "#C5A059"),
-                dark_metric_box("✅ TOTAL MATCHED", f"{state.crs_total_matched():,} QTY", "#10B981"),
-                dark_metric_box("⚠️ TOTAL UNMATCHED", f"{state.crs_total_unmatched():,} QTY", "#E53E3E"),
-                dark_metric_box("🏪 SISA QTY SYSTEM", f"{state.crs_system_left():,} QTY", "#3182CE"),
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+        # TOMBOL DOWNLOAD DI KANAN ATAS (SEPERTI COMPARE SYSTEM)
+        ui.div(
+            ui.download_button(
+                "btn_dl_cross_check",
+                ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "Download Hasil Matching (.xlsx)"),
+                style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
             ),
+            style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
+        ),
 
-            # FILTER & DOWNLOAD BUTTON
-            ui.div(
-                ui.div(
-                    ui.input_selectize("crs_status_filter", "🔍 Filter Status Laporan:", choices=state.crs_status_choices(), multiple=True, width="320px"),
-                    style="flex: 1; min-width: 250px;"
-                ),
-                ui.div(
-                    ui.download_button(
-                        "btn_dl_cross_check",
-                        ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD HASIL MATCHING (.XLSX)"),
-                        style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
-                    ),
-                    style="display: flex; align-items: flex-end; margin-bottom: 1rem;"
-                ),
-                style="display: flex; justify-content: space-between; align-items: flex-end; width: 100%; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem;"
-            ),
+        # TABEL BERSIH (PERSIS SEPERTI COMPARE SYSTEM)
+        render_clean_table(state.df_crs_headers(), state.df_crs_rows()),
+        style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
+    )
 
-            # TABEL STANDAR DENGAN 10 BARIS PER HALAMAN
-            ui.div(
-                render_clean_table(state.df_crs_headers(), state.df_crs_rows(), "tbl_crs_detail"),
-                style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0;"
-            ),
-            style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
-        )
-
-    @render.download(filename="Hasil_Matching_Real_vs_System.xlsx")
-    def btn_dl_cross_check():
-        buf = io.BytesIO()
-        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-            state._raw_df_crs_filtered.to_excel(writer, sheet_name='MATCHING_RESULT', index=False)
-        buf.seek(0)
-        yield buf.getvalue()
+@render.download(filename="Hasil_Matching_Real_vs_System.xlsx")
+def btn_dl_cross_check():
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+        state._raw_df_crs_all.to_excel(writer, sheet_name='MATCHING_RESULT', index=False)
+    buf.seek(0)
+    yield buf.getvalue()
 
 app = App(app_ui, server)

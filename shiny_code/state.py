@@ -2560,11 +2560,10 @@ class AppState:
             return False, f"Gagal Justifikasi SO: {e}"
 
 # ==========================================================================
-    # CROSS CHECK REAL & SYSTEM (PERSIS SEPERTI MENU LAINNYA)
+    # CROSS CHECK REAL & SYSTEM (INSTANT ENGINE)
     # ==========================================================================
     def process_cross_check_real_system(self, f_sys, f_real):
         try:
-            # 1. Load Data Instan
             df_sys_raw = load_data_from_info(f_sys)
             df_real_raw = load_data_from_info(f_real)
 
@@ -2576,7 +2575,6 @@ class AppState:
             if df_real_raw.shape[1] < 13:
                 return False, "File Real kurang dari 13 kolom (Kolom A=Cabang, E=SKU, M=Qty)!"
 
-            # 2. Ekstraksi NumPy C-Level
             cab_sys_arr = df_sys_raw.iloc[:, 0].astype(str).str.strip().str.upper().to_numpy()
             sku_sys_arr = df_sys_raw.iloc[:, 3].astype(str).str.strip().str.upper().to_numpy()
             qty_sys_arr = pd.to_numeric(df_sys_raw.iloc[:, 10], errors='coerce').fillna(0).to_numpy()
@@ -2585,7 +2583,7 @@ class AppState:
             sku_real_arr = df_real_raw.iloc[:, 4].astype(str).str.strip().str.upper().to_numpy()
             qty_real_arr = pd.to_numeric(df_real_raw.iloc[:, 12], errors='coerce').fillna(0).to_numpy()
 
-            # 3. Hash Map O(1) Lookup: {SKU: {CABANG: QTY}}
+            # Hash Map O(1) Lookup: {SKU: {CABANG: QTY}}
             system_pool = {}
             for i in range(len(sku_sys_arr)):
                 s, q, c = sku_sys_arr[i], qty_sys_arr[i], cab_sys_arr[i]
@@ -2594,7 +2592,6 @@ class AppState:
                         system_pool[s] = {}
                     system_pool[s][c] = system_pool[s].get(c, 0.0) + q
 
-            # 4. Fast Loop Matching
             matched_records = []
             total_real_qty = 0
             total_allocated_qty = 0
@@ -2609,7 +2606,7 @@ class AppState:
                 pool_sku = system_pool.get(sku_r)
 
                 if pool_sku:
-                    # A. Prioritas 1: Cabang Sendiri (Perfect Match)
+                    # 1. Cabang Sendiri (Match Perfect)
                     avail_home = pool_sku.get(cab_r, 0.0)
                     if avail_home > 0:
                         take = avail_home if avail_home < qty_sisa else qty_sisa
@@ -2618,7 +2615,7 @@ class AppState:
                         total_allocated_qty += take
                         matched_records.append((sku_r, cab_r, cab_r, int(take), "MATCH PERFECT"))
 
-                    # B. Prioritas 2: Lintas Cabang (Cross-Branch)
+                    # 2. Lintas Cabang (Cross-Branch)
                     if qty_sisa > 0:
                         for cab_other, avail_other in pool_sku.items():
                             if avail_other > 0:
@@ -2630,14 +2627,12 @@ class AppState:
                                 if qty_sisa <= 0:
                                     break
 
-                # C. Prioritas 3: Unmatched
+                # 3. Unmatched
                 if qty_sisa > 0:
                     matched_records.append((sku_r, cab_r, "TIDAK KETEMU / SYSTEM HABIS", int(qty_sisa), "UNMATCHED / NO SYSTEM QTY"))
 
-            # 5. Hitung Sisa Kuota
             total_system_left = sum(sum(branches.values()) for branches in system_pool.values())
 
-            # 6. Buat DataFrame Lengkap
             headers = ["SKU", "Cabang Real", "Cabang System", "Qty Match", "Status"]
             df_res = pd.DataFrame(matched_records, columns=headers) if matched_records else pd.DataFrame(columns=headers)
 
@@ -2646,28 +2641,11 @@ class AppState:
             self.crs_total_unmatched.set(int(total_real_qty - total_allocated_qty))
             self.crs_system_left.set(int(total_system_left))
 
-            statuses = sorted(df_res["Status"].unique().tolist()) if not df_res.empty else []
-            self.crs_status_choices.set(statuses)
-
             self._raw_df_crs_all = df_res.copy()
-            self._raw_df_crs_filtered = df_res.copy()
-
-            # Set seluruh baris data (Engine JS render_clean_table akan otomatis menampilkan 10 baris per halaman)
             self.df_crs_headers.set(headers)
             self.df_crs_rows.set(df_res.fillna("").astype(str).values.tolist())
 
             self.crs_processed.set(True)
-            return True, f"Matching Selesai! ({len(df_res):,} baris data terhitung)"
+            return True, "Matching Selesai!"
         except Exception as e:
             return False, f"Gagal Match Real & System: {e}"
-
-    def filter_crs_status(self, selected_statuses):
-        if self._raw_df_crs_all.empty:
-            return
-        df = self._raw_df_crs_all.copy()
-        if selected_statuses and len(selected_statuses) > 0:
-            df = df[df["Status"].isin(selected_statuses)]
-
-        self._raw_df_crs_filtered = df
-        self.df_crs_headers.set(df.columns.tolist())
-        self.df_crs_rows.set(df.fillna("").astype(str).values.tolist())
