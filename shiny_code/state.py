@@ -50,6 +50,8 @@ class AppState:
         self.active_ongkir_tab = reactive.Value("tab_input")
         self.selected_ids = reactive.Value([])
         self.show_delete_modal = reactive.Value(False)
+        self.filter_tgl_start = reactive.Value("")
+        self.filter_tgl_end = reactive.Value("")
 
         # Stock Minus
         self.stock_minus_processed = reactive.Value(False)
@@ -494,39 +496,36 @@ class AppState:
 
     def get_filtered_ongkir(self) -> list[dict]:
         res = self.data_list()
+        if not res:
+            return []
         
         # 1. Filter Ekspedisi
-        flt_eks = self.filter_ekspedisi()
-        if flt_eks != "SEMUA":
-            res = [x for x in res if str(x.get("ekspedisi", "")).upper() == flt_eks.upper()]
+        flt_eks = str(self.filter_ekspedisi()).upper().strip()
+        if flt_eks != "SEMUA" and flt_eks != "":
+            res = [x for x in res if str(x.get("ekspedisi", "")).upper().strip() == flt_eks]
             
-        # 2. Filter Periode Waktu
-        flt_waktu = self.filter_periode()
-        if flt_waktu != "SEMUA" and res:
-            now = datetime.now()
+        # 2. Filter Rentang Tanggal (Start - End)
+        start_str = str(self.filter_tgl_start() or "").strip()
+        end_str = str(self.filter_tgl_end() or "").strip()
+        
+        if (start_str or end_str) and res:
             filtered_res = []
+            d_start = pd.to_datetime(start_str).date() if start_str else None
+            d_end = pd.to_datetime(end_str).date() if end_str else None
+            
             for x in res:
-                tgl_str = str(x.get("created_at", "")).strip()
+                tgl_val = x.get("created_at") or x.get("tanggal")
+                if not tgl_val:
+                    continue
                 try:
-                    # Parse format tanggal DD-MM-YYYY HH:MM
-                    dt = pd.to_datetime(tgl_str, dayfirst=True)
-                    if flt_waktu == "HARI INI":
-                        if dt.date() == now.date():
-                            filtered_res.append(x)
-                    elif flt_waktu == "7 HARI TERAKHIR":
-                        if (now - dt).days <= 7 and dt <= now:
-                            filtered_res.append(x)
-                    elif flt_waktu == "BULAN INI":
-                        if dt.year == now.year and dt.month == now.month:
-                            filtered_res.append(x)
-                    elif flt_waktu == "BULAN LALU":
-                        # Hitung bulan lalu
-                        first_day_cur = now.replace(day=1)
-                        last_month = first_day_cur - pd.Timedelta(days=1)
-                        if dt.year == last_month.year and dt.month == last_month.month:
-                            filtered_res.append(x)
-                except Exception:
+                    item_date = pd.to_datetime(tgl_val, dayfirst=True).date()
+                    if d_start and item_date < d_start:
+                        continue
+                    if d_end and item_date > d_end:
+                        continue
                     filtered_res.append(x)
+                except Exception:
+                    continue
             res = filtered_res
 
         return res

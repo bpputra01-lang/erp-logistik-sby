@@ -75,12 +75,8 @@ def server(input: Inputs, output: Outputs, session: Session):
     def global_error_modal_ui():
         return error_modal(state.show_error_modal(), state.error_modal_message())
 
-   # ✅ GANTI DENGAN INI (Hanya 1 fungsi + auto load jika kosong):
     @render.ui
     def ongkir_tab2_dynamic_ui():
-        # Jika data di state masih kosong, otomatis tarik dari Supabase sekarang juga:
-        if not state.data_list():
-            state.load_ongkir_data()
         return ongkir_tab2_view(state)
 
     # Authentication & Navigation
@@ -107,7 +103,22 @@ def server(input: Inputs, output: Outputs, session: Session):
     @reactive.event(input.select_menu_item)
     def _nav_event(): state.set_main_menu(input.select_menu_item())
 
-    
+    @reactive.Effect
+    @reactive.event(input.change_filter_tgl_start)
+    def _update_tgl_start():
+        state.filter_tgl_start.set(str(input.change_filter_tgl_start() or ""))
+
+    @reactive.Effect
+    @reactive.event(input.change_filter_tgl_end)
+    def _update_tgl_end():
+        state.filter_tgl_end.set(str(input.change_filter_tgl_end() or ""))
+
+    @reactive.Effect
+    @reactive.event(input.btn_reset_filter_tgl)
+    def _reset_filter_tgl():
+        state.filter_tgl_start.set("")
+        state.filter_tgl_end.set("")
+        state.filter_ekspedisi.set("SEMUA")
 
     @reactive.Effect
     @reactive.event(input.btn_toggle_sidebar)

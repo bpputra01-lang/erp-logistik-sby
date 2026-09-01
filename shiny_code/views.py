@@ -607,52 +607,79 @@ def putaway_view(state: AppState):
     return ui.div(top_section, ui.output_ui("putaway_results_container"), style="width: 100%; padding: 1rem;")
 
 # ==============================================================================
-# VIEW 4: DATABASE ONGKIR (MAIN DASHBOARD)
+# VIEW 4: DATABASE ONGKIR (TAB 2: SUMMARY & HISTORY)
 # ==============================================================================
 def ongkir_tab2_view(state: AppState):
     selected_count = len(state.selected_ids())
-    del_btn_ui = ui.tags.button(f"🗑️ HAPUS ({selected_count}) DATA", onclick="Shiny.setInputValue('btn_open_delete_modal', Math.random(), {priority: 'event'})", style="background: #E53E3E; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px;") if selected_count > 0 else ui.div()
+    del_btn_ui = ui.tags.button(
+        f"🗑️ HAPUS ({selected_count}) DATA", 
+        onclick="Shiny.setInputValue('btn_open_delete_modal', Math.random(), {priority: 'event'})", 
+        style="background: #E53E3E; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px;"
+    ) if selected_count > 0 else ui.div()
     
     select_options = [ui.tags.option(opt, value=opt, selected=(opt == state.filter_ekspedisi())) for opt in state.get_list_ekspedisi_options()]
     
-    periode_pilihan = [
-        ("SEMUA", "Semua Waktu"),
-        ("HARI INI", "Hari Ini"),
-        ("7 HARI TERAKHIR", "7 Hari Terakhir"),
-        ("BULAN INI", "Bulan Ini"),
-        ("BULAN LALU", "Bulan Lalu")
-    ]
-    select_periode_options = [
-        ui.tags.option(label, value=val, selected=(val == state.filter_periode())) 
-        for val, label in periode_pilihan
-    ]
-
     table_rows = [
         ui.tags.tr(
             ui.tags.td(ui.tags.input(type="checkbox", checked=(str(r.get("id", "")) in set(state.selected_ids())), onchange=f"Shiny.setInputValue('toggle_row_id', '{r.get('id', '')}', {{priority: 'event'}})")),
-            ui.tags.td(str(r.get("created_at", r.get("tanggal", "")))), ui.tags.td(str(r.get("supplier", ""))), ui.tags.td(str(r.get("ekspedisi", ""))),
-            ui.tags.td(str(safe_int(r.get("total_koli", r.get("koli", 0))))), ui.tags.td(f"Rp {safe_int(r.get('total_ongkir', 0)):,}")
+            ui.tags.td(str(r.get("created_at", r.get("tanggal", "")))), 
+            ui.tags.td(str(r.get("supplier", ""))), 
+            ui.tags.td(str(r.get("ekspedisi", ""))),
+            ui.tags.td(str(safe_int(r.get("total_koli", r.get("koli", 0))))), 
+            ui.tags.td(f"Rp {safe_int(r.get('total_ongkir', 0)):,}")
         ) for r in state.get_filtered_ongkir()
     ]
 
     return ui.div(
         ui.div(
             ui.div(
+                # 1. FILTER EKSPEDISI
                 ui.div(
                     ui.span("EKSPEDISI:", style="font-size: 12px; font-weight: 800; color: #111111; margin-right: 6px;"),
-                    ui.tags.select(*select_options, id="select_filter_ekspedisi", onchange="Shiny.setInputValue('change_filter_ekspedisi', this.value, {priority: 'event'})", style="background-color: #FFFFFF !important; color: #000000 !important; border: 2px solid #1A202C !important; border-radius: 8px !important; font-weight: 800 !important; width: 170px; padding: 6px 10px; cursor: pointer;"),
+                    ui.tags.select(
+                        *select_options, 
+                        id="select_filter_ekspedisi", 
+                        onchange="Shiny.setInputValue('change_filter_ekspedisi', this.value, {priority: 'event'})", 
+                        style="background-color: #FFFFFF !important; color: #000000 !important; border: 2px solid #1A202C !important; border-radius: 8px !important; font-weight: 800 !important; width: 160px; padding: 6px 10px; cursor: pointer;"
+                    ),
                     style="display: flex; align-items: center;"
                 ),
+                # 2. FILTER DARI TANGGAL
                 ui.div(
-                    ui.span("PERIODE:", style="font-size: 12px; font-weight: 800; color: #111111; margin-left: 12px; margin-right: 6px;"),
-                    ui.tags.select(*select_periode_options, id="select_filter_periode", onchange="Shiny.setInputValue('change_filter_periode', this.value, {priority: 'event'})", style="background-color: #FFFFFF !important; color: #000000 !important; border: 2px solid #1A202C !important; border-radius: 8px !important; font-weight: 800 !important; width: 170px; padding: 6px 10px; cursor: pointer;"),
+                    ui.span("DARI:", style="font-size: 12px; font-weight: 800; color: #111111; margin-left: 10px; margin-right: 6px;"),
+                    ui.tags.input(
+                        type="date", 
+                        id="input_filter_tgl_start", 
+                        value=state.filter_tgl_start(), 
+                        onchange="Shiny.setInputValue('change_filter_tgl_start', this.value, {priority: 'event'})", 
+                        style="background-color: #FFFFFF !important; color: #000000 !important; border: 2px solid #1A202C !important; border-radius: 8px !important; font-weight: 800 !important; width: 145px; padding: 5px 8px; cursor: pointer;"
+                    ),
                     style="display: flex; align-items: center;"
+                ),
+                # 3. FILTER SAMPAI TANGGAL
+                ui.div(
+                    ui.span("S/D:", style="font-size: 12px; font-weight: 800; color: #111111; margin-left: 10px; margin-right: 6px;"),
+                    ui.tags.input(
+                        type="date", 
+                        id="input_filter_tgl_end", 
+                        value=state.filter_tgl_end(), 
+                        onchange="Shiny.setInputValue('change_filter_tgl_end', this.value, {priority: 'event'})", 
+                        style="background-color: #FFFFFF !important; color: #000000 !important; border: 2px solid #1A202C !important; border-radius: 8px !important; font-weight: 800 !important; width: 145px; padding: 5px 8px; cursor: pointer;"
+                    ),
+                    style="display: flex; align-items: center;"
+                ),
+                # 4. TOMBOL RESET FILTER
+                ui.tags.button(
+                    "🔄 RESET", 
+                    onclick="Shiny.setInputValue('btn_reset_filter_tgl', Math.random(), {priority: 'event'})", 
+                    style="background: #EDF2F7; color: #1A202C; border: 1.5px solid #CBD5E0; border-radius: 6px; font-weight: 800; font-size: 11px; padding: 6px 12px; cursor: pointer; margin-left: 8px;"
                 ),
                 style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px;"
             ), 
             del_btn_ui, 
             style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 1.5rem; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 10px;"
         ),
+        # METRIK KOTAK-KOTAK
         ui.div(
             metric_box("💰 BIAYA ALL", state.metric_total_biaya_all(), "#C53030", "linear-gradient(135deg, #FED7D7 0%, #FEB2B2 100%)"),
             metric_box("📦 KOLI ALL", state.metric_total_koli_all(), "#1A202C", "linear-gradient(135deg, #E2E8F0 0%, #CBD5E0 100%)"),
@@ -662,7 +689,25 @@ def ongkir_tab2_view(state: AppState):
             metric_box("🔄 BIAYA RTO", state.metric_biaya_rto(), "#9B2C2C", "linear-gradient(135deg, #FED7D7 0%, #FEB2B2 100%)"),
             style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.5rem;"
         ),
-        ui.div(ui.tags.table(ui.tags.thead(ui.tags.tr(ui.tags.th("SELECT", style="text-align: center;"), ui.tags.th("TANGGAL"), ui.tags.th("SUPPLIER"), ui.tags.th("EKSPEDISI"), ui.tags.th("KOLI"), ui.tags.th("TOTAL ONGKIR")), style="background-color: #CBD5E0 !important;"), ui.tags.tbody(*table_rows) if len(table_rows) > 0 else ui.tags.tr(ui.tags.td("Tidak ada transaksi ongkir.", colspan="6", style="text-align: center; color: #718096; padding: 2rem;")), class_="custom-clean-table"), style="background: #FFFFFF; border-radius: 16px; border: 2.5px solid #1A202C; padding: 1rem; width: 100%; box-shadow: 0 10px 25px rgba(0,0,0,0.04); overflow-x: auto;"),
+        # TABEL TRANSAKSI
+        ui.div(
+            ui.tags.table(
+                ui.tags.thead(
+                    ui.tags.tr(
+                        ui.tags.th("SELECT", style="text-align: center;"), 
+                        ui.tags.th("TANGGAL"), 
+                        ui.tags.th("SUPPLIER"), 
+                        ui.tags.th("EKSPEDISI"), 
+                        ui.tags.th("KOLI"), 
+                        ui.tags.th("TOTAL ONGKIR")
+                    ), 
+                    style="background-color: #CBD5E0 !important;"
+                ), 
+                ui.tags.tbody(*table_rows) if len(table_rows) > 0 else ui.tags.tr(ui.tags.td("Tidak ada transaksi ongkir pada rentang tanggal ini.", colspan="6", style="text-align: center; color: #718096; padding: 2rem;")), 
+                class_="custom-clean-table"
+            ), 
+            style="background: #FFFFFF; border-radius: 16px; border: 2.5px solid #1A202C; padding: 1rem; width: 100%; box-shadow: 0 10px 25px rgba(0,0,0,0.04); overflow-x: auto;"
+        ),
         style="width: 100%;"
     )
 
