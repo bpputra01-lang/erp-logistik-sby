@@ -198,7 +198,11 @@ CUSTOM_HEAD = ui.head_content(
                 if (spinner) spinner.style.setProperty('display', 'none', 'important');
             });
         }
-
+        // PEMBERSIH OTOMATIS KATA 'index.html' DI ADDRESS BAR
+        if (window.location.pathname.endsWith('index.html') && window.history.replaceState) {
+            let cleanPath = window.location.pathname.replace(/index\.html$/, '');
+            window.history.replaceState(null, '', cleanPath + window.location.hash);
+        }
         let domWatcher = new MutationObserver(function() {
             let c = getContainer();
             if (c && window._lockedScrollPos > 0 && !isUserActivelyScrolling && c.scrollTop !== window._lockedScrollPos) {
@@ -1011,20 +1015,30 @@ def physical_inventory_list_view(state: AppState):
         dynamic_body,
         style="width: 100%; padding: 1rem;"
     )
-# Navigation Components
 def menu_item(label: str, target_menu: str, current_menu: str):
+    import re
     is_active = (current_menu == target_menu)
     bg_style = "background: linear-gradient(135deg, #E50914 0%, #B20710 100%); color: #FFFFFF; font-weight: 700; box-shadow: 0 4px 12px rgba(229, 9, 20, 0.4);" if is_active else "background: transparent; color: #CBD5E0; font-weight: 500;"
     
-    # Panggil window.updateUrlMenu saat tombol diklik
-    onclick_action = f"window.updateUrlMenu('{target_menu}'); Shiny.setInputValue('select_menu_item', '{target_menu}', {{priority: 'event'}});"
+    # 1. Buat slug URL bersih
+    slug = re.sub(r'[^a-zA-Z0-9]+', '-', target_menu).strip('-').lower()
+    
+    # 2. Hapus kata 'index.html' dan ganti URL langsung ke /#slug
+    onclick_action = f"""
+        if (window.history.pushState) {{
+            window.history.pushState(null, null, '#{slug}');
+        }} else {{
+            window.location.hash = '#{slug}';
+        }}
+        Shiny.setInputValue('select_menu_item', '{target_menu}', {{priority: 'event'}});
+    """
     
     return ui.tags.button(
         label, 
         onclick=onclick_action, 
         style=f"width: 100%; text-align: left; padding: 0.5rem 0.75rem; margin-bottom: 3px; border-radius: 6px; font-size: 0.85rem; border: none; cursor: pointer; justify-content: flex-start; transition: all 0.2s ease; {bg_style}"
     )
-    
+
 def section_dropdown_header(title: str, dropdown_key: str, is_open: bool):
     icon_tag = "fa-chevron-down" if is_open else "fa-chevron-right"
     return ui.tags.div(ui.tags.span(title, style="font-size: 11px; font-weight: bold; color: #FFFFFF; letter-spacing: 0.05em;"), ui.tags.i(class_=f"fa-solid {icon_tag}", style="font-size: 12px; color: #FFFFFF;"), onclick=f"Shiny.setInputValue('toggle_dropdown_section', '{dropdown_key}', {{priority: 'event'}})", style="display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 0.5rem 0.6rem; border-radius: 6px; cursor: pointer; background: rgba(255, 255, 255, 0.05); margin-top: 0.8rem; margin-bottom: 0.3rem;")
