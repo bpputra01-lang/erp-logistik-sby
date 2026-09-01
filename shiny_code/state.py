@@ -385,20 +385,20 @@ class AppState:
 
     def get_menu_operational(self) -> list[str]:
         if self.role() == "DC":
-            return ["Purchase Order Receiving", "Putaway System", "Scan Out Validation", "Refill & Overstock", "Refill & Withdraw", "Compare RTO", "Compare Penerimaan RTO", "FDR Update"]
+            return ["Putaway System", "Compare RTO", "Purchase Order Receiving", "Instock Validation", "Compare Penerimaan RTO"]
         return ["Compare Penerimaan RTO", "Putaway System", "Purchase Order Receiving"]
 
     def get_menu_inventory(self) -> list[str]:
         if self.role() == "DC":
-            return ["Stock Opname", "Match Real & System", "Compare System", "Cycle Count", "Putaway & Picking Audit List", "List Bin Cycle Count", "Stock Tracking Timeline", "Justification SO", "Stock Minus", "List Retur Out", "Pengajuan Mutasi Karantina", "Refill Koli to Koli/Refill", "Stock Allocation"]
+            return ["Stock Opname", "Cycle Count", "Justification SO", "Stock Minus", "Compare System", "Cross Check Real & System", "Putaway & Picking Audit List", "List Bin Cycle Count", "List Retur Out", "Reloc Koli to Koli", "Stock Allocation"]
         return ["Stock Minus", "Cycle Count", "Compare System", "Justification SO"]
 
     def get_menu_reject(self) -> list[str]:
-        return ["Pengajuan Reject/Defect", "Reject/Defect List"]
+        return ["Defect & Reject Database"]
 
     def get_menu_extras(self) -> list[str]:
         if self.role() == "DC":
-            return ["Logistic Schedule", "Balancing Stock", "Reporting & PIC", "Data Timbang Ongkir", "Database Ongkir In/Out", "Precentage Display", "Precentage Request FL to Store Stock", "Refill Toko"]
+            return ["Balancing Stock", "Data Timbang Ongkir", "Database Ongkir In/Out", "Precentage Display", "Refill Toko"]
         return ["Precentage Display", "Refill Toko", "Store Leader RTO Decission"]
 
     def get_active_content_type(self) -> str:
