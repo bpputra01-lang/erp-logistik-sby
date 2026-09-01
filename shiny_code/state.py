@@ -4,12 +4,8 @@ from datetime import datetime
 import numpy as np       
 import pandas as pd
 from shiny import reactive
+from config import get_supabase, safe_int, load_data_from_info, format_datetime_wib
 
-
-# ==========================================
-# GLOBAL STATE (Dishare ke semua user)
-# ==========================================
-active_users = reactive.Value(0)
 
 class AppState:
     def __init__(self):
@@ -612,7 +608,42 @@ class AppState:
             return True, "Data Stock Minus berhasil diproses!"
         except Exception as e: return False, f"Gagal memproses file: {e}"
         
-    
+    def trigger_pc_sync_and_load(self):
+        try:
+            import urllib.request
+            import json
+            import time
+            from config import SUPABASE_URL, SUPABASE_KEY
+
+            # 1. Kirim Sinyal PENDING ke Supabase
+            insert_url = f"{SUPABASE_URL}/rest/v1/sync_queue"
+            req_ins = urllib.request.Request(
+                insert_url,
+                data=json.dumps({"status": "PENDING"}).encode('utf-8'),
+                headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}", "Content-Type": "application/json", "Prefer": "return=representation"},
+                method="POST"
+            )
+            with urllib.request.urlopen(req_ins, timeout=10) as resp:
+                created_task = json.loads(resp.read().decode('utf-8'))
+                task_id = created_task[0]["id"]
+
+            # 2. Tunggu PC Kantor Menyelesaikan Download (Polling maksimal 25 detik)
+            for _ in range(12):
+                time.sleep(2)
+                check_url = f"{SUPABASE_URL}/rest/v1/sync_queue?id=eq.{task_id}"
+                req_chk = urllib.request.Request(check_url, headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"})
+                with urllib.request.urlopen(req_chk, timeout=10) as resp_chk:
+                    t_data = json.loads(resp_chk.read().decode('utf-8'))
+                    if t_data and t_data[0]["status"] == "DONE":
+                        break
+            else:
+                return False, "Timeout: PC Kantor belum menyala atau proses terlalu lama."
+
+            # 3. Setelah PC Kantor Selesai, Baca File dari Supabase Storage
+            return self.load_stock_minus_from_supabase()
+
+        except Exception as e:
+            return False, f"Gagal trigger PC kantor: {e}"
     # --- Putaway Compare Processing ---
     def process_putaway_compare(self, ds_bytes: bytes, ds_name: str, asal_bytes: bytes, asal_name: str):
         try:

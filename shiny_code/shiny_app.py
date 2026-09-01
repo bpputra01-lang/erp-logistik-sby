@@ -1,9 +1,5 @@
 import io
 import pandas as pd
-import state
-import config
-from shiny import App, render, Session
-from view import create_ui
 from shiny import App, Inputs, Outputs, Session, reactive, render, ui
 from state import AppState
 from views import (
@@ -35,16 +31,11 @@ def server(input: Inputs, output: Outputs, session: Session):
     @reactive.event(input.change_filter_periode)
     def _update_filter_periode():
         state.filter_periode.set(input.change_filter_periode())
+
     @reactive.Effect
-    @reactive.event(input.btn_process_stock_minus)
-    def _proc_stock_file():
-        f = input.upload_stock_file()
-        if not f:
-            state.error_modal_message.set("Pilih file Stock Minus terlebih dahulu!")
-            state.show_error_modal.set(True)
-            return
-        with open(f[0]["datapath"], "rb") as fp:
-            succ, msg = state.process_stock_minus_file(fp.read(), f[0]["name"])
+    @reactive.event(input.btn_fetch_stock_minus_jezpro)
+    def _fetch_stock_minus_jezpro():
+        succ, msg = state.trigger_pc_sync_and_load()
         if succ:
             state.show_success_modal.set(True)
         else:
@@ -2147,29 +2138,5 @@ def server(input: Inputs, output: Outputs, session: Session):
             state._raw_df_jso_res.to_excel(writer, sheet_name='Summary', index=False)
         buf.seek(0)
         yield buf.getvalue()
-
-app_ui = create_ui()
-
-def server(input, output, session: Session):
-    # 1. Ketika user membuka browser/tab, tambah user aktif (+1)
-    state.active_users.set(state.active_users.get() + 1)
-
-    # 2. Ketika user menutup browser/tab (sesi putus), kurangi user aktif (-1)
-    @session.on_ended
-    def _on_session_ended():
-        current_count = state.active_users.get()
-        state.active_users.set(max(0, current_count - 1))
-
-    # 3. Output reactive (otomatis terupdate di semua user saat ada yang masuk/keluar)
-    @render.text
-    def txt_active_users():
-        count = state.active_users.get()
-        return f"{count} User Online"
-
-app = App(app_ui, server)
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("shiny_app:app", host=config.APP_HOST, port=config.APP_PORT, reload=True)
 
 app = App(app_ui, server)
