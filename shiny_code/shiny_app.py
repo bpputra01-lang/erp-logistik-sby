@@ -262,131 +262,276 @@ def server(input: Inputs, output: Outputs, session: Session):
         succ, msg = state.run_percentage_display(input.uploader_disp_stock())
         if succ: state.show_success_modal.set(True)
         else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
-    # Panduan & Logic Modal
    # =========================================================================
-    # ACTION LISTENERS TOMBOL "RUN / PROSES" MENU BARU
+    # HANDLER PANDUAN & LOGIC MODAL (SEMUA MENU)
     # =========================================================================
-
-    # 1. PO Receiving
     @reactive.Effect
-    @reactive.event(input.btn_run_po_rec)
-    def _proc_po_rec():
-        succ, msg = state.run_po_receiving(input.uploader_po_scan(), input.uploader_po_file())
-        if succ: state.show_success_modal.set(True)
-        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
+    @reactive.event(input.btn_open_panduan_modal)
+    def _open_panduan_modal():
+        cur = state.main_menu()
+        
+        guides = {
+            "Stock Minus": """
+                <b>📋 INFORMASI FORMAT FILE:</b><br>
+                - <b>All Data Stock:</b> Download Multiple Adjustment dari Jezpro dan pilih <b>Termasuk yang sudah habis</b><br><br>
+                <b>💡 LOGIC THINKING:</b><br>
+                <b>Alur Process Compare Stock Minus:</b><br>
+                - Mengambil SKU yang memiliki Qty System minus (-)<br>
+                - Lalu SKU yang memiliki QTY Minus (-) tersebut akan di lakukan shuffle covering Stock<br>
+                - Dimana terdapat Bin prioritas untuk shuffle Covering Stock (All Stagging, Karantina)<br>
+                - Dan jika minus terjadi di Gudang lt.2 maka akan prioritas mengambil BIN Toko begitupun sebaliknya<br>
+                - Lalu jika tidak ditemukan di BIN Prioritas maka akan mengambil random BIN kecuali LIVE, Offline dan Online<br>
+                - Jika sudah ditemukan SKU dan Qty yang bisa covering maka akan dibuatkan list Set up<br>
+                - Dan jika tidak bisa diselesaikan lewat set up maka sistem akan memasukkan kedalam item need justifikasi dan perlu analisa lebih lanjut
+            """,
 
-    # 2. Penerimaan RTO
-    @reactive.Effect
-    @reactive.event(input.btn_run_penerimaan_rto)
-    def _proc_rto_rec():
-        succ, msg = state.run_penerimaan_rto(input.uploader_rto_rec_scan(), input.uploader_rto_rec_tf())
-        if succ: state.show_success_modal.set(True)
-        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
+            "Putaway System": """
+                <b>📋 INFORMASI FORMAT FILE:</b><br>
+                - <b>DATA SCAN PUTAWAY:</b> Kolom A = <b>BIN</b>, Kolom B = <b>SKU</b>, Kolom C = <b>QTY SCAN</b><br>
+                - <b>DATA PUTAWAY:</b> Sesuai yang ada pada template Jezpro.<br><br>
+                <b>💡 LOGIC THINKING:</b><br>
+                <b>Alur Compare Putaway:</b><br>
+                - SKU di file data scan akan dicompare dengan SKU yang ada di File data BIN Putaway<br>
+                - Tiap unique SKU teratas di File data scan akan mendapatkan alokasi penuh<br>
+                - Untuk SKU yang tidak mendapatkan alokasi maka akan ditulis dengan note <b>PERLU CEK MANUAL</b> untuk mengetahui apakah ada double data scan atau item belum terset up di BIN PUTAWAY<br>
+                - List Set up akan dibuatkan otomatis oleh system dengan BIN awal diambil dari BIN di file Putaway dan BIN tujuan disesuaikan dengan BIN yang ada di data scan
+            """,
 
-    # 3. Scan Out Validation
-    @reactive.Effect
-    @reactive.event(input.btn_run_scan_out)
-    def _proc_scan_out():
-        succ, msg = state.run_scan_out(input.uploader_so_scan(), input.uploader_so_hist(), input.uploader_so_track())
-        if succ: state.show_success_modal.set(True)
-        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
+            "Compare System": """
+                <b>📋 INFORMASI FORMAT FILE & KOLOM MAPPING:</b><br>
+                <b>Kondisi Stok Berkurang (Sys1 > Sys2):</b><br>
+                1. <b>Stock Tracking:</b> Kolom A=Invoice, Kolom B=SKU, Kolom G=BIN, Kolom K=Qty (Index 10).<br>
+                2. <b>RTO Out:</b> Kolom D=No TF, Kolom I=SKU, Kolom J=Qty (Index 9).<br><br>
+                <b>Kondisi Stok Bertambah (Sys2 > Sys1):</b><br>
+                1. <b>Purchase Order:</b> Kolom A=No PO, Kolom D=SKU, Kolom L=Qty (Index 11).<br>
+                2. <b>RTO In:</b> Kolom D=No TF, Kolom I=SKU, Kolom K=Qty (Index 10).<br>
+                3. <b>Mutasi Refund:</b> Kolom D=SKU (Index 3), Kolom K=Qty (Index 10).
+            """,
 
-    # 4. Refill & Overstock
-    @reactive.Effect
-    @reactive.event(input.btn_run_rf_os)
-    def _proc_rf_os():
-        succ, msg = state.run_refill_overstock(input.uploader_rf_os_stock())
-        if succ: state.show_success_modal.set(True)
-        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
+            "List Bin Cycle Count": """
+                <b>📋 INFORMASI FORMAT FILE:</b><br>
+                - <b>FILTER:</b> SUB KATEGORI, BIN SYSTEM, BRAND.<br>
+                - <b>DATA MULTIPLE ADJUSTMENT:</b> Upload file data scan mentah (Kolom B=BIN, C=SKU, E=ITEM, F=VARIANT, G=SUB KATEGORI, H=HARGA, J=QTY).<br>
+                - Filter otomatis mengecualikan bin: DEFECT, REJECT, KARANTINA, STAG, INB, OUT, PUTAWAY.
+            """,
 
-    # 5. Balancing Stock
-    @reactive.Effect
-    @reactive.event(input.btn_run_bal_stock)
-    def _proc_bal_stock():
-        succ, msg = state.run_balancing_stock(input.uploader_bal_stock())
-        if succ: state.show_success_modal.set(True)
-        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
+            "Cycle Count": """
+                <b>📋 INFORMASI FORMAT FILE:</b><br>
+                - <b>FILTER:</b> Sub Kategori, BIN System, Brand, BIN Coverage.<br>
+                - <b>COMPARE DS VS STOCK SYSTEM:</b><br>
+                  - <b>DATA SCAN:</b> Kolom A = BIN, Kolom B = SKU, Kolom C = QTY SCAN<br>
+                  - <b>STOCK SYSTEM:</b> Download All stock dari Multiple Adjustment (<b>Termasuk yang sudah habis</b>)<br>
+                - <b>BIN COVERAGE:</b> Download Bin Coverage dari Multiple Adjustment (<b>Hanya ada di stock</b>)<br>
+                - <b>RECON REAL + PROCESS:</b> Upload file Recon Real + (pastikan KOLOM A bukan berisi NUMBER)<br>
+                - <b>SET UP KARANTINA GENERATOR:</b> SYSTEM + RECON & CEK STOCK ADJ - (Termasuk yang sudah habis)<br><br>
+                <b>💡 LOGIC THINKING:</b><br>
+                - <b>REAL +:</b> QTY SCAN > QTY SYSTEM (Fokus Data Scan)<br>
+                - <b>SYSTEM +:</b> QTY SYSTEM > QTY SCAN (Fokus Stock System)<br>
+                - <b>ALLOCATION REAL +:</b> Cover sistem dari BIN Coverage ➔ FULL / PARTIAL / NO ALLOCATION.<br>
+                - <b>RECON REAL + & SYSTEM +:</b> Menentukan item yang perlu masuk adjustment.<br>
+                - <b>TOTAL MISS LOCATION:</b> Diambil dari SKU & QTY berstatus FULL & PARTIAL ALLOCATION.
+            """,
 
-    # 6. Permintaan FL
-    @reactive.Effect
-    @reactive.event(input.btn_run_fl_req)
-    def _proc_fl_req():
-        succ, msg = state.run_fl_request(input.uploader_fl_stock(), input.uploader_fl_req())
-        if succ: state.show_success_modal.set(True)
-        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
+            "Compare RTO": """
+                <b>📋 INFORMASI FORMAT FILE:</b><br>
+                - <b>DS RTO:</b> Kolom A = <b>SKU</b>, Kolom B = <b>QTY SCAN</b><br>
+                - <b>APPSHEET RTO:</b> Download Spreadsheets Rekap Appsheet sesuai sheet RTO yang dituju<br>
+                - <b>UPLOAD HASIL CEK REAL:</b> Upload hasil rekonsiliasi RTO<br>
+                - <b>DRAFT RTO:</b> Download Draft RTO dari Purchasing<br><br>
+                <b>💡 LOGIC THINKING:</b><br>
+                - <b>DS Vs Appsheet:</b> QTY DS > APPSHEET ➔ Kelebihan Ambil. QTY DS < APPSHEET ➔ Kurang Ambil.<br>
+                - <b>Appsheet Vs Draft:</b> BIN beda ➔ Perlu Edit Draft. Qty beda ➔ Perlu Edit QTY Draft. SKU baru ➔ Tambah item Draft.
+            """,
 
-    # 7. Refill Toko
-    @reactive.Effect
-    @reactive.event(input.btn_run_refill_toko)
-    def _proc_refill_toko():
-        f = input.uploader_refill_stock()
-        succ, msg = state.process_refill_toko(f)
-        if succ: state.show_success_modal.set(True)
-        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
+            "Stock Opname": """
+                <b>📋 INFORMASI FORMAT FILE:</b><br>
+                - <b>DATA SCAN:</b> Kolom A = BIN, Kolom B = SKU, Kolom C = QTY SCAN<br>
+                - <b>STOCK SYSTEM:</b> Download All stock Multiple Adjustment (<b>Termasuk yang sudah habis</b>)<br>
+                - <b>BIN COVERAGE:</b> Download Bin Coverage (<b>Hanya ada di stock</b>)<br>
+                - <b>FINAL ADJUSTMENT + PROCESS:</b> REAL + RECON, CEK STOCK ADJ +, & STAGGING INBOUND.<br>
+                - <b>SET UP KARANTINA GENERATOR:</b> SYSTEM + RECON & CEK STOCK ADJ -.<br>
+                - <b>SUMMARY ADJUSTMENT REPORT:</b> Menghitung nilai finansial & kuantitas selisih adjustment (+/-).
+            """,
 
-    # 8. Store Leader RTO Decision
-    @reactive.Effect
-    @reactive.event(input.btn_run_rto_decision)
-    def _proc_rto_dec():
-        f1, f2 = input.uploader_rto_sby(), input.uploader_rto_smg()
-        f3, f4 = input.uploader_rto_sales(), input.uploader_rto_toc()
-        succ, msg = state.process_rto_decision(f1, f2, f3, f4)
-        if succ: state.show_success_modal.set(True)
-        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
+            "Justification SO": """
+                <b>📋 INFORMASI FORMAT FILE:</b><br>
+                - <b>ADJUSTMENT FILE:</b> Gabungkan Multiple Adjustment (Plus & Minus) dalam 1 File.<br>
+                - <b>SUMMARY STOCK:</b> Dashboard Asset Jezpro (Store: <b>JEZ SURABAYA</b>).<br>
+                - <b>ALL DATA STOCK:</b> Multiple Adjustment (<b>HANYA ADA STOCK</b>).<br>
+                - <b>DATA SCAN (Opsional):</b> Menggunakan Qty fisik data scan aktual.<br><br>
+                <b>💡 LOGIC THINKING:</b><br>
+                <b>REAL QTY:</b> <code>BEGINNING STOCK + (TOTAL_STOCKIN + TOTAL TRF_IN) - (TOTAL SALES + TOTAL TRF_OUT + TOTAL DRAFT TRF_OUT)</code><br>
+                - <b>Kesalahan System (Begin Stock Minus):</b> Stok SO > Sistem (+), tetapi Beginning Stock < 0.<br>
+                - <b>Kesalahan System (Ending Stock ≠ Total Stock Multiple):</b> GAP ADJ = 0 & BEGINNING = 0, tapi QTY SYSTEM ALL lebih kecil.<br>
+                - <b>Kesalahan System (Miss Match Real QTY):</b> Hitungan manual ≠ ENDING STOCK.<br>
+                - <b>Kesalahan Adjustment (+/-):</b> Koreksi dari proses adjustment sebelumnya.<br>
+                - <b>Kesalahan RTO:</b> Terdapat transaksi draft transfer yang menggantung.
+            """,
 
-    # 9. Match Real & System
-    @reactive.Effect
-    @reactive.event(input.btn_run_match_ks)
-    def _proc_match_ks():
-        succ, msg = state.run_match_karantina(input.uploader_match_sys(), input.uploader_match_real())
-        if succ: state.show_success_modal.set(True)
-        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
+            "Purchase Order Receiving": """
+                <b>📋 INFORMASI FORMAT FILE:</b><br>
+                - <b>DATA SCAN:</b> Kolom A = SKU, Kolom B = QTY SCAN<br>
+                - <b>PENERIMAAN:</b> Data Item Ordered (tambahkan Kolom A = NO PO).<br><br>
+                <b>💡 LOGIC THINKING:</b><br>
+                - SKU teratas di PO mendapat alokasi penuh dari data scan.<br>
+                - Status: <b>FULL ALLOCATION</b>, <b>PARTIAL ALLOCATION</b>, <b>NO ALLOCATION</b>, <b>OVER ALLOCATION</b>.
+            """,
 
-    # 10. Refill Koli
-    @reactive.Effect
-    @reactive.event(input.btn_run_koli_conso)
-    def _proc_koli():
-        succ, msg = state.run_koli_consolidation(input.uploader_koli_file())
-        if succ: state.show_success_modal.set(True)
-        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
+            "Compare Penerimaan RTO": """
+                <b>📋 INFORMASI FORMAT FILE:</b><br>
+                - <b>DATA SCAN:</b> Kolom A = SKU, Kolom B = QTY SCAN<br>
+                - <b>TRANSFER STOCK:</b> Download data Transfer Stock Jezpro.<br><br>
+                <b>💡 LOGIC THINKING:</b><br>
+                - Alokasi FIFO scan fisik terhadap nomor transfer sistem.<br>
+                - Deteksi item Kurang TF (Fisik > TF) dan Lebih TF (TF > Fisik).
+            """,
 
-    # 11. Stock Allocation
-    @reactive.Effect
-    @reactive.event(input.btn_run_stk_alloc)
-    def _proc_stk_alloc():
-        succ, msg = state.process_stock_allocation(input.uploader_alloc_stock(), input.uploader_alloc_sales())
-        if succ: state.show_success_modal.set(True)
-        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
+            "Scan Out Validation": """
+                <b>📋 INFORMASI FORMAT FILE:</b><br>
+                - Data Scan Appsheet / Data PBI Moving Stock Detail, History Set Up, & Stock Tracking.<br><br>
+                <b>💡 LOGIC THINKING:</b><br>
+                - Di Mutasi ada, di Tracking tidak ada ➔ <b>DONE AND MATCH SET UP</b>.<br>
+                - Di Tracking ada, di Mutasi tidak ada ➔ <b>ITEM TELAH TERJUAL</b>.<br>
+                - Tidak ada di keduanya ➔ <b>ITEM BELUM TERSETUP & TIDAK TERJUAL</b>.
+            """,
 
-    # 12. Refill & Withdraw
-    @reactive.Effect
-    @reactive.event(input.btn_run_rf_wd)
-    def _proc_rf_wd():
-        succ, msg = state.run_refill_withdraw(input.uploader_rwd_stock(), input.uploader_rwd_trx())
-        if succ: state.show_success_modal.set(True)
-        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
+            "Refill & Overstock": """
+                <b>📋 INFORMASI FORMAT FILE:</b><br>
+                - <b>ALL DATA STOCK:</b> HANYA ADA DI STOCK.<br>
+                - <b>STOCK TRACKING (Opsional):</b> JEZ SURABAYA rentang 7 hari.<br><br>
+                <b>💡 LOGIC THINKING:</b><br>
+                - <b>Refill:</b> Memicu ambil dari GL4 jika stok GL3 < 3 pcs (target max load 12 pcs).<br>
+                - <b>Overstock:</b> Memicu turun stok jika stok GL3 > 24 pcs (di luar rak).
+            """,
 
-    # 13. FDR Update
-    @reactive.Effect
-    @reactive.event(input.btn_run_fdr)
-    def _proc_fdr():
-        succ, msg = state.run_fdr_update(input.uploader_fdr_file())
-        if succ: state.show_success_modal.set(True)
-        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
+            "Balancing Stock": """
+                <b>📋 INFORMASI FORMAT FILE:</b><br>
+                - Multiple Adjustment (<b>Termasuk yang sudah habis</b>). Dihitung dari unique SKU.<br>
+                - Persentase minimal <b>GL4 ➔ GL3: 100%</b>, <b>DC ➔ Store: 98%</b>.<br><br>
+                <b>💡 LOGIC THINKING:</b><br>
+                - <b>GL4 ➔ GL3:</b> <code>(TOTAL STOCK GL4 - BELUM TEREFILL) / TOTAL STOCK GL4</code>.<br>
+                - <b>DC ➔ STORE:</b> <code>(TOTAL STOCK DC - BELUM TEREFILL) / TOTAL STOCK DC</code> (Stok DC > 1 pcs).
+            """,
 
-    # 14. Percentage Display
-    @reactive.Effect
-    @reactive.event(input.btn_run_disp_ctrl)
-    def _proc_disp_ctrl():
-        succ, msg = state.run_percentage_display(input.uploader_disp_stock())
-        if succ: state.show_success_modal.set(True)
-        else: state.error_modal_message.set(msg); state.show_error_modal.set(True)
+            "Precentage Request FL to Store Stock": """
+                <b>📋 INFORMASI FORMAT FILE:</b><br>
+                - <b>All Stock:</b> B=Bin, C=SKU, J=Qty (Area Store Surabaya).<br>
+                - <b>Permintaan FL:</b> E=SKU, V=Kriteria, W=Qty.<br><br>
+                <b>💡 LOGIC THINKING:</b><br>
+                - Indikasi Over-Request: Permintaan ke DC saat stok di Store masih ≥ 2 pcs.<br>
+                - Rumus: <code>(Total Over-Request / Total Permintaan Valid) × 100%</code>.
+            """,
+
+            "Refill Toko": """
+                <b>💡 CARA KERJA & LOGIKA:</b><br>
+                1. <b>Filter:</b> Mengabaikan kategori Shoes, Sandals, Footwear.<br>
+                2. <b>Aturan Refill:</b> Hanya muncul jika stok gudang > 0.<br>
+                   - <b>Lower Body:</b> Refill jika stok toko < 6 pcs.<br>
+                   - <b>Kategori Lain:</b> Refill jika stok toko < 2 pcs.
+            """,
+
+            "Match Real & System": """
+                <b>📋 INFORMASI FORMAT FILE:</b><br>
+                - <b>FILE SYSTEM (+):</b> Kolom A = Cabang, Kolom D = SKU System, Kolom K = Qty System.<br>
+                - <b>FILE REAL (+):</b> Kolom A = Cabang, Kolom E = SKU Real, Kolom M = Qty Real.<br><br>
+                <b>💡 LOGIC THINKING:</b><br>
+                - Prioritas mencari kecocokan di cabang asal (<b>MATCH PERFECT</b>).<br>
+                - Jika kuota cabang asal habis, mencari ke cabang lain (<b>MATCH CROSS-BRANCH</b>).
+            """,
+
+            "Refill Koli to Koli/Refill": """
+                <b>💡 INFORMASI & RULES MUTASI GUDANG (KL1 / KL2 / LT.3):</b><br>
+                - <b>Konsolidasi:</b> Penggenapan BIN KL1 (max 6) & KL2 (max 12) dengan max 2 SKU campuran.<br>
+                - <b>Mutasi Refill (Stok < 9):</b> Qty 6-8 diambil 6 unit untuk KL1 (sisa ke Lt.3). Qty < 6 seluruhnya disapu bersih ke Gudang Lt.3.
+            """,
+
+            "Stock Allocation": """
+                <b>💡 LOGIC THINKING (PROPORSI SALES 90 HARI):</b><br>
+                - <b>0 Sales:</b> Online 10% | Offline 10% | Logistik 80%<br>
+                - <b>Dominan Online (> 70%):</b> Online 70% | Offline 15% | Logistik 15%<br>
+                - <b>Dominan Offline (> 70%):</b> Online 15% | Offline 70% | Logistik 15%<br>
+                - <b>Balanced / Normal:</b> Online 40% | Offline 40% | Logistik 20%
+            """,
+
+            "Refill & Withdraw": """
+                <b>📋 INFORMASI FORMAT FILE:</b> All Data Stock & Stock Tracking 7 hari terakhir.<br><br>
+                <b>💡 LOGIC THINKING:</b> Mengatur keseimbangan stok DC vs Store (02) dengan batas maksimal 6 pcs per SKU di Store.
+            """,
+
+            "Precentage Display": """
+                <b>📋 LOGIKA PENARIKAN DISPLAY:</b><br>
+                - Eksklusi: OFFLINE, ONLINE, AMP, MARKOM, DEFECT, REJECT, STAGING, KARANTINA, EVENT, INB, OUT, PUTAWAY.<br>
+                - Deteksi SKU yang ada di Gudang/DC (> 0) tapi kosong di Toko (0) untuk dipajang.
+            """,
+
+            "Stock Tracking Timeline": """
+                <b>📋 INFORMASI FORMAT FILE:</b> Kompilasi 5 file transaksi dari Power BI (Purchase Order, Mutation Stock, Adjustment, Transfer Stock RTO, Sales Tracking).
+            """,
+
+            "List Retur Out": """
+                <b>📋 INFORMASI FORMAT FILE:</b> Multiple Adjustment (Hanya ada di stok) yang difilter khusus BIN & SKU yang akan diretur. Data otomatis tersimpan di cloud database.
+            """,
+
+            "FDR Update": """
+                <b>📋 INFORMASI FORMAT FILE:</b> Manifest Transaksi Online V2 status Done Online 30 hari terakhir.<br><br>
+                <b>💡 LOGIC THINKING:</b> Memisahkan transaksi ke dalam <b>NEED FU IT</b> dan <b>BRANCH</b>.
+            """,
+
+            "Store Leader RTO Decission": """
+                <b>💡 LOGIC THINKING:</b> Mengintegrasikan stok Surabaya, stok Semarang, performa sales 60 hari, dan target ToC untuk keputusan transfer retur.
+            """,
+
+            "Data Timbang Ongkir": """
+                <b>⚖️ RUMUS TARIF TIMBANG:</b><br>
+                - ACCESS ➔ SEMARANG: Koli × 40.000 × 3.2<br>
+                - ACCESS ➔ HUB JAKARTA: Kg × 2.500 × 3.2<br>
+                - ADEX ➔ SEMARANG / MALANG: Kg × 1.000 × 3.2<br>
+                - ADEX ➔ HUB JAKARTA: Kg × 2.000 × 3.2
+            """,
+
+            "Database Ongkir In/Out": """
+                <b>📊 LOGIKA PERHITUNGAN:</b> Pencatatan transaksi biaya ongkir supplier & ekspedisi (Biaya Datang, Biaya RTO, Avg Cost/Koli).
+            """,
+
+            "Reject/Defect List": """
+                <b>👟 LOGIKA MATCH:</b> Mencari pasangan SKU kategori 'HANYA SEBELAH KIRI' dan 'HANYA SEBELAH KANAN' lintas cabang untuk dipasangkan utuh.
+            """,
+
+            "Pengajuan Reject/Defect": """
+                <b>🔄 ALUR PROGRES:</b> Status 1 (Pengajuan) ➔ Status 2 (Approved Purchasing) ➔ Status 3 (Done Set Up).
+            """,
+
+            "Pengajuan Mutasi Karantina": """
+                <b>🔄 ALUR MONITORING:</b> Status 1 (Belum Approved) ➔ Status 2 (Done Approval / Working List) ➔ Status 3 (Final Done).
+            """,
+
+            "Logistic Schedule": """
+                <b>📅 ATURAN LOGIKA:</b> Target kerja Full-Time 6 hari, Part-Full 9 hari, plot Shift 3 (SO), dan proteksi jeda istirahat antar shift.
+            """,
+
+            "Reporting & PIC": """
+                <b>📌 FUNGSI:</b> Dashboard checklist PIC & to-do list operasional harian yang otomatis ter-reset harian.
+            """
+        }
+
+        guide_content = guides.get(
+            cur, 
+            f"<b>📌 MENU: {cur}</b><br><br>Menu ini digunakan untuk operasional warehouse Surabaya. Pastikan format file yang diunggah sesuai template standar."
+        )
 
         ui.modal_show(ui.modal(
-            guide_body, 
-            title=ui.div(ui.tags.i(class_="fa-solid fa-book-open", style="color: #C5A059; margin-right: 8px;"), f"Panduan & Logic - {cur}"), 
-            easy_close=True, 
-            footer=ui.modal_button("Tutup", class_="btn-red-gradient")
+            ui.HTML(f"""
+                <div style="padding: 10px; font-size: 13.5px; color: #2D3748; line-height: 1.6;">
+                    {guide_content}
+                </div>
+            """),
+            title=ui.div(
+                ui.tags.i(class_="fa-solid fa-book-open", style="color: #E50914; margin-right: 8px;"), 
+                f"Panduan & Logika Sistem — {cur}"
+            ),
+            easy_close=True,
+            size="l",
+            footer=ui.modal_button("Tutup Panduan", class_="btn-red-gradient")
         ))
     # Sub-render Action Buttons
     @render.ui
