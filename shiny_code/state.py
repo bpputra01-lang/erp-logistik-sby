@@ -432,6 +432,9 @@ class AppState:
         self._df_fl_bad = pd.DataFrame()
         self._df_fl_comp = pd.DataFrame()
 
+        # --- STATE: DATA TIMBANG ONGKIR ---
+        self.timbang_filter_periode = reactive.Value("ALL")
+        self.timbang_selected_ids = reactive.Value([])
 
     def set_main_menu(self, menu: str): self.main_menu.set(menu)
     def toggle_sidebar(self): self.sidebar_open.set(not self.sidebar_open())

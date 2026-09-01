@@ -1569,16 +1569,79 @@ def reporting_pic_view(state: AppState):
     )
 
 # ==============================================================================
-# VIEW: 8. DATA TIMBANG ONGKIR
+# VIEW: DATA TIMBANG ONGKIR (100% PERSIS STREAMLIT)
 # ==============================================================================
 def timbang_ongkir_view(state: AppState):
     return ui.div(
-        ui.div(
-            ui.h4("⚖️ Sistem Timbang Kolian & Estimasi Ongkir", style="font-size: 15px; font-weight: 800; margin-bottom: 0.75rem;"),
-            ui.output_ui("timbang_ongkir_metrics_ui"),
-            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+        ui.navset_card_tab(
+            # TAB 1: FORM INPUT DATA MANUAL
+            ui.nav_panel(
+                "📥 INPUT DATA MANUAL",
+                ui.div(
+                    ui.div(
+                        ui.h4("📝 FORM DATA TIMBANG", style="font-size: 16px; font-weight: 800; color: #1A202C; margin-bottom: 1.25rem;"),
+                        ui.div(
+                            # Kolom Kiri
+                            ui.div(
+                                ui.div(ui.span("EKSPEDISI", style="font-size: 11px; font-weight: 800; color: #1A202C; display: block; margin-bottom: 4px;"), ui.input_select("tb_ekspedisi", None, choices=["ACCESS", "ADex (Adika Express)"], width="100%"), style="margin-bottom: 1rem;"),
+                                ui.div(ui.span("JENIS PENGIRIMAN", style="font-size: 11px; font-weight: 800; color: #1A202C; display: block; margin-bottom: 4px;"), ui.input_select("tb_jenis", None, choices=["RTO"], width="100%"), style="margin-bottom: 1rem;"),
+                                ui.div(
+                                    ui.div(ui.span("TOTAL KOLI", style="font-size: 11px; font-weight: 800; color: #1A202C; display: block; margin-bottom: 4px;"), ui.input_numeric("tb_koli", None, value=1, min=1, step=1, width="100%"), style="flex: 1;"),
+                                    ui.div(ui.span("BERAT TOTAL (KG)", style="font-size: 11px; font-weight: 800; color: #1A202C; display: block; margin-bottom: 4px;"), ui.input_numeric("tb_berat", None, value=1.0, min=0.1, step=0.1, width="100%"), style="flex: 1;"),
+                                    style="display: flex; gap: 10px; margin-bottom: 1rem;"
+                                ),
+                                style="flex: 1; min-width: 280px;"
+                            ),
+                            # Kolom Kanan
+                            ui.div(
+                                ui.div(ui.span("PENGIRIMAN DARI", style="font-size: 11px; font-weight: 800; color: #1A202C; display: block; margin-bottom: 4px;"), ui.input_select("tb_dari", None, choices=["SURABAYA"], width="100%"), style="margin-bottom: 1rem;"),
+                                ui.div(ui.span("PENGIRIMAN KE", style="font-size: 11px; font-weight: 800; color: #1A202C; display: block; margin-bottom: 4px;"), ui.input_select("tb_ke", None, choices=["SEMARANG", "HUB JAKARTA", "MALANG"], width="100%"), style="margin-bottom: 1rem;"),
+                                ui.tags.div(style="height: 15px;"),
+                                ui.tags.button(
+                                    ui.tags.span(ui.tags.i(class_="fa-solid fa-scale-balanced", style="margin-right: 6px;"), "⚖️ SIMPAN DATA TIMBANG"),
+                                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_save_timbang', Math.random(), {priority: 'event'});",
+                                    class_="btn-red-gradient",
+                                    style="width: 100%; height: 45px;"
+                                ),
+                                style="flex: 1; min-width: 280px;"
+                            ),
+                            style="display: flex; gap: 2rem; flex-wrap: wrap; width: 100%;"
+                        ),
+                        style="background: #FFFFFF; border-radius: 12px; border: 1.5px solid #CBD5E0; padding: 1.5rem;"
+                    ),
+                    style="padding: 1.25rem;"
+                )
+            ),
+            # TAB 2: METRIC MONITORING & RIWAYAT
+            ui.nav_panel(
+                "📊 METRIC MONITORING",
+                ui.div(
+                    # Filter Periode
+                    ui.div(
+                        ui.div(
+                            ui.span("📅 Filter Periode Data:", style="font-size: 12px; font-weight: 800; color: #111111; margin-right: 8px;"),
+                            ui.tags.select(
+                                ui.tags.option("All Time (Semua Data)", value="ALL", selected=True),
+                                ui.tags.option("Today (Hari Ini)", value="TODAY"),
+                                ui.tags.option("This Month (Bulan Ini)", value="MONTH"),
+                                id="select_filter_timbang",
+                                onchange="Shiny.setInputValue('change_filter_timbang_periode', this.value, {priority: 'event'})",
+                                style="background: white; border: 2px solid #1A202C; border-radius: 8px; font-weight: 800; padding: 6px 12px; width: 220px; cursor: pointer;"
+                            ),
+                            style="display: flex; align-items: center;"
+                        ),
+                        ui.output_ui("timbang_delete_selected_btn_ui"),
+                        style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 10px;"
+                    ),
+                    # 4 Kotak Metrik
+                    ui.output_ui("timbang_ongkir_metrics_ui"),
+                    ui.hr(style="margin: 1.5rem 0; border-color: #E2E8F0;"),
+                    ui.h4("📋 LIST DATA TIMBANG", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+                    ui.output_ui("timbang_ongkir_table_ui"),
+                    style="padding: 1.25rem;"
+                )
+            )
         ),
-        ui.output_ui("timbang_ongkir_table_ui"),
         style="width: 100%; padding: 1rem;"
     )
 
