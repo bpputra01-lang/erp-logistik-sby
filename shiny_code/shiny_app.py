@@ -2368,14 +2368,15 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         yield buf.getvalue()
         
-    # =========================================================================
-    # ➕ TAMBAHAN: SERVER HANDLERS UNTUK 4 MENU SUPABASE LAMA
-    # =========================================================================
+# ==========================================================================
+    # LOGIC: TIMBANG ONGKIR
+    # ==========================================================================
+    timbang_reload_trigger = reactive.Value(0)
 
     # 1. SIMPAN DATA MANUAL KE SUPABASE LAMA
     @reactive.Effect
     @reactive.event(input.btn_save_timbang)
-    def _save_timbang_handler():
+    def _save_timbang():
         try:
             sb = config.get_supabase_old()
             now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -2394,10 +2395,10 @@ def server(input: Inputs, output: Outputs, session: Session):
             state.error_modal_message.set(f"Gagal simpan data: {e}")
             state.show_error_modal.set(True)
 
-    # 2. HAPUS DATA SATUAN DARI TABEL
+    # 2. HAPUS DATA SATUAN DARI TABEL (DETAIL SATUAN)
     @reactive.Effect
     @reactive.event(input.btn_delete_timbang_single)
-    def _delete_timbang_single_handler():
+    def _delete_timbang_single():
         target_id = input.btn_delete_timbang_single()
         if not target_id:
             return
@@ -2412,7 +2413,7 @@ def server(input: Inputs, output: Outputs, session: Session):
     # 3. GANTI FILTER PERIODE
     @reactive.Effect
     @reactive.event(input.change_filter_timbang_periode)
-    def _chg_flt_timbang_handler():
+    def _chg_flt_timbang():
         val = str(input.change_filter_timbang_periode() or "ALL")
         if hasattr(state, "timbang_filter_periode"):
             if callable(getattr(state.timbang_filter_periode, "set", None)):
@@ -2422,7 +2423,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         timbang_reload_trigger.set(timbang_reload_trigger() + 1)
 
     # 4. HELPER: RUMUS TARIF HARGA
-    def _calc_harga_timbang(row):
+    def _hitung_harga_timbang(row):
         try:
             eksp = str(row.get("ekspedisi", "") or "").upper()
             tujuan = str(row.get("pengiriman_ke", "") or "").upper()
@@ -2441,8 +2442,8 @@ def server(input: Inputs, output: Outputs, session: Session):
         except Exception:
             return 0.0
 
-    # 5. HELPER: TARIK DATA + FILTER PERIODE (TERMASUK BULAN LALU)
-    def _fetch_timbang_data():
+    # 5. HELPER: TARIK DATA SUPABASE + FILTER (TERMASUK PAST_MONTH)
+    def _get_filtered_timbang_data():
         _ = timbang_reload_trigger()
         try:
             sb = config.get_supabase_old()
@@ -2452,13 +2453,13 @@ def server(input: Inputs, output: Outputs, session: Session):
                 return pd.DataFrame()
 
             df = pd.DataFrame(data)
-            df["Estimasi Harga"] = df.apply(_calc_harga_timbang, axis=1)
+            df["Estimasi Harga"] = df.apply(_hitung_harga_timbang, axis=1)
 
             if "created_at" in df.columns:
                 df["created_at_dt"] = pd.to_datetime(df["created_at"], errors="coerce")
                 df = df.sort_values(by="created_at_dt", ascending=False).reset_index(drop=True)
 
-                # Ambil nilai filter aktif
+                # Ambil filter aktif
                 flt = "ALL"
                 if hasattr(state, "timbang_filter_periode"):
                     flt_val = state.timbang_filter_periode() if callable(state.timbang_filter_periode) else state.timbang_filter_periode
@@ -2479,11 +2480,14 @@ def server(input: Inputs, output: Outputs, session: Session):
             print(f"Error load timbang: {e}")
             return pd.DataFrame()
 
+    # Alias cadangan
+    _fetch_timbang_data = _get_filtered_timbang_data
+
     # 6. RENDER 4 KOTAK METRIK
     @output
     @render.ui
     def timbang_ongkir_metrics_ui():
-        df = _fetch_timbang_data()
+        df = _get_filtered_timbang_data()
         if df.empty:
             return ui.div(
                 dark_metric_box("📦 TOTAL KOLI", "0", "#FFD700"),
@@ -2510,7 +2514,7 @@ def server(input: Inputs, output: Outputs, session: Session):
     @output
     @render.ui
     def timbang_ongkir_table_ui():
-        df = _fetch_timbang_data()
+        df = _get_filtered_timbang_data()
         if df.empty:
             return ui.div("💡 Belum ada data timbang masuk untuk periode ini.", style="text-align: center; padding: 2rem; color: #718096; font-style: italic;")
 
@@ -2523,7 +2527,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         display_df["Berat (Kg)"] = display_df["berat_total_timbang"].apply(lambda x: f"{float(x):,.2f} Kg" if pd.notna(x) else "-")
         display_df["Estimasi Harga (Rp)"] = display_df["Estimasi Harga"].apply(lambda x: f"Rp {float(x):,.0f}" if pd.notna(x) else "Rp 0")
 
-        # Tombol Hapus per Baris
+        # Tombol Aksi Hapus Satuan
         display_df["Aksi"] = display_df["id"].apply(
             lambda x: f'<button type="button" onclick="if(confirm(\'Yakin ingin menghapus data baris ID {x}?\')) {{ Shiny.setInputValue(\'btn_delete_timbang_single\', \'{x}\', {{priority: \'event\'}}); }}" style="background: #FFF5F5; color: #E53E3E; border: 1px solid #FEB2B2; padding: 3px 8px; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer;">🗑️ Hapus</button>'
         )
