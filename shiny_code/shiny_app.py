@@ -2444,8 +2444,19 @@ def server(input: Inputs, output: Outputs, session: Session):
     def pil_dynamic_body_ui():
         mode = state.pil_mode()
 
-        # MODE 1: BY PUTAWAY & PICKING AUDIT
-        if mode == "PUTAWAY & PICKING AUDIT":
+        # 0. KONDISI AWAL (BLANK / BELUM MEMILIH MODE)
+        if not mode or mode == "":
+            return ui.div(
+                ui.div(
+                    ui.tags.i(class_="fa-solid fa-hand-pointer", style="font-size: 32px; color: #C5A059; margin-bottom: 12px;"),
+                    ui.h4("Silakan Pilih Metode Penarikan Data Terlebih Dahulu", style="font-size: 16px; font-weight: 800; color: #1A202C; margin: 0 0 6px 0;"),
+                    ui.p("Pilih salah satu metode pada dropdown di atas untuk memunculkan form upload dokumen & proses penarikan data.", style="color: #718096; font-size: 13px; margin: 0;"),
+                    style="background: #FFFFFF; border: 2px dashed #CBD5E0; border-radius: 12px; padding: 3rem 1.5rem; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; box-shadow: 0 4px 12px rgba(0,0,0,0.02);"
+                )
+            )
+
+        # 1. MODE 1: BY PUTAWAY & PICKING AUDIT
+        elif mode == "PUTAWAY & PICKING AUDIT":
             return ui.div(
                 ui.div(
                     ui.h4("📥 Upload Dokumen Audit (Sales, RTO, & Mutasi)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
@@ -2461,8 +2472,8 @@ def server(input: Inputs, output: Outputs, session: Session):
                 ui.output_ui("ppa_results_container")
             )
 
-        # MODE 2: BY NON AUDIT (FILTER MULTIPLE ADJUSTMENT)
-        else:
+        # 2. MODE 2: BY NON AUDIT (FILTER MULTIPLE ADJUSTMENT)
+        elif mode == "NON AUDIT (MULTIPLE ADJ)":
             return ui.div(
                 ui.div(
                     ui.h4("📥 Upload File Multiple Adjustment", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),

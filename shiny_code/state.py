@@ -388,7 +388,7 @@ class AppState:
         self._raw_df_bs_on_missing = pd.DataFrame()
 
         # --- PHYSICAL INVENTORY LIST STATE (UNIFIED) ---
-        self.pil_mode = reactive.Value("PUTAWAY & PICKING AUDIT")
+        self.pil_mode = reactive.Value("")
 
     def set_main_menu(self, menu: str): self.main_menu.set(menu)
     def toggle_sidebar(self): self.sidebar_open.set(not self.sidebar_open())

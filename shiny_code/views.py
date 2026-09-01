@@ -943,17 +943,17 @@ def balancing_stock_view(state: AppState):
         style="width: 100%; padding: 1rem;"
     )
 
-    # ==============================================================================
+# ==============================================================================
 # VIEW: PHYSICAL INVENTORY LIST (UNIFIED 2-IN-1 MODE)
 # ==============================================================================
 def physical_inventory_list_view(state: AppState):
-    # Mode Selector Dropdown di Paling Atas
     mode_selector = ui.div(
         ui.div(
             ui.span("🎯 PILIH METODE PENARIKAN DATA PHYSICAL INVENTORY:", style="font-weight: 800; color: #1A202C; font-size: 13px; margin-bottom: 6px; display: block; letter-spacing: 0.5px;"),
             ui.tags.select(
-                ui.tags.option("1. TARIK BY PUTAWAY & PICKING AUDIT (Sales, RTO, Mutasi)", value="PUTAWAY & PICKING AUDIT", selected=(state.pil_mode() == "PUTAWAY & PICKING AUDIT")),
-                ui.tags.option("2. TARIK BY NON AUDIT (Filter Multiple Adjustment / Brand / Tier)", value="NON AUDIT (MULTIPLE ADJ)", selected=(state.pil_mode() == "NON AUDIT (MULTIPLE ADJ)")),
+                ui.tags.option("-- Pilih Metode Penarikan Data Physical Inventory --", value="", selected=(state.pil_mode() == "")),
+                ui.tags.option("1. TARIK BY PUTAWAY & PICKING AUDIT", value="PUTAWAY & PICKING AUDIT", selected=(state.pil_mode() == "PUTAWAY & PICKING AUDIT")),
+                ui.tags.option("2. TARIK BY NON PUTAWAY &PICKING AUDIT ", value="NON AUDIT (MULTIPLE ADJ)", selected=(state.pil_mode() == "NON AUDIT (MULTIPLE ADJ)")),
                 id="select_pil_mode_input",
                 onchange="Shiny.setInputValue('change_pil_mode', this.value, {priority: 'event'})",
                 style="width: 100%; padding: 10px 14px; background-color: #FFFFFF; color: #1A202C; font-weight: 800; font-size: 14px; border: 2px solid #CBD5E0; border-radius: 8px; outline: none; cursor: pointer;"
@@ -963,7 +963,6 @@ def physical_inventory_list_view(state: AppState):
         style="background: white; padding: 1.25rem 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem; box-shadow: 0 4px 12px rgba(0,0,0,0.03);"
     )
 
-    # Dynamic Body Container (Berubah otomatis sesuai Mode yang dipilih)
     dynamic_body = ui.output_ui("pil_dynamic_body_ui")
 
     return ui.div(
