@@ -1,18 +1,11 @@
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.resolve()))
 import os
 import json
 import random
 import base64
-import config
 from datetime import datetime
 from shiny import ui
 from state import AppState
 from config import safe_int
-
-
-
 
 # Helper membaca gambar otomatis agar tidak pernah broken
 def get_image_base64(filename):
@@ -26,11 +19,11 @@ def get_image_base64(filename):
     return f"./{filename}"
 
 # ==============================================================================
-# CSS & JAVASCRIPT ASSETS (PERBAIKAN TOTAL: ANTI-LONCAT & ZERO-GLITCH)
+# CSS & JAVASCRIPT ASSETS (LENGKAP DENGAN SMART SCROLL LOCK ANTI-LONCAT)
 # ==============================================================================
 
 CUSTOM_HEAD = ui.head_content(
-    # --- 1. SCRIPT UTAMA (PAGINASI, DRAG & DROP, & SCROLL LOCK SIDEBAR + LAYAR) ---
+    # --- 1. SCRIPT UTAMA (PAGINASI, DRAG & DROP, & ZERO-GLITCH SCROLL) ---
     ui.tags.script("""
         document.title = "ZKN WAREHOUSE ERP";
         let favicon = document.querySelector("link[rel~='icon']");
@@ -41,97 +34,7 @@ CUSTOM_HEAD = ui.head_content(
         }
         favicon.href = "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>";
 
-        // --- A. PENGUNCI SCROLL SIDEBAR (ANTI LOMPAT KE ATAS) ---
-        window._sidebarScrollPos = 0;
-
-        function getSidebarEl() {
-            return document.getElementById("sidebar-scroll-box") || document.querySelector(".sidebar div[style*='overflow-y: auto']");
-        }
-
-        document.addEventListener('scroll', function(e) {
-            let sb = getSidebarEl();
-            if (sb && (e.target === sb || sb.contains(e.target))) {
-                window._sidebarScrollPos = sb.scrollTop;
-            }
-        }, true);
-
-        document.addEventListener('mousedown', function(e) {
-            let sb = getSidebarEl();
-            if (sb && sb.scrollTop > 0) {
-                window._sidebarScrollPos = sb.scrollTop;
-            }
-        }, true);
-
-        function restoreSidebarScroll() {
-            let sb = getSidebarEl();
-            if (sb && window._sidebarScrollPos > 0 && sb.scrollTop !== window._sidebarScrollPos) {
-                sb.scrollTop = window._sidebarScrollPos;
-            }
-        }
-
-        // --- B. ZERO-GLITCH MAIN CONTAINER SCROLL LOCK ---
-        window._lockedScrollPos = 0;
-        let isUserActivelyScrolling = false;
-        let scrollResetTimer = null;
-
-        function getMainContainer() {
-            return document.getElementById("main-scroll-container") || document.querySelector('div[style*="overflow-y: auto"]');
-        }
-
-        window.addEventListener('wheel', function() {
-            isUserActivelyScrolling = true;
-            clearTimeout(scrollResetTimer);
-            scrollResetTimer = setTimeout(function() { isUserActivelyScrolling = false; }, 200);
-        }, { passive: true, capture: true });
-
-        window.addEventListener('touchmove', function() {
-            isUserActivelyScrolling = true;
-            clearTimeout(scrollResetTimer);
-            scrollResetTimer = setTimeout(function() { isUserActivelyScrolling = false; }, 200);
-        }, { passive: true, capture: true });
-
-        document.addEventListener('scroll', function(e) {
-            let c = getMainContainer();
-            if (c && e.target === c && isUserActivelyScrolling && c.scrollTop > 0) {
-                window._lockedScrollPos = c.scrollTop;
-            }
-        }, true);
-
-        // --- C. SHINY LIFECYCLE HOOKS ---
-        if (window.jQuery) {
-            $(document).on('shiny:inputchanged shiny:recalculating', function() {
-                let c = getMainContainer();
-                if (c && c.scrollTop > 0) {
-                    window._lockedScrollPos = c.scrollTop;
-                }
-                let sb = getSidebarEl();
-                if (sb && sb.scrollTop > 0) {
-                    window._sidebarScrollPos = sb.scrollTop;
-                }
-            });
-
-            $(document).on('shiny:value shiny:recalculated', function() {
-                let c = getMainContainer();
-                if (c && window._lockedScrollPos > 0 && !isUserActivelyScrolling) {
-                    c.scrollTop = window._lockedScrollPos;
-                }
-                restoreSidebarScroll();
-            });
-        }
-
-        let domWatcher = new MutationObserver(function() {
-            let c = getMainContainer();
-            if (c && window._lockedScrollPos > 0 && !isUserActivelyScrolling && c.scrollTop !== window._lockedScrollPos) {
-                c.scrollTop = window._lockedScrollPos;
-            }
-            restoreSidebarScroll();
-        });
-
-        document.addEventListener("DOMContentLoaded", function() {
-            domWatcher.observe(document.body, { childList: true, subtree: true });
-        });
-
-        // --- D. FAST TABLE PAGINATION (0ms) ---
+        // --- 1. ENGINE PAGINASI CEPAT (0ms) ---
         window.fastTables = window.fastTables || {};
         window.renderFastTablePage = function(tableId) {
             let tState = window.fastTables[tableId];
@@ -194,7 +97,7 @@ CUSTOM_HEAD = ui.head_content(
             }
         };
 
-        // --- E. DRAG & DROP FILE ---
+        // --- 2. DRAG & DROP FILE DARI EXPLORER ---
         document.addEventListener('dragover', function(e) {
             let box = e.target.closest('.reflex-upload-container, .csv-batch-box');
             if (box) {
@@ -224,6 +127,75 @@ CUSTOM_HEAD = ui.head_content(
                 }
             }
         });
+
+        // --- 3. ZERO-GLITCH SYNCHRONOUS SCROLL LOCK (100% DIAM MEMATUNG) ---
+        window._lockedScrollPos = 0;
+        let isUserActivelyScrolling = false;
+        let scrollResetTimer = null;
+
+        function getContainer() {
+            return document.getElementById("main-scroll-container") || document.querySelector('div[style*="overflow-y: auto"]');
+        }
+
+        // Catat posisi scroll setiap user menggeser mouse
+        window.addEventListener('wheel', function() {
+            isUserActivelyScrolling = true;
+            clearTimeout(scrollResetTimer);
+            scrollResetTimer = setTimeout(function() { isUserActivelyScrolling = false; }, 200);
+        }, { passive: true, capture: true });
+
+        window.addEventListener('touchmove', function() {
+            isUserActivelyScrolling = true;
+            clearTimeout(scrollResetTimer);
+            scrollResetTimer = setTimeout(function() { isUserActivelyScrolling = false; }, 200);
+        }, { passive: true, capture: true });
+
+        document.addEventListener('scroll', function(e) {
+            let c = getContainer();
+            if (c && isUserActivelyScrolling && c.scrollTop > 0) {
+                window._lockedScrollPos = c.scrollTop;
+            }
+        }, true);
+
+        // Rekam posisi saat klik tombol atau pilih file
+        document.addEventListener('mousedown', function() {
+            let c = getContainer();
+            if (c && c.scrollTop > 0) {
+                window._lockedScrollPos = c.scrollTop;
+            }
+        }, true);
+
+        // Kunci instan tepat di siklus hidup Shiny sebelum frame digambar (Zero-Flicker)
+        if (window.jQuery) {
+            $(document).on('shiny:inputchanged shiny:recalculating', function() {
+                let c = getContainer();
+                if (c && c.scrollTop > 0) {
+                    window._lockedScrollPos = c.scrollTop;
+                }
+            });
+
+            $(document).on('shiny:value shiny:recalculated', function() {
+                let c = getContainer();
+                if (c && window._lockedScrollPos > 0 && !isUserActivelyScrolling) {
+                    c.scrollTop = window._lockedScrollPos;
+                }
+            });
+        }
+
+        // Penjaga ganda MutationObserver
+        let domWatcher = new MutationObserver(function() {
+            let c = getContainer();
+            if (c && window._lockedScrollPos > 0 && !isUserActivelyScrolling && c.scrollTop !== window._lockedScrollPos) {
+                c.scrollTop = window._lockedScrollPos;
+            }
+        });
+
+        document.addEventListener("DOMContentLoaded", function() {
+            let c = getContainer();
+            if (c) {
+                domWatcher.observe(c, { childList: true, subtree: true });
+            }
+        });
     """),
 
     # --- 2. FONT AWESOME ICONS ---
@@ -232,42 +204,8 @@ CUSTOM_HEAD = ui.head_content(
     # --- 3. CSS STYLING LENGKAP ---
     ui.tags.style("""
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body, html { height: 100%; width: 100%; overflow-x: hidden; background-color: #111318; margin: 0; padding: 0; }
         
-        html { 
-            height: 100%; 
-            width: 100%; 
-            overflow-y: scroll !important; 
-            scrollbar-gutter: stable !important; 
-            background-color: #111318; 
-            margin: 0; 
-            padding: 0; 
-        }
-        body { 
-            height: 100%; 
-            width: 100%; 
-            background-color: #111318; 
-            margin: 0; 
-            padding: 0; 
-        }
-
-        #main-scroll-container {
-            min-height: 100vh !important;
-            overflow-anchor: none !important;
-            scroll-behavior: auto !important;
-        }
-
-        .shiny-output-recalculating {
-            opacity: 1 !important;
-            visibility: visible !important;
-            transition: none !important;
-        }
-
-        #sidebar-scroll-box {
-            overflow-y: auto !important;
-            overscroll-behavior: contain !important;
-            scrollbar-width: thin;
-        }
-
         .selectize-control .selectize-input {
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234A5568' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
             background-repeat: no-repeat !important;
@@ -276,10 +214,12 @@ CUSTOM_HEAD = ui.head_content(
             padding-right: 2.25rem !important;
         }
 
+        /* Saat dropdown sedang diklik/dibuka (Panah berbalik ke atas & berubah merah) */
         .selectize-control .selectize-input.dropdown-active {
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23E50914' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='18 15 12 9 6 15'%3E%3C/polyline%3E%3C/svg%3E") !important;
         }
 
+        /* 2. Untuk Semua Dropdown Native (<select>) */
         select.form-control, select {
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234A5568' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
             background-repeat: no-repeat !important;
@@ -289,6 +229,11 @@ CUSTOM_HEAD = ui.head_content(
             -webkit-appearance: none !important;
             -moz-appearance: none !important;
             appearance: none !important;
+        }
+        /* Mematikan reflek loncat otomatis browser */
+        #main-scroll-container {
+            overflow-anchor: none !important;
+            scroll-behavior: auto !important;
         }
 
         @keyframes blinkAnimation {
@@ -411,22 +356,31 @@ CUSTOM_HEAD = ui.head_content(
         }, 1000);
     """)
 )
- 
+
 # ==============================================================================
 # MAPPING CABANG & BIN
 # ==============================================================================
 BRANCH_BIN_MAPPING = {
-    "SURABAYA": ["GUDANG LT.2", "LIVE", "GL1-DC-KL2", "GL1-DC-KL1", "GL2-STORE", "GL2-STR", "OFFLINE", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-KL", "GL3-DC-RAK", "PUTAWAY", "KEEP AMP", "MARKOM", "DEFECT", "REJECT", "INBOUND", "BANDING"],
+    "SURABAYA": ["GUDANG LT.2", "LIVE", "KL2", "KL1", "GL2-STORE", "GL2-STR", "OFFLINE", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL", "GL3-DC-RAK", "GL4-DC-RAK", "PUTAWAY", "KEEP AMP", "MARKOM", "DEFECT", "REJECT", "INBOUND", "BANDING"],
     "MALANG": ["GL1-BACKLINE", "GL1-C1", "GL1-C2", "GL1-C3-CTN", "GL1-C4-KL3", "GL1-KAVLING2", "DAU", "KAV2", "KAV7", "KAV8", "KAV9", "KAV10", "GL1-C0", "OFFLINE", "TOKO", "PUTAWAY", "KEEP AMP", "MARKOM", "DEFECT", "REJECT", "INBOUND", "REFUND", "BANDING"],
     "JEMBER": ["GL2-JBR", "GUDANG", "GL2-JBR-KL1", "GL2-JBR-KL2", "GL2-JBR-CTN", "GL2-JBR-GKH", "GL2-JBR-KL3", "GL2-JBR-KOLI2", "EVENT", "GAGAL QC", "INBOUND", "PUTAWAY", "REFUND", "DEFECT", "REJECT", "OFFLINE", "TOKO", "BANDING"],
     "KEDIRI": ["GL1-KDR-BACKLINE", "GL1-KDR", "GL2-KDR", "GL2-KDR-CTN", "GL3-KDR-KL1", "GL3-KDR-KL2", "GL3-KDR-KL3", "GL3-KOLI", "EVENT", "GAGAL QC", "INBOUND", "PUTAWAY", "REFUND", "DEFECT", "REJECT", "OFFLINE", "TOKO", "BANDING"],
     "SIDOARJO": ["GL2-SDA-RAK", "GL3-SDA", "GL3-SDA-BIN OFFLINE", "INBOUND", "PUTAWAY", "REFUND", "DEFECT", "REJECT", "OFFLINE", "TOKO", "BANDING", "EVENT", "GAGAL QC"],
     "SEMARANG": ["GL2-SMG", "GL2-SMG-CTN-", "GUDANG LT 2", "INBOUND", "PUTAWAY", "REFUND", "DEFECT", "REJECT", "OFFLINE", "TOKO", "BANDING", "EVENT", "GAGAL QC"],
-    "HUB JAKARTA": ["GL1-JKT-A", "GL1-JKT-B", "GL1-JKT-C", "GL1-JKT-D", "GL1-JKT-E", "INBOUND", "PUTAWAY", "REFUND", "GAGAL QC", "RU HUB"],
-    "HUB ONLINE SURABAYA": ["ONL","HUB ONL", "ONL-KL1", "ONL-KL2"],
-    "HUB ONLINE MALANG": ["HUB"]
+    "HUB JAKARTA": ["GL1-JKT-A", "GL1-JKT-B", "GL1-JKT-C", "GL1-JKT-D", "GL1-JKT-E", "INBOUND", "PUTAWAY", "REFUND", "GAGAL QC", "RU HUB"]
 }
 
+
+# Helper membaca gambar otomatis agar tidak pernah broken/gagal load
+def get_image_base64(filename):
+    try:
+        if os.path.exists(filename):
+            with open(filename, "rb") as f:
+                encoded = base64.b64encode(f.read()).decode("utf-8")
+                return f"data:image/png;base64,{encoded}"
+    except Exception:
+        pass
+    return f"./{filename}"
 # Helper UI Components
 def metric_box(title: str, val_str: str, text_color: str, bg_gradient: str):
     return ui.div(
@@ -612,14 +566,34 @@ def compare_system_view(state: AppState):
         style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
     )
     return ui.div(upload_section, ui.output_ui("compare_system_results_container"), style="width: 100%; padding: 1rem;")
-    
+
 # ==============================================================================
-# VIEW 2: STOCK MINUS (BERSIH & KEMBALI KE ASLI)
+# VIEW 2: STOCK MINUS (DENGAN INTEGRASI SUPABASE STORAGE)
 # ==============================================================================
 def stock_minus_view(state: AppState):
     return ui.div(
+        # --- KOTAK 1: AMBIL OTOMATIS DARI SUPABASE ---
         ui.div(
-            ui.span("Upload File STOCK MINUS", style="font-weight: bold; color: #1A202C; font-size: 14px; margin-bottom: 0.25rem; display: block;"),
+            ui.div(
+                ui.div(
+                    ui.h4("⚡ Ambil Data Stok Terkini dari Supabase", style="font-size: 15px; font-weight: 800; color: #065F46; margin: 0 0 4px 0;"),
+                    ui.p("Gunakan data stok terbaru yang tersimpan di cloud Supabase tanpa perlu cari file di laptop.", style="color: #4A5568; font-size: 12px; margin: 0;"),
+                    style="display: flex; flex-direction: column;"
+                ),
+                ui.tags.button(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-cloud-arrow-down", style="margin-right: 8px; font-size: 14px;"), "AMBIL STOK DARI SUPABASE"),
+                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_fetch_stock_supabase', Math.random(), {priority: 'event'});",
+                    class_="btn-red-gradient",
+                    style="padding: 10px 20px; font-size: 13px;"
+                ),
+                style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 10px;"
+            ),
+            style="width: 100%; background: #D1FAE5; border: 1.5px solid #A7F3D0; padding: 1.25rem; border-radius: 10px; margin-bottom: 1rem;"
+        ),
+
+        # --- KOTAK 2: OPSI UPLOAD MANUAL DARI LAPTOP (CADANGAN) ---
+        ui.div(
+            ui.span("📁 Atau Upload File dari Laptop (Multiple Adjustment)", style="font-weight: bold; color: #1A202C; font-size: 13px; margin-bottom: 0.25rem; display: block;"),
             ui.div(
                 ui.input_file(
                     "upload_stock_file", None, accept=[".xlsx", ".xls"], multiple=False, 
@@ -631,10 +605,10 @@ def stock_minus_view(state: AppState):
             ui.output_ui("stock_minus_action_btn_ui"),
             style="width: 100%; background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
         ),
+
         ui.output_ui("stock_minus_results_container"),
         style="width: 100%; padding: 1rem;"
     )
-
 # ==============================================================================
 # VIEW 3: PUTAWAY SYSTEM
 # ==============================================================================
@@ -657,79 +631,52 @@ def putaway_view(state: AppState):
     return ui.div(top_section, ui.output_ui("putaway_results_container"), style="width: 100%; padding: 1rem;")
 
 # ==============================================================================
-# VIEW 4: DATABASE ONGKIR (TAB 2: SUMMARY & HISTORY)
+# VIEW 4: DATABASE ONGKIR (MAIN DASHBOARD)
 # ==============================================================================
 def ongkir_tab2_view(state: AppState):
     selected_count = len(state.selected_ids())
-    del_btn_ui = ui.tags.button(
-        f"🗑️ HAPUS ({selected_count}) DATA", 
-        onclick="Shiny.setInputValue('btn_open_delete_modal', Math.random(), {priority: 'event'})", 
-        style="background: #E53E3E; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px;"
-    ) if selected_count > 0 else ui.div()
+    del_btn_ui = ui.tags.button(f"🗑️ HAPUS ({selected_count}) DATA", onclick="Shiny.setInputValue('btn_open_delete_modal', Math.random(), {priority: 'event'})", style="background: #E53E3E; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px;") if selected_count > 0 else ui.div()
     
     select_options = [ui.tags.option(opt, value=opt, selected=(opt == state.filter_ekspedisi())) for opt in state.get_list_ekspedisi_options()]
     
+    periode_pilihan = [
+        ("SEMUA", "Semua Waktu"),
+        ("HARI INI", "Hari Ini"),
+        ("7 HARI TERAKHIR", "7 Hari Terakhir"),
+        ("BULAN INI", "Bulan Ini"),
+        ("BULAN LALU", "Bulan Lalu")
+    ]
+    select_periode_options = [
+        ui.tags.option(label, value=val, selected=(val == state.filter_periode())) 
+        for val, label in periode_pilihan
+    ]
+
     table_rows = [
         ui.tags.tr(
             ui.tags.td(ui.tags.input(type="checkbox", checked=(str(r.get("id", "")) in set(state.selected_ids())), onchange=f"Shiny.setInputValue('toggle_row_id', '{r.get('id', '')}', {{priority: 'event'}})")),
-            ui.tags.td(str(r.get("created_at", r.get("tanggal", "")))), 
-            ui.tags.td(str(r.get("supplier", ""))), 
-            ui.tags.td(str(r.get("ekspedisi", ""))),
-            ui.tags.td(str(safe_int(r.get("total_koli", r.get("koli", 0))))), 
-            ui.tags.td(f"Rp {safe_int(r.get('total_ongkir', 0)):,}")
+            ui.tags.td(str(r.get("created_at", r.get("tanggal", "")))), ui.tags.td(str(r.get("supplier", ""))), ui.tags.td(str(r.get("ekspedisi", ""))),
+            ui.tags.td(str(safe_int(r.get("total_koli", r.get("koli", 0))))), ui.tags.td(f"Rp {safe_int(r.get('total_ongkir', 0)):,}")
         ) for r in state.get_filtered_ongkir()
     ]
 
     return ui.div(
         ui.div(
             ui.div(
-                # 1. FILTER EKSPEDISI
                 ui.div(
                     ui.span("EKSPEDISI:", style="font-size: 12px; font-weight: 800; color: #111111; margin-right: 6px;"),
-                    ui.tags.select(
-                        *select_options, 
-                        id="select_filter_ekspedisi", 
-                        onchange="Shiny.setInputValue('change_filter_ekspedisi', this.value, {priority: 'event'})", 
-                        style="background-color: #FFFFFF !important; color: #000000 !important; border: 2px solid #1A202C !important; border-radius: 8px !important; font-weight: 800 !important; width: 160px; padding: 6px 10px; cursor: pointer;"
-                    ),
+                    ui.tags.select(*select_options, id="select_filter_ekspedisi", onchange="Shiny.setInputValue('change_filter_ekspedisi', this.value, {priority: 'event'})", style="background-color: #FFFFFF !important; color: #000000 !important; border: 2px solid #1A202C !important; border-radius: 8px !important; font-weight: 800 !important; width: 170px; padding: 6px 10px; cursor: pointer;"),
                     style="display: flex; align-items: center;"
                 ),
-                # 2. FILTER DARI TANGGAL
                 ui.div(
-                    ui.span("DARI:", style="font-size: 12px; font-weight: 800; color: #111111; margin-left: 10px; margin-right: 6px;"),
-                    ui.tags.input(
-                        type="date", 
-                        id="input_filter_tgl_start", 
-                        value=state.filter_tgl_start(), 
-                        onchange="Shiny.setInputValue('change_filter_tgl_start', this.value, {priority: 'event'})", 
-                        style="background-color: #FFFFFF !important; color: #000000 !important; border: 2px solid #1A202C !important; border-radius: 8px !important; font-weight: 800 !important; width: 145px; padding: 5px 8px; cursor: pointer;"
-                    ),
+                    ui.span("PERIODE:", style="font-size: 12px; font-weight: 800; color: #111111; margin-left: 12px; margin-right: 6px;"),
+                    ui.tags.select(*select_periode_options, id="select_filter_periode", onchange="Shiny.setInputValue('change_filter_periode', this.value, {priority: 'event'})", style="background-color: #FFFFFF !important; color: #000000 !important; border: 2px solid #1A202C !important; border-radius: 8px !important; font-weight: 800 !important; width: 170px; padding: 6px 10px; cursor: pointer;"),
                     style="display: flex; align-items: center;"
-                ),
-                # 3. FILTER SAMPAI TANGGAL
-                ui.div(
-                    ui.span("S/D:", style="font-size: 12px; font-weight: 800; color: #111111; margin-left: 10px; margin-right: 6px;"),
-                    ui.tags.input(
-                        type="date", 
-                        id="input_filter_tgl_end", 
-                        value=state.filter_tgl_end(), 
-                        onchange="Shiny.setInputValue('change_filter_tgl_end', this.value, {priority: 'event'})", 
-                        style="background-color: #FFFFFF !important; color: #000000 !important; border: 2px solid #1A202C !important; border-radius: 8px !important; font-weight: 800 !important; width: 145px; padding: 5px 8px; cursor: pointer;"
-                    ),
-                    style="display: flex; align-items: center;"
-                ),
-                # 4. TOMBOL RESET FILTER
-                ui.tags.button(
-                    "🔄 RESET", 
-                    onclick="Shiny.setInputValue('btn_reset_filter_tgl', Math.random(), {priority: 'event'})", 
-                    style="background: #EDF2F7; color: #1A202C; border: 1.5px solid #CBD5E0; border-radius: 6px; font-weight: 800; font-size: 11px; padding: 6px 12px; cursor: pointer; margin-left: 8px;"
                 ),
                 style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px;"
             ), 
             del_btn_ui, 
             style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 1.5rem; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 10px;"
         ),
-        # METRIK KOTAK-KOTAK
         ui.div(
             metric_box("💰 BIAYA ALL", state.metric_total_biaya_all(), "#C53030", "linear-gradient(135deg, #FED7D7 0%, #FEB2B2 100%)"),
             metric_box("📦 KOLI ALL", state.metric_total_koli_all(), "#1A202C", "linear-gradient(135deg, #E2E8F0 0%, #CBD5E0 100%)"),
@@ -739,25 +686,7 @@ def ongkir_tab2_view(state: AppState):
             metric_box("🔄 BIAYA RTO", state.metric_biaya_rto(), "#9B2C2C", "linear-gradient(135deg, #FED7D7 0%, #FEB2B2 100%)"),
             style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.5rem;"
         ),
-        # TABEL TRANSAKSI
-        ui.div(
-            ui.tags.table(
-                ui.tags.thead(
-                    ui.tags.tr(
-                        ui.tags.th("SELECT", style="text-align: center;"), 
-                        ui.tags.th("TANGGAL"), 
-                        ui.tags.th("SUPPLIER"), 
-                        ui.tags.th("EKSPEDISI"), 
-                        ui.tags.th("KOLI"), 
-                        ui.tags.th("TOTAL ONGKIR")
-                    ), 
-                    style="background-color: #CBD5E0 !important;"
-                ), 
-                ui.tags.tbody(*table_rows) if len(table_rows) > 0 else ui.tags.tr(ui.tags.td("Tidak ada transaksi ongkir pada rentang tanggal ini.", colspan="6", style="text-align: center; color: #718096; padding: 2rem;")), 
-                class_="custom-clean-table"
-            ), 
-            style="background: #FFFFFF; border-radius: 16px; border: 2.5px solid #1A202C; padding: 1rem; width: 100%; box-shadow: 0 10px 25px rgba(0,0,0,0.04); overflow-x: auto;"
-        ),
+        ui.div(ui.tags.table(ui.tags.thead(ui.tags.tr(ui.tags.th("SELECT", style="text-align: center;"), ui.tags.th("TANGGAL"), ui.tags.th("SUPPLIER"), ui.tags.th("EKSPEDISI"), ui.tags.th("KOLI"), ui.tags.th("TOTAL ONGKIR")), style="background-color: #CBD5E0 !important;"), ui.tags.tbody(*table_rows) if len(table_rows) > 0 else ui.tags.tr(ui.tags.td("Tidak ada transaksi ongkir.", colspan="6", style="text-align: center; color: #718096; padding: 2rem;")), class_="custom-clean-table"), style="background: #FFFFFF; border-radius: 16px; border: 2.5px solid #1A202C; padding: 1rem; width: 100%; box-shadow: 0 10px 25px rgba(0,0,0,0.04); overflow-x: auto;"),
         style="width: 100%;"
     )
 
@@ -985,766 +914,12 @@ def justification_so_view(state: AppState):
         style="width: 100%; padding: 1rem;"
     )
 
-
-# ✅ GANTI DENGAN INI:
-def create_ui():
-    return ui.page_fluid(
-        CUSTOM_HEAD,
-        static_loading_spinner(),
-        ui.output_ui("app_root_ui"),
-        style="padding: 0; margin: 0; background-color: #111318; min-height: 100vh;"
-    )
-
-# ==============================================================================
-# VIEW 1: PURCHASE ORDER RECEIVING
-# ==============================================================================
-def po_receiving_view(state: AppState):
-    m = state.po_rec_metrics()
-    results_ui = ui.div()
-    if state.po_rec_done():
-        results_ui = ui.div(
-            ui.hr(),
-            ui.div(
-                dark_metric_box("📦 TOTAL QTY PO", f"{m.get('total_po', 0):,}", "#00d2ff"),
-                dark_metric_box("📲 TOTAL QTY SCAN", f"{m.get('total_scan', 0):,}", "#00d2ff"),
-                dark_metric_box("➕ DIFF SCAN > PO", f"{m.get('kurang_po', 0):,}", "#ff4b4b"),
-                dark_metric_box("➖ DIFF PO > SCAN", f"{m.get('lebih_po', 0):,}", "#ffa500"),
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;"
-            ),
-            ui.navset_card_tab(
-                ui.nav_panel("📊 Detail Alokasi", ui.div(render_clean_table(state._df_po_hasil.columns.tolist(), state._df_po_hasil.values.tolist(), "tbl_po_hasil"), style="padding: 0.75rem 0;")),
-                ui.nav_panel("➕ QTY SCAN > PO", ui.div(render_clean_table(state._df_po_extra.columns.tolist(), state._df_po_extra.values.tolist(), "tbl_po_extra"), style="padding: 0.75rem 0;")),
-                ui.nav_panel("➖ QTY PO > SCAN", ui.div(render_clean_table(state._df_po_miss.columns.tolist(), state._df_po_miss.values.tolist(), "tbl_po_miss"), style="padding: 0.75rem 0;"))
-            )
-        )
-    return ui.div(
-        ui.div(
-            ui.h4("📥 1. Upload File PO & Data Scan", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
-            ui.div(custom_uploader_box("uploader_po_scan", "1. Data Scan Penerimaan"), custom_uploader_box("uploader_po_file", "2. File Purchase Order"), style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem;"),
-            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px;"), "RUN COMPARE PO"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_po_rec', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
-            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
-        ), results_ui, style="width: 100%; padding: 1rem;"
-    )
-
-# ==============================================================================
-# VIEW 2: COMPARE PENERIMAAN RTO
-# ==============================================================================
-def penerimaan_rto_view(state: AppState):
-    m = state.rto_rec_metrics()
-    results_ui = ui.div()
-    if state.rto_rec_done():
-        results_ui = ui.div(
-            ui.hr(),
-            ui.div(
-                dark_metric_box("Total Qty TF", f"{m.get('total_tf', 0):,}", "#C5A059"),
-                dark_metric_box("Total Qty Scan", f"{m.get('total_scan', 0):,}", "#10B981"),
-                dark_metric_box("Total Kurang TF", f"{m.get('kurang_tf', 0):,}", "#E53E3E"),
-                dark_metric_box("Total Lebih TF", f"{m.get('lebih_tf', 0):,}", "#DD6B20"),
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;"
-            ),
-            ui.navset_card_tab(
-                ui.nav_panel("📊 Compare Alokasi", ui.div(render_clean_table(state._df_rto_rec_hasil.columns.tolist(), state._df_rto_rec_hasil.values.tolist(), "tbl_rto_rec_h"), style="padding: 0.75rem 0;")),
-                ui.nav_panel("➖ Kurang TF", ui.div(render_clean_table(state._df_rto_rec_kurang.columns.tolist(), state._df_rto_rec_kurang.values.tolist(), "tbl_rto_rec_k"), style="padding: 0.75rem 0;")),
-                ui.nav_panel("➕ Lebih TF", ui.div(render_clean_table(state._df_rto_rec_lebih.columns.tolist(), state._df_rto_rec_lebih.values.tolist(), "tbl_rto_rec_l"), style="padding: 0.75rem 0;"))
-            )
-        )
-    return ui.div(
-        ui.div(
-            ui.h4("📥 Upload Scan RTO & Transfer Stock", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
-            ui.div(custom_uploader_box("uploader_rto_rec_scan", "1. Hasil Scan RTO"), custom_uploader_box("uploader_rto_rec_tf", "2. Transfer Stock"), style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem;"),
-            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px;"), "RUN DATA RTO"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_penerimaan_rto', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
-            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
-        ), results_ui, style="width: 100%; padding: 1rem;"
-    )
-
-# ==============================================================================
-# VIEW 3: SCAN OUT VALIDATION
-# ==============================================================================
-def scan_out_view(state: AppState):
-    results_ui = ui.div()
-    if state.scan_out_done():
-        results_ui = ui.div(
-            ui.hr(),
-            ui.navset_card_tab(
-                ui.nav_panel("📋 DATA SCAN (COMPARED)", ui.div(render_clean_table(state._df_scan_out_res.columns.tolist(), state._df_scan_out_res.values.tolist(), "tbl_scan_out"), style="padding: 0.75rem 0;")),
-                ui.nav_panel("📝 DRAFT SET UP", ui.div(render_clean_table(state._df_scan_out_draft.columns.tolist(), state._df_scan_out_draft.values.tolist(), "tbl_scan_out_dr"), style="padding: 0.75rem 0;"))
-            )
-        )
-    return ui.div(
-        ui.div(
-            ui.h4("📥 Upload Scan Out, History Set Up & Tracking", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
-            ui.div(custom_uploader_box("uploader_so_scan", "1. Data Scan Out"), custom_uploader_box("uploader_so_hist", "2. History Set Up"), custom_uploader_box("uploader_so_track", "3. Stock Tracking"), style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem;"),
-            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px;"), "COMPARE SCAN OUT"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_scan_out', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
-            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
-        ), results_ui, style="width: 100%; padding: 1rem;"
-    )
-
-# ==============================================================================
-# VIEW 4: REFILL & OVERSTOCK
-# ==============================================================================
-def refill_overstock_view(state: AppState):
-    results_ui = ui.div()
-    if state.rf_os_done():
-        results_ui = ui.div(
-            ui.hr(),
-            ui.navset_card_tab(
-                ui.nav_panel("📦 REFILL", ui.div(render_clean_table(state._df_rf_res.columns.tolist(), state._df_rf_res.values.tolist(), "tbl_rf"), style="padding: 0.75rem 0;")),
-                ui.nav_panel("⚠️ OVERSTOCK", ui.div(render_clean_table(state._df_os_res.columns.tolist(), state._df_os_res.values.tolist(), "tbl_os"), style="padding: 0.75rem 0;"))
-            )
-        )
-    return ui.div(
-        ui.div(
-            ui.h4("📥 Upload All Data Stock (GL3 & GL4)", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
-            custom_uploader_box("uploader_rf_os_stock", "Upload All Data Stock"),
-            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px;"), "PROSES REFILL & OVERSTOCK"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_rf_os', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
-            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
-        ), results_ui, style="width: 100%; padding: 1rem;"
-    )
-
-# ==============================================================================
-# VIEW 5: BALANCING STOCK
-# ==============================================================================
-def balancing_stock_view(state: AppState):
-    m = state.bal_stock_metrics()
-    results_ui = ui.div()
-    if state.bal_stock_done():
-        results_ui = ui.div(
-            ui.hr(),
-            ui.div(
-                dark_metric_box("📦 Total SKU Aktif", f"{m.get('total_sku', 0):,}", "#7B61FF"),
-                dark_metric_box("🏪 DC to Store (Avail)", f"{m.get('dc_avail', 0):,}", "#00C853"),
-                dark_metric_box("⚠️ Belum Terdistribusi DC", f"{m.get('dc_miss', 0):,}", "#E91E63"),
-                dark_metric_box("🏗️ GL4 to GL3 (Avail)", f"{m.get('gl_avail', 0):,}", "#FFAB00"),
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;"
-            ),
-            ui.navset_card_tab(
-                ui.nav_panel("DC ➔ Store", ui.div(render_clean_table(state._df_bal_dc.columns.tolist(), state._df_bal_dc.values.tolist(), "tbl_bal_dc"), style="padding: 0.75rem 0;")),
-                ui.nav_panel("GL4 ➔ GL3", ui.div(render_clean_table(state._df_bal_gl.columns.tolist(), state._df_bal_gl.values.tolist(), "tbl_bal_gl"), style="padding: 0.75rem 0;"))
-            )
-        )
-    return ui.div(
-        ui.div(
-            ui.h4("📥 Upload All Stock System", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
-            custom_uploader_box("uploader_bal_stock", "Upload All Data Stock"),
-            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px;"), "PROSES BALANCING STOCK"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_bal_stock', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
-            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
-        ), results_ui, style="width: 100%; padding: 1rem;"
-    )
-
-# ==============================================================================
-# VIEW 6: PERCENTAGE REQUEST FL TO STORE
-# ==============================================================================
-def fl_request_view(state: AppState):
-    m = state.fl_req_metrics()
-    results_ui = ui.div()
-    if state.fl_req_done():
-        results_ui = ui.div(
-            ui.hr(),
-            ui.div(
-                dark_metric_box("📋 Total Permintaan FL", f"{m.get('total_valid', 0):,}", "#C5A059"),
-                dark_metric_box("⚠️ Indikasi Over-Request", f"{m.get('total_bad', 0):,}", "#FF4B4B"),
-                dark_metric_box("🚨 Persentase Over Request", f"{m.get('percentage', 0):.2f}%", "#E53E3E"),
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;"
-            ),
-            ui.navset_card_tab(
-                ui.nav_panel("📋 SKU Over-Request", ui.div(render_clean_table(state._df_fl_bad.columns.tolist(), state._df_fl_bad.values.tolist(), "tbl_fl_bad"), style="padding: 0.75rem 0;")),
-                ui.nav_panel("🔄 Compare SKU Permintaan vs Stock", ui.div(render_clean_table(state._df_fl_comp.columns.tolist(), state._df_fl_comp.values.tolist(), "tbl_fl_comp"), style="padding: 0.75rem 0;"))
-            )
-        )
-    return ui.div(
-        ui.div(
-            ui.h4("📥 Upload All Stock & File Permintaan FL", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
-            ui.div(custom_uploader_box("uploader_fl_stock", "1. File All Stock"), custom_uploader_box("uploader_fl_req", "2. File Permintaan FL"), style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem;"),
-            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px;"), "PROSES ANALISIS PERMINTAAN"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_fl_req', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
-            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
-        ), results_ui, style="width: 100%; padding: 1rem;"
-    )
-    # ==============================================================================
-# VIEW 7: REFILL TOKO
-# ==============================================================================
-def refill_toko_view(state: AppState):
-    results_ui = ui.div()
-    if state.refill_toko_done():
-        df = state._df_refill_toko
-        priority_sku = len(df[df["QTY TOKO"] == 0]) if not df.empty and "QTY TOKO" in df.columns else 0
-        results_ui = ui.div(
-            ui.hr(),
-            ui.div(
-                dark_metric_box("📦 SKU PERLU REFILL", f"{len(df):,}", "#2BEBFA"),
-                dark_metric_box("📈 PRIORITY (QTY TOKO 0)", f"{priority_sku:,}", "#FACA2B"),
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;"
-            ),
-            ui.div(
-                ui.download_button("btn_dl_refill_toko", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px;"), "Download Refill Toko (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"),
-                style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
-            ),
-            render_clean_table(df.columns.tolist(), df.values.tolist(), "tbl_refill_toko")
-        )
-    return ui.div(
-        ui.div(
-            ui.h4("📥 Upload Stock System (Multiple Adjustment)", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
-            custom_uploader_box("uploader_refill_stock", "Stock System All"),
-            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px;"), "PROSES REFILL TOKO"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_refill_toko', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
-            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
-        ), results_ui, style="width: 100%; padding: 1rem;"
-    )
-
-# ==============================================================================
-# VIEW 8: STORE LEADER RTO DECISSION
-# ==============================================================================
-def rto_decision_view(state: AppState):
-    results_ui = ui.div()
-    if state.rto_dec_done():
-        df = state._df_rto_dec
-        results_ui = ui.div(
-            ui.hr(),
-            ui.div(
-                dark_metric_box("Total Unique SKU", f"{len(df):,}", "#C5A059"),
-                dark_metric_box("Total Qty Surabaya", f"{df['QTY SURABAYA'].sum():,}", "#3182CE"),
-                dark_metric_box("Total Qty Semarang", f"{df['QTY SEMARANG'].sum():,}", "#10B981"),
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;"
-            ),
-            ui.div(
-                ui.download_button("btn_dl_rto_dec", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px;"), "Download Hasil Compare (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"),
-                style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
-            ),
-            render_clean_table(df.columns.tolist(), df.values.tolist(), "tbl_rto_decision")
-        )
-    return ui.div(
-        ui.div(
-            ui.h4("📤 Upload 4 File Logistik (SBY, SMG, Sales 60d, ToC)", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
-            ui.div(
-                custom_uploader_box("uploader_rto_sby", "1. Stock Surabaya"),
-                custom_uploader_box("uploader_rto_smg", "2. Stock Semarang"),
-                custom_uploader_box("uploader_rto_sales", "3. Sales 60d"),
-                custom_uploader_box("uploader_rto_toc", "4. ToC Master"),
-                style="display: flex; gap: 1rem; width: 100%; margin-bottom: 0.5rem; flex-wrap: wrap;"
-            ),
-            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px;"), "INTEGRATE & COMPARE DATA"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_rto_decision', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
-            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
-        ), results_ui, style="width: 100%; padding: 1rem;"
-    )
-
-# ==============================================================================
-# VIEW 9: MATCH REAL & SYSTEM (CROSS-BRANCH)
-# ==============================================================================
-def match_karantina_view(state: AppState):
-    m = state.match_ks_metrics()
-    results_ui = ui.div()
-    if state.match_ks_done():
-        results_ui = ui.div(
-            ui.hr(),
-            ui.div(
-                dark_metric_box("📦 Total Qty Real +", f"{m.get('total_real', 0):,}", "#C5A059"),
-                dark_metric_box("✅ Total Match", f"{m.get('total_match', 0):,}", "#2ecc71"),
-                dark_metric_box("⚠️ Total Unmatched", f"{m.get('total_unmatch', 0):,}", "#e74c3c"),
-                dark_metric_box("🏪 Sisa System (Karantina)", f"{m.get('sys_left', 0):,}", "#3498db"),
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;"
-            ),
-            render_clean_table(state._df_match_ks.columns.tolist(), state._df_match_ks.values.tolist(), "tbl_match_ks")
-        )
-    return ui.div(
-        ui.div(
-            ui.h4("📥 Upload Data System (+) & Data Real (+)", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
-            ui.div(custom_uploader_box("uploader_match_sys", "1. Laporan System (+)"), custom_uploader_box("uploader_match_real", "2. Laporan Real (+)"), style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem;"),
-            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px;"), "RUN CROSS-BRANCH MATCH"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_match_ks', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
-            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
-        ), results_ui, style="width: 100%; padding: 1rem;"
-    )
-
-# ==============================================================================
-# VIEW 10: REFILL KOLI TO KOLI / REFILL
-# ==============================================================================
-def koli_consolidation_view(state: AppState):
-    results_ui = ui.div()
-    if state.koli_done():
-        results_ui = ui.div(
-            ui.hr(),
-            ui.h4("🚨 JOB DELEGATION: ACTION REFILL / MUTASI", style="font-size: 15px; font-weight: 800; margin-bottom: 0.75rem;"),
-            render_clean_table(state._df_koli_refill.columns.tolist(), state._df_koli_refill.values.tolist(), "tbl_koli_refill")
-        )
-    return ui.div(
-        ui.div(
-            ui.h4("📥 Upload Excel Gudang Koli (KL1/KL2)", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
-            custom_uploader_box("uploader_koli_file", "Upload Excel Gudang"),
-            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px;"), "PROSES KONSOLIDASI KOLI"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_koli_conso', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
-            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
-        ), results_ui, style="width: 100%; padding: 1rem;"
-    )
-
-# ==============================================================================
-# VIEW 11: DYNAMIC STOCK ALLOCATION
-# ==============================================================================
-def stock_allocation_view(state: AppState):
-    results_ui = ui.div()
-    if state.stk_alloc_done():
-        df = state._raw_df_stk_alloc
-        results_ui = ui.div(
-            ui.hr(),
-            ui.div(
-                dark_metric_box("Total Stock Master", f"{df.iloc[:, 1].sum():,.0f} Pcs", "#ffc107"),
-                dark_metric_box("Alokasi Online", f"{df['QTY_ONLINE'].sum():,.0f} Pcs", "#10b981"),
-                dark_metric_box("Alokasi Offline", f"{df['QTY_OFFLINE'].sum():,.0f} Pcs", "#3b82f6"),
-                dark_metric_box("Alokasi Logistik", f"{df['QTY_LOGISTIK'].sum():,.0f} Pcs", "#e74c3c"),
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;"
-            ),
-            render_clean_table(df.columns.tolist(), df.values.tolist(), "tbl_stk_alloc")
-        )
-    return ui.div(
-        ui.div(
-            ui.h4("📥 Upload Stock & Sales Report", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
-            ui.div(custom_uploader_box("uploader_alloc_stock", "1. File Stock (.xlsx)"), custom_uploader_box("uploader_alloc_sales", "2. File Sales (.xlsx)"), style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem;"),
-            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px;"), "RUN DYNAMIC ALLOCATION"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_stk_alloc', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
-            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
-        ), results_ui, style="width: 100%; padding: 1rem;"
-    )
-
-# ==============================================================================
-# VIEW 12: REFILL & WITHDRAW SYSTEM
-# ==============================================================================
-def refill_withdraw_view(state: AppState):
-    results_ui = ui.div()
-    if state.rf_wd_done():
-        results_ui = ui.div(
-            ui.hr(),
-            ui.navset_card_tab(
-                ui.nav_panel("♻️ Summary Refill", ui.div(render_clean_table(state._df_rf_summary.columns.tolist(), state._df_rf_summary.values.tolist(), "tbl_rf_sum"), style="padding: 0.75rem 0;")),
-                ui.nav_panel("♻️ Summary Withdraw", ui.div(render_clean_table(state._df_wd_summary.columns.tolist(), state._df_wd_summary.values.tolist(), "tbl_wd_sum"), style="padding: 0.75rem 0;"))
-            )
-        )
-    return ui.div(
-        ui.div(
-            ui.h4("📥 Upload Stock Surabaya & Stock Tracking", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
-            ui.div(custom_uploader_box("uploader_rwd_stock", "1. All Stock SBY"), custom_uploader_box("uploader_rwd_trx", "2. Stock Tracking"), style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem;"),
-            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px;"), "GENERATE SUMMARY REFILL/WITHDRAW"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_rf_wd', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
-            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
-        ), results_ui, style="width: 100%; padding: 1rem;"
-    )
-
-# ==============================================================================
-# VIEW 13: FDR UPDATE (MANIFEST CHECKER)
-# ==============================================================================
-def fdr_update_view(state: AppState):
-    results_ui = ui.div()
-    if state.fdr_done():
-        m = state.fdr_metrics()
-        results_ui = ui.div(
-            ui.hr(),
-            ui.div(
-                dark_metric_box("TOTAL MANIFEST", f"{m.get('total', 0):,}", "#3182CE"),
-                dark_metric_box("FU IT", f"{m.get('fu', 0):,}", "#FFA500"),
-                dark_metric_box("NEED CHECK BRANCH", f"{m.get('sisa', 0):,}", "#FF4B4B"),
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;"
-            ),
-            ui.navset_card_tab(
-                ui.nav_panel("📥 MANIFEST", ui.div(render_clean_table(state._df_fdr_manifest.columns.tolist(), state._df_fdr_manifest.values.tolist(), "tbl_fdr_m"), style="padding: 0.75rem 0;")),
-                ui.nav_panel("📋 FU IT", ui.div(render_clean_table(state._df_fdr_fu.columns.tolist(), state._df_fdr_fu.values.tolist(), "tbl_fdr_fu"), style="padding: 0.75rem 0;"))
-            )
-        )
-    return ui.div(
-        ui.div(
-            ui.h4("📂 Upload File Manifest Jezpro", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
-            custom_uploader_box("uploader_fdr_file", "Upload Manifest"),
-            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px;"), "PROCESS MANIFEST"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_fdr', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
-            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
-        ), results_ui, style="width: 100%; padding: 1rem;"
-    )
-
-# ==============================================================================
-# VIEW 14: PERCENTAGE DISPLAY CONTROL
-# ==============================================================================
-def percentage_display_view(state: AppState):
-    results_ui = ui.div()
-    if state.disp_ctrl_done():
-        m = state.disp_ctrl_metrics()
-        results_ui = ui.div(
-            ui.hr(),
-            ui.div(
-                dark_metric_box("🧥 Total Article", f"{m.get('total_art', 0):,}", "#7B61FF"),
-                dark_metric_box("✅ On Display", f"{m.get('on_display', 0):,}", "#00C853"),
-                dark_metric_box("⚠️ Need Display", f"{m.get('need_display', 0):,}", "#FF5252"),
-                dark_metric_box("🏬 From Store", f"{m.get('need_gudang', 0):,}", "#FF9800"),
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;"
-            ),
-            render_clean_table(state._df_disp_detail.columns.tolist(), state._df_disp_detail.values.tolist(), "tbl_disp_detail")
-        )
-    return ui.div(
-        ui.div(
-            ui.h4("📥 Upload All Stock Display", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
-            custom_uploader_box("uploader_disp_stock", "All Stock"),
-            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px;"), "ANALISIS DISPLAY AVAILABILITY"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_disp_ctrl', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
-            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
-        ), results_ui, style="width: 100%; padding: 1rem;"
-    )
-
-# ==============================================================================
-# VIEW: 1. STOCK TRACKING TIMELINE
-# ==============================================================================
-def stock_tracking_view(state: AppState):
-    return ui.div(
-        ui.div(
-            ui.h4("📥 Upload 5 File Log Transaksi (PO, Mutasi, Adj, Tracking, RTO)", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
-            ui.div(
-                custom_uploader_box("uploader_st_main", "1. Multiple Adj (Main)"),
-                custom_uploader_box("uploader_st_stock", "2. All Data Stock"),
-                custom_uploader_box("uploader_st_po", "3. Purchase Order"),
-                custom_uploader_box("uploader_st_mutasi", "4. Mutasi"),
-                custom_uploader_box("uploader_st_adj", "5. Adjustment"),
-                custom_uploader_box("uploader_st_track", "6. Stock Tracking"),
-                custom_uploader_box("uploader_st_rto", "7. RTO"),
-                style="display: flex; gap: 1rem; width: 100%; flex-wrap: wrap; margin-bottom: 0.5rem;"
-            ),
-            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px;"), "KOMPILASI MASTER TIMELINE"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_st_timeline', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
-            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
-        ),
-        ui.output_ui("st_timeline_results_ui"),
-        style="width: 100%; padding: 1rem;"
-    )
-
-# ==============================================================================
-# VIEW: LIST RETUR OUT (PERSIS STREAMLIT)
-# ==============================================================================
-def retur_out_view(state: AppState):
-    return ui.div(
-        ui.div(
-            ui.h4("📦 Upload File Retur Out", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
-            custom_uploader_box("uploader_retur_file", "Upload File Retur (Excel/CSV)"),
-            ui.tags.button(
-                ui.tags.span(ui.tags.i(class_="fa-solid fa-cloud-arrow-up", style="margin-right: 6px;"), "SIMPAN KE CLOUD"),
-                onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_save_retur_cloud', Math.random(), {priority: 'event'});",
-                class_="btn-red-gradient"
-            ),
-            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
-        ),
-        ui.output_ui("retur_out_metrics_ui"),
-        ui.hr(),
-        ui.div(
-            ui.h4("📜 Database History Retur Out", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
-            ui.output_ui("retur_out_table_ui"),
-            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
-        ),
-        style="width: 100%; padding: 1rem;"
-    )
-# ==============================================================================
-# VIEW: 3. PENGAJUAN MUTASI KARANTINA
-# ==============================================================================
-def pengajuan_mutasi_view(state: AppState):
-    return ui.div(
-        ui.div(
-            ui.h4("☣️ Form Pengajuan Mutasi Karantina", style="font-size: 15px; font-weight: 800; margin-bottom: 0.75rem;"),
-            custom_uploader_box("uploader_mutasi_karantina_bulk", "Bulk Upload Mutasi (Excel)"),
-            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-paper-plane", style="margin-right: 6px;"), "SUBMIT PENGAJUAN"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_submit_mutasi_karantina', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
-            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
-        ),
-        ui.output_ui("mutasi_karantina_monitor_ui"),
-        style="width: 100%; padding: 1rem;"
-    )
-
-# ==============================================================================
-# VIEW: PENGAJUAN REJECT/DEFECT (PERSIS STREAMLIT)
-# ==============================================================================
-def pengajuan_reject_view(state: AppState):
-    return ui.div(
-        ui.navset_card_tab(
-            # TAB 1: FORM INPUT PENGAJUAN
-            ui.nav_panel(
-                "💻 Input Pengajuan",
-                ui.div(
-                    ui.h4("Form Pengajuan Reject/Defect", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 1rem;"),
-                    ui.div(
-                        ui.div(
-                            ui.input_text("pr_nama", "Nama Tim (Pengaju):", placeholder="Nama Anda...", width="100%"),
-                            ui.input_text("pr_bin_asal", "Bin Asal:", placeholder="Bin Asal...", width="100%"),
-                            ui.input_text("pr_sku", "SKU Item:", placeholder="SKU...", width="100%"),
-                            ui.input_select("pr_cabang", "Pilih Cabang:", choices=["SURABAYA", "SIDOARJO", "SEMARANG"], width="100%"),
-                            style="flex: 1; min-width: 250px;"
-                        ),
-                        ui.div(
-                            ui.input_text("pr_article", "Article Name:", placeholder="Nama Barang...", width="100%"),
-                            ui.input_text("pr_size", "Size:", placeholder="Ukuran...", width="100%"),
-                            ui.input_text_area("pr_ket", "Keterangan Kerusakan:", placeholder="Detail kerusakan...", width="100%"),
-                            style="flex: 1; min-width: 250px;"
-                        ),
-                        style="display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 1rem;"
-                    ),
-                    ui.tags.button(
-                        ui.tags.span(ui.tags.i(class_="fa-solid fa-paper-plane", style="margin-right: 6px;"), "SUBMIT REQUEST"),
-                        onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_sub_pengajuan_reject', Math.random(), {priority: 'event'});",
-                        class_="btn-red-gradient", style="width: 100%; height: 45px;"
-                    ),
-                    style="padding: 1.25rem;"
-                )
-            ),
-            # TAB 2: HISTORY & APPROVAL STATUS (3 CABANG)
-            ui.nav_panel(
-                "📑 History & Approval Status",
-                ui.div(
-                    ui.output_ui("pengajuan_reject_history_ui"),
-                    style="padding: 1.25rem;"
-                )
-            )
-        ),
-        style="width: 100%; padding: 1rem;"
-    )
-
-# ==============================================================================
-# VIEW: REJECT/DEFECT LIST (LENGKAP 4 TAB PERSIS STREAMLIT)
-# ==============================================================================
-def reject_list_view(state: AppState):
-    return ui.div(
-        ui.navset_card_tab(
-            # TAB 1: ENTRY DATA (SINGLE & MASS IMPORT)
-            ui.nav_panel(
-                "📥 ENTRY DATA",
-                ui.div(
-                    ui.h4("➕ Upload Single Item", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
-                    ui.div(
-                        ui.div(
-                            ui.input_select("rj_cabang", "Lokasi Operasional:", choices=["SURABAYA", "SIDOARJO", "SEMARANG"], width="100%"),
-                            ui.input_text("rj_bin_awal", "BIN Awal:", placeholder="Contoh: GL1-DC", width="100%"),
-                            ui.input_select("rj_bin_tujuan", "BIN Tujuan:", choices=["REJECT DC", "DEFECT DC", "DEFECT STORE", "REJECT STORE"], width="100%"),
-                            ui.input_text("rj_sku", "SKU:", placeholder="SKU...", width="100%"),
-                            style="flex: 1; min-width: 250px;"
-                        ),
-                        ui.div(
-                            ui.input_text("rj_nama", "Nama Barang:", placeholder="Article...", width="100%"),
-                            ui.input_text("rj_size", "Size:", placeholder="Size...", width="100%"),
-                            ui.input_select("rj_kategori", "Kategori Defect:", choices=["D1", "D2", "D3", "D4", "R1", "R3", "R4", "HANYA SEBELAH KIRI", "HANYA SEBELAH KANAN", "BERBEDA ARTICLE", "BERBEDA SIZE"], width="100%"),
-                            ui.input_text_area("rj_ket", "Detail Kerusakan:", placeholder="Keterangan...", width="100%"),
-                            style="flex: 1; min-width: 250px;"
-                        ),
-                        style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;"
-                    ),
-                    ui.tags.button("📤 UPLOAD SINGLE LIST", onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_submit_single_reject', Math.random(), {priority: 'event'});", class_="btn-red-gradient", style="width: 100%; height: 45px;"),
-                    style="padding: 1.25rem;"
-                )
-            ),
-            # TAB 2: ANALYTICS DASHBOARD
-            ui.nav_panel(
-                "📊 ANALYTICS DASHBOARD",
-                ui.div(
-                    ui.output_ui("reject_list_metrics_ui"),
-                    ui.hr(),
-                    ui.output_ui("reject_list_table_ui"),
-                    style="padding: 1.25rem;"
-                )
-            ),
-            # TAB 3: CROSS-CHECK SKU MATCHING
-            ui.nav_panel(
-                "🔍 MATCH DEFECT/REJECT",
-                ui.div(
-                    ui.output_ui("reject_match_kiri_kanan_ui"),
-                    style="padding: 1.25rem;"
-                )
-            )
-        ),
-        style="width: 100%; padding: 1rem;"
-    )
-# ==============================================================================
-# VIEW: 5. REJECT/DEFECT LIST
-# ==============================================================================
-def reject_list_view(state: AppState):
-    return ui.div(
-        ui.div(
-            ui.h4("⚠️ Database & Cross-Check Match Reject/Defect", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
-            ui.output_ui("reject_list_metrics_ui"),
-            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
-        ),
-        ui.output_ui("reject_list_table_ui"),
-        style="width: 100%; padding: 1rem;"
-    )
-
-# ==============================================================================
-# VIEW: LOGISTIC SCHEDULE (LENGKAP PERSIS STREAMLIT)
-# ==============================================================================
-def logistic_schedule_view(state: AppState):
-    return ui.div(
-        ui.navset_card_tab(
-            # TAB 1: DATABASE TIM & DAY OFF
-            ui.nav_panel(
-                "👤 1. TIM & DAY OFF",
-                ui.div(
-                    ui.h4("➕ Tambah Anggota Tim", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
-                    ui.div(
-                        ui.input_text("sc_nama_karyawan", "Nama Lengkap:", placeholder="Ketik nama...", width="100%"),
-                        ui.input_select("sc_posisi", "Posisi/Role:", choices=["WF-PICKER", "WF-ADMIN", "LOG-ADMIN", "LOG-LOADER", "LOG-STORE", "LOG-SO", "WF-SO", "SPV"], width="100%"),
-                        ui.input_select("sc_tipe", "Tipe Kontrak:", choices=["Full-Time", "Part-Full", "Part-Time"], width="100%"),
-                        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;"
-                    ),
-                    ui.tags.button("💾 SIMPAN TIM", onclick="Shiny.setInputValue('btn_add_karyawan', Math.random(), {priority: 'event'})", class_="btn-red-gradient", style="margin-top: 10px; margin-bottom: 1.5rem;"),
-                    ui.hr(),
-                    ui.h4("🚫 Pengajuan Libur (Day Off)", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
-                    ui.output_ui("schedule_libur_form_ui"),
-                    style="padding: 1.25rem;"
-                )
-            ),
-            # TAB 2: PLOT SHIFT 3
-            ui.nav_panel(
-                "🌙 2. PLOT SHIFT 3 (SO)",
-                ui.div(
-                    ui.h4("🌙 Plot Khusus Shift 3 Stock Opname", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
-                    ui.output_ui("schedule_shift3_form_ui"),
-                    style="padding: 1.25rem;"
-                )
-            ),
-            # TAB 3: GENERATE JADWAL MINGGUAN
-            ui.nav_panel(
-                "📅 3. GENERATE JADWAL SHIFT",
-                ui.div(
-                    ui.div(
-                        ui.input_date("sc_start_monday", "Pilih Hari Senin Mulai Shift:", value=datetime.now().strftime("%Y-%m-%d")),
-                        ui.tags.button("▶️ RUN JADWAL SHIFT MINGGUAN", onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_schedule_full', Math.random(), {priority: 'event'});", class_="btn-red-gradient", style="height: 42px; margin-top: 24px;"),
-                        style="display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem;"
-                    ),
-                    ui.output_ui("schedule_final_table_ui"),
-                    style="padding: 1.25rem;"
-                )
-            )
-        ),
-        style="width: 100%; padding: 1rem;"
-    )
-# ==============================================================================
-# VIEW: 7. REPORTING & PIC
-# ==============================================================================
-def reporting_pic_view(state: AppState):
-    return ui.div(
-        ui.div(
-            ui.h4("🚹 Dashboard Checklist PIC & To-Do Harian", style="font-size: 15px; font-weight: 800; margin-bottom: 0.75rem;"),
-            ui.output_ui("reporting_pic_status_ui"),
-            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
-        ),
-        style="width: 100%; padding: 1rem;"
-    )
-
-# ==============================================================================
-# VIEW: DATA TIMBANG ONGKIR
-# ==============================================================================
-def timbang_ongkir_view(state: AppState):
-    return ui.div(
-        ui.navset_card_tab(
-            # TAB 1: INPUT DATA MANUAL
-            ui.nav_panel(
-                "📥 INPUT DATA MANUAL",
-                ui.div(
-                    ui.div(
-                        ui.h4("📝 FORM DATA TIMBANG", style="font-size: 16px; font-weight: 800; color: #1A202C; margin-bottom: 1.5rem;"),
-                        ui.div(
-                            # Kolom Kiri
-                            ui.div(
-                                ui.div(ui.span("Ekspedisi", style="font-size: 13px; font-weight: 700; color: #2D3748; display: block; margin-bottom: 5px;"), ui.input_select("tb_ekspedisi", None, choices=["ACCESS", "ADex (Adika Express)"], width="100%"), style="margin-bottom: 1.25rem;"),
-                                ui.div(ui.span("Jenis Pengiriman", style="font-size: 13px; font-weight: 700; color: #2D3748; display: block; margin-bottom: 5px;"), ui.input_select("tb_jenis", None, choices=["RTO"], width="100%"), style="margin-bottom: 1.25rem;"),
-                                ui.div(
-                                    ui.div(ui.span("Total Koli", style="font-size: 13px; font-weight: 700; color: #2D3748; display: block; margin-bottom: 5px;"), ui.input_numeric("tb_koli", None, value=1, min=1, step=1, width="100%"), style="flex: 1;"),
-                                    ui.div(ui.span("Berat Total (Kg)", style="font-size: 13px; font-weight: 700; color: #2D3748; display: block; margin-bottom: 5px;"), ui.input_numeric("tb_berat", None, value=0.1, min=0.1, step=0.1, width="100%"), style="flex: 1;"),
-                                    style="display: flex; gap: 15px; margin-bottom: 1.25rem;"
-                                ),
-                                style="flex: 1; min-width: 280px;"
-                            ),
-                            # Kolom Kanan
-                            ui.div(
-                                ui.div(ui.span("Pengiriman Dari", style="font-size: 13px; font-weight: 700; color: #2D3748; display: block; margin-bottom: 5px;"), ui.input_select("tb_dari", None, choices=["SURABAYA"], width="100%"), style="margin-bottom: 1.25rem;"),
-                                ui.div(ui.span("Pengiriman Ke", style="font-size: 13px; font-weight: 700; color: #2D3748; display: block; margin-bottom: 5px;"), ui.input_select("tb_ke", None, choices=["SEMARANG", "HUB JAKARTA", "MALANG"], width="100%"), style="margin-bottom: 1.25rem;"),
-                                ui.tags.div(style="height: 15px;"),
-                                ui.tags.button(
-                                    ui.tags.span(ui.tags.i(class_="fa-solid fa-scale-balanced", style="margin-right: 8px;"), "⚖️ SIMPAN DATA TIMBANG"),
-                                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_save_timbang', Math.random(), {priority: 'event'});",
-                                    class_="btn-red-gradient",
-                                    style="width: 100%; height: 48px; font-size: 14px; font-weight: 800; margin-top: 18px;"
-                                ),
-                                style="flex: 1; min-width: 280px;"
-                            ),
-                            style="display: flex; gap: 2rem; flex-wrap: wrap; width: 100%;"
-                        ),
-                        style="background: #FFFFFF; border-radius: 12px; border: 1.5px solid #CBD5E0; padding: 1.5rem;"
-                    ),
-                    style="padding: 1.25rem;"
-                )
-            ),
-            # TAB 2: METRIC MONITORING & HISTORY TABLE
-            ui.nav_panel(
-                "📊 METRIC MONITORING",
-                ui.div(
-                    # Filter Periode
-                    ui.div(
-                        ui.div(
-                            ui.span("📅 Filter Periode Data:", style="font-size: 13px; font-weight: 800; color: #111111; margin-right: 8px;"),
-                            ui.tags.select(
-                                ui.tags.option("All Time (Semua Data)", value="ALL", selected=True),
-                                ui.tags.option("Today (Hari Ini)", value="TODAY"),
-                                ui.tags.option("This Month (Bulan Ini)", value="MONTH"),
-                                ui.tags.option("Past Month (Bulan Lalu)", value="PAST_MONTH"),
-                                id="select_filter_timbang",
-                                onchange="Shiny.setInputValue('change_filter_timbang_periode', this.value, {priority: 'event'})",
-                                style="background: white; border: 2px solid #1A202C; border-radius: 8px; font-weight: 800; padding: 6px 12px; width: 230px; cursor: pointer;"
-                            ),
-                            style="display: flex; align-items: center;"
-                        ),
-                        ui.output_ui("timbang_delete_selected_btn_ui"),
-                        style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 10px;"
-                    ),
-                    # Metrik
-                    ui.output_ui("timbang_ongkir_metrics_ui"),
-                    ui.hr(style="margin: 1.5rem 0; border-color: #E2E8F0;"),
-                    ui.h4("📋 LIST DATA TIMBANG", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
-                    # Tabel
-                    ui.output_ui("timbang_ongkir_table_ui"),
-                    style="padding: 1.25rem;"
-                )
-            )
-        ),
-        style="width: 100%; padding: 1rem;"
-    )
 # Navigation Components
 def menu_item(label: str, target_menu: str, current_menu: str):
     is_active = (current_menu == target_menu)
     bg_style = "background: linear-gradient(135deg, #E50914 0%, #B20710 100%); color: #FFFFFF; font-weight: 700; box-shadow: 0 4px 12px rgba(229, 9, 20, 0.4);" if is_active else "background: transparent; color: #CBD5E0; font-weight: 500;"
-    return ui.tags.button(
-        label, 
-        onclick=f"event.preventDefault(); Shiny.setInputValue('select_menu_item', '{target_menu}', {{priority: 'event'}})", 
-        style=f"width: 100%; text-align: left; padding: 0.5rem 0.75rem; margin-bottom: 3px; border-radius: 6px; font-size: 0.85rem; border: none; cursor: pointer; justify-content: flex-start; transition: all 0.2s ease; {bg_style}"
-    )
+    return ui.tags.button(label, onclick=f"Shiny.setInputValue('select_menu_item', '{target_menu}', {{priority: 'event'}})", style=f"width: 100%; text-align: left; padding: 0.5rem 0.75rem; margin-bottom: 3px; border-radius: 6px; font-size: 0.85rem; border: none; cursor: pointer; justify-content: flex-start; transition: all 0.2s ease; {bg_style}")
 
-def section_dropdown_header(title: str, dropdown_key: str, is_open: bool):
-    icon_tag = "fa-chevron-down" if is_open else "fa-chevron-right"
-    return ui.tags.div(
-        ui.tags.span(title, style="font-size: 11px; font-weight: bold; color: #FFFFFF; letter-spacing: 0.05em;"), 
-        ui.tags.i(class_=f"fa-solid {icon_tag}", style="font-size: 12px; color: #FFFFFF;"), 
-        onclick=f"Shiny.setInputValue('toggle_dropdown_section', '{dropdown_key}', {{priority: 'event'}})", 
-        style="display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 0.5rem 0.6rem; border-radius: 6px; cursor: pointer; background: rgba(255, 255, 255, 0.05); margin-top: 0.8rem; margin-bottom: 0.3rem;"
-    )
-
-def sidebar(state: AppState):
-    cur_menu = state.main_menu()
-    if not state.sidebar_open():
-        return ui.div(
-            ui.tags.button(ui.tags.i(class_="fa-solid fa-bars", style="font-size: 18px; color: #FFFFFF;"), onclick="Shiny.setInputValue('btn_toggle_sidebar', Math.random(), {priority: 'event'})", style="background: transparent; border: none; cursor: pointer; padding: 0.5rem; border-radius: 6px;"), 
-            style="width: 60px; min-width: 60px; padding: 1rem 0.5rem; background: #111318; border-right: 1px solid #2D3748; height: 100vh; display: flex; flex-direction: column; align-items: center;"
-        )
-
-    return ui.div(
-        ui.div(
-            ui.div(
-                ui.div(
-                    ui.tags.i(class_="fa-solid fa-boxes-stacked", style="color: #FFFFFF; font-size: 18px;"),
-                    style="width: 38px; height: 38px; background: linear-gradient(135deg, #E50914 0%, #B20710 100%); border-radius: 8px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(229, 9, 20, 0.4); flex-shrink: 0;"
-                ),
-                ui.div(ui.span("ZKN LOGISTIC", style="color: #E50914; font-weight: 900; font-size: 14px; letter-spacing: 0.5px; line-height: 1.2;"), ui.span("WAREHOUSE SYSTEM", style="color: #FFFFFF; font-weight: 700; font-size: 10px; letter-spacing: 1.5px; opacity: 0.9;"), style="display: flex; flex-direction: column; justify-content: center;"),
-                style="display: flex; align-items: center; gap: 10px;"
-            ),
-            ui.tags.button(ui.tags.i(class_="fa-solid fa-angles-left", style="font-size: 14px; color: #CBD5E0;"), onclick="Shiny.setInputValue('btn_toggle_sidebar', Math.random(), {priority: 'event'})", style="background: transparent; border: none; cursor: pointer; padding: 6px; border-radius: 4px; display: flex; align-items: center;"),
-            style="display: flex; justify-content: space-between; width: 100%; align-items: center; margin-bottom: 0.8rem; padding-bottom: 0.6rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08);"
-        ),
-        ui.div(
-            ui.div(section_dropdown_header("OPERATIONAL", "operational", state.dropdown_operational()), ui.div(*[menu_item(item, item, cur_menu) for item in state.get_menu_operational()], style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_operational() else "display: none;"), style="width: 100%;"),
-            ui.div(section_dropdown_header("INVENTORY", "inventory", state.dropdown_inventory()), ui.div(*[menu_item(item, item, cur_menu) for item in state.get_menu_inventory()], style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_inventory() else "display: none;"), style="width: 100%;"),
-            ui.div(section_dropdown_header("REJECT & DEFECT", "reject", state.dropdown_reject()), ui.div(*[menu_item(item, item, cur_menu) for item in state.get_menu_reject()], style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_reject() else "display: none;"), style="width: 100%;"),
-            ui.div(section_dropdown_header("EXTRAS", "extras", state.dropdown_extras()), ui.div(*[menu_item(item, item, cur_menu) for item in state.get_menu_extras()], style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_extras() else "display: none;"), style="width: 100%;"),
-            id="sidebar-scroll-box",
-            style="width: 100%; flex: 1; overflow-y: auto; padding-right: 4px;"
-        ),
-        ui.div(ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-right-from-bracket", style="margin-right: 8px; font-size: 14px;"), ui.span("Logout Sistem", style="font-weight: bold; font-size: 13px;")), onclick="Shiny.setInputValue('btn_execute_logout', Math.random(), {priority: 'event'})", class_="btn-red-gradient", style="width: 100%; padding: 0.5rem; border-radius: 6px; display: flex; align-items: center; justify-content: center;"), style="width: 100%; padding-top: 0.8rem; border-top: 1px solid rgba(255, 255, 255, 0.1); margin-top: auto;"),
-        style="width: 280px; min-width: 280px; padding: 1rem; background: linear-gradient(180deg, #111318 0%, #1A1D24 50%, #0D0F12 100%); border-right: 1px solid #2D3748; height: 100vh; display: flex; flex-direction: column; align-items: flex-start;"
-    )
 def section_dropdown_header(title: str, dropdown_key: str, is_open: bool):
     icon_tag = "fa-chevron-down" if is_open else "fa-chevron-right"
     return ui.tags.div(ui.tags.span(title, style="font-size: 11px; font-weight: bold; color: #FFFFFF; letter-spacing: 0.05em;"), ui.tags.i(class_=f"fa-solid {icon_tag}", style="font-size: 12px; color: #FFFFFF;"), onclick=f"Shiny.setInputValue('toggle_dropdown_section', '{dropdown_key}', {{priority: 'event'}})", style="display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 0.5rem 0.6rem; border-radius: 6px; cursor: pointer; background: rgba(255, 255, 255, 0.05); margin-top: 0.8rem; margin-bottom: 0.3rem;")
@@ -1804,39 +979,15 @@ def login_page():
 
 def global_header(state: AppState):
     return ui.div(
-        # SISI KIRI: Title & User Info
+        ui.div(ui.div(style="width: 10px; height: 32px; background: #E50914; border-radius: 4px; margin-right: 12px;"), ui.div(ui.h3(state.main_menu(), style="font-size: 18px; color: #111111; font-weight: 800; margin: 0; line-height: 1.2;"), ui.span(f"Logged in as: {state.user_display_name()} ({state.role()})", style="font-size: 12px; color: #4A5568;"), style="display: flex; flex-direction: column; align-items: flex-start;"), style="display: flex; align-items: center;"),
         ui.div(
-            ui.div(style="width: 10px; height: 32px; background: #E50914; border-radius: 4px; margin-right: 12px;"),
-            ui.div(
-                ui.h3(state.main_menu(), style="font-size: 18px; color: #111111; font-weight: 800; margin: 0; line-height: 1.2;"),
-                ui.span(f"Logged in as: {state.user_display_name()} ({state.role()})", style="font-size: 12px; color: #4A5568;"),
-                style="display: flex; flex-direction: column; align-items: flex-start;"
+            ui.tags.button(ui.tags.i(class_="fa-solid fa-bullhorn", style="margin-right: 6px; color: #1A202C; font-size: 14px;"), "Panduan & Logic", onclick="Shiny.setInputValue('btn_open_panduan_modal', Math.random(), {priority: 'event'})", style="background: #E2E8F0; color: #1A202C; border: none; padding: 6px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px;"
             ),
-            style="display: flex; align-items: center;"
-        ),
-        
-        # SISI KANAN: Active User, Tombol Panduan, & Status Online
-        ui.div(
-            # 1. BADGE ACTIVE USER (Baru di sebelah Panduan & Logic)
-            ui.div(
-                ui.tags.i(class_="fa-solid fa-users", style="margin-right: 6px; color: #15803D; font-size: 13px;"),
-                ui.output_text("txt_active_users", inline=True),
-                style="background: #FFFFFF; border: 1.5px solid #A7F3D0; color: #065F46; padding: 6px 12px; border-radius: 6px; font-weight: 800; font-size: 12px; display: flex; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);"
-            ),
-
-            # 2. TOMBOL PANDUAN & LOGIC
-            ui.tags.button(
-                ui.tags.i(class_="fa-solid fa-bullhorn", style="margin-right: 6px; color: #1A202C; font-size: 14px;"),
-                "Panduan & Logic",
-                onclick="Shiny.setInputValue('btn_open_panduan_modal', Math.random(), {priority: 'event'})",
-                style="background: #E2E8F0; color: #1A202C; border: none; padding: 6px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px;"
-            ),
-
-            # 3. STATUS ONLINE & LIVE TIMER (Tetap Utuh)
             ui.div(
                 ui.div(
+                    # --- TITIK HIJAU BERKEDIP ---
                     ui.div(
-                        style="width: 8px; height: 8px; background: #10B981; border-radius: 50%; margin-right: 6px;",
+                        style="width: 8px; height: 8px; background: #10B981; border-radius: 50%; margin-right: 6px; animation: blinkAnimation 1.5s infinite ease-in-out;",
                         class_="blink-online"
                     ),
                     ui.span("ONLINE", style="font-size: 12px; font-weight: 800; color: #065F46;"),
@@ -1850,7 +1001,7 @@ def global_header(state: AppState):
                 ),
                 style="display: flex; flex-direction: column; align-items: center; gap: 2px;"
             ),
-            style="display: flex; align-items: center; gap: 10px;"
+            style="display: flex; align-items: center; gap: 1.25rem;"
         ),
         style="padding: 12px 20px; background: #D1FAE5; border: 1.5px solid #A7F3D0; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 1rem;"
     )

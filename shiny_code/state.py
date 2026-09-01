@@ -4,13 +4,8 @@ from datetime import datetime
 import numpy as np       
 import pandas as pd
 from shiny import reactive
-from config import get_supabase, format_datetime_wib, safe_int,load_data_from_info
-
-
-# ==========================================
-# GLOBAL STATE (Dishare ke semua user)
-# ==========================================
-active_users = reactive.Value(0)
+from config import get_supabase, safe_int, load_data_from_info, format_datetime_wib
+from jezpro_service import fetch_jezpro_stock_excel_bytes
 
 class AppState:
     def __init__(self):
@@ -50,8 +45,6 @@ class AppState:
         self.active_ongkir_tab = reactive.Value("tab_input")
         self.selected_ids = reactive.Value([])
         self.show_delete_modal = reactive.Value(False)
-        self.filter_tgl_start = reactive.Value("")
-        self.filter_tgl_end = reactive.Value("")
 
         # Stock Minus
         self.stock_minus_processed = reactive.Value(False)
@@ -357,85 +350,6 @@ class AppState:
         self.df_jso_rows = reactive.Value([])
         self._raw_df_jso_res = pd.DataFrame()
 
-        # 1. PO Receiving
-        self.po_rec_done = reactive.Value(False)
-        self.po_rec_metrics = reactive.Value({})
-        self._df_po_hasil = pd.DataFrame()
-        self._df_po_extra = pd.DataFrame()
-        self._df_po_miss = pd.DataFrame()
-
-        # 2. Compare Penerimaan RTO
-        self.rto_rec_done = reactive.Value(False)
-        self.rto_rec_metrics = reactive.Value({})
-        self._df_rto_rec_hasil = pd.DataFrame()
-        self._df_rto_rec_kurang = pd.DataFrame()
-        self._df_rto_rec_lebih = pd.DataFrame()
-
-        # 3. Scan Out Validation
-        self.scan_out_done = reactive.Value(False)
-        self._df_scan_out_res = pd.DataFrame()
-        self._df_scan_out_draft = pd.DataFrame()
-
-        # 4. Refill & Overstock
-        self.rf_os_done = reactive.Value(False)
-        self._df_rf_res = pd.DataFrame()
-        self._df_os_res = pd.DataFrame()
-
-        # 5. Refill & Withdraw
-        self.rf_wd_done = reactive.Value(False)
-        self._df_rf_summary = pd.DataFrame()
-        self._df_wd_summary = pd.DataFrame()
-
-        # 6. FDR Update
-        self.fdr_done = reactive.Value(False)
-        self.fdr_metrics = reactive.Value({})
-        self._df_fdr_manifest = pd.DataFrame()
-        self._df_fdr_fu = pd.DataFrame()
-        self._fdr_dict_kurir = {}
-
-        # 7. Refill Koli
-        self.koli_done = reactive.Value(False)
-        self._df_koli_conso = pd.DataFrame()
-        self._df_koli_refill = pd.DataFrame()
-
-        # 8. Refill Toko
-        self.refill_toko_done = reactive.Value(False)
-        self._df_refill_toko = pd.DataFrame()
-
-        # 9. Match Real & System
-        self.match_ks_done = reactive.Value(False)
-        self.match_ks_metrics = reactive.Value({})
-        self._df_match_ks = pd.DataFrame()
-
-        # 10. Stock Allocation
-        self.stk_alloc_done = reactive.Value(False)
-        self._df_stk_alloc = pd.DataFrame()
-
-        # 11. Store Leader RTO Decision
-        self.rto_dec_done = reactive.Value(False)
-        self._df_rto_dec = pd.DataFrame()
-
-        # 12. Balancing Stock
-        self.bal_stock_done = reactive.Value(False)
-        self.bal_stock_metrics = reactive.Value({})
-        self._df_bal_dc = pd.DataFrame()
-        self._df_bal_gl = pd.DataFrame()
-
-        # 13. Precentage Display
-        self.disp_ctrl_done = reactive.Value(False)
-        self.disp_ctrl_metrics = reactive.Value({})
-        self._df_disp_detail = pd.DataFrame()
-
-        # 14. Precentage Request FL
-        self.fl_req_done = reactive.Value(False)
-        self.fl_req_metrics = reactive.Value({})
-        self._df_fl_bad = pd.DataFrame()
-        self._df_fl_comp = pd.DataFrame()
-
-        # --- STATE: DATA TIMBANG ONGKIR ---
-        self.timbang_filter_periode = reactive.Value("ALL")
-        self.timbang_selected_ids = reactive.Value([])
-
     def set_main_menu(self, menu: str): self.main_menu.set(menu)
     def toggle_sidebar(self): self.sidebar_open.set(not self.sidebar_open())
     def toggle_dropdown(self, key: str):
@@ -488,44 +402,18 @@ class AppState:
         return ["Precentage Display", "Refill Toko", "Store Leader RTO Decission"]
 
     def get_active_content_type(self) -> str:
-        menu = self.main_menu()
-        
-        # 10 Menu Awal
-        if menu in ["Database Ongkir In/Out", "Database Ongkir"]: return "dashboard_ongkir"
-        elif menu == "Stock Minus": return "stock_minus"
-        elif menu == "Putaway System": return "putaway_system"
-        elif menu == "Compare System": return "compare_system"
-        elif menu == "List Bin Cycle Count": return "cycle_count"
-        elif menu == "Putaway & Picking Audit List": return "ppa_audit"
-        elif menu == "Cycle Count": return "cycle_count_analyzer"
-        elif menu == "Compare RTO": return "compare_rto"
-        elif menu == "Stock Opname": return "stock_opname"
-        elif menu == "Justification SO": return "justification_so"
-
-        # 14 Menu Baru (Lengkap)
-        elif menu == "Refill & Withdraw": return "refill_withdraw"
-        elif menu == "FDR Update": return "fdr_update"
-        elif menu == "Match Real & System": return "match_karantina"
-        elif menu == "Stock Tracking Timeline": return "stock_tracking"
-        elif menu == "List Retur Out": return "retur_out"
-        elif menu == "Pengajuan Mutasi Karantina": return "pengajuan_mutasi"
-        elif menu == "Refill Koli to Koli/Refill": return "koli_consolidation"
-        elif menu == "Stock Allocation": return "stock_allocation"
-        elif menu == "Pengajuan Reject/Defect": return "pengajuan_reject"
-        elif menu == "Reject/Defect List": return "reject_list"
-        elif menu in ["Logistik Schedule", "Logistic Schedule"]: return "logistic_schedule"
-        elif menu in ["Reporting & PIC", "Repoerting & PIC"]: return "reporting_pic"
-        elif menu == "Data Timbang Ongkir": return "timbang_ongkir"
-        elif menu == "Precentage Display": return "percentage_display"
-        elif menu == "Purchase Order Receiving": return "po_receiving"
-        elif menu == "Compare Penerimaan RTO": return "penerimaan_rto"
-        elif menu == "Scan Out Validation": return "scan_out"
-        elif menu == "Refill & Overstock": return "refill_overstock"
-        elif menu == "Balancing Stock": return "balancing_stock"
-        elif menu == "Precentage Request FL to Store Stock": return "fl_request"
-        elif menu == "Refill Toko": return "refill_toko"
-        elif menu == "Store Leader RTO Decission": return "rto_decision"
-        
+        cur_menu = self.main_menu()
+        if cur_menu in ["Database Ongkir In/Out", "Database Ongkir", "dashboard_ongkir"]:
+            return "dashboard_ongkir"
+        elif cur_menu == "Stock Minus": return "stock_minus"
+        elif cur_menu == "Putaway System": return "putaway_system"
+        elif cur_menu == "Compare System": return "compare_system"
+        elif cur_menu == "List Bin Cycle Count": return "cycle_count"
+        elif cur_menu in ["Putaway & Picking Audit List", "Putaway & Picking Audit"]: return "ppa_audit"
+        elif cur_menu == "Cycle Count": return "cycle_count_analyzer"
+        elif cur_menu == "Compare RTO": return "compare_rto"
+        elif cur_menu == "Stock Opname": return "stock_opname"
+        elif cur_menu == "Justification SO": return "justification_so"
         return "under_development"
 
     # --- Ongkir Methods ---
@@ -600,36 +488,39 @@ class AppState:
 
     def get_filtered_ongkir(self) -> list[dict]:
         res = self.data_list()
-        if not res:
-            return []
         
         # 1. Filter Ekspedisi
-        flt_eks = str(self.filter_ekspedisi()).upper().strip()
-        if flt_eks != "SEMUA" and flt_eks != "":
-            res = [x for x in res if str(x.get("ekspedisi", "")).upper().strip() == flt_eks]
+        flt_eks = self.filter_ekspedisi()
+        if flt_eks != "SEMUA":
+            res = [x for x in res if str(x.get("ekspedisi", "")).upper() == flt_eks.upper()]
             
-        # 2. Filter Rentang Tanggal (Start - End)
-        start_str = str(self.filter_tgl_start() or "").strip()
-        end_str = str(self.filter_tgl_end() or "").strip()
-        
-        if (start_str or end_str) and res:
+        # 2. Filter Periode Waktu
+        flt_waktu = self.filter_periode()
+        if flt_waktu != "SEMUA" and res:
+            now = datetime.now()
             filtered_res = []
-            d_start = pd.to_datetime(start_str).date() if start_str else None
-            d_end = pd.to_datetime(end_str).date() if end_str else None
-            
             for x in res:
-                tgl_val = x.get("created_at") or x.get("tanggal")
-                if not tgl_val:
-                    continue
+                tgl_str = str(x.get("created_at", "")).strip()
                 try:
-                    item_date = pd.to_datetime(tgl_val, dayfirst=True).date()
-                    if d_start and item_date < d_start:
-                        continue
-                    if d_end and item_date > d_end:
-                        continue
-                    filtered_res.append(x)
+                    # Parse format tanggal DD-MM-YYYY HH:MM
+                    dt = pd.to_datetime(tgl_str, dayfirst=True)
+                    if flt_waktu == "HARI INI":
+                        if dt.date() == now.date():
+                            filtered_res.append(x)
+                    elif flt_waktu == "7 HARI TERAKHIR":
+                        if (now - dt).days <= 7 and dt <= now:
+                            filtered_res.append(x)
+                    elif flt_waktu == "BULAN INI":
+                        if dt.year == now.year and dt.month == now.month:
+                            filtered_res.append(x)
+                    elif flt_waktu == "BULAN LALU":
+                        # Hitung bulan lalu
+                        first_day_cur = now.replace(day=1)
+                        last_month = first_day_cur - pd.Timedelta(days=1)
+                        if dt.year == last_month.year and dt.month == last_month.month:
+                            filtered_res.append(x)
                 except Exception:
-                    continue
+                    filtered_res.append(x)
             res = filtered_res
 
         return res
@@ -715,8 +606,73 @@ class AppState:
             self.stock_minus_processed.set(True)
             return True, "Data Stock Minus berhasil diproses!"
         except Exception as e: return False, f"Gagal memproses file: {e}"
+    def auto_sync_stock_minus_from_jezpro(self):
+        try:
+            # 1. Download file langsung dari Jezpro
+            excel_bytes = fetch_jezpro_stock_excel_bytes(store_id=3, qty_filter=1)
+            # 2. Langsung proses ke algoritma Stock Minus yang sudah ada
+            return self.process_stock_minus_file(excel_bytes, "Stock_Minus_Jezpro.xlsx")
+        except Exception as e:
+            return False, f"Gagal Sinkronisasi Jezpro: {e}"
+
+    def load_stock_minus_from_supabase(self):
+        try:
+            import urllib.request
+            from config import SUPABASE_URL, SUPABASE_KEY
+            
+            # URL file langsung dari Supabase Storage
+            file_url = f"{SUPABASE_URL}/storage/v1/object/public/stock_files/latest_stock.xlsx"
+            
+            req = urllib.request.Request(
+                file_url,
+                headers={
+                    "apikey": SUPABASE_KEY,
+                    "Authorization": f"Bearer {SUPABASE_KEY}"
+                }
+            )
+            
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                excel_bytes = resp.read()
+                
+            if not excel_bytes:
+                return False, "File di Supabase kosong!"
+                
+            # Langsung proses ke algoritma Stock Minus
+            return self.process_stock_minus_file(excel_bytes, "latest_stock.xlsx")
+        except Exception as e:
+            return False, f"Gagal mengambil file dari Supabase: {e}"
+
+    def upload_dan_bersihkan_file_lama(file_bytes, nama_file="latest_stock.xlsx"):
+    from config import SUPABASE_URL, SUPABASE_KEY
+    import urllib.request
+    import json
+
+    # 1. HAPUS FILE LAMA DI BUCKET
+    delete_url = f"{SUPABASE_URL}/storage/v1/object/stock_files"
+    payload_delete = json.dumps({"prefixes": [nama_file]}).encode("utf-8")
+    req_del = urllib.request.Request(
+        delete_url,
+        data=payload_delete,
+        headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}", "Content-Type": "application/json"},
+        method="DELETE"
+    )
+    try:
+        urllib.request.urlopen(req_del, timeout=30)
+        print("🗑️ File lama berhasil dibersihkan.")
+    except Exception:
+        pass  # Jika file belum ada, lewati
+
+    # 2. UPLOAD FILE BARU
+    upload_url = f"{SUPABASE_URL}/storage/v1/object/stock_files/{nama_file}"
+    req_upload = urllib.request.Request(
+        upload_url,
+        data=file_bytes,
+        headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}", "x-upsert": "true"},
+        method="POST"
+    )
+    with urllib.request.urlopen(req_upload, timeout=60) as resp:
+        print("✅ File baru berhasil disimpan.")
         
-    
     # --- Putaway Compare Processing ---
     def process_putaway_compare(self, ds_bytes: bytes, ds_name: str, asal_bytes: bytes, asal_name: str):
         try:
@@ -2617,499 +2573,3 @@ class AppState:
             return True, f"Justifikasi Selesai! ({len(final_df):,} Baris Diproses)"
         except Exception as e:
             return False, f"Gagal Justifikasi SO: {e}"
-
-# 1. PO RECEIVING
-    def run_po_receiving(self, f_scan, f_po):
-        try:
-            df_s = load_data_from_info(f_scan)
-            df_p = load_data_from_info(f_po)
-            if df_s.empty or df_p.empty or len(df_p.columns) < 8:
-                return False, "File PO/Scan minimal 8 kolom!"
-
-            s_sku, s_qty = df_s.columns[0], df_s.columns[1]
-            p_no, p_sku, p_qty = df_p.columns[0], df_p.columns[6], df_p.columns[7]
-
-            clean = lambda v: str(v).strip().upper()[:-2] if str(v).strip().upper().endswith('.0') else str(v).strip().upper()
-            df_s[s_sku], df_p[p_sku] = df_s[s_sku].apply(clean), df_p[p_sku].apply(clean)
-            df_s[s_qty] = pd.to_numeric(df_s[s_qty], errors='coerce').fillna(0)
-            df_p[p_qty] = pd.to_numeric(df_p[p_qty], errors='coerce').fillna(0)
-
-            stok_pool = df_s.groupby(s_sku)[s_qty].sum().to_dict()
-            df_p['Qty Alokasi'] = 0.0
-            over_alloc = []
-
-            for sku, total_stok in stok_pool.items():
-                sisa = float(total_stok)
-                target_idx = df_p[df_p[p_sku] == sku].index.tolist()
-                if not target_idx:
-                    over_alloc.append({'No PO': 'WRONG SKU', 'SKU': sku, 'Qty PO': 0, 'Qty Alokasi': sisa, 'Status Alokasi': 'Wrong SKU'})
-                    continue
-                for idx in target_idx:
-                    butuh = df_p.at[idx, p_qty]
-                    isi = min(butuh, sisa)
-                    df_p.at[idx, 'Qty Alokasi'] = isi
-                    sisa -= isi
-                    if sisa <= 0: break
-                if sisa > 0:
-                    over_alloc.append({'No PO': 'OVER SCAN PO', 'SKU': sku, 'Qty PO': 0, 'Qty Alokasi': sisa, 'Status Alokasi': 'Over Allocation'})
-
-            df_p['Status Alokasi'] = df_p.apply(lambda r: 'No Allocation' if r['Qty Alokasi'] == 0 else ('Partial Allocation' if r['Qty Alokasi'] < r[p_qty] else 'Full Allocation'), axis=1)
-            self._df_po_hasil = pd.concat([df_p[[p_no, p_sku, p_qty, 'Qty Alokasi', 'Status Alokasi']].rename(columns={p_no: 'No PO', p_sku: 'SKU', p_qty: 'Qty PO'}), pd.DataFrame(over_alloc)], ignore_index=True)
-            self._df_po_extra = pd.DataFrame(over_alloc)
-            self._df_po_miss = df_p[df_p['Qty Alokasi'] < df_p[p_qty]]
-            
-            self.po_rec_metrics.set({
-                "total_po": int(df_p[p_qty].sum()),
-                "total_scan": int(df_s[s_qty].sum()),
-                "kurang_po": int(sum(x['Qty Alokasi'] for x in over_alloc)),
-                "lebih_po": int(df_p[p_qty].sum() - df_p['Qty Alokasi'].sum())
-            })
-            self.po_rec_done.set(True)
-            return True, "PO Receiving Berhasil!"
-        except Exception as e: return False, str(e)
-
-    # 2. COMPARE PENERIMAAN RTO
-    def run_penerimaan_rto(self, f_scan, f_tf):
-        try:
-            df_s = load_data_from_info(f_scan)
-            df_t = load_data_from_info(f_tf)
-            if df_s.empty or df_t.empty or len(df_t.columns) < 8: return False, "File tidak lengkap!"
-
-            clean = lambda v: str(v).strip().upper()
-            df_s.iloc[:, 0] = df_s.iloc[:, 0].apply(clean)
-            df_t.iloc[:, 3] = df_t.iloc[:, 3].apply(clean)
-
-            agg_s = df_s.groupby(df_s.columns[0])[df_s.columns[1]].sum()
-            agg_t = df_t.groupby(df_t.columns[3])[df_t.columns[7]].sum()
-            comp = pd.concat([agg_s, agg_t], axis=1).fillna(0)
-            comp.columns = ['QTY_SCAN', 'QTY_TF']
-
-            hasil_alokasi = []
-            tf_grp = df_t.groupby([df_t.columns[0], df_t.columns[3]])[df_t.columns[7]].sum().reset_index()
-            tf_grp.columns = ['No Transfer', 'SKU', 'Qty TF']
-
-            for sku in agg_s.index:
-                avail = agg_s[sku]
-                for _, r in tf_grp[tf_grp['SKU'] == sku].iterrows():
-                    tgt = float(r['Qty TF'])
-                    alloc = min(tgt, avail) if avail > 0 else 0
-                    stat = "Full Allocation" if alloc == tgt else ("Partial Allocation" if alloc > 0 else "No Allocation")
-                    hasil_alokasi.append({'No Transfer': r['No Transfer'], 'SKU': sku, 'Qty TF': tgt, 'Qty Alokasi': alloc, 'Status Alokasi': stat})
-                    avail -= alloc
-                if avail > 0:
-                    hasil_alokasi.append({'No Transfer': 'KURANG TF / OVER SCAN', 'SKU': sku, 'Qty TF': 0, 'Qty Alokasi': avail, 'Status Alokasi': 'Over Allocation'})
-
-            self._df_rto_rec_hasil = pd.DataFrame(hasil_alokasi)
-            self._df_rto_rec_kurang = comp[comp['QTY_SCAN'] > comp['QTY_TF']].reset_index().rename(columns={'index': 'SKU'})
-            self._df_rto_rec_lebih = comp[comp['QTY_TF'] > comp['QTY_SCAN']].reset_index().rename(columns={'index': 'SKU'})
-
-            self.rto_rec_metrics.set({
-                "total_tf": int(agg_t.sum()), "total_scan": int(agg_s.sum()),
-                "kurang_tf": int(self._df_rto_rec_kurang['QTY_SCAN'].sum() - self._df_rto_rec_kurang['QTY_TF'].sum()) if not self._df_rto_rec_kurang.empty else 0,
-                "lebih_tf": int(self._df_rto_rec_lebih['QTY_TF'].sum() - self._df_rto_rec_lebih['QTY_SCAN'].sum()) if not self._df_rto_rec_lebih.empty else 0
-            })
-            self.rto_rec_done.set(True)
-            return True, "Compare Penerimaan RTO Berhasil!"
-        except Exception as e: return False, str(e)
-
-    # 3. SCAN OUT VALIDATION
-    def run_scan_out(self, f_scan, f_hist, f_track):
-        try:
-            df_s = load_data_from_info(f_scan)
-            df_h = load_data_from_info(f_hist)
-            df_t = load_data_from_info(f_track)
-            
-            clean = lambda v: str(v).strip().upper()
-            df_s.columns = [clean(c) for c in df_s.columns]
-            df_h.columns = [clean(c) for c in df_h.columns]
-            df_t.columns = [clean(c) for c in df_t.columns]
-
-            # Rename columns
-            df_s = df_s.rename(columns={df_s.columns[0]: 'BIN_AWAL', df_s.columns[1]: 'SKU'})
-            df_h = df_h.rename(columns={df_h.columns[3]: 'SKU', df_h.columns[8]: 'BIN_HIST', df_h.columns[10]: 'QTY_HIST', df_h.columns[12]: 'BIN_AFTER'})
-            df_t = df_t.rename(columns={df_t.columns[0]: 'INVOICE', df_t.columns[1]: 'SKU', df_t.columns[6]: 'BIN_STOCK', df_t.columns[10]: 'QTY_STOCK'})
-
-            for df in [df_s, df_h, df_t]:
-                for c in ['SKU', 'BIN_AWAL', 'BIN_HIST', 'BIN_STOCK', 'BIN_AFTER', 'INVOICE']:
-                    if c in df.columns: df[c] = df[c].astype(str).str.strip().str.upper()
-
-            df_h['QTY_HIST'] = pd.to_numeric(df_h['QTY_HIST'], errors='coerce').fillna(0).astype(int)
-            df_t['QTY_STOCK'] = pd.to_numeric(df_t['QTY_STOCK'], errors='coerce').fillna(0).astype(int)
-
-            final_res = []
-            for _, row in df_s.iterrows():
-                sku, bin_f = row['SKU'], row['BIN_AWAL']
-                found, ket, qty, bin_aft, inv = False, "", 0, "", ""
-
-                h_ex = df_h[(df_h['SKU'] == sku) & (df_h['BIN_HIST'] == bin_f) & (df_h['QTY_HIST'] > 0)]
-                if not h_ex.empty:
-                    idx = h_ex.index[0]
-                    ket, bin_aft, qty, found = 'DONE AND MATCH SET UP', df_h.loc[idx, 'BIN_AFTER'], 1, True
-                    df_h.loc[idx, 'QTY_HIST'] -= 1
-                
-                if not found:
-                    t_ex = df_t[(df_t['SKU'] == sku) & (df_t['BIN_STOCK'] == bin_f) & (df_t['QTY_STOCK'] > 0)]
-                    if not t_ex.empty:
-                        idx = t_ex.index[0]
-                        ket, inv, qty, found = 'ITEM TELAH TERJUAL', df_t.loc[idx, 'INVOICE'], 1, True
-                        df_t.loc[idx, 'QTY_STOCK'] -= 1
-
-                if not found:
-                    h_sk = df_h[(df_h['SKU'] == sku) & (df_h['QTY_HIST'] > 0)]
-                    if not h_sk.empty:
-                        idx = h_sk.index[0]
-                        ket, bin_aft, qty, found = 'DONE SETUP (BIN MISSMATCH)', df_h.loc[idx, 'BIN_AFTER'], 1, True
-                        df_h.loc[idx, 'QTY_HIST'] -= 1
-
-                if not found:
-                    t_sk = df_t[(df_t['SKU'] == sku) & (df_t['QTY_STOCK'] > 0)]
-                    if not t_sk.empty:
-                        idx = t_sk.index[0]
-                        ket, inv, qty, found = 'ITEM TELAH TERJUAL (BIN MISSMATCH)', df_t.loc[idx, 'INVOICE'], 1, True
-                        df_t.loc[idx, 'QTY_STOCK'] -= 1
-
-                if not found: ket, qty = 'ITEM BELUM TERSETUP & TIDAK TERJUAL', 0
-                final_res.append({'BIN AWAL': bin_f, 'SKU': sku, 'QTY SCAN': 1, 'Keterangan': ket, 'Total Qty Setup/Terjual': qty, 'Bin After Set Up': bin_aft, 'Invoice': inv})
-
-            df_res = pd.DataFrame(final_res).groupby(['BIN AWAL', 'SKU', 'Keterangan', 'Bin After Set Up', 'Invoice'], dropna=False).agg({'QTY SCAN': 'sum', 'Total Qty Setup/Terjual': 'sum'}).reset_index()
-            
-            # Draft Data
-            draft_data = []
-            for _, r in df_res.iterrows():
-                k = str(r['Keterangan'])
-                if 'BIN MISSMATCH' in k or 'QTY MISSMATCH' in k or 'BELUM' in k:
-                    draft_data.append({'BIN AWAL': r['BIN AWAL'], 'BIN TUJUAN': 'KARANTINA', 'SKU': r['SKU'], 'QUANTITY': r['QTY SCAN'], 'NOTES': 'WAITING OFFLINE'})
-
-            self._df_scan_out_res = df_res[['BIN AWAL', 'SKU', 'QTY SCAN', 'Keterangan', 'Total Qty Setup/Terjual', 'Bin After Set Up', 'Invoice']]
-            self._df_scan_out_draft = pd.DataFrame(draft_data) if draft_data else pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
-            self.scan_out_done.set(True)
-            return True, "Scan Out Validation Berhasil!"
-        except Exception as e: return False, str(e)
-
-    # 4. REFILL & OVERSTOCK
-    def run_refill_overstock(self, f_all, f_track=None):
-        try:
-            df = load_data_from_info(f_all)
-            if df.empty or len(df.columns) < 10: return False, "File tidak valid!"
-
-            df.iloc[:, 1] = df.iloc[:, 1].astype(str).str.upper()
-            df.iloc[:, 2] = df.iloc[:, 2].astype(str).str.strip()
-            df.iloc[:, 9] = pd.to_numeric(df.iloc[:, 9], errors='coerce').fillna(0)
-
-            # GL3 & GL4 Split
-            df_gl3 = df[df.iloc[:, 1].str.contains("GL3", na=False) & ~df.iloc[:, 1].str.contains("LIVE", na=False)]
-            df_gl4 = df[df.iloc[:, 1].str.contains("GL4", na=False) & ~df.iloc[:, 1].str.contains("DEFECT|REJECT|ONLINE|RAK", regex=True, na=False)]
-
-            dict_gl3 = df_gl3.groupby(df_gl3.columns[2])[df_gl3.columns[9]].sum().to_dict()
-            target_skus = {sku: True for sku, q in dict_gl3.items() if q < 3}
-            for sku in df_gl4.iloc[:, 2].unique():
-                if sku not in dict_gl3: target_skus[sku] = True
-
-            refill_out = []
-            for sku in target_skus.keys():
-                q_gl3 = dict_gl3.get(sku, 0)
-                sisa_load = 12
-                g4_rows = df_gl4[df_gl4.iloc[:, 2] == sku]
-                for _, r in g4_rows.iterrows():
-                    q_g4 = int(r.iloc[9])
-                    if q_g4 > 0 and sisa_load > 0:
-                        take = min(q_g4, sisa_load)
-                        refill_out.append([r.iloc[1], sku, r.iloc[3], r.iloc[4], r.iloc[5], q_g4, take, q_gl3])
-                        sisa_load -= take
-                        if sisa_load <= 0: break
-
-            overstock_out = []
-            for _, r in df_gl3.iterrows():
-                qty_s = int(r.iloc[9])
-                if qty_s > 24 and "RAK" not in str(r.iloc[1]):
-                    overstock_out.append([r.iloc[1], r.iloc[2], r.iloc[3], r.iloc[4], r.iloc[5], qty_s, qty_s - 24])
-
-            self._df_rf_res = pd.DataFrame(refill_out, columns=["BIN", "SKU", "BRAND", "ITEM NAME", "VARIANT", "QTY BIN AMBIL", "LOAD", "QTY GL3"]) if refill_out else pd.DataFrame()
-            self._df_os_res = pd.DataFrame(overstock_out, columns=["BIN", "SKU", "BRAND", "ITEM NAME", "VARIANT", "QTY BIN AMBIL", "LOAD"]) if overstock_out else pd.DataFrame()
-            self.rf_os_done.set(True)
-            return True, "Refill & Overstock Selesai!"
-        except Exception as e: return False, str(e)
-
-    # 5. REFILL KOLI TO KOLI
-    def run_koli_consolidation(self, f_master):
-        try:
-            df = load_data_from_info(f_master)
-            df_k = df[df.iloc[:, 1].astype(str).str.upper().str.contains('KL1|KL2', regex=True, na=False)].copy()
-            if df_k.empty: return False, "Tidak ada BIN KL1/KL2!"
-
-            bin_grp = df_k.groupby(df_k.columns[1]).agg({df_k.columns[2]: lambda x: list(set(x.dropna().astype(str))), df_k.columns[9]: 'sum'}).reset_index()
-            bin_grp.columns = ['BIN', 'SKUS', 'QTY']
-
-            refill_list = []
-            for _, r in bin_grp.iterrows():
-                b, q = r['BIN'], int(r['QTY'])
-                if q >= 9: continue
-                q_kl1 = 6 if ('KL2' in b.upper() and q >= 6) else 0
-                q_lt3 = q - q_kl1
-                refill_list.append({'BIN': b, 'SKU': ", ".join(r['SKUS']), 'QTY SEKARANG': q, 'MUTASI KE KL1': q_kl1, 'MUTASI KE GUDANG LT.3': q_lt3})
-
-            self._df_koli_refill = pd.DataFrame(refill_list)
-            self.koli_done.set(True)
-            return True, "Koli Consolidation Selesai!"
-        except Exception as e: return False, str(e)
-
-    # 6. BALANCING STOCK
-    def run_balancing_stock(self, f_stock):
-        try:
-            df = load_data_from_info(f_stock)
-            col_bin, col_sku, col_qty = df.columns[1], df.columns[2], df.columns[9]
-            df[col_qty] = pd.to_numeric(df[col_qty], errors='coerce').fillna(0)
-            df[col_bin] = df[col_bin].astype(str).str.upper()
-
-            excl = "DEFECT|REJECT|ONLINE|LIVE|MARKOM|KARANTINA|STAGING|STAGGING|PUTAWAY|INB|AMP|RAK"
-            df_clean = df[~df[col_bin].str.contains(excl, regex=True, na=False)]
-
-            # DC to Store
-            dc_skus = set(df_clean[df_clean[col_bin].str.contains('DC', na=False) & (df_clean[col_qty] > 1)][col_sku].unique())
-            store_skus = set(df_clean[df_clean[col_bin].str.contains('TOKO|STORE|GUDANG LT.2|OUT', regex=True, na=False) & (df_clean[col_qty] > 0)][col_sku].unique())
-            missing_dc = list(dc_skus - store_skus)
-
-            # GL4 to GL3
-            gl4_skus = set(df_clean[df_clean[col_bin].str.contains('GL4', na=False) & (df_clean[col_qty] > 0)][col_sku].unique())
-            gl3_skus = set(df_clean[df_clean[col_bin].str.contains('GL3', na=False) & (df_clean[col_qty] > 0)][col_sku].unique())
-            missing_gl = list(gl4_skus - gl3_skus)
-
-            self._df_bal_dc = df[df[col_sku].isin(missing_dc)][[col_sku, df.columns[4]]].drop_duplicates(col_sku).rename(columns={col_sku: 'SKU', df.columns[4]: 'Deskripsi'})
-            self._df_bal_gl = df[df[col_sku].isin(missing_gl)][[col_sku, df.columns[4]]].drop_duplicates(col_sku).rename(columns={col_sku: 'SKU', df.columns[4]: 'Deskripsi'})
-
-            self.bal_stock_metrics.set({
-                "total_sku": len(df_clean[df_clean[col_qty] > 0][col_sku].unique()),
-                "dc_avail": len(dc_skus) - len(missing_dc),
-                "dc_miss": len(missing_dc),
-                "gl_avail": len(gl4_skus) - len(missing_gl),
-                "gl_miss": len(missing_gl)
-            })
-            self.bal_stock_done.set(True)
-            return True, "Balancing Stock Berhasil!"
-        except Exception as e: return False, str(e)
-
-    # 7. PERCENTAGE REQUEST FL
-    def run_fl_request(self, f_stock, f_req):
-        try:
-            dfs = load_data_from_info(f_stock)
-            dfr = load_data_from_info(f_req)
-            if dfs.empty or dfr.empty: return False, "File kosong!"
-
-            dfs.iloc[:, 1] = dfs.iloc[:, 1].astype(str).str.upper()
-            df_store = dfs[dfs.iloc[:, 1].str.contains('TOKO|GUDANG|STR|STORE', regex=True, na=False)]
-            df_store.iloc[:, 2] = df_store.iloc[:, 2].astype(str).str.strip()
-            df_store.iloc[:, 9] = pd.to_numeric(df_store.iloc[:, 9], errors='coerce').fillna(0)
-            stk_grp = df_store.groupby(df_store.columns[2])[df_store.columns[9]].sum().reset_index().rename(columns={df_store.columns[2]: 'SKU', df_store.columns[9]: 'QTY_STOCK'})
-
-            dfr.iloc[:, 4] = dfr.iloc[:, 4].astype(str).str.strip()
-            dfr.iloc[:, 22] = pd.to_numeric(dfr.iloc[:, 22], errors='coerce').fillna(0)
-            req_grp = dfr.groupby(dfr.columns[4])[dfr.columns[22]].sum().reset_index().rename(columns={dfr.columns[4]: 'SKU', dfr.columns[22]: 'QTY_REQUEST'})
-
-            bad = req_grp.merge(stk_grp[stk_grp['QTY_STOCK'] >= 2], on='SKU', how='inner')
-            tot_req = req_grp['QTY_REQUEST'].sum()
-            tot_bad = bad['QTY_REQUEST'].sum()
-            pct = (tot_bad / tot_req * 100) if tot_req > 0 else 0.0
-
-            self._df_fl_bad = bad[['SKU', 'QTY_STOCK', 'QTY_REQUEST']].rename(columns={'QTY_STOCK': 'Current Stock di Store', 'QTY_REQUEST': 'QTY Diminta ke DC'})
-            self._df_fl_comp = req_grp.merge(stk_grp, on='SKU', how='left').fillna(0).rename(columns={'QTY_REQUEST': 'Total QTY Diminta (DC)', 'QTY_STOCK': 'Total QTY Tersedia (Store)'})
-
-            self.fl_req_metrics.set({"total_valid": int(tot_req), "total_bad": int(tot_bad), "percentage": pct})
-            self.fl_req_done.set(True)
-            return True, "Analisis Permintaan FL Selesai!"
-        except Exception as e: return False, str(e)
-
-# 1. REFILL TOKO
-    def process_refill_toko(self, file_stock, selected_cats=None):
-        try:
-            df = load_data_from_info(file_stock)
-            if df.empty or len(df.columns) < 10: return False, "File Stock tidak valid!"
-            df.columns = [f"col_{i}" for i in range(len(df.columns))]
-            df_filtered = df[~df['col_6'].astype(str).str.upper().isin(["SHOES", "SANDALS", "FOOTWEAR"])].copy()
-            if selected_cats: df_filtered = df_filtered[df_filtered['col_6'].isin(selected_cats)]
-            
-            excl = "DEFECT|REJECT|STAGING|STAGGING|BALANCING|PUTAWAY|EVENT|OFFLINE|KARANTINA"
-            is_toko = df_filtered['col_1'].astype(str).str.upper() == "TOKO"
-            is_gudang = (~is_toko) & (~df_filtered['col_1'].astype(str).str.upper().str.contains(excl, na=False))
-
-            df_toko = df_filtered[is_toko].groupby('col_2')['col_9'].sum().reset_index().rename(columns={'col_9': 'qty_toko'})
-            df_gudang = df_filtered[is_gudang].groupby('col_2').agg({'col_9': 'sum', 'col_1': lambda x: ", ".join(set(x[df_filtered.loc[x.index, 'col_9'] > 0].astype(str)))}).reset_index().rename(columns={'col_9': 'qty_gudang', 'col_1': 'available_in_bins'})
-
-            df_master = df_filtered[['col_2', 'col_3', 'col_4', 'col_5', 'col_6']].drop_duplicates('col_2')
-            df_final = df_master.merge(df_toko, on='col_2', how='left').merge(df_gudang, on='col_2', how='left').fillna(0)
-
-            df_final['is_refill'] = df_final.apply(lambda r: (r['qty_toko'] < 6 if "LOWER BODY" in str(r['col_6']).upper() else r['qty_toko'] < 2) if r['qty_gudang'] > 0 else False, axis=1)
-            df_view = df_final[df_final['is_refill'] == True][['col_2', 'col_3', 'col_4', 'col_5', 'col_6', 'qty_toko', 'qty_gudang', 'available_in_bins']]
-            df_view.columns = ['SKU', 'BRAND', 'ITEM NAME', 'VARIANT', 'SUB KATEGORI', 'QTY TOKO', 'QTY GUDANG', 'LOKASI BIN']
-
-            self._df_refill_toko = df_view
-            self.refill_toko_done.set(True)
-            return True, "Refill Toko Selesai!"
-        except Exception as e: return False, str(e)
-
-    # 2. STORE LEADER RTO DECISION
-    def process_rto_decision(self, f_sby, f_smg, f_sales, f_toc):
-        try:
-            df_sby, df_smg = load_data_from_info(f_sby), load_data_from_info(f_smg)
-            df_sales, df_toc = load_data_from_info(f_sales), load_data_from_info(f_toc)
-            for df in [df_sby, df_smg, df_sales, df_toc]: df.columns = df.columns.str.strip()
-
-            sby_grp = df_sby.groupby(df_sby.columns[2]).agg({df_sby.columns[4]: 'first', df_sby.columns[5]: 'first', df_sby.columns[9]: 'sum'}).reset_index()
-            sby_grp.columns = ['SKU', 'ITEM NAME', 'VARIANT', 'QTY SURABAYA']
-
-            smg_grp = df_smg.groupby(df_smg.columns[2]).agg({df_smg.columns[9]: 'sum'}).reset_index()
-            smg_grp.columns = ['SKU', 'QTY SEMARANG']
-
-            sales_grp = df_sales.groupby(df_sales.columns[17]).agg({df_sales.columns[25]: 'sum'}).reset_index()
-            sales_grp.columns = ['SKU', 'SALES 60d']
-
-            toc_lookup = df_toc[[df_toc.columns[2], df_toc.columns[7]]].drop_duplicates(subset=[df_toc.columns[2]], keep='last')
-            toc_lookup.columns = ['ITEM NAME', 'ToC']
-
-            compiled = pd.merge(sby_grp, smg_grp, on='SKU', how='left').merge(sales_grp, on='SKU', how='left').fillna(0)
-            compiled = compiled[(compiled['QTY SURABAYA'] != 0) | (compiled['QTY SEMARANG'] != 0)]
-            final_df = pd.merge(compiled, toc_lookup, on='ITEM NAME', how='left').fillna('-')
-
-            self._df_rto_dec = final_df[['SKU', 'ITEM NAME', 'VARIANT', 'QTY SURABAYA', 'QTY SEMARANG', 'SALES 60d', 'ToC']]
-            self.rto_dec_done.set(True)
-            return True, "Matching RTO Selesai!"
-        except Exception as e: return False, str(e)
-
-    # 3. STOCK ALLOCATION
-    def process_stock_allocation(self, f_stock, f_sales):
-        try:
-            df_stk, df_sal = load_data_from_info(f_stock), load_data_from_info(f_sales)
-            df_sal.iloc[:, 18] = pd.to_numeric(df_sal.iloc[:, 18], errors="coerce").fillna(0)
-            store_u = df_sal.iloc[:, 0].astype(str).str.upper()
-            df_sal["SALES_ONLINE"] = np.where(store_u.str.contains("ONLINE", na=False), df_sal.iloc[:, 18], 0)
-            df_sal["SALES_OFFLINE"] = np.where(store_u.str.contains("JEZ", na=False), df_sal.iloc[:, 18], 0)
-            sales_sum = df_sal.groupby(df_sal.columns[26]).agg({"SALES_ONLINE": "sum", "SALES_OFFLINE": "sum"}).reset_index()
-            sales_sum["TOTAL_SALES"] = sales_sum["SALES_ONLINE"] + sales_sum["SALES_OFFLINE"]
-
-            df_stk_u = df_stk.groupby(df_stk.columns[2]).agg({df_stk.columns[9]: "sum"}).reset_index()
-            col_sku, col_qty = df_stk_u.columns[0], df_stk_u.columns[1]
-            merged = pd.merge(df_stk_u, sales_sum, left_on=col_sku, right_on=sales_sum.columns[0], how="left").fillna(0)
-
-            def calc_prop(r):
-                t = r["TOTAL_SALES"]
-                if t == 0: return 0.10, 0.10, 0.80
-                return (0.70, 0.15, 0.15) if (r["SALES_ONLINE"]/t > 0.7) else ((0.15, 0.70, 0.15) if (r["SALES_OFFLINE"]/t > 0.7) else (0.40, 0.40, 0.20))
-
-            props = merged.apply(calc_prop, axis=1)
-            merged["PCT_ONLINE"], merged["PCT_OFFLINE"], merged["PCT_LOGISTIK"] = [x[0] for x in props], [x[1] for x in props], [x[2] for x in props]
-            merged["QTY_ONLINE"] = np.ceil(merged[col_qty] * merged["PCT_ONLINE"]).astype(int)
-            merged["QTY_OFFLINE"] = np.ceil(merged[col_qty] * merged["PCT_OFFLINE"]).astype(int)
-            merged["QTY_LOGISTIK"] = merged[col_qty] - merged["QTY_ONLINE"] - merged["QTY_OFFLINE"]
-
-            self._df_stk_alloc = merged[[col_sku, col_qty, "SALES_ONLINE", "SALES_OFFLINE", "QTY_ONLINE", "QTY_OFFLINE", "QTY_LOGISTIK"]]
-            self.stk_alloc_done.set(True)
-            return True, "Alokasi Stok Selesai!"
-        except Exception as e: return False, str(e)
-
-    # 4. MATCH REAL & SYSTEM (CROSS-BRANCH)
-    def run_match_karantina(self, f_sys, f_real):
-        try:
-            df_sys, df_real = load_data_from_info(f_sys), load_data_from_info(f_real)
-            system_pool = {}
-            for _, r in df_sys.iterrows():
-                cb, sku, q = str(r.iloc[0]).strip().upper(), str(r.iloc[3]).strip().upper(), pd.to_numeric(r.iloc[10], errors='coerce') or 0
-                if sku and q > 0:
-                    if cb not in system_pool: system_pool[cb] = {}
-                    system_pool[cb][sku] = system_pool[cb].get(sku, 0) + q
-
-            matched, total_real, total_alloc = [], pd.to_numeric(df_real.iloc[:, 12], errors='coerce').sum(), 0
-            for _, r in df_real.iterrows():
-                cb_r, sku_r, q_r = str(r.iloc[0]).strip().upper(), str(r.iloc[4]).strip().upper(), pd.to_numeric(r.iloc[12], errors='coerce') or 0
-                if not sku_r or q_r <= 0: continue
-
-                # Match Cabang Sendiri
-                if cb_r in system_pool and sku_r in system_pool[cb_r] and system_pool[cb_r][sku_r] > 0:
-                    al = min(q_r, system_pool[cb_r][sku_r])
-                    system_pool[cb_r][sku_r] -= al
-                    q_r -= al; total_alloc += al
-                    matched.append({"SKU": sku_r, "Cabang Real": cb_r, "Cabang System": cb_r, "Qty Match": al, "Status": "MATCH PERFECT"})
-
-                # Match Cross Branch
-                if q_r > 0:
-                    for cb_s, skus in system_pool.items():
-                        if sku_r in skus and skus[sku_r] > 0:
-                            al = min(q_r, skus[sku_r])
-                            system_pool[cb_s][sku_r] -= al
-                            q_r -= al; total_alloc += al
-                            matched.append({"SKU": sku_r, "Cabang Real": cb_r, "Cabang System": cb_s, "Qty Match": al, "Status": "MATCH CROSS-BRANCH"})
-                            if q_r <= 0: break
-
-                if q_r > 0:
-                    matched.append({"SKU": sku_r, "Cabang Real": cb_r, "Cabang System": "TIDAK KETEMU", "Qty Match": q_r, "Status": "UNMATCHED"})
-
-            self.match_ks_metrics.set({"total_real": int(total_real), "total_match": int(total_alloc), "total_unmatch": int(total_real - total_alloc), "sys_left": int(sum(sum(s.values()) for s in system_pool.values()))})
-            self._df_match_ks = pd.DataFrame(matched)
-            self.match_ks_done.set(True)
-            return True, "Match Real & System Selesai!"
-        except Exception as e: return False, str(e)
-
-    # 5. REFILL & WITHDRAW
-    def run_refill_withdraw(self, f_stock, f_trx=None):
-        try:
-            df_s = load_data_from_info(f_stock)
-            dictDC, dict02, dictTotDC, dictTot02, dictBrand, dictItem, dictVar, dictSub = {}, {}, {}, {}, {}, {}, {}, {}
-            for _, r in df_s.iterrows():
-                sku, binL, q = str(r.iloc[2]).strip(), str(r.iloc[1]).upper().strip(), pd.to_numeric(r.iloc[9], errors='coerce') or 0
-                if any(ex in binL for ex in ["DEFECT", "REJECT", "ONLINE", "LIVE", "MARKOM", "KARANTINA", "STAGING", "PUTAWAY"]): continue
-                if sku not in dictBrand: dictBrand[sku], dictItem[sku], dictVar[sku], dictSub[sku] = str(r.iloc[3]), str(r.iloc[4]), str(r.iloc[5]), str(r.iloc[6])
-                if any(x in binL for x in ["02", "TOKO", "STORE", "LT.2", "STR"]):
-                    dictTot02[sku] = dictTot02.get(sku, 0) + q; dict02[sku] = binL
-                elif any(x in binL for x in ["DC", "INBOUND", "KL", "RAK"]):
-                    dictTotDC[sku] = dictTotDC.get(sku, 0) + q; dictDC[sku] = binL
-
-            outRef, outWdr = [], []
-            for sku in dictBrand.keys():
-                if dictTotDC.get(sku, 0) > 1 and dictTot02.get(sku, 0) == 0 and sku in dictDC:
-                    outRef.append([sku, dictBrand[sku], dictItem[sku], dictVar[sku], dictDC[sku], dictTotDC[sku], math.ceil(dictTotDC[sku]/2), 0, dictSub.get(sku, "-")])
-                if dictTot02.get(sku, 0) > 3 and dictTotDC.get(sku, 0) == 0 and sku in dict02:
-                    outWdr.append([sku, dictBrand[sku], dictItem[sku], dictVar[sku], dict02[sku], dictTot02[sku], math.ceil(dictTot02[sku]/2), 0, dictSub.get(sku, "-")])
-
-            self._df_rf_summary = pd.DataFrame(outRef, columns=["SKU", "BRAND", "ITEM NAME", "VARIANT", "BIN AMBIL", "QTY BIN", "LOAD", "QTY 02", "SUB KATEGORI"])
-            self._df_wd_summary = pd.DataFrame(outWdr, columns=["SKU", "BRAND", "ITEM NAME", "VARIANT", "BIN AMBIL", "QTY BIN", "LOAD", "QTY DC", "SUB KATEGORI"])
-            self.rf_wd_done.set(True)
-            return True, "Refill & Withdraw Selesai!"
-        except Exception as e: return False, str(e)
-
-    # 6. FDR UPDATE
-    def run_fdr_update(self, f_manifest):
-        try:
-            df = load_data_from_info(f_manifest)
-            cols_to_drop = [6, 7, 8, 10, 11, 12, 17, 18, 19, 20, 21, 22]
-            existing = [df.columns[i] for i in cols_to_drop if i < len(df.columns)]
-            df_clean = df.drop(columns=existing).fillna("") if existing else df.copy().fillna("")
-
-            c_it, c_br = df_clean.iloc[:, 12], df_clean.iloc[:, 11]
-            df_fu = df_clean[c_it != ""].copy()
-            df_br = df_clean[(c_it == "") & (c_br != "")].copy()
-
-            self._df_fdr_manifest = df_clean
-            self._df_fdr_fu = df_fu
-            self.fdr_metrics.set({"total": len(df_clean), "fu": len(df_fu), "sisa": len(df_clean) - len(df_fu)})
-            self.fdr_done.set(True)
-            return True, "FDR Update Berhasil!"
-        except Exception as e: return False, str(e)
-
-    # 7. PERCENTAGE DISPLAY
-    def run_percentage_display(self, f_stock):
-        try:
-            df = load_data_from_info(f_stock)
-            col_b, col_s, col_q, col_d = df.columns[1], df.columns[2], df.columns[9], df.columns[4]
-            df[col_q] = pd.to_numeric(df[col_q], errors='coerce').fillna(0)
-            df['ARTICLE'] = df[col_d].astype(str).apply(lambda x: x.split(' ')[0])
-
-            excl = "OFFLINE|ONLINE|AMP|MARKOM|DEFECT|REJECT|STAGING|STAGGING|KARANTINA|EVENT|BANDING|INB|OUT|PUTAWAY"
-            df_clean = df[~df[col_b].astype(str).str.upper().str.contains(excl, regex=True, na=False)]
-
-            toko_arts = set(df_clean[df_clean[col_b].astype(str).str.upper().str.contains('TOKO|DISPLAY', regex=True, na=False) & (df_clean[col_q] > 0)]['ARTICLE'].unique())
-            gudang_df = df_clean[~df_clean[col_b].astype(str).str.upper().str.contains('TOKO|DISPLAY', regex=True, na=False) & (df_clean[col_q] > 0)]
-            need_display = gudang_df[~gudang_df['ARTICLE'].isin(toko_arts)].drop_duplicates('ARTICLE')
-
-            self._df_disp_detail = need_display[['ARTICLE', col_s, col_d, col_b, col_q]].rename(columns={col_s: 'SKU', col_d: 'Deskripsi', col_b: 'Bin Lokasi', col_q: 'Qty'})
-            self.disp_ctrl_metrics.set({"total_art": len(toko_arts) + len(need_display), "on_display": len(toko_arts), "need_display": len(need_display), "need_gudang": len(need_display)})
-            self.disp_ctrl_done.set(True)
-            return True, "Analisis Display Selesai!"
-        except Exception as e: return False, str(e)
