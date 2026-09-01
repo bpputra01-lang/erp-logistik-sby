@@ -2171,32 +2171,32 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         yield buf.getvalue()
 
-# ==========================================================================
-# CROSS CHECK REAL & SYSTEM CONTROLLER & HANDLERS (PERSIS COMPARE SYSTEM)
-# ==========================================================================
-@render.ui
-def cross_check_action_btn_ui():
-    f1 = input.uploader_crs_sys() if "uploader_crs_sys" in input else None
-    f2 = input.uploader_crs_real() if "uploader_crs_real" in input else None
+    # ==========================================================================
+    # CROSS CHECK REAL & SYSTEM CONTROLLER & HANDLERS (PERSIS COMPARE SYSTEM)
+    # ==========================================================================
+    @render.ui
+    def cross_check_action_btn_ui():
+        f1 = input.uploader_crs_sys() if "uploader_crs_sys" in input else None
+        f2 = input.uploader_crs_real() if "uploader_crs_real" in input else None
 
-    if (f1 and len(f1) > 0) and (f2 and len(f2) > 0):
+        if (f1 and len(f1) > 0) and (f2 and len(f2) > 0):
+            return ui.div(
+                ui.tags.button(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "RUN MATCHING PROCESS"),
+                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_cross_check', Math.random(), {priority: 'event'});",
+                    class_="btn-red-gradient"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+            )
         return ui.div(
             ui.tags.button(
-                ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "RUN MATCHING PROCESS"),
-                onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_cross_check', Math.random(), {priority: 'event'});",
-                class_="btn-red-gradient"
+                ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"),
+                "UPLOAD KEDUA FILE UNTUK MEMULAI",
+                disabled=True,
+                class_="btn-locked"
             ),
             style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
         )
-    return ui.div(
-        ui.tags.button(
-            ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"),
-            "UPLOAD KEDUA FILE UNTUK MEMULAI",
-            disabled=True,
-            class_="btn-locked"
-        ),
-        style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
-    )
 
     @reactive.Effect
     @reactive.event(input.btn_run_cross_check)
