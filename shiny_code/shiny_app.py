@@ -16,14 +16,34 @@ import config
 import state
 from state import AppState, active_users
 
-# 4. Import komponen UI dari view.py (PASTIKAN TANPA 's')
+# 4. Import komponen UI dari views.py
 from views import (
+    # Komponen Dasar & Modal
     CUSTOM_HEAD, static_loading_spinner, success_modal, error_modal,
     render_clean_table, metric_box, dark_metric_box, BRANCH_BIN_MAPPING, 
-    custom_uploader_box, compare_system_view, stock_minus_view, stock_opname_view,
-    putaway_view, main_dashboard_view, sidebar, ongkir_tab2_view, compare_rto_view, 
-    justification_so_view, cycle_count_view, login_page, ppa_audit_view, 
-    cycle_count_analyzer_view, global_header, po_receiving_view, refill_toko_view, rto_decision_view, create_ui
+    custom_uploader_box, sidebar, login_page, global_header, create_ui,
+
+    # 10 Menu Awal Anda
+    main_dashboard_view, ongkir_tab2_view, stock_minus_view, putaway_view, 
+    compare_system_view, cycle_count_view, ppa_audit_view, 
+    cycle_count_analyzer_view, compare_rto_view, stock_opname_view, 
+    justification_so_view,
+
+    # 14 Menu Baru Lengkap
+    po_receiving_view,
+    penerimaan_rto_view,
+    scan_out_view,
+    refill_overstock_view,
+    balancing_stock_view,
+    fl_request_view,
+    refill_toko_view,
+    rto_decision_view,
+    match_karantina_view,
+    koli_consolidation_view,
+    stock_allocation_view,
+    refill_withdraw_view,
+    fdr_update_view,
+    percentage_display_view
 )
 
 
