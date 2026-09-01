@@ -209,6 +209,21 @@ CUSTOM_HEAD = ui.head_content(
                 c.scrollTop = window._lockedScrollPos;
             }
         });
+        // FUNGSI ROUTING GLOBAL: HAPUS index.html & PASANG HASH MENU
+        window.setMenuRoute = function(menuName, slug) {
+            try {
+                let basePath = window.location.pathname.replace(/index\.html$/, '');
+                if (!basePath.endsWith('/')) basePath += '/';
+                if (window.history.pushState) {
+                    window.history.pushState(null, '', basePath + '#' + slug);
+                } else {
+                    window.location.hash = '#' + slug;
+                }
+            } catch(e) {
+                window.location.hash = '#' + slug;
+            }
+            Shiny.setInputValue('select_menu_item', menuName, {priority: 'event'});
+        };
 
         // --- 6. SINKRONISASI URL ROUTING MENU OTOMATIS ---
         window.updateUrlMenu = function(menuName) {
@@ -1015,27 +1030,21 @@ def physical_inventory_list_view(state: AppState):
         dynamic_body,
         style="width: 100%; padding: 1rem;"
     )
+
+
 def menu_item(label: str, target_menu: str, current_menu: str):
     import re
     is_active = (current_menu == target_menu)
     bg_style = "background: linear-gradient(135deg, #E50914 0%, #B20710 100%); color: #FFFFFF; font-weight: 700; box-shadow: 0 4px 12px rgba(229, 9, 20, 0.4);" if is_active else "background: transparent; color: #CBD5E0; font-weight: 500;"
     
-    # 1. Buat slug URL bersih
     slug = re.sub(r'[^a-zA-Z0-9]+', '-', target_menu).strip('-').lower()
     
-    # 2. Hapus kata 'index.html' dan ganti URL langsung ke /#slug
-    onclick_action = f"""
-        if (window.history.pushState) {{
-            window.history.pushState(null, null, '#{slug}');
-        }} else {{
-            window.location.hash = '#{slug}';
-        }}
-        Shiny.setInputValue('select_menu_item', '{target_menu}', {{priority: 'event'}});
-    """
+    # Panggil fungsi 1 baris rapat agar browser mengeksekusinya seketika
+    onclick_js = f"window.setMenuRoute('{target_menu}', '{slug}');"
     
     return ui.tags.button(
         label, 
-        onclick=onclick_action, 
+        onclick=onclick_js, 
         style=f"width: 100%; text-align: left; padding: 0.5rem 0.75rem; margin-bottom: 3px; border-radius: 6px; font-size: 0.85rem; border: none; cursor: pointer; justify-content: flex-start; transition: all 0.2s ease; {bg_style}"
     )
 
