@@ -75,13 +75,12 @@ def server(input: Inputs, output: Outputs, session: Session):
     def global_error_modal_ui():
         return error_modal(state.show_error_modal(), state.error_modal_message())
 
+   # ✅ GANTI DENGAN INI (Hanya 1 fungsi + auto load jika kosong):
     @render.ui
     def ongkir_tab2_dynamic_ui():
-        return ongkir_tab2_view(state)
-
-    # Authentication & Navigation
-    @render.ui
-    def ongkir_tab2_dynamic_ui():
+        # Jika data di state masih kosong, otomatis tarik dari Supabase sekarang juga:
+        if not state.data_list():
+            state.load_ongkir_data()
         return ongkir_tab2_view(state)
 
     # Authentication & Navigation
