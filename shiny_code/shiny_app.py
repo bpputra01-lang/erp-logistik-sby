@@ -2518,15 +2518,11 @@ def server(input: Inputs, output: Outputs, session: Session):
             df['Harga (Rp)'] = df.apply(_hitung_harga_timbang, axis=1)
         return df
 
-    # =========================================================================
-    # 1. SERVER LOGIC: DATA TIMBANG ONGKIR (KEBAL ERROR & 100% PERSIS STREAMLIT)
-    # =========================================================================
+   def timbang_ongkir_server(input, output, session, state: AppState):
+    # Trigger reaktif untuk reload otomatis saat simpan/hapus
+    reload_trigger = reactive.Value(0)
 
-def timbang_ongkir_server(input, output, session, state: AppState):
-    # Trigger reaktif untuk auto-refresh tabel/metrik setelah save/delete
-    refresh_trigger = reactive.Value(0)
-
-    # A. SIMPAN DATA MANUAL KE SUPABASE LAMA
+    # 1. SIMPAN DATA MANUAL
     @reactive.Effect
     @reactive.event(input.btn_save_timbang)
     def _save_timbang():
@@ -2534,20 +2530,21 @@ def timbang_ongkir_server(input, output, session, state: AppState):
             sb = config.get_supabase_old()
             now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             sb.table("timbang_kolian").insert({
-                "ekspedisi": str(input.tb_ekspedisi()).upper().strip(),
-                "jenis_pengiriman": str(input.tb_jenis()).strip(),
-                "pengiriman_dari": str(input.tb_dari()).upper().strip(),
-                "pengiriman_ke": str(input.tb_ke()).upper().strip(),
-                "total_koli": int(input.tb_koli()),
-                "berat_total_timbang": float(input.tb_berat()),
+                "ekspedisi": str(input.tb_ekspedisi() or "").upper().strip(),
+                "jenis_pengiriman": str(input.tb_jenis() or "").strip(),
+                "pengiriman_dari": str(input.tb_dari() or "").upper().strip(),
+                "pengiriman_ke": str(input.tb_ke() or "").upper().strip(),
+                "total_koli": int(input.tb_koli() or 1),
+                "berat_total_timbang": float(input.tb_berat() or 0.0),
                 "created_at": now_str
             }).execute()
+            reload_trigger.set(reload_trigger() + 1)
             state.show_success_modal.set(True)
         except Exception as e:
             state.error_modal_message.set(f"Gagal simpan data: {e}")
             state.show_error_modal.set(True)
 
-    # B. HAPUS DATA SATUAN PER BARIS DARI TABEL
+    # 2. HAPUS DATA SATUAN PER BARIS
     @reactive.Effect
     @reactive.event(input.btn_delete_timbang_single)
     def _delete_timbang_single():
@@ -2557,43 +2554,40 @@ def timbang_ongkir_server(input, output, session, state: AppState):
         try:
             sb = config.get_supabase_old()
             sb.table("timbang_kolian").delete().eq("id", target_id).execute()
-            # Trigger refresh dengan update filter state
-            current_flt = state.timbang_filter_periode() or "ALL"
-            state.timbang_filter_periode.set(current_flt)
+            reload_trigger.set(reload_trigger() + 1)
         except Exception as e:
             state.error_modal_message.set(f"Gagal menghapus data: {e}")
             state.show_error_modal.set(True)
 
-    # C. GANTI FILTER PERIODE
+    # 3. GANTI FILTER PERIODE
     @reactive.Effect
     @reactive.event(input.change_filter_timbang_periode)
     def _chg_flt_timbang():
         state.timbang_filter_periode.set(str(input.change_filter_timbang_periode()))
 
-    # D. HELPER: 4 RUMUS TARIF HARGA
+    # 4. HELPER HITUNG HARGA
     def _hitung_harga_timbang(row):
         try:
             eksp = str(row.get('ekspedisi', '') or '').upper()
             tujuan = str(row.get('pengiriman_ke', '') or '').upper()
-            koli = pd.to_numeric(row.get('total_koli', 0), errors='coerce')
-            koli = 0.0 if pd.isna(koli) else float(koli)
-            berat = pd.to_numeric(row.get('berat_total_timbang', 0), errors='coerce')
-            berat = 0.0 if pd.isna(berat) else float(berat)
+            koli = pd.to_numeric(row.get('total_koli', 0), errors='coerce') or 0.0
+            berat = pd.to_numeric(row.get('berat_total_timbang', 0), errors='coerce') or 0.0
 
             if "ACCESS" in eksp and "SEMARANG" in tujuan:
-                return koli * 40000.0 * 3.2
+                return float(koli) * 40000.0 * 3.2
             elif "ACCESS" in eksp and "HUB JAKARTA" in tujuan:
-                return berat * 2500.0 * 3.2
+                return float(berat) * 2500.0 * 3.2
             elif "ADEX" in eksp and ("SEMARANG" in tujuan or "MALANG" in tujuan):
-                return berat * 1000.0 * 3.2
+                return float(berat) * 1000.0 * 3.2
             elif "ADEX" in eksp and "HUB JAKARTA" in tujuan:
-                return berat * 2000.0 * 3.2
+                return float(berat) * 2000.0 * 3.2
             return 0.0
         except Exception:
             return 0.0
 
-    # E. HELPER: TARIK DATA + FILTER PERIODE (TERMASUK BULAN LALU)
+    # 5. HELPER TARIK DATA SUPABASE
     def _get_filtered_timbang_data():
+        _ = reload_trigger() # Membaca dependency reactive
         try:
             sb = config.get_supabase_old()
             res = sb.table("timbang_kolian").select("*").execute()
@@ -2602,30 +2596,22 @@ def timbang_ongkir_server(input, output, session, state: AppState):
                 return pd.DataFrame()
 
             df = pd.DataFrame(data)
-
-            # Hitung Estimasi Harga
             df['Estimasi Harga'] = df.apply(_hitung_harga_timbang, axis=1)
 
-            # Format Tanggal & Filter
             if "created_at" in df.columns:
                 df['created_at_dt'] = pd.to_datetime(df['created_at'], errors='coerce')
                 df = df.sort_values(by="created_at_dt", ascending=False).reset_index(drop=True)
 
                 flt = str(state.timbang_filter_periode() or "ALL").upper()
                 now_dt = datetime.now()
-                
+
                 if flt == "TODAY":
                     df = df[df['created_at_dt'].dt.date == now_dt.date()]
                 elif flt == "MONTH":
                     df = df[(df['created_at_dt'].dt.year == now_dt.year) & (df['created_at_dt'].dt.month == now_dt.month)]
                 elif flt == "PAST_MONTH":
-                    # Hitung bulan lalu & tangani jika Januari -> mundur ke Desember tahun sebelumnya
-                    if now_dt.month == 1:
-                        past_year = now_dt.year - 1
-                        past_month = 12
-                    else:
-                        past_year = now_dt.year
-                        past_month = now_dt.month - 1
+                    past_year = now_dt.year - 1 if now_dt.month == 1 else now_dt.year
+                    past_month = 12 if now_dt.month == 1 else now_dt.month - 1
                     df = df[(df['created_at_dt'].dt.year == past_year) & (df['created_at_dt'].dt.month == past_month)]
 
             return df
@@ -2633,7 +2619,8 @@ def timbang_ongkir_server(input, output, session, state: AppState):
             print(f"Error load timbang: {e}")
             return pd.DataFrame()
 
-    # F. RENDER 4 KOTAK METRIK
+    # 6. RENDER METRIK UI
+    @output
     @render.ui
     def timbang_ongkir_metrics_ui():
         df = _get_filtered_timbang_data()
@@ -2659,7 +2646,8 @@ def timbang_ongkir_server(input, output, session, state: AppState):
             style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;"
         )
 
-    # G. RENDER TABEL RIWAYAT DENGAN TOMBOL HAPUS PER BARIS
+    # 7. RENDER TABEL UI
+    @output
     @render.ui
     def timbang_ongkir_table_ui():
         df = _get_filtered_timbang_data()
@@ -2675,16 +2663,16 @@ def timbang_ongkir_server(input, output, session, state: AppState):
         display_df['Berat (Kg)'] = display_df['berat_total_timbang'].apply(lambda x: f"{float(x):,.2f} Kg" if pd.notna(x) else "-")
         display_df['Estimasi Harga (Rp)'] = display_df['Estimasi Harga'].apply(lambda x: f"Rp {float(x):,.0f}" if pd.notna(x) else "Rp 0")
 
-        # Tombol hapus satuan
+        # Tombol aksi Hapus
         display_df['Aksi'] = display_df['id'].apply(
-            lambda x: f'<button type="button" onclick="if(confirm(\'Hapus data baris ID: {x}?\')) {{ Shiny.setInputValue(\'btn_delete_timbang_single\', \'{x}\', {{priority: \'event\'}}); }}" style="background: #FFF5F5; color: #E53E3E; border: 1px solid #FEB2B2; padding: 3px 8px; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer;">🗑️ Hapus</button>'
+            lambda x: f'<button type="button" onclick="if(confirm(\'Hapus baris data ID {x}?\')) {{ Shiny.setInputValue(\'btn_delete_timbang_single\', \'{x}\', {{priority: \'event\'}}); }}" style="background: #FFF5F5; color: #E53E3E; border: 1px solid #FEB2B2; padding: 3px 8px; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer;">🗑️ Hapus</button>'
         )
 
         cols_show = ['id', 'Waktu', 'ekspedisi', 'jenis_pengiriman', 'total_koli', 'Berat (Kg)', 'pengiriman_dari', 'pengiriman_ke', 'Estimasi Harga (Rp)', 'Aksi']
         final_cols = [c for c in cols_show if c in display_df.columns]
 
         return render_clean_table(final_cols, display_df[final_cols].fillna("").astype(str).values.tolist(), "tbl_timbang_fast")
-
+        
     # 2. REPORTING & PIC
     current_pic = reactive.Value("VERREL & GALIH")
 

@@ -1569,7 +1569,7 @@ def reporting_pic_view(state: AppState):
     )
 
 # ==============================================================================
-# VIEW & LOGIC: DATA TIMBANG ONGKIR
+# VIEW: DATA TIMBANG ONGKIR
 # ==============================================================================
 def timbang_ongkir_view(state: AppState):
     return ui.div(
@@ -1620,7 +1620,7 @@ def timbang_ongkir_view(state: AppState):
             ui.nav_panel(
                 "📊 METRIC MONITORING",
                 ui.div(
-                    # Baris Filter Tanggal & Tombol Hapus
+                    # Filter Periode
                     ui.div(
                         ui.div(
                             ui.span("📅 Filter Periode Data:", style="font-size: 13px; font-weight: 800; color: #111111; margin-right: 8px;"),
@@ -1628,7 +1628,7 @@ def timbang_ongkir_view(state: AppState):
                                 ui.tags.option("All Time (Semua Data)", value="ALL", selected=True),
                                 ui.tags.option("Today (Hari Ini)", value="TODAY"),
                                 ui.tags.option("This Month (Bulan Ini)", value="MONTH"),
-                                ui.tags.option("Past Month (Bulan Lalu)", value="PAST_MONTH"),  # <-- OPSI FILTER BARU
+                                ui.tags.option("Past Month (Bulan Lalu)", value="PAST_MONTH"),
                                 id="select_filter_timbang",
                                 onchange="Shiny.setInputValue('change_filter_timbang_periode', this.value, {priority: 'event'})",
                                 style="background: white; border: 2px solid #1A202C; border-radius: 8px; font-weight: 800; padding: 6px 12px; width: 230px; cursor: pointer;"
@@ -1638,11 +1638,11 @@ def timbang_ongkir_view(state: AppState):
                         ui.output_ui("timbang_delete_selected_btn_ui"),
                         style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 10px;"
                     ),
-                    # 4 Kotak Metrik
+                    # Metrik
                     ui.output_ui("timbang_ongkir_metrics_ui"),
                     ui.hr(style="margin: 1.5rem 0; border-color: #E2E8F0;"),
                     ui.h4("📋 LIST DATA TIMBANG", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
-                    # Tabel Riwayat
+                    # Tabel
                     ui.output_ui("timbang_ongkir_table_ui"),
                     style="padding: 1.25rem;"
                 )
@@ -1650,60 +1650,6 @@ def timbang_ongkir_view(state: AppState):
         ),
         style="width: 100%; padding: 1rem;"
     )
-
-    
-    # F. RENDER 4 KOTAK METRIK
-    @render.ui
-    def timbang_ongkir_metrics_ui():
-        df = _get_filtered_timbang_data()
-        if df.empty:
-            return ui.div(
-                dark_metric_box("📦 TOTAL KOLI", "0", "#FFD700"),
-                dark_metric_box("⚖️ TOTAL BERAT", "0.00 Kg", "#FFD700"),
-                dark_metric_box("💰 TOTAL BIAYA", "Rp 0", "#00FF66"),
-                dark_metric_box("📝 TOTAL DATA", "0", "#FFD700"),
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;"
-            )
-
-        tot_koli = int(pd.to_numeric(df.get('total_koli', 0), errors='coerce').fillna(0).sum())
-        tot_berat = float(pd.to_numeric(df.get('berat_total_timbang', 0), errors='coerce').fillna(0).sum())
-        tot_harga = float(pd.to_numeric(df.get('Estimasi Harga', 0), errors='coerce').fillna(0).sum())
-        tot_data = len(df)
-
-        return ui.div(
-            dark_metric_box("📦 TOTAL KOLI", f"{tot_koli:,}", "#FFD700"),
-            dark_metric_box("⚖️ TOTAL BERAT", f"{tot_berat:,.2f} Kg", "#FFD700"),
-            dark_metric_box("💰 TOTAL BIAYA", f"Rp {tot_harga:,.0f}", "#00FF66"),
-            dark_metric_box("📝 TOTAL DATA", f"{tot_data:,}", "#FFD700"),
-            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;"
-        )
-
-    # G. RENDER TABEL RIWAYAT DENGAN TOMBOL HAPUS PER BARIS
-    @render.ui
-    def timbang_ongkir_table_ui():
-        df = _get_filtered_timbang_data()
-        if df.empty:
-            return ui.div("💡 Belum ada data timbang masuk untuk periode ini.", style="text-align: center; padding: 2rem; color: #718096; font-style: italic;")
-
-        display_df = df.copy()
-        if 'created_at_dt' in display_df.columns:
-            display_df['Waktu'] = display_df['created_at_dt'].dt.strftime('%d-%m-%Y %H:%M')
-        else:
-            display_df['Waktu'] = display_df.get('created_at', '')
-
-        display_df['Berat (Kg)'] = display_df['berat_total_timbang'].apply(lambda x: f"{float(x):,.2f} Kg" if pd.notna(x) else "-")
-        display_df['Estimasi Harga (Rp)'] = display_df['Estimasi Harga'].apply(lambda x: f"Rp {float(x):,.0f}" if pd.notna(x) else "Rp 0")
-
-        # Tombol hapus satuan
-        display_df['Aksi'] = display_df['id'].apply(
-            lambda x: f'<button type="button" onclick="if(confirm(\'Hapus data baris ID: {x}?\')) {{ Shiny.setInputValue(\'btn_delete_timbang_single\', \'{x}\', {{priority: \'event\'}}); }}" style="background: #FFF5F5; color: #E53E3E; border: 1px solid #FEB2B2; padding: 3px 8px; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer;">🗑️ Hapus</button>'
-        )
-
-        cols_show = ['id', 'Waktu', 'ekspedisi', 'jenis_pengiriman', 'total_koli', 'Berat (Kg)', 'pengiriman_dari', 'pengiriman_ke', 'Estimasi Harga (Rp)', 'Aksi']
-        final_cols = [c for c in cols_show if c in display_df.columns]
-
-        return render_clean_table(final_cols, display_df[final_cols].fillna("").astype(str).values.tolist(), "tbl_timbang_fast")
-
 # Navigation Components
 def menu_item(label: str, target_menu: str, current_menu: str):
     is_active = (current_menu == target_menu)
