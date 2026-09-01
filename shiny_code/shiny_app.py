@@ -677,6 +677,259 @@ def server(input: Inputs, output: Outputs, session: Session):
         else:
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
+    # --- RETUR OUT: UPLOAD & AUTO-SAVE KE SUPABASE LAMA ---
+    @reactive.Effect
+    @reactive.event(input.btn_save_retur_cloud)
+    def _save_retur():
+        f = input.uploader_retur_file()
+        if not f:
+            state.error_modal_message.set("Pilih file Retur terlebih dahulu!")
+            state.show_error_modal.set(True)
+            return
+        try:
+            df = config.load_data_from_info(f)
+            df.columns = [str(c).strip() for c in df.columns]
+            req_cols = {'Identify': 'identify', 'BIN': 'bin', 'SKU': 'sku', 'BRAND': 'brand', 'ITEM NAME': 'item_name', 'VARIANT': 'variant', 'SUB KATEGORI': 'sub_kategori', 'Harga Beli': 'harga_beli', 'Harga Jual': 'harga_jual', 'QTY SYSTEM': 'qty_system', 'QTY SO': 'qty_so'}
+            
+            df_save = df[[c for c in req_cols.keys() if c in df.columns]].copy()
+            df_save.rename(columns=req_cols, inplace=True)
+            df_save['tanggal'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            records = df_save.fillna("").to_dict(orient='records')
+            
+            sb = config.get_supabase_old()
+            sb.table("retur_out_v3").insert(records).execute()
+            state.show_success_modal.set(True)
+        except Exception as e:
+            state.error_modal_message.set(f"Gagal upload retur: {e}")
+            state.show_error_modal.set(True)
+
+    @render.ui
+    def retur_out_metrics_ui():
+        try:
+            sb = config.get_supabase_old()
+            res = sb.table("retur_out_v3").select("*").execute()
+            df = pd.DataFrame(res.data) if res and res.data else pd.DataFrame()
+            if df.empty: return ui.div()
+            
+            df['qty_system'] = pd.to_numeric(df.get('qty_system', 0), errors='coerce').fillna(0)
+            df['harga_beli'] = pd.to_numeric(df.get('harga_beli', 0), errors='coerce').fillna(0)
+            
+            tot_sku = df['sku'].nunique() if 'sku' in df.columns else 0
+            tot_qty = int(df['qty_system'].sum())
+            tot_val = float((df['qty_system'] * df['harga_beli']).sum())
+            
+            return ui.div(
+                dark_metric_box("🗄️ TOTAL SKU", f"{tot_sku:,}", "#8b5cf6"),
+                dark_metric_box("📦 TOTAL QTY", f"{tot_qty:,}", "#10b981"),
+                dark_metric_box("💰 TOTAL VALUE", f"Rp {tot_val:,.0f}", "#f59e0b"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;"
+            )
+        except Exception: return ui.div()
+
+    @render.ui
+    def retur_out_table_ui():
+        try:
+            sb = config.get_supabase_old()
+            res = sb.table("retur_out_v3").select("*").order("tanggal", desc=True).execute()
+            df = pd.DataFrame(res.data) if res and res.data else pd.DataFrame()
+            if df.empty: return ui.div("Belum ada data di tabel retur_out_v3.")
+            return render_clean_table(df.columns.tolist(), df.fillna("").astype(str).values.tolist(), "tbl_retur_out")
+        except Exception as e: return ui.div(f"Error load data: {e}")
+    
+    # --- LOGISTIC SCHEDULE SERVER ENGINE ---
+    @reactive.Effect
+    @reactive.event(input.btn_add_karyawan)
+    def _add_staff():
+        nm = str(input.sc_nama_karyawan()).upper().strip()
+        if nm:
+            try:
+                sb = config.get_supabase_old()
+                sb.table("karyawan").insert({"nama": nm, "posisi": str(input.sc_posisi()), "tipe": str(input.sc_tipe())}).execute()
+                state.show_success_modal.set(True)
+            except Exception as e:
+                state.error_modal_message.set(f"Gagal: {e}"); state.show_error_modal.set(True)
+
+    @render.ui
+    def schedule_libur_form_ui():
+        try:
+            sb = config.get_supabase_old()
+            res_k = sb.table("karyawan").select("nama").execute()
+            names = [r['nama'] for r in res_k.data] if res_k and res_k.data else ["-"]
+            return ui.div(
+                ui.div(
+                    ui.input_select("sc_libur_nama", "Pilih Karyawan:", choices=names),
+                    ui.input_date("sc_libur_tgl", "Tanggal Libur:", value=datetime.now().strftime("%Y-%m-%d")),
+                    ui.input_select("sc_libur_jenis", "Jenis:", choices=["LIBUR", "CUTI", "LPH"]),
+                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;"
+                ),
+                ui.tags.button("SUBMIT OFF", onclick="Shiny.setInputValue('btn_submit_libur', Math.random(), {priority: 'event'})", class_="btn-red-gradient", style="margin-top: 10px;")
+            )
+        except Exception: return ui.div()
+
+    @reactive.Effect
+    @reactive.event(input.btn_submit_libur)
+    def _sub_libur():
+        try:
+            sb = config.get_supabase_old()
+            sb.table("libur_request").insert({"nama": str(input.sc_libur_nama()), "tanggal": str(input.sc_libur_tgl()), "jenis": str(input.sc_libur_jenis())}).execute()
+            state.show_success_modal.set(True)
+        except Exception as e:
+            state.error_modal_message.set(f"Gagal: {e}"); state.show_error_modal.set(True)
+
+    @render.ui
+    def schedule_shift3_form_ui():
+        try:
+            sb = config.get_supabase_old()
+            res_k = sb.table("karyawan").select("*").execute()
+            names = [r['nama'] for r in res_k.data] if res_k and res_k.data else ["-"]
+            return ui.div(
+                ui.div(
+                    ui.input_select("sc_s3_nama", "Pilih Nama Tim:", choices=names),
+                    ui.input_date("sc_s3_tgl", "Tanggal Masuk Shift 3:", value=datetime.now().strftime("%Y-%m-%d")),
+                    style="display: flex; gap: 1rem;"
+                ),
+                ui.tags.button("SUBMIT PLOT SHIFT 3", onclick="Shiny.setInputValue('btn_submit_s3', Math.random(), {priority: 'event'})", class_="btn-red-gradient", style="margin-top: 10px;")
+            )
+        except Exception: return ui.div()
+
+    @reactive.Effect
+    @reactive.event(input.btn_submit_s3)
+    def _sub_s3():
+        try:
+            sb = config.get_supabase_old()
+            sb.table("plot_shift3").insert({"nama": str(input.sc_s3_nama()), "tanggal": str(input.sc_s3_tgl()), "posisi": "SO", "tipe": "Full-Time"}).execute()
+            state.show_success_modal.set(True)
+        except Exception as e:
+            state.error_modal_message.set(f"Gagal: {e}"); state.show_error_modal.set(True)
+
+    # --- ENGINE GENERATOR JADWAL JEZ SBY PERSIS STREAMLIT ---
+    df_schedule_res_full = reactive.Value(pd.DataFrame())
+
+    @reactive.Effect
+    @reactive.event(input.btn_run_schedule_full)
+    def _run_sched_engine():
+        try:
+            import random
+            start_date_val = pd.to_datetime(input.sc_start_monday()).date()
+            dates_real = [(start_date_val + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
+            day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
+            
+            sb = config.get_supabase_old()
+            karyawan_list = sb.table("karyawan").select("*").execute().data or []
+            df_libur = pd.DataFrame(sb.table("libur_request").select("*").execute().data or [])
+            df_manual_s3 = pd.DataFrame(sb.table("plot_shift3").select("*").execute().data or [])
+
+            base_roles = [
+                ("SHIFT 0", "WF-PICKER"), ("SHIFT 0", "WF-ADMIN"),
+                ("SHIFT 1", "LOG-ADMIN"), ("SHIFT 1", "LOG-LOADER"), ("SHIFT 1", "LOG-STORE"), ("SHIFT 1", "WF-ADMIN"), ("SHIFT 1", "WF-PICKER"),
+                ("SHIFT 2", "LOG-ADMIN"), ("SHIFT 2", "LOG-LOADER"), ("SHIFT 2", "LOG-STORE"), ("SHIFT 2", "WF-ADMIN"), ("SHIFT 2", "WF-PICKER"), ("SHIFT 2", "SPV"),
+                ("SHIFT 3", "SO")
+            ]
+
+            storage = {d: {f"{s} - {r}": [] for s, r in base_roles} for d in day_names}
+            weekly_counter = {k['nama']: 0 for k in karyawan_list}
+            double_day_count = {k['nama']: 0 for k in karyawan_list}
+            for k in karyawan_list: k['target_fix'] = 9 if k.get('tipe') == "Part-Full" else 6
+
+            def get_active_shifts(nama, d_name):
+                return [slot.split(" - ")[0] for slot in storage[d_name] if any(nama in n for n in storage[d_name][slot])]
+
+            # 1. Plot Shift 3
+            for day_name, tgl_str in zip(day_names, dates_real):
+                if not df_manual_s3.empty and 'tanggal' in df_manual_s3.columns:
+                    names_manual = df_manual_s3[df_manual_s3['tanggal'] == tgl_str]['nama'].tolist()
+                    if names_manual:
+                        storage[day_name]["SHIFT 3 - SO"] = names_manual
+                        for nm in names_manual:
+                            if nm in weekly_counter: weekly_counter[nm] += 1
+
+            # 2. Loop Phase Target
+            for phase in ["TARGET_1_ORANG", "TARGET_2_ORANG", "SISA_JATAH"]:
+                for day_name in day_names:
+                    tgl_ini = dates_real[day_names.index(day_name)]
+                    for shf_jam, shf_role in base_roles:
+                        if shf_jam == "SHIFT 3": continue
+                        slot_key = f"{shf_jam} - {shf_role}"
+                        current_fill = len(storage[day_name][slot_key])
+                        if phase == "TARGET_1_ORANG" and current_fill >= 1: continue
+                        if phase == "TARGET_2_ORANG" and current_fill >= 2: continue
+
+                        potential = [k for k in karyawan_list if weekly_counter[k['nama']] < k['target_fix'] and not get_active_shifts(k['nama'], day_name)]
+                        if potential:
+                            random.shuffle(potential)
+                            pick = potential[0]['nama']
+                            storage[day_name][slot_key].append(pick)
+                            weekly_counter[pick] += 1
+
+            final_table = []
+            for shf_jam, shf_role in base_roles:
+                slot_key = f"{shf_jam} - {shf_role}"
+                max_r = max([len(storage[d][slot_key]) for d in day_names])
+                for r in range(max(1, max_r)):
+                    row = {"SHIFT - ROLE": slot_key}
+                    for d in day_names:
+                        names = storage[d][slot_key]
+                        row[d] = names[r] if r < len(names) else ""
+                    final_table.append(row)
+
+            df_schedule_res_full.set(pd.DataFrame(final_table))
+            state.show_success_modal.set(True)
+        except Exception as e:
+            state.error_modal_message.set(f"Gagal: {e}"); state.show_error_modal.set(True)
+
+    @render.ui
+    def schedule_final_table_ui():
+        df = df_schedule_res_full()
+        if df.empty: return ui.div("Klik tombol RUN JADWAL SHIFT di atas untuk memproses jadwal.")
+        return render_clean_table(df.columns.tolist(), df.values.tolist(), "tbl_sched_final")
+    
+    # --- SUBMISSION PENGAJUAN REJECT (SUPABASE LAMA) ---
+    @reactive.Effect
+    @reactive.event(input.btn_sub_pengajuan_reject)
+    def _sub_pengajuan():
+        try:
+            sb = config.get_supabase_old()
+            now_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            sb.table("submissions").insert({
+                "timestamp": now_ts, "nama_tim": str(input.pr_nama()), "bin_asal": str(input.pr_bin_asal()),
+                "sku": str(input.pr_sku()).upper().strip(), "article_name": str(input.pr_article()),
+                "size": str(input.pr_size()), "keterangan": str(input.pr_ket()),
+                "status": 1, "cabang": str(input.pr_cabang())
+            }).execute()
+            state.show_success_modal.set(True)
+        except Exception as e:
+            state.error_modal_message.set(f"Gagal simpan pengajuan: {e}"); state.show_error_modal.set(True)
+
+    @render.ui
+    def pengajuan_reject_history_ui():
+        try:
+            sb = config.get_supabase_old()
+            res = sb.table("submissions").select("*").order("id", desc=True).execute()
+            df = pd.DataFrame(res.data) if res and res.data else pd.DataFrame()
+            if df.empty: return ui.div("Belum ada data pengajuan di database.")
+            return render_clean_table(df.columns.tolist(), df.fillna("").astype(str).values.tolist(), "tbl_sub_hist")
+        except Exception as e: return ui.div(f"Error: {e}")
+
+    # --- CROSS-CHECK MATCHING KIRI KANAN ---
+    @render.ui
+    def reject_match_kiri_kanan_ui():
+        try:
+            sb = config.get_supabase_old()
+            res = sb.table("reject_list").select("*").eq("status", "PENDING").execute()
+            df = pd.DataFrame(res.data) if res and res.data else pd.DataFrame()
+            if df.empty: return ui.div("✅ Tidak ditemukan Reject/Defect Match (Semua aman).")
+            
+            # Cari Pasangan Kiri-Kanan
+            def check_kiri_kanan(grp):
+                cats = grp['kategori'].astype(str).str.lower().values
+                return any('kiri' in c for c in cats) and any('kanan' in c for c in cats)
+            
+            valid_skus = df.groupby('sku').filter(check_kiri_kanan)['sku'].unique() if 'kategori' in df.columns else []
+            df_m = df[df['sku'].isin(valid_skus)].copy() if len(valid_skus) > 0 else pd.DataFrame()
+            
+            if df_m.empty: return ui.div("Tidak ada pasangan SKU Kiri-Kanan yang match.")
+            return render_clean_table(df_m.columns.tolist(), df_m.fillna("").astype(str).values.tolist(), "tbl_match_res")
+        except Exception as e: return ui.div(f"Error matching: {e}")
 
     @reactive.Effect
     @reactive.event(input.toggle_row_id)

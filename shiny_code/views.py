@@ -1354,20 +1354,29 @@ def stock_tracking_view(state: AppState):
     )
 
 # ==============================================================================
-# VIEW: 2. LIST RETUR OUT (SUPABASE)
+# VIEW: LIST RETUR OUT (PERSIS STREAMLIT)
 # ==============================================================================
 def retur_out_view(state: AppState):
     return ui.div(
         ui.div(
-            ui.h4("📥 Upload File Retur Out ke Cloud Supabase", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
+            ui.h4("📦 Upload File Retur Out", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
             custom_uploader_box("uploader_retur_file", "Upload File Retur (Excel/CSV)"),
-            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-cloud-arrow-up", style="margin-right: 6px;"), "SIMPAN KE CLOUD"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_save_retur_cloud', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
+            ui.tags.button(
+                ui.tags.span(ui.tags.i(class_="fa-solid fa-cloud-arrow-up", style="margin-right: 6px;"), "SIMPAN KE CLOUD"),
+                onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_save_retur_cloud', Math.random(), {priority: 'event'});",
+                class_="btn-red-gradient"
+            ),
             style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
         ),
-        ui.output_ui("retur_out_table_ui"),
+        ui.output_ui("retur_out_metrics_ui"),
+        ui.hr(),
+        ui.div(
+            ui.h4("📜 Database History Retur Out", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
+            ui.output_ui("retur_out_table_ui"),
+            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
+        ),
         style="width: 100%; padding: 1rem;"
     )
-
 # ==============================================================================
 # VIEW: 3. PENGAJUAN MUTASI KARANTINA
 # ==============================================================================
@@ -1384,20 +1393,105 @@ def pengajuan_mutasi_view(state: AppState):
     )
 
 # ==============================================================================
-# VIEW: 4. PENGAJUAN REJECT/DEFECT
+# VIEW: PENGAJUAN REJECT/DEFECT (PERSIS STREAMLIT)
 # ==============================================================================
 def pengajuan_reject_view(state: AppState):
     return ui.div(
-        ui.div(
-            ui.h4("📋 Form Pengajuan Reject/Defect", style="font-size: 15px; font-weight: 800; margin-bottom: 0.75rem;"),
-            custom_uploader_box("uploader_reject_template", "Upload Excel Template Reject"),
-            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-paper-plane", style="margin-right: 6px;"), "KIRIM PENGAJUAN"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_submit_reject', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
-            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+        ui.navset_card_tab(
+            # TAB 1: FORM INPUT PENGAJUAN
+            ui.nav_panel(
+                "💻 Input Pengajuan",
+                ui.div(
+                    ui.h4("Form Pengajuan Reject/Defect", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 1rem;"),
+                    ui.div(
+                        ui.div(
+                            ui.input_text("pr_nama", "Nama Tim (Pengaju):", placeholder="Nama Anda...", width="100%"),
+                            ui.input_text("pr_bin_asal", "Bin Asal:", placeholder="Bin Asal...", width="100%"),
+                            ui.input_text("pr_sku", "SKU Item:", placeholder="SKU...", width="100%"),
+                            ui.input_select("pr_cabang", "Pilih Cabang:", choices=["SURABAYA", "SIDOARJO", "SEMARANG"], width="100%"),
+                            style="flex: 1; min-width: 250px;"
+                        ),
+                        ui.div(
+                            ui.input_text("pr_article", "Article Name:", placeholder="Nama Barang...", width="100%"),
+                            ui.input_text("pr_size", "Size:", placeholder="Ukuran...", width="100%"),
+                            ui.input_text_area("pr_ket", "Keterangan Kerusakan:", placeholder="Detail kerusakan...", width="100%"),
+                            style="flex: 1; min-width: 250px;"
+                        ),
+                        style="display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 1rem;"
+                    ),
+                    ui.tags.button(
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-paper-plane", style="margin-right: 6px;"), "SUBMIT REQUEST"),
+                        onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_sub_pengajuan_reject', Math.random(), {priority: 'event'});",
+                        class_="btn-red-gradient", style="width: 100%; height: 45px;"
+                    ),
+                    style="padding: 1.25rem;"
+                )
+            ),
+            # TAB 2: HISTORY & APPROVAL STATUS (3 CABANG)
+            ui.nav_panel(
+                "📑 History & Approval Status",
+                ui.div(
+                    ui.output_ui("pengajuan_reject_history_ui"),
+                    style="padding: 1.25rem;"
+                )
+            )
         ),
-        ui.output_ui("pengajuan_reject_history_ui"),
         style="width: 100%; padding: 1rem;"
     )
 
+# ==============================================================================
+# VIEW: REJECT/DEFECT LIST (LENGKAP 4 TAB PERSIS STREAMLIT)
+# ==============================================================================
+def reject_list_view(state: AppState):
+    return ui.div(
+        ui.navset_card_tab(
+            # TAB 1: ENTRY DATA (SINGLE & MASS IMPORT)
+            ui.nav_panel(
+                "📥 ENTRY DATA",
+                ui.div(
+                    ui.h4("➕ Upload Single Item", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
+                    ui.div(
+                        ui.div(
+                            ui.input_select("rj_cabang", "Lokasi Operasional:", choices=["SURABAYA", "SIDOARJO", "SEMARANG"], width="100%"),
+                            ui.input_text("rj_bin_awal", "BIN Awal:", placeholder="Contoh: GL1-DC", width="100%"),
+                            ui.input_select("rj_bin_tujuan", "BIN Tujuan:", choices=["REJECT DC", "DEFECT DC", "DEFECT STORE", "REJECT STORE"], width="100%"),
+                            ui.input_text("rj_sku", "SKU:", placeholder="SKU...", width="100%"),
+                            style="flex: 1; min-width: 250px;"
+                        ),
+                        ui.div(
+                            ui.input_text("rj_nama", "Nama Barang:", placeholder="Article...", width="100%"),
+                            ui.input_text("rj_size", "Size:", placeholder="Size...", width="100%"),
+                            ui.input_select("rj_kategori", "Kategori Defect:", choices=["D1", "D2", "D3", "D4", "R1", "R3", "R4", "HANYA SEBELAH KIRI", "HANYA SEBELAH KANAN", "BERBEDA ARTICLE", "BERBEDA SIZE"], width="100%"),
+                            ui.input_text_area("rj_ket", "Detail Kerusakan:", placeholder="Keterangan...", width="100%"),
+                            style="flex: 1; min-width: 250px;"
+                        ),
+                        style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;"
+                    ),
+                    ui.tags.button("📤 UPLOAD SINGLE LIST", onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_submit_single_reject', Math.random(), {priority: 'event'});", class_="btn-red-gradient", style="width: 100%; height: 45px;"),
+                    style="padding: 1.25rem;"
+                )
+            ),
+            # TAB 2: ANALYTICS DASHBOARD
+            ui.nav_panel(
+                "📊 ANALYTICS DASHBOARD",
+                ui.div(
+                    ui.output_ui("reject_list_metrics_ui"),
+                    ui.hr(),
+                    ui.output_ui("reject_list_table_ui"),
+                    style="padding: 1.25rem;"
+                )
+            ),
+            # TAB 3: CROSS-CHECK SKU MATCHING
+            ui.nav_panel(
+                "🔍 MATCH DEFECT/REJECT",
+                ui.div(
+                    ui.output_ui("reject_match_kiri_kanan_ui"),
+                    style="padding: 1.25rem;"
+                )
+            )
+        ),
+        style="width: 100%; padding: 1rem;"
+    )
 # ==============================================================================
 # VIEW: 5. REJECT/DEFECT LIST
 # ==============================================================================
@@ -1413,19 +1507,54 @@ def reject_list_view(state: AppState):
     )
 
 # ==============================================================================
-# VIEW: 6. LOGISTIC SCHEDULE
+# VIEW: LOGISTIC SCHEDULE (LENGKAP PERSIS STREAMLIT)
 # ==============================================================================
 def logistic_schedule_view(state: AppState):
     return ui.div(
-        ui.div(
-            ui.h4("📅 Generator Jadwal Shift Tim Logistik", style="font-size: 15px; font-weight: 800; margin-bottom: 0.75rem;"),
-            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-calendar-check", style="margin-right: 6px;"), "GENERATE JADWAL MINGGUAN"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_schedule', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
-            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+        ui.navset_card_tab(
+            # TAB 1: DATABASE TIM & DAY OFF
+            ui.nav_panel(
+                "👤 1. TIM & DAY OFF",
+                ui.div(
+                    ui.h4("➕ Tambah Anggota Tim", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
+                    ui.div(
+                        ui.input_text("sc_nama_karyawan", "Nama Lengkap:", placeholder="Ketik nama...", width="100%"),
+                        ui.input_select("sc_posisi", "Posisi/Role:", choices=["WF-PICKER", "WF-ADMIN", "LOG-ADMIN", "LOG-LOADER", "LOG-STORE", "LOG-SO", "WF-SO", "SPV"], width="100%"),
+                        ui.input_select("sc_tipe", "Tipe Kontrak:", choices=["Full-Time", "Part-Full", "Part-Time"], width="100%"),
+                        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;"
+                    ),
+                    ui.tags.button("💾 SIMPAN TIM", onclick="Shiny.setInputValue('btn_add_karyawan', Math.random(), {priority: 'event'})", class_="btn-red-gradient", style="margin-top: 10px; margin-bottom: 1.5rem;"),
+                    ui.hr(),
+                    ui.h4("🚫 Pengajuan Libur (Day Off)", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
+                    ui.output_ui("schedule_libur_form_ui"),
+                    style="padding: 1.25rem;"
+                )
+            ),
+            # TAB 2: PLOT SHIFT 3
+            ui.nav_panel(
+                "🌙 2. PLOT SHIFT 3 (SO)",
+                ui.div(
+                    ui.h4("🌙 Plot Khusus Shift 3 Stock Opname", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
+                    ui.output_ui("schedule_shift3_form_ui"),
+                    style="padding: 1.25rem;"
+                )
+            ),
+            # TAB 3: GENERATE JADWAL MINGGUAN
+            ui.nav_panel(
+                "📅 3. GENERATE JADWAL SHIFT",
+                ui.div(
+                    ui.div(
+                        ui.input_date("sc_start_monday", "Pilih Hari Senin Mulai Shift:", value=datetime.now().strftime("%Y-%m-%d")),
+                        ui.tags.button("▶️ RUN JADWAL SHIFT MINGGUAN", onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_schedule_full', Math.random(), {priority: 'event'});", class_="btn-red-gradient", style="height: 42px; margin-top: 24px;"),
+                        style="display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem;"
+                    ),
+                    ui.output_ui("schedule_final_table_ui"),
+                    style="padding: 1.25rem;"
+                )
+            )
         ),
-        ui.output_ui("schedule_table_ui"),
         style="width: 100%; padding: 1rem;"
     )
-
 # ==============================================================================
 # VIEW: 7. REPORTING & PIC
 # ==============================================================================
@@ -1452,7 +1581,7 @@ def timbang_ongkir_view(state: AppState):
         ui.output_ui("timbang_ongkir_table_ui"),
         style="width: 100%; padding: 1rem;"
     )
-    
+
 # Navigation Components
 def menu_item(label: str, target_menu: str, current_menu: str):
     is_active = (current_menu == target_menu)
