@@ -197,7 +197,14 @@ CUSTOM_HEAD = ui.head_content(
             }
         });
     """),
-
+// AUTO-DISMISS SPINNER BEGITU SHINY SELESAI PROSES
+        if (window.jQuery) {
+            $(document).on('shiny:idle shiny:value shiny:recalculated', function() {
+                document.body.classList.remove('process-running');
+                let spinner = document.getElementById('global_reflex_loading');
+                if (spinner) spinner.style.display = 'none';
+            });
+        }
     # --- 2. FONT AWESOME ICONS ---
     ui.tags.link(rel="stylesheet", href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"),
 
