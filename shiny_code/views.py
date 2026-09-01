@@ -26,11 +26,11 @@ def get_image_base64(filename):
     return f"./{filename}"
 
 # ==============================================================================
-# CSS & JAVASCRIPT ASSETS (LENGKAP DENGAN SMART SCROLL LOCK ANTI-LONCAT)
+# CSS & JAVASCRIPT ASSETS (PERBAIKAN TOTAL: ANTI-LONCAT & ZERO-GLITCH)
 # ==============================================================================
 
 CUSTOM_HEAD = ui.head_content(
-    # --- 1. SCRIPT UTAMA (PAGINASI, DRAG & DROP, & ZERO-GLITCH SCROLL) ---
+    # --- 1. SCRIPT UTAMA (PAGINASI, DRAG & DROP, & SCROLL LOCK SIDEBAR + LAYAR) ---
     ui.tags.script("""
         document.title = "ZKN WAREHOUSE ERP";
         let favicon = document.querySelector("link[rel~='icon']");
@@ -41,7 +41,109 @@ CUSTOM_HEAD = ui.head_content(
         }
         favicon.href = "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>";
 
-        // --- 1. ENGINE PAGINASI CEPAT (0ms) ---
+        // =====================================================================
+        // A. ENGINE PENGUNCI SCROLL SIDEBAR (ANTI LOMPAT KE ATAS)
+        // =====================================================================
+        window._sidebarScrollPos = 0;
+
+        function getSidebarEl() {
+            return document.getElementById("sidebar-scroll-box") || document.querySelector(".sidebar div[style*='overflow-y: auto']");
+        }
+
+        // Rekam posisi scroll sidebar saat user menggeser menu
+        document.addEventListener('scroll', function(e) {
+            let sb = getSidebarEl();
+            if (sb && (e.target === sb || sb.contains(e.target))) {
+                window._sidebarScrollPos = sb.scrollTop;
+            }
+        }, true);
+
+        // Rekam posisi scroll sidebar saat tombol menu diklik
+        document.addEventListener('mousedown', function(e) {
+            let sb = getSidebarEl();
+            if (sb && sb.scrollTop > 0) {
+                window._sidebarScrollPos = sb.scrollTop;
+            }
+        }, true);
+
+        // Fungsi pemulih posisi scroll sidebar secara instan
+        function restoreSidebarScroll() {
+            let sb = getSidebarEl();
+            if (sb && window._sidebarScrollPos > 0 && sb.scrollTop !== window._sidebarScrollPos) {
+                sb.scrollTop = window._sidebarScrollPos;
+            }
+        }
+
+        // =====================================================================
+        // B. ZERO-GLITCH MAIN CONTAINER SCROLL LOCK
+        // =====================================================================
+        window._lockedScrollPos = 0;
+        let isUserActivelyScrolling = false;
+        let scrollResetTimer = null;
+
+        function getMainContainer() {
+            return document.getElementById("main-scroll-container") || document.querySelector('div[style*="overflow-y: auto"]');
+        }
+
+        window.addEventListener('wheel', function() {
+            isUserActivelyScrolling = true;
+            clearTimeout(scrollResetTimer);
+            scrollResetTimer = setTimeout(function() { isUserActivelyScrolling = false; }, 200);
+        }, { passive: true, capture: true });
+
+        window.addEventListener('touchmove', function() {
+            isUserActivelyScrolling = true;
+            clearTimeout(scrollResetTimer);
+            scrollResetTimer = setTimeout(function() { isUserActivelyScrolling = false; }, 200);
+        }, { passive: true, capture: true });
+
+        document.addEventListener('scroll', function(e) {
+            let c = getMainContainer();
+            if (c && e.target === c && isUserActivelyScrolling && c.scrollTop > 0) {
+                window._lockedScrollPos = c.scrollTop;
+            }
+        }, true);
+
+        // =====================================================================
+        // C. INTEGRASI SIKLUS HIDUP SHINY (SYNCHRONOUS DOM EVENT)
+        // =====================================================================
+        if (window.jQuery) {
+            $(document).on('shiny:inputchanged shiny:recalculating', function() {
+                let c = getMainContainer();
+                if (c && c.scrollTop > 0) {
+                    window._lockedScrollPos = c.scrollTop;
+                }
+                let sb = getSidebarEl();
+                if (sb && sb.scrollTop > 0) {
+                    window._sidebarScrollPos = sb.scrollTop;
+                }
+            });
+
+            $(document).on('shiny:value shiny:recalculated', function() {
+                let c = getMainContainer();
+                if (c && window._lockedScrollPos > 0 && !isUserActivelyScrolling) {
+                    c.scrollTop = window._lockedScrollPos;
+                }
+                restoreSidebarScroll();
+            });
+        }
+
+        // Penjaga Ganda (MutationObserver)
+        let domWatcher = new MutationObserver(function() {
+            let c = getMainContainer();
+            if (c && window._lockedScrollPos > 0 && !isUserActivelyScrolling && c.scrollTop !== window._lockedScrollPos) {
+                c.scrollTop = window._lockedScrollPos;
+            }
+            restoreSidebarScroll();
+        });
+
+        document.addEventListener("DOMContentLoaded", function() {
+            domWatcher.observe(document.body, { childList: true, subtree: true });
+        });
+
+        // =====================================================================
+        // D. ENGINE PAGINASI CEPAT (0ms)
+        // =====================================================================
         window.fastTables = window.fastTables || {};
         window.renderFastTablePage = function(tableId) {
             let tState = window.fastTables[tableId];
@@ -104,7 +206,9 @@ CUSTOM_HEAD = ui.head_content(
             }
         };
 
-        // --- 2. DRAG & DROP FILE DARI EXPLORER ---
+        // =====================================================================
+        // E. DRAG & DROP FILE DARI EXPLORER
+        // =====================================================================
         document.addEventListener('dragover', function(e) {
             let box = e.target.closest('.reflex-upload-container, .csv-batch-box');
             if (box) {
@@ -134,76 +238,196 @@ CUSTOM_HEAD = ui.head_content(
                 }
             }
         });
-
-        // --- 3. ZERO-GLITCH SYNCHRONOUS SCROLL LOCK (100% DIAM MEMATUNG) ---
-        window._lockedScrollPos = 0;
-        let isUserActivelyScrolling = false;
-        let scrollResetTimer = null;
-
-        function getContainer() {
-            return document.getElementById("main-scroll-container") || document.querySelector('div[style*="overflow-y: auto"]');
-        }
-
-        // Catat posisi scroll setiap user menggeser mouse
-        window.addEventListener('wheel', function() {
-            isUserActivelyScrolling = true;
-            clearTimeout(scrollResetTimer);
-            scrollResetTimer = setTimeout(function() { isUserActivelyScrolling = false; }, 200);
-        }, { passive: true, capture: true });
-
-        window.addEventListener('touchmove', function() {
-            isUserActivelyScrolling = true;
-            clearTimeout(scrollResetTimer);
-            scrollResetTimer = setTimeout(function() { isUserActivelyScrolling = false; }, 200);
-        }, { passive: true, capture: true });
-
-        document.addEventListener('scroll', function(e) {
-            let c = getContainer();
-            if (c && isUserActivelyScrolling && c.scrollTop > 0) {
-                window._lockedScrollPos = c.scrollTop;
-            }
-        }, true);
-
-        // Rekam posisi saat klik tombol atau pilih file
-        document.addEventListener('mousedown', function() {
-            let c = getContainer();
-            if (c && c.scrollTop > 0) {
-                window._lockedScrollPos = c.scrollTop;
-            }
-        }, true);
-
-        // Kunci instan tepat di siklus hidup Shiny sebelum frame digambar (Zero-Flicker)
-        if (window.jQuery) {
-            $(document).on('shiny:inputchanged shiny:recalculating', function() {
-                let c = getContainer();
-                if (c && c.scrollTop > 0) {
-                    window._lockedScrollPos = c.scrollTop;
-                }
-            });
-
-            $(document).on('shiny:value shiny:recalculated', function() {
-                let c = getContainer();
-                if (c && window._lockedScrollPos > 0 && !isUserActivelyScrolling) {
-                    c.scrollTop = window._lockedScrollPos;
-                }
-            });
-        }
-
-        // Penjaga ganda MutationObserver
-        let domWatcher = new MutationObserver(function() {
-            let c = getContainer();
-            if (c && window._lockedScrollPos > 0 && !isUserActivelyScrolling && c.scrollTop !== window._lockedScrollPos) {
-                c.scrollTop = window._lockedScrollPos;
-            }
-        });
-
-        document.addEventListener("DOMContentLoaded", function() {
-            let c = getContainer();
-            if (c) {
-                domWatcher.observe(c, { childList: true, subtree: true });
-            }
-        });
     """),
+
+    # --- 2. FONT AWESOME ICONS ---
+    ui.tags.link(rel="stylesheet", href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"),
+
+    # --- 3. CSS STYLING LENGKAP (DENGAN PERBAIKAN ANTI-GLITCH) ---
+    ui.tags.style("""
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        
+        /* 1. MENCEGAH LAYOUT SHIFT & GLITCH LAYAR TURUN */
+        html { 
+            height: 100%; 
+            width: 100%; 
+            overflow-y: scroll !important; 
+            scrollbar-gutter: stable !important; 
+            background-color: #111318; 
+            margin: 0; 
+            padding: 0; 
+        }
+        body { 
+            height: 100%; 
+            width: 100%; 
+            background-color: #111318; 
+            margin: 0; 
+            padding: 0; 
+        }
+
+        #main-scroll-container {
+            min-height: 100vh !important;
+            overflow-anchor: none !important;
+            scroll-behavior: auto !important;
+        }
+
+        /* 2. MATIKAN EFEK KEDIP/TRANSISI SHINY SAAT LOADING RE-RENDER */
+        .shiny-output-recalculating {
+            opacity: 1 !important;
+            visibility: visible !important;
+            transition: none !important;
+        }
+
+        /* 3. OPTIMASI SCROLL SIDEBAR */
+        #sidebar-scroll-box {
+            overflow-y: auto !important;
+            overscroll-behavior: contain !important;
+            scrollbar-width: thin;
+        }
+
+        .selectize-control .selectize-input {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234A5568' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+            background-repeat: no-repeat !important;
+            background-position: right 0.75rem center !important;
+            background-size: 14px 14px !important;
+            padding-right: 2.25rem !important;
+        }
+
+        .selectize-control .selectize-input.dropdown-active {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23E50914' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='18 15 12 9 6 15'%3E%3C/polyline%3E%3C/svg%3E") !important;
+        }
+
+        select.form-control, select {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234A5568' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+            background-repeat: no-repeat !important;
+            background-position: right 0.75rem center !important;
+            background-size: 14px 14px !important;
+            padding-right: 2.25rem !important;
+            -webkit-appearance: none !important;
+            -moz-appearance: none !important;
+            appearance: none !important;
+        }
+
+        @keyframes blinkAnimation {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.25; transform: scale(0.75); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        .blink-online {
+            animation: blinkAnimation 1.5s infinite ease-in-out;
+        }
+
+        .reflex-spinner-red {
+            width: 38px; height: 38px;
+            border: 3.5px solid rgba(229, 9, 20, 0.2);
+            border-top-color: #E50914; border-radius: 50%;
+            animation: reflexSpin 0.75s linear infinite;
+        }
+        @keyframes reflexSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        #global_reflex_loading { display: none; }
+        body.process-running #global_reflex_loading {
+            display: flex !important; position: fixed !important;
+            top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important;
+            background: rgba(0, 0, 0, 0.5) !important; z-index: 99999 !important;
+            align-items: center !important; justify-content: center !important;
+        }
+
+        @keyframes popIn { 0% { transform: scale(0.5); opacity: 0; } 70% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+        .animate-pop { animation: popIn 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        
+        #shiny-notification-panel { top: 25px !important; right: 25px !important; bottom: auto !important; left: auto !important; position: fixed !important; z-index: 999999 !important; width: 360px !important; }
+        .shiny-notification { border-radius: 10px !important; box-shadow: 0 10px 25px rgba(0,0,0,0.18) !important; font-weight: 700 !important; font-size: 13px !important; padding: 14px 18px !important; margin-bottom: 10px !important; }
+        .shiny-notification-message { background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important; color: #FFFFFF !important; border: none !important; }
+        .shiny-notification-error { background: linear-gradient(135deg, #E50914 0%, #B20710 100%) !important; color: #FFFFFF !important; border: none !important; }
+        .shiny-notification-warning { background: linear-gradient(135deg, #DD6B20 0%, #C05621 100%) !important; color: #FFFFFF !important; border: none !important; }
+
+        .custom-clean-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
+        .custom-clean-table th { background: #EDF2F7; color: #1A202C; font-weight: bold; font-size: 12px; padding: 10px; white-space: nowrap; border-bottom: 1px solid #CBD5E0; }
+        .custom-clean-table td { color: #2D3748; padding: 8px 10px; white-space: nowrap; border-bottom: 1px solid #EDF2F7; }
+        .custom-clean-table tr:hover { background-color: #F8FAFC; }
+        
+        .btn-red-gradient {
+            background: linear-gradient(135deg, #E50914 0%, #B20710 100%) !important;
+            color: #FFFFFF !important; font-weight: 800 !important; border-radius: 6px !important;
+            border: none !important; cursor: pointer; box-shadow: 0 4px 12px rgba(229, 9, 20, 0.25);
+            padding: 0.75rem 1.5rem; transition: all 0.2s ease;
+        }
+        .btn-red-gradient:hover { filter: brightness(1.1); }
+        .btn-locked { background-color: #E50914 !important; opacity: 0.5 !important; color: white !important; font-weight: bold !important; border-radius: 6px !important; cursor: not-allowed !important; border: none !important; padding: 0.75rem 1.5rem; }
+
+        .btn-page-nav {
+            background: #FFFFFF; border: 1.5px solid #CBD5E0; border-radius: 6px;
+            padding: 4px 12px; font-weight: 700; font-size: 12px; color: #1A202C;
+            cursor: pointer; transition: all 0.2s ease;
+        }
+        .btn-page-nav:hover:not(:disabled) { background: #EDF2F7; border-color: #A0AEC0; }
+        .btn-page-nav:disabled { opacity: 0.35; cursor: not-allowed; }
+
+        .reflex-upload-container {
+            border: 2px dashed #000000 !important; border-radius: 8px; background: #F8FAFC;
+            padding: 1.25rem 1.5rem; min-height: 85px; width: 100%;
+            display: flex !important; align-items: center !important; justify-content: flex-start !important;
+            position: relative; transition: all 0.2s ease;
+        }
+        .reflex-upload-container:hover { border-color: #C5A059; background-color: #FFFFFF; }
+        .reflex-upload-container .shiny-input-container { margin-bottom: 0 !important; width: 100%; display: flex !important; align-items: center !important; }
+        .reflex-upload-container .input-group { display: flex !important; align-items: center !important; width: 100% !important; margin-bottom: 0 !important; }
+        .reflex-upload-container .input-group-prepend, .reflex-upload-container .input-group-btn { display: flex !important; align-items: center !important; margin: 0 !important; }
+        .reflex-upload-container .btn-file {
+            background-color: #C5A059 !important; color: white !important; font-weight: bold !important;
+            border-radius: 6px !important; border: none !important; padding: 8px 18px !important;
+            margin-right: 14px !important; display: inline-flex !important; align-items: center !important; height: 38px !important;
+        }
+        .reflex-upload-container input[type="text"].form-control {
+            background-color: transparent !important; border: none !important; color: #38A169 !important;
+            font-weight: 700 !important; font-size: 14px !important; box-shadow: none !important;
+            padding: 0 !important; height: 38px !important; line-height: 38px !important; display: flex !important;
+            align-items: center !important; width: 100% !important; flex: 1 1 auto !important;
+            overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important;
+        }
+        .reflex-upload-container input[type="text"].form-control::placeholder { color: #718096 !important; font-weight: normal !important; font-size: 13px !important; }
+
+        .reflex-upload-container .shiny-file-input-progress,
+        .reflex-upload-container .progress,
+        .csv-batch-box .shiny-file-input-progress,
+        .csv-batch-box .progress { display: none !important; visibility: hidden !important; height: 0 !important; margin: 0 !important; padding: 0 !important; opacity: 0 !important; }
+
+        .csv-batch-box {
+            border: 2px dashed #000000 !important; border-radius: 12px; background: #FFF5F5;
+            padding: 2rem 1.5rem; width: 100%; text-align: center; margin-bottom: 1.25rem;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .csv-batch-box .shiny-input-container { margin-bottom: 0 !important; width: 100%; }
+        .csv-batch-box .input-group { display: flex !important; align-items: center !important; width: 100% !important; margin-bottom: 0 !important; }
+        .csv-batch-box .btn-file { background: #1A202C !important; color: #FFFFFF !important; font-weight: 700 !important; border-radius: 6px !important; border: none !important; padding: 8px 16px !important; margin-right: 10px !important; }
+        .csv-batch-box input[type="text"].form-control { background-color: transparent !important; border: none !important; color: #2D3748 !important; font-weight: 700 !important; font-size: 13px !important; box-shadow: none !important; }
+
+        details { border: 1px solid #E2E8F0; border-radius: 6px; margin-bottom: 8px; background: #FFFFFF; }
+        summary { font-weight: bold; padding: 10px 14px; cursor: pointer; color: #1A202C; background: #F8FAFC; border-radius: 6px; }
+        details[open] summary { border-bottom: 1px solid #E2E8F0; border-radius: 6px 6px 0 0; }
+        .accordion-content { padding: 14px; font-size: 13px; color: #4A5568; background: #F7FAFC; }
+    """),
+
+    # --- 4. SCRIPT LIVE TIMER ---
+    ui.tags.script("""
+        setInterval(function() {
+            let elStore = document.getElementById('login-time-store');
+            let elTimer = document.getElementById('live-timer');
+            if (elStore && elTimer) {
+                let loginTime = parseInt(elStore.innerText);
+                if (loginTime && loginTime > 0) {
+                    let now = new Date().getTime();
+                    let diff = Math.floor((now - loginTime) / 1000);
+                    let h = String(Math.floor(diff / 3600)).padStart(2, '0');
+                    let m = String(Math.floor((diff % 3600) / 60)).padStart(2, '0');
+                    let s = String(diff % 60).padStart(2, '0');
+                    elTimer.innerText = h + ':' + m + ':' + s;
+                } else { elTimer.innerText = "00:00:00"; }
+            }
+        }, 1000);
+    """)
+),
 
     # --- 2. FONT AWESOME ICONS ---
     ui.tags.link(rel="stylesheet", href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"),
@@ -1650,7 +1874,46 @@ def timbang_ongkir_view(state: AppState):
 def menu_item(label: str, target_menu: str, current_menu: str):
     is_active = (current_menu == target_menu)
     bg_style = "background: linear-gradient(135deg, #E50914 0%, #B20710 100%); color: #FFFFFF; font-weight: 700; box-shadow: 0 4px 12px rgba(229, 9, 20, 0.4);" if is_active else "background: transparent; color: #CBD5E0; font-weight: 500;"
-    return ui.tags.button(label, onclick=f"Shiny.setInputValue('select_menu_item', '{target_menu}', {{priority: 'event'}})", style=f"width: 100%; text-align: left; padding: 0.5rem 0.75rem; margin-bottom: 3px; border-radius: 6px; font-size: 0.85rem; border: none; cursor: pointer; justify-content: flex-start; transition: all 0.2s ease; {bg_style}")
+    # Ditambahkan event.preventDefault() agar browser tidak melempar scroll
+    return ui.tags.button(
+        label, 
+        onclick=f"event.preventDefault(); Shiny.setInputValue('select_menu_item', '{target_menu}', {{priority: 'event'}})", 
+        style=f"width: 100%; text-align: left; padding: 0.5rem 0.75rem; margin-bottom: 3px; border-radius: 6px; font-size: 0.85rem; border: none; cursor: pointer; justify-content: flex-start; transition: all 0.2s ease; {bg_style}"
+    )
+
+def sidebar(state: AppState):
+    cur_menu = state.main_menu()
+    if not state.sidebar_open():
+        return ui.div(
+            ui.tags.button(ui.tags.i(class_="fa-solid fa-bars", style="font-size: 18px; color: #FFFFFF;"), onclick="Shiny.setInputValue('btn_toggle_sidebar', Math.random(), {priority: 'event'})", style="background: transparent; border: none; cursor: pointer; padding: 0.5rem; border-radius: 6px;"), 
+            style="width: 60px; min-width: 60px; padding: 1rem 0.5rem; background: #111318; border-right: 1px solid #2D3748; height: 100vh; display: flex; flex-direction: column; align-items: center;"
+        )
+
+    return ui.div(
+        ui.div(
+            ui.div(
+                ui.div(
+                    ui.tags.i(class_="fa-solid fa-boxes-stacked", style="color: #FFFFFF; font-size: 18px;"),
+                    style="width: 38px; height: 38px; background: linear-gradient(135deg, #E50914 0%, #B20710 100%); border-radius: 8px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(229, 9, 20, 0.4); flex-shrink: 0;"
+                ),
+                ui.div(ui.span("ZKN LOGISTIC", style="color: #E50914; font-weight: 900; font-size: 14px; letter-spacing: 0.5px; line-height: 1.2;"), ui.span("WAREHOUSE SYSTEM", style="color: #FFFFFF; font-weight: 700; font-size: 10px; letter-spacing: 1.5px; opacity: 0.9;"), style="display: flex; flex-direction: column; justify-content: center;"),
+                style="display: flex; align-items: center; gap: 10px;"
+            ),
+            ui.tags.button(ui.tags.i(class_="fa-solid fa-angles-left", style="font-size: 14px; color: #CBD5E0;"), onclick="Shiny.setInputValue('btn_toggle_sidebar', Math.random(), {priority: 'event'})", style="background: transparent; border: none; cursor: pointer; padding: 6px; border-radius: 4px; display: flex; align-items: center;"),
+            style="display: flex; justify-content: space-between; width: 100%; align-items: center; margin-bottom: 0.8rem; padding-bottom: 0.6rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08);"
+        ),
+        # Ditambahkan id='sidebar-scroll-box' agar posisi scroll tersimpan dan tidak reset ke atas
+        ui.div(
+            ui.div(section_dropdown_header("OPERATIONAL", "operational", state.dropdown_operational()), ui.div(*[menu_item(item, item, cur_menu) for item in state.get_menu_operational()], style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_operational() else "display: none;"), style="width: 100%;"),
+            ui.div(section_dropdown_header("INVENTORY", "inventory", state.dropdown_inventory()), ui.div(*[menu_item(item, item, cur_menu) for item in state.get_menu_inventory()], style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_inventory() else "display: none;"), style="width: 100%;"),
+            ui.div(section_dropdown_header("REJECT & DEFECT", "reject", state.dropdown_reject()), ui.div(*[menu_item(item, item, cur_menu) for item in state.get_menu_reject()], style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_reject() else "display: none;"), style="width: 100%;"),
+            ui.div(section_dropdown_header("EXTRAS", "extras", state.dropdown_extras()), ui.div(*[menu_item(item, item, cur_menu) for item in state.get_menu_extras()], style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_extras() else "display: none;"), style="width: 100%;"),
+            id="sidebar-scroll-box",
+            style="width: 100%; flex: 1; overflow-y: auto; padding-right: 4px;"
+        ),
+        ui.div(ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-right-from-bracket", style="margin-right: 8px; font-size: 14px;"), ui.span("Logout Sistem", style="font-weight: bold; font-size: 13px;")), onclick="Shiny.setInputValue('btn_execute_logout', Math.random(), {priority: 'event'})", class_="btn-red-gradient", style="width: 100%; padding: 0.5rem; border-radius: 6px; display: flex; align-items: center; justify-content: center;"), style="width: 100%; padding-top: 0.8rem; border-top: 1px solid rgba(255, 255, 255, 0.1); margin-top: auto;"),
+        style="width: 280px; min-width: 280px; padding: 1rem; background: linear-gradient(180deg, #111318 0%, #1A1D24 50%, #0D0F12 100%); border-right: 1px solid #2D3748; height: 100vh; display: flex; flex-direction: column; align-items: flex-start;"
+    )
 
 def section_dropdown_header(title: str, dropdown_key: str, is_open: bool):
     icon_tag = "fa-chevron-down" if is_open else "fa-chevron-right"
