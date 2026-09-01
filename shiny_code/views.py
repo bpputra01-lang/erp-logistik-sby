@@ -427,7 +427,7 @@ CUSTOM_HEAD = ui.head_content(
             }
         }, 1000);
     """)
-),
+)
 
     # --- 2. FONT AWESOME ICONS ---
     ui.tags.link(rel="stylesheet", href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"),
@@ -586,7 +586,7 @@ CUSTOM_HEAD = ui.head_content(
             }
         }, 1000);
     """)
-)
+
 
 # ==============================================================================
 # MAPPING CABANG & BIN
