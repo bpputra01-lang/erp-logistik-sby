@@ -427,7 +427,7 @@ class AppState:
 
     def get_menu_inventory(self) -> list[str]:
         if self.role() == "DC":
-            return ["Stock Opname", "Cycle Count", "Justification SO", "Stock Minus", "Compare System", "Cross Check Real & System", "Putaway & Picking Audit List", "List Bin Cycle Count", "List Retur Out", "Reloc Koli to Koli", "Stock Allocation"]
+            return ["Stock Opname", "Cycle Count", "Justification SO", "Stock Minus", "Compare System", "Physical Inventory List", "Cross Check Real & System", "Putaway & Picking Audit List", "List Bin Cycle Count", "List Retur Out", "Reloc Koli to Koli", "Stock Allocation"]
         return ["Stock Minus", "Cycle Count", "Compare System", "Justification SO"]
 
     def get_menu_reject(self) -> list[str]:
