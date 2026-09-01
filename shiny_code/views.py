@@ -1574,9 +1574,7 @@ def reporting_pic_view(state: AppState):
 def timbang_ongkir_view(state: AppState):
     return ui.div(
         ui.navset_card_tab(
-            # ==================================================================
             # TAB 1: INPUT DATA MANUAL
-            # ==================================================================
             ui.nav_panel(
                 "📥 INPUT DATA MANUAL",
                 ui.div(
@@ -1614,9 +1612,7 @@ def timbang_ongkir_view(state: AppState):
                     style="padding: 1.25rem;"
                 )
             ),
-            # ==================================================================
             # TAB 2: METRIC MONITORING & HISTORY TABLE
-            # ==================================================================
             ui.nav_panel(
                 "📊 METRIC MONITORING",
                 ui.div(
