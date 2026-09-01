@@ -33,7 +33,8 @@ class SimpleSupabaseTable:
             "apikey": key,
             "Authorization": f"Bearer {key}",
             "Content-Type": "application/json",
-            "Prefer": "return=representation"
+            "Prefer": "return=representation",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"  # <-- WAJIB INI AGAR TIDAK DIBLOKIR CLOUDFLARE
         }
         self.params = []
         self.method = "GET"
@@ -79,14 +80,20 @@ class SimpleSupabaseTable:
         data_bytes = json.dumps(self.body).encode("utf-8") if self.body else None
         req = urllib.request.Request(full_url, data=data_bytes, headers=self.headers, method=self.method)
 
-        try:
-            with urllib.request.urlopen(req) as resp:
-                res_data = resp.read().decode("utf-8")
-                return type("Response", (), {"data": json.loads(res_data) if res_data else []})()
-        except Exception as e:
-            print(f"[Supabase REST Error]: {e}")
-            return type("Response", (), {"data": []})()
+        # Bypass SSL verification untuk lingkungan Pyodide/Cloud
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
 
+        try:
+            with urllib.request.urlopen(req, context=ctx) as resp:
+                res_data = resp.read().decode("utf-8")
+                parsed_data = json.loads(res_data) if res_data else []
+                return type("Response", (), {"data": parsed_data})()
+        except Exception as e:
+            print(f"[Supabase REST Error ({self.method} {full_url})]: {e}")
+            return type("Response", (), {"data": []})()
+            
 class SimpleSupabaseClient:
     def __init__(self, url, key):
         self.url = url

@@ -2369,7 +2369,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         yield buf.getvalue()
         
 # ==========================================================================
-    # LOGIC: TIMBANG ONGKIR (MENGGUNAKAN CONFIG.GET_SUPABASE_OLD)
+    # LOGIC: TIMBANG ONGKIR
     # ==========================================================================
     timbang_reload_trigger = reactive.Value(0)
 
@@ -2391,9 +2391,12 @@ def server(input: Inputs, output: Outputs, session: Session):
             }
 
             res = sb.table("timbang_kolian").insert(data_payload).execute()
-            print(f"✅ [TIMBANG INSERT] Sukses: {res.data}")
+            print(f"✅ [TIMBANG INSERT] Response DB: {res.data}")
 
-            # Reload tabel & metrik
+            if not res.data:
+                raise Exception("Data gagal disimpan ke database. Cek koneksi Supabase.")
+
+            # Trigger reload tabel & metrik
             timbang_reload_trigger.set(timbang_reload_trigger() + 1)
             
             if hasattr(state, "show_success_modal"):
@@ -2420,8 +2423,8 @@ def server(input: Inputs, output: Outputs, session: Session):
             return
         try:
             sb = config.get_supabase_old()
-            sb.table("timbang_kolian").delete().eq("id", str(target_id).strip()).execute()
-            print(f"🗑️ [TIMBANG DELETE] Baris ID {target_id} berhasil dihapus.")
+            res = sb.table("timbang_kolian").delete().eq("id", str(target_id).strip()).execute()
+            print(f"🗑️ [TIMBANG DELETE] ID {target_id} dihapus. Respon: {res.data}")
             timbang_reload_trigger.set(timbang_reload_trigger() + 1)
         except Exception as e:
             print(f"❌ [TIMBANG DELETE ERROR] {e}")
@@ -2450,41 +2453,39 @@ def server(input: Inputs, output: Outputs, session: Session):
             koli = pd.to_numeric(row.get('total_koli', 0), errors='coerce') or 0.0
             berat = pd.to_numeric(row.get('berat_total_timbang', 0), errors='coerce') or 0.0
 
-            # Logic 1: ACCESS + SEMARANG = Koli * 40.000 * 3.2
             if "ACCESS" in eksp and "SEMARANG" in tujuan:
                 return float(koli) * 40000.0 * 3.2
-            # Logic 2: ACCESS + HUB JAKARTA = Kg * 2.500 * 3.2
             elif "ACCESS" in eksp and "HUB JAKARTA" in tujuan:
                 return float(berat) * 2500.0 * 3.2
-            # Logic 3: ADEX + SEMARANG / MALANG = Kg * 1.000 * 3.2
             elif "ADEX" in eksp and ("SEMARANG" in tujuan or "MALANG" in tujuan):
                 return float(berat) * 1000.0 * 3.2
-            # Logic 4: ADEX + HUB JAKARTA = Kg * 2.000 * 3.2
             elif "ADEX" in eksp and "HUB JAKARTA" in tujuan:
                 return float(berat) * 2000.0 * 3.2
             return 0.0
         except Exception:
             return 0.0
 
-    # 5. AMBIL DATA SUPABASE LAMA DENGAN FILTER TANGGAL (WIB)
+    # 5. TARIK DATA DARI SUPABASE LAMA DENGAN FILTER TANGGAL (WIB)
     def _get_filtered_timbang_data():
         _ = timbang_reload_trigger()
         try:
             sb = config.get_supabase_old()
             res = sb.table("timbang_kolian").select("*").execute()
             data = res.data if hasattr(res, "data") and res.data else []
+            
+            print(f"📦 [TIMBANG FETCH] Total baris mentah dari DB: {len(data)}")
             if not data:
                 return pd.DataFrame()
 
             raw_df = pd.DataFrame(data)
 
             # Konversi Tanggal ke WIB (Persis Streamlit)
-            raw_df['created_at'] = pd.to_datetime(raw_df['created_at'])
+            raw_df['created_at'] = pd.to_datetime(raw_df['created_at'], errors='coerce')
             if raw_df['created_at'].dt.tz is None:
                 raw_df['created_at'] = raw_df['created_at'].dt.tz_localize('UTC')
             raw_df['created_at'] = raw_df['created_at'].dt.tz_convert('Asia/Jakarta')
 
-            # Urutkan paling baru ke lama
+            # Urutkan paling baru
             raw_df = raw_df.sort_values(by="created_at", ascending=False).reset_index(drop=True)
 
             # Hitung Estimasi Harga
@@ -2570,7 +2571,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         final_cols = [c for c in cols_show if c in display_df.columns]
 
         return render_clean_table(final_cols, display_df[final_cols].fillna("").astype(str).values.tolist(), "tbl_timbang_fast")
-                
+             
     # 2. REPORTING & PIC
     current_pic = reactive.Value("VERREL & GALIH")
 
