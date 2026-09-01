@@ -904,8 +904,8 @@ def cross_check_real_system_view(state: AppState):
     upload_section = ui.div(
         ui.h4("📥 Upload Dokumen System & Real Aktual", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
         ui.div(
-            custom_uploader_box("uploader_crs_sys", "1. Laporan System (+) (Kolom A, D, K)", placeholder="Upload File System..."),
-            custom_uploader_box("uploader_crs_real", "2. Laporan Real (+) (Kolom A, E, M)", placeholder="Upload File Real Fisik..."),
+            custom_uploader_box("uploader_crs_sys", "1. Laporan System (+)"),
+            custom_uploader_box("uploader_crs_real", "2. Laporan Real (+)"),
             style="display: flex; gap: 1rem; width: 100%; margin-bottom: 0.5rem; flex-wrap: wrap;"
         ),
         ui.output_ui("cross_check_action_btn_ui"),
