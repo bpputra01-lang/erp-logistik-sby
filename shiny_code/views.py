@@ -1,29 +1,9 @@
-import os
-import json
-import random
-import base64
-from datetime import datetime
-from shiny import ui
-from state import AppState
-from config import safe_int
-
-# Helper membaca gambar otomatis agar tidak pernah broken
-def get_image_base64(filename):
-    try:
-        if os.path.exists(filename):
-            with open(filename, "rb") as f:
-                encoded = base64.b64encode(f.read()).decode("utf-8")
-                return f"data:image/png;base64,{encoded}"
-    except Exception:
-        pass
-    return f"./{filename}"
-
 # ==============================================================================
 # CSS & JAVASCRIPT ASSETS (LENGKAP DENGAN SMART SCROLL LOCK ANTI-LONCAT)
 # ==============================================================================
 
 CUSTOM_HEAD = ui.head_content(
-    # --- 1. SCRIPT UTAMA (PAGINASI, DRAG & DROP, & ZERO-GLITCH SCROLL) ---
+    # --- 1. SCRIPT UTAMA (PAGINASI, DRAG & DROP, ZERO-GLITCH SCROLL, & AUTO-DISMISS SPINNER) ---
     ui.tags.script("""
         document.title = "ZKN WAREHOUSE ERP";
         let favicon = document.querySelector("link[rel~='icon']");
@@ -137,7 +117,6 @@ CUSTOM_HEAD = ui.head_content(
             return document.getElementById("main-scroll-container") || document.querySelector('div[style*="overflow-y: auto"]');
         }
 
-        // Catat posisi scroll setiap user menggeser mouse
         window.addEventListener('wheel', function() {
             isUserActivelyScrolling = true;
             clearTimeout(scrollResetTimer);
@@ -157,7 +136,6 @@ CUSTOM_HEAD = ui.head_content(
             }
         }, true);
 
-        // Rekam posisi saat klik tombol atau pilih file
         document.addEventListener('mousedown', function() {
             let c = getContainer();
             if (c && c.scrollTop > 0) {
@@ -165,7 +143,6 @@ CUSTOM_HEAD = ui.head_content(
             }
         }, true);
 
-        // Kunci instan tepat di siklus hidup Shiny sebelum frame digambar (Zero-Flicker)
         if (window.jQuery) {
             $(document).on('shiny:inputchanged shiny:recalculating', function() {
                 let c = getContainer();
@@ -180,9 +157,15 @@ CUSTOM_HEAD = ui.head_content(
                     c.scrollTop = window._lockedScrollPos;
                 }
             });
+
+            // --- 4. AUTO-DISMISS SPINNER BEGITU SHINY SELESAI PROSES (ANTI-STUCK) ---
+            $(document).on('shiny:idle shiny:value shiny:recalculated', function() {
+                document.body.classList.remove('process-running');
+                let spinner = document.getElementById('global_reflex_loading');
+                if (spinner) spinner.style.display = 'none';
+            });
         }
 
-        // Penjaga ganda MutationObserver
         let domWatcher = new MutationObserver(function() {
             let c = getContainer();
             if (c && window._lockedScrollPos > 0 && !isUserActivelyScrolling && c.scrollTop !== window._lockedScrollPos) {
@@ -197,14 +180,163 @@ CUSTOM_HEAD = ui.head_content(
             }
         });
     """),
-// AUTO-DISMISS SPINNER BEGITU SHINY SELESAI PROSES
-        if (window.jQuery) {
-            $(document).on('shiny:idle shiny:value shiny:recalculated', function() {
-                document.body.classList.remove('process-running');
-                let spinner = document.getElementById('global_reflex_loading');
-                if (spinner) spinner.style.display = 'none';
-            });
+
+    # --- 2. FONT AWESOME ICONS ---
+    ui.tags.link(rel="stylesheet", href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"),
+
+    # --- 3. CSS STYLING LENGKAP ---
+    ui.tags.style("""
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body, html { height: 100%; width: 100%; overflow-x: hidden; background-color: #111318; margin: 0; padding: 0; }
+        
+        .selectize-control .selectize-input {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234A5568' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+            background-repeat: no-repeat !important;
+            background-position: right 0.75rem center !important;
+            background-size: 14px 14px !important;
+            padding-right: 2.25rem !important;
         }
+
+        .selectize-control .selectize-input.dropdown-active {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23E50914' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='18 15 12 9 6 15'%3E%3C/polyline%3E%3C/svg%3E") !important;
+        }
+
+        select.form-control, select {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234A5568' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+            background-repeat: no-repeat !important;
+            background-position: right 0.75rem center !important;
+            background-size: 14px 14px !important;
+            padding-right: 2.25rem !important;
+            -webkit-appearance: none !important;
+            -moz-appearance: none !important;
+            appearance: none !important;
+        }
+
+        #main-scroll-container {
+            overflow-anchor: none !important;
+            scroll-behavior: auto !important;
+        }
+
+        @keyframes blinkAnimation {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.25; transform: scale(0.75); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        .blink-online {
+            animation: blinkAnimation 1.5s infinite ease-in-out;
+        }
+
+        .reflex-spinner-red {
+            width: 38px; height: 38px;
+            border: 3.5px solid rgba(229, 9, 20, 0.2);
+            border-top-color: #E50914; border-radius: 50%;
+            animation: reflexSpin 0.75s linear infinite;
+        }
+        @keyframes reflexSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        #global_reflex_loading { display: none; }
+        body.process-running #global_reflex_loading {
+            display: flex !important; position: fixed !important;
+            top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important;
+            background: rgba(0, 0, 0, 0.5) !important; z-index: 99999 !important;
+            align-items: center !important; justify-content: center !important;
+        }
+
+        @keyframes popIn { 0% { transform: scale(0.5); opacity: 0; } 70% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+        .animate-pop { animation: popIn 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        
+        #shiny-notification-panel { top: 25px !important; right: 25px !important; bottom: auto !important; left: auto !important; position: fixed !important; z-index: 999999 !important; width: 360px !important; }
+        .shiny-notification { border-radius: 10px !important; box-shadow: 0 10px 25px rgba(0,0,0,0.18) !important; font-weight: 700 !important; font-size: 13px !important; padding: 14px 18px !important; margin-bottom: 10px !important; }
+        .shiny-notification-message { background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important; color: #FFFFFF !important; border: none !important; }
+        .shiny-notification-error { background: linear-gradient(135deg, #E50914 0%, #B20710 100%) !important; color: #FFFFFF !important; border: none !important; }
+        .shiny-notification-warning { background: linear-gradient(135deg, #DD6B20 0%, #C05621 100%) !important; color: #FFFFFF !important; border: none !important; }
+
+        .custom-clean-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
+        .custom-clean-table th { background: #EDF2F7; color: #1A202C; font-weight: bold; font-size: 12px; padding: 10px; white-space: nowrap; border-bottom: 1px solid #CBD5E0; }
+        .custom-clean-table td { color: #2D3748; padding: 8px 10px; white-space: nowrap; border-bottom: 1px solid #EDF2F7; }
+        .custom-clean-table tr:hover { background-color: #F8FAFC; }
+        
+        .btn-red-gradient {
+            background: linear-gradient(135deg, #E50914 0%, #B20710 100%) !important;
+            color: #FFFFFF !important; font-weight: 800 !important; border-radius: 6px !important;
+            border: none !important; cursor: pointer; box-shadow: 0 4px 12px rgba(229, 9, 20, 0.25);
+            padding: 0.75rem 1.5rem; transition: all 0.2s ease;
+        }
+        .btn-red-gradient:hover { filter: brightness(1.1); }
+        .btn-locked { background-color: #E50914 !important; opacity: 0.5 !important; color: white !important; font-weight: bold !important; border-radius: 6px !important; cursor: not-allowed !important; border: none !important; padding: 0.75rem 1.5rem; }
+
+        .btn-page-nav {
+            background: #FFFFFF; border: 1.5px solid #CBD5E0; border-radius: 6px;
+            padding: 4px 12px; font-weight: 700; font-size: 12px; color: #1A202C;
+            cursor: pointer; transition: all 0.2s ease;
+        }
+        .btn-page-nav:hover:not(:disabled) { background: #EDF2F7; border-color: #A0AEC0; }
+        .btn-page-nav:disabled { opacity: 0.35; cursor: not-allowed; }
+
+        .reflex-upload-container {
+            border: 2px dashed #000000 !important; border-radius: 8px; background: #F8FAFC;
+            padding: 1.25rem 1.5rem; min-height: 85px; width: 100%;
+            display: flex !important; align-items: center !important; justify-content: flex-start !important;
+            position: relative; transition: all 0.2s ease;
+        }
+        .reflex-upload-container:hover { border-color: #C5A059; background-color: #FFFFFF; }
+        .reflex-upload-container .shiny-input-container { margin-bottom: 0 !important; width: 100%; display: flex !important; align-items: center !important; }
+        .reflex-upload-container .input-group { display: flex !important; align-items: center !important; width: 100% !important; margin-bottom: 0 !important; }
+        .reflex-upload-container .input-group-prepend, .reflex-upload-container .input-group-btn { display: flex !important; align-items: center !important; margin: 0 !important; }
+        .reflex-upload-container .btn-file {
+            background-color: #C5A059 !important; color: white !important; font-weight: bold !important;
+            border-radius: 6px !important; border: none !important; padding: 8px 18px !important;
+            margin-right: 14px !important; display: inline-flex !important; align-items: center !important; height: 38px !important;
+        }
+        .reflex-upload-container input[type="text"].form-control {
+            background-color: transparent !important; border: none !important; color: #38A169 !important;
+            font-weight: 700 !important; font-size: 14px !important; box-shadow: none !important;
+            padding: 0 !important; height: 38px !important; line-height: 38px !important; display: flex !important;
+            align-items: center !important; width: 100% !important; flex: 1 1 auto !important;
+            overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important;
+        }
+        .reflex-upload-container input[type="text"].form-control::placeholder { color: #718096 !important; font-weight: normal !important; font-size: 13px !important; }
+
+        .reflex-upload-container .shiny-file-input-progress,
+        .reflex-upload-container .progress,
+        .csv-batch-box .shiny-file-input-progress,
+        .csv-batch-box .progress { display: none !important; visibility: hidden !important; height: 0 !important; margin: 0 !important; padding: 0 !important; opacity: 0 !important; }
+
+        .csv-batch-box {
+            border: 2px dashed #000000 !important; border-radius: 12px; background: #FFF5F5;
+            padding: 2rem 1.5rem; width: 100%; text-align: center; margin-bottom: 1.25rem;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .csv-batch-box .shiny-input-container { margin-bottom: 0 !important; width: 100%; }
+        .csv-batch-box .input-group { display: flex !important; align-items: center !important; width: 100% !important; margin-bottom: 0 !important; }
+        .csv-batch-box .btn-file { background: #1A202C !important; color: #FFFFFF !important; font-weight: 700 !important; border-radius: 6px !important; border: none !important; padding: 8px 16px !important; margin-right: 10px !important; }
+        .csv-batch-box input[type="text"].form-control { background-color: transparent !important; border: none !important; color: #2D3748 !important; font-weight: 700 !important; font-size: 13px !important; box-shadow: none !important; }
+
+        details { border: 1px solid #E2E8F0; border-radius: 6px; margin-bottom: 8px; background: #FFFFFF; }
+        summary { font-weight: bold; padding: 10px 14px; cursor: pointer; color: #1A202C; background: #F8FAFC; border-radius: 6px; }
+        details[open] summary { border-bottom: 1px solid #E2E8F0; border-radius: 6px 6px 0 0; }
+        .accordion-content { padding: 14px; font-size: 13px; color: #4A5568; background: #F7FAFC; }
+    """),
+
+    # --- 4. SCRIPT LIVE TIMER ---
+    ui.tags.script("""
+        setInterval(function() {
+            let elStore = document.getElementById('login-time-store');
+            let elTimer = document.getElementById('live-timer');
+            if (elStore && elTimer) {
+                let loginTime = parseInt(elStore.innerText);
+                if (loginTime && loginTime > 0) {
+                    let now = new Date().getTime();
+                    let diff = Math.floor((now - loginTime) / 1000);
+                    let h = String(Math.floor(diff / 3600)).padStart(2, '0');
+                    let m = String(Math.floor((diff % 3600) / 60)).padStart(2, '0');
+                    let s = String(diff % 60).padStart(2, '0');
+                    elTimer.innerText = h + ':' + m + ':' + s;
+                } else { elTimer.innerText = "00:00:00"; }
+            }
+        }, 1000);
+    """)
+)
     # --- 2. FONT AWESOME ICONS ---
     ui.tags.link(rel="stylesheet", href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"),
 
