@@ -2380,22 +2380,45 @@ def server(input: Inputs, output: Outputs, session: Session):
         try:
             sb = config.get_supabase_old()
             now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            
+            # Ambil data form
+            eksp = str(input.tb_ekspedisi() or "").upper().strip()
+            jenis = str(input.tb_jenis() or "").strip()
+            dari = str(input.tb_dari() or "").upper().strip()
+            ke = str(input.tb_ke() or "").upper().strip()
+            koli = int(input.tb_koli() or 1)
+            berat = float(input.tb_berat() or 0.0)
+
             sb.table("timbang_kolian").insert({
-                "ekspedisi": str(input.tb_ekspedisi() or "").upper().strip(),
-                "jenis_pengiriman": str(input.tb_jenis() or "").strip(),
-                "pengiriman_dari": str(input.tb_dari() or "").upper().strip(),
-                "pengiriman_ke": str(input.tb_ke() or "").upper().strip(),
-                "total_koli": int(input.tb_koli() or 1),
-                "berat_total_timbang": float(input.tb_berat() or 0.0),
+                "ekspedisi": eksp,
+                "jenis_pengiriman": jenis,
+                "pengiriman_dari": dari,
+                "pengiriman_ke": ke,
+                "total_koli": koli,
+                "berat_total_timbang": berat,
                 "created_at": now_str
             }).execute()
-            timbang_reload_trigger.set(timbang_reload_trigger() + 1)
-            state.show_success_modal.set(True)
-        except Exception as e:
-            state.error_modal_message.set(f"Gagal simpan data: {e}")
-            state.show_error_modal.set(True)
 
-    # 2. HAPUS DATA SATUAN DARI TABEL (DETAIL SATUAN)
+            # Refresh data tabel & metrik
+            timbang_reload_trigger.set(timbang_reload_trigger() + 1)
+            
+            if hasattr(state, "show_success_modal"):
+                state.show_success_modal.set(True)
+        except Exception as e:
+            print(f"Error save timbang: {e}")
+            if hasattr(state, "error_modal_message"):
+                state.error_modal_message.set(f"Gagal simpan data: {e}")
+            if hasattr(state, "show_error_modal"):
+                state.show_error_modal.set(True)
+        finally:
+            # WAJIB: Hapus animasi loading agar tidak muter-muter terus
+            ui.insert_ui(
+                ui.tags.script("document.body.classList.remove('process-running');"),
+                selector="body",
+                where="beforeEnd"
+            )
+
+    # 2. HAPUS DATA SATUAN DARI TABEL
     @reactive.Effect
     @reactive.event(input.btn_delete_timbang_single)
     def _delete_timbang_single():
@@ -2407,8 +2430,16 @@ def server(input: Inputs, output: Outputs, session: Session):
             sb.table("timbang_kolian").delete().eq("id", str(target_id).strip()).execute()
             timbang_reload_trigger.set(timbang_reload_trigger() + 1)
         except Exception as e:
-            state.error_modal_message.set(f"Gagal menghapus baris data: {e}")
-            state.show_error_modal.set(True)
+            if hasattr(state, "error_modal_message"):
+                state.error_modal_message.set(f"Gagal menghapus baris data: {e}")
+            if hasattr(state, "show_error_modal"):
+                state.show_error_modal.set(True)
+        finally:
+            ui.insert_ui(
+                ui.tags.script("document.body.classList.remove('process-running');"),
+                selector="body",
+                where="beforeEnd"
+            )
 
     # 3. GANTI FILTER PERIODE
     @reactive.Effect
