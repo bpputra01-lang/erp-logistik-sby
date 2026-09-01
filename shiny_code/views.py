@@ -19,23 +19,35 @@ def get_image_base64(filename):
     return f"./{filename}"
 
 # ==============================================================================
-# CSS & JAVASCRIPT ASSETS (LENGKAP DENGAN ROUTING URL & AUTO-DISMISS SPINNER)
+# CSS & JAVASCRIPT ASSETS (LENGKAP DENGAN KUNCI LOGO, SCROLL LOCK & AUTO-DISMISS)
 # ==============================================================================
 CUSTOM_HEAD = ui.head_content(
-    # --- 1. SCRIPT UTAMA (PAGINASI, DRAG & DROP, SCROLL LOCK, AUTO-DISMISS, & URL ROUTING) ---
+    # --- 1. HTML NATIVE TITLE & FAVICON DARI image_981625.png ---
+    ui.tags.title("ZKN WAREHOUSE ERP"),
+    ui.tags.link(rel="icon", type="image/png", href="./image_981625.png?v=99"),
+
+    # --- 2. SCRIPT UTAMA (BRANDING LOCK, PAGINASI, SCROLL LOCK, AUTO-DISMISS & ROUTING) ---
     ui.tags.script("""
+        // --- 1. GEMBOK OTOMATIS JUDUL & FAVICON (ANTI-OVERWRITE SHINYLIVE) ---
         function setBrandTab() {
-            document.title = "ZKN WAREHOUSE ERP";
-            let favicon = document.querySelector("link[rel~='icon']") || document.createElement('link');
-            favicon.rel = 'icon';
-            favicon.type = 'image/png';
-            favicon.href = './image_981625.png';
-            document.head.appendChild(favicon);
+            if (document.title !== "ZKN WAREHOUSE ERP") {
+                document.title = "ZKN WAREHOUSE ERP";
+            }
+            let favicon = document.querySelector("link[rel~='icon']");
+            if (!favicon) {
+                favicon = document.createElement('link');
+                favicon.rel = 'icon';
+                favicon.type = 'image/png';
+                document.head.appendChild(favicon);
+            }
+            if (!favicon.href.includes("image_981625.png")) {
+                favicon.href = './image_981625.png?v=99';
+            }
         }
         setBrandTab();
-        setInterval(setBrandTab, 1000); // Dikunci per detik agar tidak ditindih lagi oleh Shinylive
-        
-        // --- 1. ENGINE PAGINASI CEPAT (0ms) ---
+        setInterval(setBrandTab, 1000); // Kunci per detik
+
+        // --- 2. ENGINE PAGINASI CEPAT (0ms) ---
         window.fastTables = window.fastTables || {};
         window.renderFastTablePage = function(tableId) {
             let tState = window.fastTables[tableId];
@@ -98,7 +110,7 @@ CUSTOM_HEAD = ui.head_content(
             }
         };
 
-        // --- 2. DRAG & DROP FILE DARI EXPLORER ---
+        // --- 3. DRAG & DROP FILE DARI EXPLORER ---
         document.addEventListener('dragover', function(e) {
             let box = e.target.closest('.reflex-upload-container, .csv-batch-box');
             if (box) {
@@ -129,7 +141,7 @@ CUSTOM_HEAD = ui.head_content(
             }
         });
 
-        // --- 3. ZERO-GLITCH SYNCHRONOUS SCROLL LOCK ---
+        // --- 4. ZERO-GLITCH SYNCHRONOUS SCROLL LOCK ---
         window._lockedScrollPos = 0;
         let isUserActivelyScrolling = false;
         let scrollResetTimer = null;
@@ -179,7 +191,7 @@ CUSTOM_HEAD = ui.head_content(
                 }
             });
 
-            // --- 4. AUTO-DISMISS SPINNER BEGITU SHINY SELESAI PROSES ---
+            // --- 5. AUTO-DISMISS SPINNER BEGITU SHINY SELESAI PROSES ---
             $(document).on('shiny:idle shiny:value shiny:recalculated', function() {
                 document.body.classList.remove('process-running');
                 let spinner = document.getElementById('global_reflex_loading');
@@ -194,7 +206,7 @@ CUSTOM_HEAD = ui.head_content(
             }
         });
 
-        // --- 5. SINKRONISASI URL ROUTING MENU OTOMATIS ---
+        // --- 6. SINKRONISASI URL ROUTING MENU OTOMATIS ---
         window.updateUrlMenu = function(menuName) {
             let slug = menuName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
             if (window.history.pushState) {
@@ -220,10 +232,10 @@ CUSTOM_HEAD = ui.head_content(
         });
     """),
 
-    # --- 2. FONT AWESOME ICONS ---
+    # --- 3. FONT AWESOME ICONS ---
     ui.tags.link(rel="stylesheet", href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"),
 
-    # --- 3. CSS STYLING LENGKAP ---
+    # --- 4. CSS STYLING LENGKAP ---
     ui.tags.style("""
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         body, html { height: 100%; width: 100%; overflow-x: hidden; background-color: #111318; margin: 0; padding: 0; }
@@ -366,7 +378,7 @@ CUSTOM_HEAD = ui.head_content(
         .accordion-content { padding: 14px; font-size: 13px; color: #4A5568; background: #F7FAFC; }
     """),
 
-    # --- 4. SCRIPT LIVE TIMER ---
+    # --- 5. SCRIPT LIVE TIMER ---
     ui.tags.script("""
         setInterval(function() {
             let elStore = document.getElementById('login-time-store');
@@ -385,6 +397,7 @@ CUSTOM_HEAD = ui.head_content(
         }, 1000);
     """)
 )
+
 # ==============================================================================
 # MAPPING CABANG & BIN
 # ==============================================================================
