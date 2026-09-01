@@ -1568,9 +1568,6 @@ def reporting_pic_view(state: AppState):
         style="width: 100%; padding: 1rem;"
     )
 
-# ==============================================================================
-# VIEW: DATA TIMBANG ONGKIR (2 TAB PERSIS STREAMLIT)
-# ==============================================================================
 def timbang_ongkir_view(state: AppState):
     return ui.div(
         ui.navset_card_tab(
@@ -1620,25 +1617,25 @@ def timbang_ongkir_view(state: AppState):
             ui.nav_panel(
                 "📊 METRIC MONITORING",
                 ui.div(
-                    # Baris Filter Tanggal & Tombol Hapus
+                    # Baris Filter Tanggal
                     ui.div(
                         ui.div(
                             ui.span("📅 Filter Periode Data:", style="font-size: 13px; font-weight: 800; color: #111111; margin-right: 8px;"),
-                            # Di dalam views.py -> def timbang_ongkir_view:
                             ui.tags.select(
                                 ui.tags.option("All Time (Semua Data)", value="ALL", selected=True),
                                 ui.tags.option("Today (Hari Ini)", value="TODAY"),
                                 ui.tags.option("This Month (Bulan Ini)", value="MONTH"),
+                                ui.tags.option("Past Month (Bulan Lalu)", value="PAST_MONTH"),  # <-- Opsi Baru
                                 id="select_filter_timbang",
                                 onchange="Shiny.setInputValue('change_filter_timbang_periode', this.value, {priority: 'event'})",
-                                style="background: white; border: 2px solid #1A202C; border-radius: 8px; font-weight: 800; padding: 6px 12px; width: 220px; cursor: pointer;"
+                                style="background: white; border: 2px solid #1A202C; border-radius: 8px; font-weight: 800; padding: 6px 12px; width: 230px; cursor: pointer;"
                             ),
                             style="display: flex; align-items: center;"
                         ),
                         ui.output_ui("timbang_delete_selected_btn_ui"),
                         style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 10px;"
                     ),
-                    # 4 Kotak Metrik (Total Koli, Total Berat, Total Biaya, Total Data)
+                    # 4 Kotak Metrik
                     ui.output_ui("timbang_ongkir_metrics_ui"),
                     ui.hr(style="margin: 1.5rem 0; border-color: #E2E8F0;"),
                     ui.h4("📋 LIST DATA TIMBANG", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
