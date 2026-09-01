@@ -23,27 +23,21 @@ from views import (
     render_clean_table, metric_box, dark_metric_box, BRANCH_BIN_MAPPING, 
     custom_uploader_box, sidebar, login_page, global_header, create_ui,
 
-    # 10 Menu Awal Anda
+    # 10 Menu Awal
     main_dashboard_view, ongkir_tab2_view, stock_minus_view, putaway_view, 
     compare_system_view, cycle_count_view, ppa_audit_view, 
     cycle_count_analyzer_view, compare_rto_view, stock_opname_view, 
     justification_so_view,
 
     # 14 Menu Baru Lengkap
-    po_receiving_view,
-    penerimaan_rto_view,
-    scan_out_view,
-    refill_overstock_view,
-    balancing_stock_view,
-    fl_request_view,
-    refill_toko_view,
-    rto_decision_view,
-    match_karantina_view,
-    koli_consolidation_view,
-    stock_allocation_view,
-    refill_withdraw_view,
-    fdr_update_view,
-    percentage_display_view
+    po_receiving_view, penerimaan_rto_view, scan_out_view,
+    refill_overstock_view, balancing_stock_view, fl_request_view,
+    refill_toko_view, rto_decision_view, match_karantina_view,
+    koli_consolidation_view, stock_allocation_view, refill_withdraw_view,
+    fdr_update_view, percentage_display_view, stock_tracking_view,
+    retur_out_view, pengajuan_mutasi_view, pengajuan_reject_view,
+    reject_list_view, logistic_schedule_view, reporting_pic_view,
+    timbang_ongkir_view
 )
 
 
@@ -781,8 +775,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         yield buf.getvalue()
 
-    # Main Dynamic Router
-    # Main Dynamic Router
+   # Main Dynamic Router
     @render.ui
     def main_root_container():
         if not state.logged_in(): 
@@ -805,7 +798,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         elif content_type == "justification_so": page_content = justification_so_view(state)
 
         # =====================================================================
-        # 2. MENU BARU HASIL KONVERSI DARI STREAMLIT
+        # 2. 14 MENU BARU STREAMLIT HASIL KONVERSI
         # =====================================================================
         elif content_type == "po_receiving": page_content = po_receiving_view(state)
         elif content_type == "penerimaan_rto": page_content = penerimaan_rto_view(state)
@@ -815,25 +808,27 @@ def server(input: Inputs, output: Outputs, session: Session):
         elif content_type == "fl_request": page_content = fl_request_view(state)
         elif content_type == "refill_toko": page_content = refill_toko_view(state)
         elif content_type == "rto_decision": page_content = rto_decision_view(state)
-
-        # =====================================================================
-        # 3. FALLBACK / AKSES DITOLAK
-        # =====================================================================
+        elif content_type == "match_karantina": page_content = match_karantina_view(state)
+        elif content_type == "koli_consolidation": page_content = koli_consolidation_view(state)
+        elif content_type == "stock_allocation": page_content = stock_allocation_view(state)
+        elif content_type == "refill_withdraw": page_content = refill_withdraw_view(state)
+        elif content_type == "fdr_update": page_content = fdr_update_view(state)
+        elif content_type == "percentage_display": page_content = percentage_display_view(state)
+        elif content_type == "stock_tracking": page_content = stock_tracking_view(state)
+        elif content_type == "retur_out": page_content = retur_out_view(state)
+        elif content_type == "pengajuan_mutasi": page_content = pengajuan_mutasi_view(state)
+        elif content_type == "pengajuan_reject": page_content = pengajuan_reject_view(state)
+        elif content_type == "reject_list": page_content = reject_list_view(state)
+        elif content_type == "logistic_schedule": page_content = logistic_schedule_view(state)
+        elif content_type == "reporting_pic": page_content = reporting_pic_view(state)
+        elif content_type == "timbang_ongkir": page_content = timbang_ongkir_view(state)
         elif content_type == "access_denied":
-            page_content = ui.div(
-                ui.h2("⛔ Akses Ditolak", style="font-size: 28px; color: #E53E3E; font-weight: bold;"), 
-                ui.p("Maaf, halaman ini dibatasi hak aksesnya.", style="color: #718096; font-size: 15px;"), 
-                style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;"
-            )
+            page_content = ui.div(ui.h2("⛔ Akses Ditolak", style="font-size: 28px; color: #E53E3E; font-weight: bold;"), ui.p("Maaf, halaman ini dibatasi hak aksesnya.", style="color: #718096; font-size: 15px;"), style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;")
         else:
-            page_content = ui.div(
-                ui.h2(f"Halaman: {state.main_menu()}", style="font-size: 28px; color: #1A202C; font-weight: bold;"), 
-                ui.p("Halaman ini sedang dalam tahap pengembangan.", style="color: #718096; font-size: 15px;"), 
-                style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;"
-            )
+            page_content = ui.div(ui.h2(f"Halaman: {state.main_menu()}", style="font-size: 28px; color: #1A202C; font-weight: bold;"), ui.p("Halaman ini sedang dalam tahap pengembangan.", style="color: #718096; font-size: 15px;"), style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;")
 
         # =====================================================================
-        # 4. RENDER LAYOUT UTAMA (SIDEBAR + GLOBAL HEADER + KONTEN AKTIF)
+        # 3. RENDER LAYOUT
         # =====================================================================
         return ui.div(
             sidebar(state),

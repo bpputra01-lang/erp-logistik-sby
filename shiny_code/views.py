@@ -1328,6 +1328,131 @@ def percentage_display_view(state: AppState):
             style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
         ), results_ui, style="width: 100%; padding: 1rem;"
     )
+
+# ==============================================================================
+# VIEW: 1. STOCK TRACKING TIMELINE
+# ==============================================================================
+def stock_tracking_view(state: AppState):
+    return ui.div(
+        ui.div(
+            ui.h4("📥 Upload 5 File Log Transaksi (PO, Mutasi, Adj, Tracking, RTO)", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
+            ui.div(
+                custom_uploader_box("uploader_st_main", "1. Multiple Adj (Main)"),
+                custom_uploader_box("uploader_st_stock", "2. All Data Stock"),
+                custom_uploader_box("uploader_st_po", "3. Purchase Order"),
+                custom_uploader_box("uploader_st_mutasi", "4. Mutasi"),
+                custom_uploader_box("uploader_st_adj", "5. Adjustment"),
+                custom_uploader_box("uploader_st_track", "6. Stock Tracking"),
+                custom_uploader_box("uploader_st_rto", "7. RTO"),
+                style="display: flex; gap: 1rem; width: 100%; flex-wrap: wrap; margin-bottom: 0.5rem;"
+            ),
+            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px;"), "KOMPILASI MASTER TIMELINE"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_st_timeline', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
+            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+        ),
+        ui.output_ui("st_timeline_results_ui"),
+        style="width: 100%; padding: 1rem;"
+    )
+
+# ==============================================================================
+# VIEW: 2. LIST RETUR OUT (SUPABASE)
+# ==============================================================================
+def retur_out_view(state: AppState):
+    return ui.div(
+        ui.div(
+            ui.h4("📥 Upload File Retur Out ke Cloud Supabase", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
+            custom_uploader_box("uploader_retur_file", "Upload File Retur (Excel/CSV)"),
+            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-cloud-arrow-up", style="margin-right: 6px;"), "SIMPAN KE CLOUD"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_save_retur_cloud', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
+            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+        ),
+        ui.output_ui("retur_out_table_ui"),
+        style="width: 100%; padding: 1rem;"
+    )
+
+# ==============================================================================
+# VIEW: 3. PENGAJUAN MUTASI KARANTINA
+# ==============================================================================
+def pengajuan_mutasi_view(state: AppState):
+    return ui.div(
+        ui.div(
+            ui.h4("☣️ Form Pengajuan Mutasi Karantina", style="font-size: 15px; font-weight: 800; margin-bottom: 0.75rem;"),
+            custom_uploader_box("uploader_mutasi_karantina_bulk", "Bulk Upload Mutasi (Excel)"),
+            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-paper-plane", style="margin-right: 6px;"), "SUBMIT PENGAJUAN"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_submit_mutasi_karantina', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
+            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+        ),
+        ui.output_ui("mutasi_karantina_monitor_ui"),
+        style="width: 100%; padding: 1rem;"
+    )
+
+# ==============================================================================
+# VIEW: 4. PENGAJUAN REJECT/DEFECT
+# ==============================================================================
+def pengajuan_reject_view(state: AppState):
+    return ui.div(
+        ui.div(
+            ui.h4("📋 Form Pengajuan Reject/Defect", style="font-size: 15px; font-weight: 800; margin-bottom: 0.75rem;"),
+            custom_uploader_box("uploader_reject_template", "Upload Excel Template Reject"),
+            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-paper-plane", style="margin-right: 6px;"), "KIRIM PENGAJUAN"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_submit_reject', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
+            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+        ),
+        ui.output_ui("pengajuan_reject_history_ui"),
+        style="width: 100%; padding: 1rem;"
+    )
+
+# ==============================================================================
+# VIEW: 5. REJECT/DEFECT LIST
+# ==============================================================================
+def reject_list_view(state: AppState):
+    return ui.div(
+        ui.div(
+            ui.h4("⚠️ Database & Cross-Check Match Reject/Defect", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
+            ui.output_ui("reject_list_metrics_ui"),
+            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+        ),
+        ui.output_ui("reject_list_table_ui"),
+        style="width: 100%; padding: 1rem;"
+    )
+
+# ==============================================================================
+# VIEW: 6. LOGISTIC SCHEDULE
+# ==============================================================================
+def logistic_schedule_view(state: AppState):
+    return ui.div(
+        ui.div(
+            ui.h4("📅 Generator Jadwal Shift Tim Logistik", style="font-size: 15px; font-weight: 800; margin-bottom: 0.75rem;"),
+            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-calendar-check", style="margin-right: 6px;"), "GENERATE JADWAL MINGGUAN"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_schedule', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
+            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+        ),
+        ui.output_ui("schedule_table_ui"),
+        style="width: 100%; padding: 1rem;"
+    )
+
+# ==============================================================================
+# VIEW: 7. REPORTING & PIC
+# ==============================================================================
+def reporting_pic_view(state: AppState):
+    return ui.div(
+        ui.div(
+            ui.h4("🚹 Dashboard Checklist PIC & To-Do Harian", style="font-size: 15px; font-weight: 800; margin-bottom: 0.75rem;"),
+            ui.output_ui("reporting_pic_status_ui"),
+            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+        ),
+        style="width: 100%; padding: 1rem;"
+    )
+
+# ==============================================================================
+# VIEW: 8. DATA TIMBANG ONGKIR
+# ==============================================================================
+def timbang_ongkir_view(state: AppState):
+    return ui.div(
+        ui.div(
+            ui.h4("⚖️ Sistem Timbang Kolian & Estimasi Ongkir", style="font-size: 15px; font-weight: 800; margin-bottom: 0.75rem;"),
+            ui.output_ui("timbang_ongkir_metrics_ui"),
+            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+        ),
+        ui.output_ui("timbang_ongkir_table_ui"),
+        style="width: 100%; padding: 1rem;"
+    )
+    
 # Navigation Components
 def menu_item(label: str, target_menu: str, current_menu: str):
     is_active = (current_menu == target_menu)
