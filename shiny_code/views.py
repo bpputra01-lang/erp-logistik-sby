@@ -176,6 +176,16 @@ CUSTOM_HEAD = ui.head_content(
             }
         }, true);
 
+        // --- 5. FUNGSI PEMICU SPINNER LOADING GLOBAL ---
+        window.showGlobalSpinner = function() {
+            let spinner = document.getElementById('global_reflex_loading');
+            if (spinner) {
+                spinner.style.removeProperty('display');
+            }
+            document.body.classList.add('process-running');
+        };
+
+        // --- 6. EVENT LISTENER SHINY (SINKRON SCROLL & AUTO-DISMISS SPINNER) ---
         if (window.jQuery) {
             $(document).on('shiny:inputchanged shiny:recalculating', function() {
                 let c = getContainer();
@@ -191,25 +201,29 @@ CUSTOM_HEAD = ui.head_content(
                 }
             });
 
-            // --- 5. AUTO-DISMISS SPINNER BEGITU SHINY SELESAI PROSES ---
-            $(document).on('shiny:idle shiny:value shiny:recalculated', function() {
+            // HANYA tutup spinner saat Shiny benar-benar IDLE (selesai seluruh kalkulasi)
+            $(document).on('shiny:idle', function() {
                 document.body.classList.remove('process-running');
                 let spinner = document.getElementById('global_reflex_loading');
-                if (spinner) spinner.style.setProperty('display', 'none', 'important');
+                if (spinner) {
+                    spinner.style.removeProperty('display');
+                }
             });
         }
-        // PEMBERSIH OTOMATIS KATA 'index.html' DI ADDRESS BAR
+
+        // --- 7. ROUTING MENU & URL SYNC ---
         if (window.location.pathname.endsWith('index.html') && window.history.replaceState) {
             let cleanPath = window.location.pathname.replace(/index\.html$/, '');
             window.history.replaceState(null, '', cleanPath + window.location.hash);
         }
+
         let domWatcher = new MutationObserver(function() {
             let c = getContainer();
             if (c && window._lockedScrollPos > 0 && !isUserActivelyScrolling && c.scrollTop !== window._lockedScrollPos) {
                 c.scrollTop = window._lockedScrollPos;
             }
         });
-        // FUNGSI ROUTING GLOBAL: HAPUS index.html & PASANG HASH MENU
+
         window.setMenuRoute = function(menuName, slug) {
             try {
                 let basePath = window.location.pathname.replace(/index\.html$/, '');
@@ -225,7 +239,6 @@ CUSTOM_HEAD = ui.head_content(
             Shiny.setInputValue('select_menu_item', menuName, {priority: 'event'});
         };
 
-        // --- 6. SINKRONISASI URL ROUTING MENU OTOMATIS ---
         window.updateUrlMenu = function(menuName) {
             let slug = menuName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
             if (window.history.pushState) {
@@ -416,7 +429,6 @@ CUSTOM_HEAD = ui.head_content(
         }, 1000);
     """)
 )
-
 # ==============================================================================
 # MAPPING CABANG & BIN
 # ==============================================================================
