@@ -19,20 +19,18 @@ def get_image_base64(filename):
     return f"./{filename}"
 
 # ==============================================================================
-# CSS & JAVASCRIPT ASSETS (ZERO-GLITCH & BEBAS SCROLL KE ATAS / BAWAH)
+# CSS & JAVASCRIPT ASSETS (ZERO-GLITCH, ANTI-JUMP UPLOAD & FREE SCROLL)
 # ==============================================================================
 CUSTOM_HEAD = ui.head_content(
     # --- 1. HTML NATIVE TITLE & FAVICON ---
     ui.tags.title("ZKN WAREHOUSE ERP"),
     ui.tags.link(rel="icon", type="image/png", href="./image_981625.png?v=99"),
 
-    # --- 2. SCRIPT UTAMA (BRANDING LOCK, FAST PAGINATION & SMART SCROLL) ---
+    # --- 2. SCRIPT UTAMA ---
     ui.tags.script("""
         // --- 1. GEMBOK OTOMATIS JUDUL & FAVICON ---
         function setBrandTab() {
-            if (document.title !== "ZKN WAREHOUSE ERP") {
-                document.title = "ZKN WAREHOUSE ERP";
-            }
+            if (document.title !== "ZKN WAREHOUSE ERP") document.title = "ZKN WAREHOUSE ERP";
             let favicon = document.querySelector("link[rel~='icon']");
             if (!favicon) {
                 favicon = document.createElement('link');
@@ -40,9 +38,7 @@ CUSTOM_HEAD = ui.head_content(
                 favicon.type = 'image/png';
                 document.head.appendChild(favicon);
             }
-            if (!favicon.href.includes("image_981625.png")) {
-                favicon.href = './image_981625.png?v=99';
-            }
+            if (!favicon.href.includes("image_981625.png")) favicon.href = './image_981625.png?v=99';
         }
         setBrandTab();
         setInterval(setBrandTab, 1000);
@@ -70,9 +66,7 @@ CUSTOM_HEAD = ui.head_content(
                 htmlStr += "<tr>";
                 for (let j = 0; j < row.length; j++) {
                     let cell = row[j] !== null && row[j] !== undefined ? String(row[j]).trim() : "";
-                    if (/^-?\\d+\\.0+$/.test(cell)) {
-                        cell = cell.replace(/\\.0+$/, "");
-                    }
+                    if (/^-?\\d+\\.0+$/.test(cell)) cell = cell.replace(/\\.0+$/, "");
                     htmlStr += "<td>" + cell + "</td>";
                 }
                 htmlStr += "</tr>";
@@ -88,9 +82,7 @@ CUSTOM_HEAD = ui.head_content(
                 let dispStart = total > 0 ? (start + 1) : 0;
                 info.innerText = "Menampilkan " + dispStart + " - " + end + " dari " + total.toLocaleString() + " baris";
             }
-            if (pageNum) {
-                pageNum.innerText = "Hal " + tState.currentPage + " / " + maxPages;
-            }
+            if (pageNum) pageNum.innerText = "Hal " + tState.currentPage + " / " + maxPages;
             if (prevBtn) prevBtn.disabled = (tState.currentPage <= 1);
             if (nextBtn) nextBtn.disabled = (tState.currentPage >= maxPages);
         };
@@ -113,26 +105,16 @@ CUSTOM_HEAD = ui.head_content(
         // --- 3. DRAG & DROP FILE ---
         document.addEventListener('dragover', function(e) {
             let box = e.target.closest('.reflex-upload-container, .csv-batch-box');
-            if (box) {
-                e.preventDefault();
-                box.style.borderColor = '#E50914';
-                box.style.backgroundColor = '#FFF5F5';
-            }
+            if (box) { e.preventDefault(); box.style.borderColor = '#E50914'; box.style.backgroundColor = '#FFF5F5'; }
         });
         document.addEventListener('dragleave', function(e) {
             let box = e.target.closest('.reflex-upload-container, .csv-batch-box');
-            if (box) {
-                e.preventDefault();
-                box.style.borderColor = '';
-                box.style.backgroundColor = '';
-            }
+            if (box) { e.preventDefault(); box.style.borderColor = ''; box.style.backgroundColor = ''; }
         });
         document.addEventListener('drop', function(e) {
             let box = e.target.closest('.reflex-upload-container, .csv-batch-box');
             if (box && e.dataTransfer && e.dataTransfer.files.length > 0) {
-                e.preventDefault();
-                box.style.borderColor = '';
-                box.style.backgroundColor = '';
+                e.preventDefault(); box.style.borderColor = ''; box.style.backgroundColor = '';
                 let fileInput = box.querySelector('input[type="file"]');
                 if (fileInput) {
                     fileInput.files = e.dataTransfer.files;
@@ -141,132 +123,157 @@ CUSTOM_HEAD = ui.head_content(
             }
         });
 
-        // --- 4. ZERO-GLITCH SMART SCROLL LOCK (ANTI-LOMPAT & BEBAS SCROLL ATAS/BAWAH) ---
-        let lockedScrollTop = 0;
-        let isUploadingFile = false;
+        // --- 4. HUMAN-AWARE ZERO-GLITCH SCROLL ENGINE ---
+        let userScrollTop = 0;
+        let isHumanScrolling = false;
+        let humanScrollTimer = null;
+        let isFileInteracting = false;
 
         function getContainer() {
             return document.getElementById("main-scroll-container");
         }
 
-        // Catat posisi scroll aktual HANYA saat user melakukan scroll alami
-        window.addEventListener('scroll', function(e) {
+        // Deteksi bahwa scroll dilakukan oleh manusia asli (Wheel, Touch, Keyboard, Drag Scrollbar)
+        function markHumanScroll() {
+            isHumanScrolling = true;
+            clearTimeout(humanScrollTimer);
+            humanScrollTimer = setTimeout(function() {
+                isHumanScrolling = false;
+            }, 250);
+        }
+
+        window.addEventListener('wheel', markHumanScroll, { passive: true, capture: true });
+        window.addEventListener('touchmove', markHumanScroll, { passive: true, capture: true });
+        window.addEventListener('keydown', function(e) {
+            if ([32, 33, 34, 35, 36, 38, 40].includes(e.keyCode)) markHumanScroll();
+        }, { passive: true, capture: true });
+        
+        // Deteksi klik/drag pada scrollbar
+        document.addEventListener('mousedown', function(e) {
             let c = getContainer();
-            if (c && (e.target === c || e.target === document)) {
-                if (!isUploadingFile) {
-                    lockedScrollTop = c.scrollTop;
+            if (c) {
+                let rect = c.getBoundingClientRect();
+                if (e.clientX >= rect.right - 25) markHumanScroll();
+            }
+        }, true);
+        document.addEventListener('mousemove', function(e) {
+            if (e.buttons === 1) markHumanScroll();
+        }, true);
+
+        // KONTROL SCROLL: HANYA ubah userScrollTop jika manusia yang scroll.
+        // Jika browser mencoba melompat ke 0 secara sepihak (glitch), tahan seketika!
+        document.addEventListener('scroll', function(e) {
+            let c = getContainer();
+            if (!c) return;
+
+            if (e.target === c || e.target === document) {
+                if (isHumanScrolling) {
+                    // Manusia sedang scroll -> simpan posisi terbarunya! (Bebas ke atas / ke bawah)
+                    userScrollTop = c.scrollTop;
+                } else if (userScrollTop > 0 && c.scrollTop === 0) {
+                    // GLITCH BROWSER TERDETEKSI: Tiba-tiba jadi 0 tanpa ada scroll manusia!
+                    // Tahan seketika di posisi semula!
+                    c.scrollTop = userScrollTop;
                 }
             }
         }, true);
 
-        // Kunci koordinat tepat saat tombol/kotak upload disentuh
+        // KUNCI POSISI SAAT KLIK UPLOAD (Cegah lompat sebelum jendela file terbuka)
         document.addEventListener('pointerdown', function(e) {
             let c = getContainer();
-            if (c && e.target && (e.target.closest('.reflex-upload-container') || e.target.closest('.btn-file') || e.target.type === 'file')) {
-                lockedScrollTop = c.scrollTop;
+            if (c && c.scrollTop > 0) {
+                userScrollTop = c.scrollTop;
+            }
+            if (e.target && (e.target.closest('.reflex-upload-container') || e.target.closest('.btn-file') || e.target.type === 'file')) {
+                isFileInteracting = true;
             }
         }, true);
 
-        // Tahan posisi saat file dipilih dari Windows Explorer (Tanpa Glitch & Tanpa Freeze)
+        // TAHAN POSISI SAAT FILE TERPILIH DARI EXPLORER
         document.addEventListener('change', function(e) {
             if (e.target && e.target.type === 'file') {
                 let c = getContainer();
-                if (c && lockedScrollTop > 0) {
-                    isUploadingFile = true;
-                    c.scrollTop = lockedScrollTop;
-
-                    // Kunci secara presisi selama 250ms saja agar browser tidak memicu auto-focus jump
+                if (c && userScrollTop > 0) {
+                    c.scrollTop = userScrollTop;
+                    // Jaga posisi selama 350ms saat jendela explorer menutup
                     let count = 0;
                     let holdTimer = setInterval(function() {
-                        if (c && c.scrollTop !== lockedScrollTop) {
-                            c.scrollTop = lockedScrollTop;
-                        }
+                        if (c && c.scrollTop !== userScrollTop) c.scrollTop = userScrollTop;
                         count++;
-                        if (count >= 12) { // 12 x 20ms = 240ms
+                        if (count >= 14) {
                             clearInterval(holdTimer);
-                            isUploadingFile = false; // BUKA KUNCI TOTAL: User bebas scroll ke atas/bawah!
+                            isFileInteracting = false;
                         }
-                    }, 20);
+                    }, 25);
                 }
             }
         }, true);
 
-        // Cegah auto-focus browser membanting scroll ke 0 saat input file aktif
+        // CEGAH BROWSER MELEMPAR FOKUS KE ATAS SAAT INPUT FILE MENERIMA FOKUS
         window.addEventListener('focusin', function(e) {
             if (e.target && e.target.type === 'file') {
                 let c = getContainer();
-                if (c && isUploadingFile && lockedScrollTop > 0) {
-                    c.scrollTop = lockedScrollTop;
+                if (c && userScrollTop > 0) {
+                    c.scrollTop = userScrollTop;
                 }
             }
         }, true);
 
-        // --- 5. FUNGSI PEMICU SPINNER LOADING GLOBAL ---
+        // --- 5. SPINNER CONTROLLER ---
         window.showGlobalSpinner = function() {
             let spinner = document.getElementById('global_reflex_loading');
-            if (spinner) {
-                spinner.style.removeProperty('display');
-            }
+            if (spinner) spinner.style.removeProperty('display');
             document.body.classList.add('process-running');
         };
 
-        // --- 6. SHINY EVENT LISTENERS (TANPA MUTATION OBSERVER YANG MENJEBAK SCROLL) ---
+        // --- 6. SHINY EVENT LISTENERS ---
         if (window.jQuery) {
             $(document).on('shiny:fileuploaded shiny:inputchanged', function() {
                 let c = getContainer();
-                if (c && isUploadingFile && lockedScrollTop > 0) {
-                    c.scrollTop = lockedScrollTop;
+                if (c && userScrollTop > 0) {
+                    c.scrollTop = userScrollTop;
                 }
             });
 
-            // HANYA tutup spinner saat Shiny benar-benar IDLE (selesai seluruh proses)
             $(document).on('shiny:idle', function() {
                 document.body.classList.remove('process-running');
                 let spinner = document.getElementById('global_reflex_loading');
-                if (spinner) {
-                    spinner.style.removeProperty('display');
-                }
-                isUploadingFile = false; // Bebaskan scroll total
+                if (spinner) spinner.style.removeProperty('display');
+                isFileInteracting = false;
             });
         }
 
-        // --- 7. ROUTING MENU & URL SYNC ---
+        // --- 7. ROUTING MENU ---
         if (window.location.pathname.endsWith('index.html') && window.history.replaceState) {
             let cleanPath = window.location.pathname.replace(/index\.html$/, '');
             window.history.replaceState(null, '', cleanPath + window.location.hash);
         }
 
         window.setMenuRoute = function(menuName, slug) {
+            // Saat user klik menu di sidebar, reset scroll ke paling atas
+            userScrollTop = 0;
+            let c = getContainer();
+            if (c) c.scrollTop = 0;
+
             try {
                 let basePath = window.location.pathname.replace(/index\.html$/, '');
                 if (!basePath.endsWith('/')) basePath += '/';
-                if (window.history.pushState) {
-                    window.history.pushState(null, '', basePath + '#' + slug);
-                } else {
-                    window.location.hash = '#' + slug;
-                }
-            } catch(e) {
-                window.location.hash = '#' + slug;
-            }
+                if (window.history.pushState) window.history.pushState(null, '', basePath + '#' + slug);
+                else window.location.hash = '#' + slug;
+            } catch(e) { window.location.hash = '#' + slug; }
             Shiny.setInputValue('select_menu_item', menuName, {priority: 'event'});
         };
 
         window.updateUrlMenu = function(menuName) {
             let slug = menuName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-            if (window.history.pushState) {
-                window.history.pushState(null, null, '#' + slug);
-            } else {
-                window.location.hash = '#' + slug;
-            }
+            if (window.history.pushState) window.history.pushState(null, null, '#' + slug);
+            else window.location.hash = '#' + slug;
         };
 
-        // BACA URL SAAT PERTAMA KALI HALAMAN DIBUKA
         document.addEventListener("DOMContentLoaded", function() {
             let h = window.location.hash.replace('#', '').trim();
             if (h) {
-                setTimeout(function() {
-                    Shiny.setInputValue('initial_url_hash', h, {priority: 'event'});
-                }, 500);
+                setTimeout(function() { Shiny.setInputValue('initial_url_hash', h, {priority: 'event'}); }, 500);
             }
         });
     """),
@@ -274,12 +281,11 @@ CUSTOM_HEAD = ui.head_content(
     # --- 3. FONT AWESOME ICONS ---
     ui.tags.link(rel="stylesheet", href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"),
 
-    # --- 4. CSS STYLING LENGKAP (OPTIMASI ZERO-GLITCH) ---
+    # --- 4. CSS STYLING LENGKAP ---
     ui.tags.style("""
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         body, html { height: 100%; width: 100%; overflow-x: hidden; background-color: #111318; margin: 0; padding: 0; }
         
-        /* Container scroll: Bebas scroll alami, anti-bouncing */
         #main-scroll-container {
             overflow-y: auto !important;
             overflow-x: hidden !important;
@@ -288,7 +294,7 @@ CUSTOM_HEAD = ui.head_content(
             -webkit-overflow-scrolling: touch;
         }
 
-        /* HILANGKAN GLITCH 0.1 DETIK: Input file diletakkan pas di atas tombol upload */
+        /* POSISI INPUT FILE PERSIS DI DALAM TOMBOL (CEGAH LOMPATAN SAAT DIKLIK) */
         .btn-file {
             position: relative !important;
             overflow: hidden !important;
@@ -305,12 +311,10 @@ CUSTOM_HEAD = ui.head_content(
             cursor: pointer !important;
             margin: 0 !important;
             padding: 0 !important;
-            font-size: 0 !important;
             display: block !important;
-            z-index: 10 !important;
+            z-index: 5 !important;
         }
 
-        /* Hilangkan 'transition: all' yang menyebabkan layar bergoyang saat upload */
         .reflex-upload-container {
             border: 2px dashed #000000 !important;
             border-radius: 8px;
