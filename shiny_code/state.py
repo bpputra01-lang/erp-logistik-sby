@@ -1881,10 +1881,10 @@ class AppState:
             return False, f"Gagal Generate New Draft: {e}"
 
 # ==========================================================================
-    # STOCK OPNAME ANALYZER (DENGAN INTEGRASI STOCK MINUS CERDAS)
+    # STOCK OPNAME ANALYZER (STEP 1 & STEP 2 - DENGAN INTEGRASI STOCK MINUS)
     # ==========================================================================
 
-    # --- STEP 1: COMPARE SCAN VS STOCK (POIN 2: QTY SYSTEM < 0 MASUK DENGAN NOTE 'Stock Minus') ---
+    # --- STEP 1: COMPARE SCAN VS STOCK (NOTE: 'STOCK MINUS' HURUF BESAR) ---
     def run_so_step1(self, f_scan, f_stock, sub_sel, bin_sys_sel):
         try:
             df_s_raw = load_data_from_info(f_scan)
@@ -1926,16 +1926,16 @@ class AppState:
             res_scan = ds.merge(dt_grouped, on=['BIN', 'SKU'], how='left').fillna(0)
             res_scan['DIFF'] = res_scan['QTY_SCAN'] - res_scan['QTY_SYSTEM']
 
-            # Labeling Note: Jika QTY_SYSTEM < 0 maka dilabeli "Stock Minus"
+            # Labeling Note (HURUF BESAR SEMUA: STOCK MINUS)
             cond_scan = [
                 (res_scan['QTY_SYSTEM'] < 0),
                 (res_scan['DIFF'] > 0),
                 (res_scan['DIFF'] < 0)
             ]
-            choices_scan = ["Stock Minus", "REAL +", "SYSTEM +"]
+            choices_scan = ["STOCK MINUS", "REAL +", "SYSTEM +"]
             res_scan['NOTE'] = np.select(cond_scan, choices_scan, default="OK")
 
-            # CEK STOCK MINUS DARI SISTEM YANG TIDAK TERSCAN (QTY SCAN = 0)
+            # CEK STOCK MINUS DARI SISTEM YANG TIDAK TERSCAN SAMA SEKALI (QTY SCAN = 0)
             scanned_keys = set(zip(res_scan['BIN'], res_scan['SKU']))
             missing_minus = dt_grouped[dt_grouped['QTY_SYSTEM'] < 0].copy()
             
@@ -1949,7 +1949,7 @@ class AppState:
                         'QTY_SCAN': 0,
                         'QTY_SYSTEM': q_sys_val,
                         'DIFF': abs(q_sys_val),
-                        'NOTE': 'Stock Minus'
+                        'NOTE': 'STOCK MINUS'
                     })
 
             if unscanned_rows:
@@ -1971,14 +1971,14 @@ class AppState:
                 (dt_merged['DIFF'] > 0),
                 (dt_merged['DIFF'] < 0)
             ]
-            choices_stock = ["Stock Minus", "SYSTEM +", "REAL +"]
+            choices_stock = ["STOCK MINUS", "SYSTEM +", "REAL +"]
             dt_merged['NOTE'] = np.select(cond_stock, choices_stock, default="OK")
 
             res_stock = dt_merged.drop(columns=['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN'], errors='ignore')
             res_stock['ITEM NAME'] = res_stock.iloc[:, 2].astype(str).str.upper().map(map_dict).fillna("-")
 
-            # Masukkan kedua kondisi (REAL + dan Stock Minus) ke dalam tabel real_plus
-            real_plus = res_scan[res_scan['NOTE'].isin(["REAL +", "Stock Minus"])].copy()
+            # Masukkan REAL + dan STOCK MINUS ke dalam tabel real_plus
+            real_plus = res_scan[res_scan['NOTE'].isin(["REAL +", "STOCK MINUS"])].copy()
             system_plus = res_stock[res_stock['NOTE'] == "SYSTEM +"].copy()
 
             self.so_qty_real_plus.set(int(real_plus['DIFF'].sum()) if not real_plus.empty else 0)
@@ -2004,7 +2004,7 @@ class AppState:
         except Exception as e:
             return False, f"Gagal Compare Step 1: {e}"
 
-    # --- STEP 2: ALLOCATION (POIN 3: STOCK MINUS DIALOKASIKAN PALING AKHIR) ---
+    # --- STEP 2: ALLOCATION (STOCK MINUS DIALOKASIKAN PALING AKHIR) ---
     def run_so_step2(self, f_bin_cov, selected_bin_cov):
         try:
             if self._raw_df_so_real_plus.empty or self._raw_df_so_sys_plus.empty:
@@ -2021,6 +2021,7 @@ class AppState:
             else:
                 df_cov = df_cov_raw.copy()
 
+            # 1. Pool Stok System +
             system_by_sku = {}
             for _, row in self._raw_df_so_sys_plus.iterrows():
                 b, s = str(row['BIN']).strip().upper(), str(row['SKU']).strip().upper()
@@ -2029,6 +2030,7 @@ class AppState:
                     if s not in system_by_sku: system_by_sku[s] = {}
                     system_by_sku[s][b] = system_by_sku[s].get(b, 0) + q
 
+            # 2. Pool Stok BIN Coverage
             selected_bins = set(df_cov.iloc[:, 1].astype(str).str.strip().str.upper().unique())
             coverage_by_sku = {}
             for _, row in df_cov.iterrows():
@@ -2044,15 +2046,16 @@ class AppState:
             df_sys_updated = self._raw_df_so_sys_plus.copy()
             sys_reduction = {}
 
-            # URUTKAN ITERASI: REAL + NORMAL DULUAN, BARU STOCK MINUS PALING AKHIR
+            # URUTAN PRIORITAS ALOKASI:
+            # - Batch 1: REAL + (Normal) dieksekusi sampai tuntas terlebih dahulu
+            # - Batch 2: STOCK MINUS dieksekusi PALING AKHIR menggunakan sisa alokasi
             normal_real = self._raw_df_so_real_plus[self._raw_df_so_real_plus['NOTE'] == "REAL +"].copy()
-            minus_real = self._raw_df_so_real_plus[self._raw_df_so_real_plus['NOTE'] == "Stock Minus"].copy()
+            minus_real = self._raw_df_so_real_plus[self._raw_df_so_real_plus['NOTE'] == "STOCK MINUS"].copy()
             ordered_real = pd.concat([normal_real, minus_real], ignore_index=True)
 
             for _, row in ordered_real.iterrows():
                 sku = str(row['SKU']).strip().upper()
                 diff_needed = float(row['DIFF'])
-                is_minus = (row.get('NOTE') == "Stock Minus")
 
                 if diff_needed <= 0:
                     r_copy = row.to_dict()
@@ -2061,8 +2064,8 @@ class AppState:
                     continue
 
                 remaining = diff_needed
-                
-                # Cek stok di System +
+
+                # 1. Alokasi dari System +
                 if sku in system_by_sku:
                     for bin_src, qty_avail in list(system_by_sku[sku].items()):
                         if remaining <= 0: break
@@ -2079,7 +2082,7 @@ class AppState:
                             sys_reduction[(bin_src, sku)] = sys_reduction.get((bin_src, sku), 0) + alloc
                             remaining -= alloc
 
-                # Cek sisa stok di BIN Coverage
+                # 2. Alokasi dari BIN Coverage (jika masih ada sisa kebutuhan)
                 if remaining > 0 and sku in coverage_by_sku:
                     for bin_src, qty_avail in list(coverage_by_sku[sku].items()):
                         if remaining <= 0: break
@@ -2095,6 +2098,7 @@ class AppState:
                             coverage_by_sku[sku][bin_src] -= alloc
                             remaining -= alloc
 
+                # 3. Kebutuhan yang tidak tercover masuk ke NO ALLOCATION
                 if remaining > 0:
                     r_no = row.to_dict()
                     r_no.update({'DIFF': remaining, 'BIN ALOKASI': '', 'QTY ALLOCATION': 0, 'STATUS': 'NO ALLOCATION'})
@@ -2107,13 +2111,14 @@ class AppState:
 
             allocated['ITEM NAME'] = allocated['SKU'].map(self._so_map_dict)
 
+            # Generate Template SET UP REAL +
             filtered_setup = allocated[allocated['STATUS'].isin(['FULL ALLOCATION', 'PARTIAL ALLOCATION'])].copy()
             if not filtered_setup.empty:
                 filtered_setup['BIN AWAL'] = filtered_setup['BIN ALOKASI']
                 filtered_setup['BIN TUJUAN'] = filtered_setup['BIN']
                 filtered_setup['QUANTITY'] = filtered_setup['QTY ALLOCATION']
-                # Tandai notes khusus untuk Stock Minus
-                filtered_setup['NOTES'] = np.where(filtered_setup['NOTE'] == "Stock Minus", "STOCK MINUS", "MISS LOCATION")
+                # Tandai NOTES: STOCK MINUS untuk stok minus, MISS LOCATION untuk normal
+                filtered_setup['NOTES'] = np.where(filtered_setup['NOTE'] == "STOCK MINUS", "STOCK MINUS", "MISS LOCATION")
                 df_setup_real = filtered_setup[['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES']].copy()
             else:
                 df_setup_real = pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])

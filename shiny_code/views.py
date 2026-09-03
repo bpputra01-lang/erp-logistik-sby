@@ -19,16 +19,16 @@ def get_image_base64(filename):
     return f"./{filename}"
 
 # ==============================================================================
-# CSS & JAVASCRIPT ASSETS (LENGKAP DENGAN KUNCI LOGO, SCROLL LOCK & AUTO-DISMISS)
+# CSS & JAVASCRIPT ASSETS (ZERO-GLITCH & BEBAS SCROLL KE ATAS / BAWAH)
 # ==============================================================================
 CUSTOM_HEAD = ui.head_content(
-    # --- 1. HTML NATIVE TITLE & FAVICON DARI image_981625.png ---
+    # --- 1. HTML NATIVE TITLE & FAVICON ---
     ui.tags.title("ZKN WAREHOUSE ERP"),
     ui.tags.link(rel="icon", type="image/png", href="./image_981625.png?v=99"),
 
-    # --- 2. SCRIPT UTAMA (BRANDING LOCK, PAGINASI, SCROLL LOCK, AUTO-DISMISS & ROUTING) ---
+    # --- 2. SCRIPT UTAMA (BRANDING LOCK, FAST PAGINATION & SMART SCROLL) ---
     ui.tags.script("""
-        // --- 1. GEMBOK OTOMATIS JUDUL & FAVICON (ANTI-OVERWRITE SHINYLIVE) ---
+        // --- 1. GEMBOK OTOMATIS JUDUL & FAVICON ---
         function setBrandTab() {
             if (document.title !== "ZKN WAREHOUSE ERP") {
                 document.title = "ZKN WAREHOUSE ERP";
@@ -45,7 +45,7 @@ CUSTOM_HEAD = ui.head_content(
             }
         }
         setBrandTab();
-        setInterval(setBrandTab, 1000); // Kunci per detik
+        setInterval(setBrandTab, 1000);
 
         // --- 2. ENGINE PAGINASI CEPAT (0ms) ---
         window.fastTables = window.fastTables || {};
@@ -110,7 +110,7 @@ CUSTOM_HEAD = ui.head_content(
             }
         };
 
-        // --- 3. DRAG & DROP FILE DARI EXPLORER ---
+        // --- 3. DRAG & DROP FILE ---
         document.addEventListener('dragover', function(e) {
             let box = e.target.closest('.reflex-upload-container, .csv-batch-box');
             if (box) {
@@ -141,59 +141,62 @@ CUSTOM_HEAD = ui.head_content(
             }
         });
 
-        // --- 4. ZERO-GLITCH SCROLL LOCK & ANTI-JUMP FILE UPLOAD ---
-        let userScrollPos = 0;
-        let lockedUploadScroll = 0;
-        let isLockingScroll = false;
+        // --- 4. ZERO-GLITCH SMART SCROLL LOCK (ANTI-LOMPAT & BEBAS SCROLL ATAS/BAWAH) ---
+        let lockedScrollTop = 0;
+        let isUploadingFile = false;
 
         function getContainer() {
-            return document.getElementById("main-scroll-container") || document.querySelector('div[style*="overflow-y: auto"]');
+            return document.getElementById("main-scroll-container");
         }
 
-        // Catat posisi scroll aktual setiap kali user menggulung layar
+        // Catat posisi scroll aktual HANYA saat user melakukan scroll alami
         window.addEventListener('scroll', function(e) {
             let c = getContainer();
             if (c && (e.target === c || e.target === document)) {
-                if (!isLockingScroll && c.scrollTop > 0) {
-                    userScrollPos = c.scrollTop;
+                if (!isUploadingFile) {
+                    lockedScrollTop = c.scrollTop;
                 }
             }
         }, true);
 
-        // Kunci posisi scroll seketika saat user mengklik area upload file
+        // Kunci koordinat tepat saat tombol/kotak upload disentuh
         document.addEventListener('pointerdown', function(e) {
             let c = getContainer();
-            if (c) {
-                userScrollPos = c.scrollTop;
-                if (e.target && (e.target.closest('.reflex-upload-container') || e.target.closest('.btn-file') || e.target.type === 'file')) {
-                    lockedUploadScroll = c.scrollTop;
-                }
+            if (c && e.target && (e.target.closest('.reflex-upload-container') || e.target.closest('.btn-file') || e.target.type === 'file')) {
+                lockedScrollTop = c.scrollTop;
             }
         }, true);
 
-        // Tahan posisi saat file selesai dipilih dari Windows Explorer (Cegah lompat ke atas)
+        // Tahan posisi saat file dipilih dari Windows Explorer (Tanpa Glitch & Tanpa Freeze)
         document.addEventListener('change', function(e) {
             if (e.target && e.target.type === 'file') {
                 let c = getContainer();
-                let targetPos = lockedUploadScroll || userScrollPos;
-                if (c && targetPos > 0) {
-                    isLockingScroll = true;
-                    c.scrollTop = targetPos;
+                if (c && lockedScrollTop > 0) {
+                    isUploadingFile = true;
+                    c.scrollTop = lockedScrollTop;
 
-                    // Kunci posisi selama 600ms selama browser & Shiny memproses upload
-                    let frames = 0;
-                    function holdScroll() {
-                        if (c && c.scrollTop !== targetPos) {
-                            c.scrollTop = targetPos;
+                    // Kunci secara presisi selama 250ms saja agar browser tidak memicu auto-focus jump
+                    let count = 0;
+                    let holdTimer = setInterval(function() {
+                        if (c && c.scrollTop !== lockedScrollTop) {
+                            c.scrollTop = lockedScrollTop;
                         }
-                        frames++;
-                        if (frames < 35) {
-                            requestAnimationFrame(holdScroll);
-                        } else {
-                            isLockingScroll = false;
+                        count++;
+                        if (count >= 12) { // 12 x 20ms = 240ms
+                            clearInterval(holdTimer);
+                            isUploadingFile = false; // BUKA KUNCI TOTAL: User bebas scroll ke atas/bawah!
                         }
-                    }
-                    requestAnimationFrame(holdScroll);
+                    }, 20);
+                }
+            }
+        }, true);
+
+        // Cegah auto-focus browser membanting scroll ke 0 saat input file aktif
+        window.addEventListener('focusin', function(e) {
+            if (e.target && e.target.type === 'file') {
+                let c = getContainer();
+                if (c && isUploadingFile && lockedScrollTop > 0) {
+                    c.scrollTop = lockedScrollTop;
                 }
             }
         }, true);
@@ -207,41 +210,31 @@ CUSTOM_HEAD = ui.head_content(
             document.body.classList.add('process-running');
         };
 
-        // --- 6. EVENT LISTENER SHINY (RESTORASI POSISI SETELAH RE-RENDER) ---
+        // --- 6. SHINY EVENT LISTENERS (TANPA MUTATION OBSERVER YANG MENJEBAK SCROLL) ---
         if (window.jQuery) {
-            $(document).on('shiny:inputchanged shiny:fileuploaded shiny:recalculated shiny:value', function() {
+            $(document).on('shiny:fileuploaded shiny:inputchanged', function() {
                 let c = getContainer();
-                let targetPos = lockedUploadScroll || userScrollPos;
-                if (c && targetPos > 0) {
-                    c.scrollTop = targetPos;
+                if (c && isUploadingFile && lockedScrollTop > 0) {
+                    c.scrollTop = lockedScrollTop;
                 }
             });
 
-            // HANYA tutup spinner saat Shiny benar-benar IDLE
+            // HANYA tutup spinner saat Shiny benar-benar IDLE (selesai seluruh proses)
             $(document).on('shiny:idle', function() {
                 document.body.classList.remove('process-running');
                 let spinner = document.getElementById('global_reflex_loading');
                 if (spinner) {
                     spinner.style.removeProperty('display');
                 }
-                // Lepaskan kunci upload setelah stabil
-                setTimeout(function() {
-                    lockedUploadScroll = 0;
-                }, 300);
+                isUploadingFile = false; // Bebaskan scroll total
             });
         }
+
         // --- 7. ROUTING MENU & URL SYNC ---
         if (window.location.pathname.endsWith('index.html') && window.history.replaceState) {
             let cleanPath = window.location.pathname.replace(/index\.html$/, '');
             window.history.replaceState(null, '', cleanPath + window.location.hash);
         }
-
-        let domWatcher = new MutationObserver(function() {
-            let c = getContainer();
-            if (c && window._lockedScrollPos > 0 && !isUserActivelyScrolling && c.scrollTop !== window._lockedScrollPos) {
-                c.scrollTop = window._lockedScrollPos;
-            }
-        });
 
         window.setMenuRoute = function(menuName, slug) {
             try {
@@ -269,11 +262,6 @@ CUSTOM_HEAD = ui.head_content(
 
         // BACA URL SAAT PERTAMA KALI HALAMAN DIBUKA
         document.addEventListener("DOMContentLoaded", function() {
-            let c = getContainer();
-            if (c) {
-                domWatcher.observe(c, { childList: true, subtree: true });
-            }
-
             let h = window.location.hash.replace('#', '').trim();
             if (h) {
                 setTimeout(function() {
@@ -286,111 +274,60 @@ CUSTOM_HEAD = ui.head_content(
     # --- 3. FONT AWESOME ICONS ---
     ui.tags.link(rel="stylesheet", href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"),
 
-    # --- 4. CSS STYLING LENGKAP ---
+    # --- 4. CSS STYLING LENGKAP (OPTIMASI ZERO-GLITCH) ---
     ui.tags.style("""
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         body, html { height: 100%; width: 100%; overflow-x: hidden; background-color: #111318; margin: 0; padding: 0; }
         
-        .selectize-control .selectize-input {
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234A5568' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
-            background-repeat: no-repeat !important;
-            background-position: right 0.75rem center !important;
-            background-size: 14px 14px !important;
-            padding-right: 2.25rem !important;
-        }
-
-        .selectize-control .selectize-input.dropdown-active {
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23E50914' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='18 15 12 9 6 15'%3E%3C/polyline%3E%3C/svg%3E") !important;
-        }
-
-        select.form-control, select {
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234A5568' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
-            background-repeat: no-repeat !important;
-            background-position: right 0.75rem center !important;
-            background-size: 14px 14px !important;
-            padding-right: 2.25rem !important;
-            -webkit-appearance: none !important;
-            -moz-appearance: none !important;
-            appearance: none !important;
-        }
-
+        /* Container scroll: Bebas scroll alami, anti-bouncing */
         #main-scroll-container {
-            overflow-anchor: none !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
             scroll-behavior: auto !important;
+            overscroll-behavior: contain !important;
+            -webkit-overflow-scrolling: touch;
         }
 
-        @keyframes blinkAnimation {
-            0% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.25; transform: scale(0.75); }
-            100% { opacity: 1; transform: scale(1); }
+        /* HILANGKAN GLITCH 0.1 DETIK: Input file diletakkan pas di atas tombol upload */
+        .btn-file {
+            position: relative !important;
+            overflow: hidden !important;
+            cursor: pointer !important;
         }
-        .blink-online {
-            animation: blinkAnimation 1.5s infinite ease-in-out;
-        }
-
-        .reflex-spinner-red {
-            width: 38px; height: 38px;
-            border: 3.5px solid rgba(229, 9, 20, 0.2);
-            border-top-color: #E50914; border-radius: 50%;
-            animation: reflexSpin 0.75s linear infinite;
-        }
-        @keyframes reflexSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-        #global_reflex_loading { display: none; }
-        body.process-running #global_reflex_loading {
-            display: flex !important; position: fixed !important;
-            top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important;
-            background: rgba(0, 0, 0, 0.5) !important; z-index: 99990 !important;
-            align-items: center !important; justify-content: center !important;
+        .btn-file input[type="file"],
+        .reflex-upload-container input[type="file"] {
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            opacity: 0 !important;
+            cursor: pointer !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            font-size: 0 !important;
+            display: block !important;
+            z-index: 10 !important;
         }
 
-        body:has(#success-modal-overlay) #global_reflex_loading,
-        body:has(#error-modal-overlay) #global_reflex_loading {
-            display: none !important;
-        }
-
-        #success-modal-overlay, #error-modal-overlay {
-            z-index: 999999 !important;
-        }
-
-        @keyframes popIn { 0% { transform: scale(0.5); opacity: 0; } 70% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
-        .animate-pop { animation: popIn 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
-        
-        #shiny-notification-panel { top: 25px !important; right: 25px !important; bottom: auto !important; left: auto !important; position: fixed !important; z-index: 999999 !important; width: 360px !important; }
-        .shiny-notification { border-radius: 10px !important; box-shadow: 0 10px 25px rgba(0,0,0,0.18) !important; font-weight: 700 !important; font-size: 13px !important; padding: 14px 18px !important; margin-bottom: 10px !important; }
-        .shiny-notification-message { background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important; color: #FFFFFF !important; border: none !important; }
-        .shiny-notification-error { background: linear-gradient(135deg, #E50914 0%, #B20710 100%) !important; color: #FFFFFF !important; border: none !important; }
-        .shiny-notification-warning { background: linear-gradient(135deg, #DD6B20 0%, #C05621 100%) !important; color: #FFFFFF !important; border: none !important; }
-
-        .custom-clean-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
-        .custom-clean-table th { background: #EDF2F7; color: #1A202C; font-weight: bold; font-size: 12px; padding: 10px; white-space: nowrap; border-bottom: 1px solid #CBD5E0; }
-        .custom-clean-table td { color: #2D3748; padding: 8px 10px; white-space: nowrap; border-bottom: 1px solid #EDF2F7; }
-        .custom-clean-table tr:hover { background-color: #F8FAFC; }
-        
-        .btn-red-gradient {
-            background: linear-gradient(135deg, #E50914 0%, #B20710 100%) !important;
-            color: #FFFFFF !important; font-weight: 800 !important; border-radius: 6px !important;
-            border: none !important; cursor: pointer; box-shadow: 0 4px 12px rgba(229, 9, 20, 0.25);
-            padding: 0.75rem 1.5rem; transition: all 0.2s ease;
-        }
-        .btn-red-gradient:hover { filter: brightness(1.1); }
-        .btn-locked { background-color: #E50914 !important; opacity: 0.5 !important; color: white !important; font-weight: bold !important; border-radius: 6px !important; cursor: not-allowed !important; border: none !important; padding: 0.75rem 1.5rem; }
-
-        .btn-page-nav {
-            background: #FFFFFF; border: 1.5px solid #CBD5E0; border-radius: 6px;
-            padding: 4px 12px; font-weight: 700; font-size: 12px; color: #1A202C;
-            cursor: pointer; transition: all 0.2s ease;
-        }
-        .btn-page-nav:hover:not(:disabled) { background: #EDF2F7; border-color: #A0AEC0; }
-        .btn-page-nav:disabled { opacity: 0.35; cursor: not-allowed; }
-
+        /* Hilangkan 'transition: all' yang menyebabkan layar bergoyang saat upload */
         .reflex-upload-container {
-            border: 2px dashed #000000 !important; border-radius: 8px; background: #F8FAFC;
-            padding: 1.25rem 1.5rem; min-height: 85px; width: 100%;
-            display: flex !important; align-items: center !important; justify-content: flex-start !important;
-            position: relative; transition: all 0.2s ease;
+            border: 2px dashed #000000 !important;
+            border-radius: 8px;
+            background: #F8FAFC;
+            padding: 1.25rem 1.5rem;
+            min-height: 85px;
+            width: 100%;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: flex-start !important;
+            position: relative !important;
+            transition: border-color 0.15s ease, background-color 0.15s ease !important;
         }
-        .reflex-upload-container:hover { border-color: #C5A059; background-color: #FFFFFF; }
+        .reflex-upload-container:hover {
+            border-color: #C5A059 !important;
+            background-color: #FFFFFF !important;
+        }
         .reflex-upload-container .shiny-input-container { margin-bottom: 0 !important; width: 100%; display: flex !important; align-items: center !important; }
         .reflex-upload-container .input-group { display: flex !important; align-items: center !important; width: 100% !important; margin-bottom: 0 !important; }
         .reflex-upload-container .input-group-prepend, .reflex-upload-container .input-group-btn { display: flex !important; align-items: center !important; margin: 0 !important; }
@@ -423,22 +360,92 @@ CUSTOM_HEAD = ui.head_content(
         .csv-batch-box .btn-file { background: #1A202C !important; color: #FFFFFF !important; font-weight: 700 !important; border-radius: 6px !important; border: none !important; padding: 8px 16px !important; margin-right: 10px !important; }
         .csv-batch-box input[type="text"].form-control { background-color: transparent !important; border: none !important; color: #2D3748 !important; font-weight: 700 !important; font-size: 13px !important; box-shadow: none !important; }
 
+        .selectize-control .selectize-input {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234A5568' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+            background-repeat: no-repeat !important;
+            background-position: right 0.75rem center !important;
+            background-size: 14px 14px !important;
+            padding-right: 2.25rem !important;
+        }
+
+        .selectize-control .selectize-input.dropdown-active {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23E50914' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='18 15 12 9 6 15'%3E%3C/polyline%3E%3C/svg%3E") !important;
+        }
+
+        select.form-control, select {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234A5568' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+            background-repeat: no-repeat !important;
+            background-position: right 0.75rem center !important;
+            background-size: 14px 14px !important;
+            padding-right: 2.25rem !important;
+            -webkit-appearance: none !important;
+            -moz-appearance: none !important;
+            appearance: none !important;
+        }
+
+        @keyframes blinkAnimation {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.25; transform: scale(0.75); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        .blink-online { animation: blinkAnimation 1.5s infinite ease-in-out; }
+
+        .reflex-spinner-red {
+            width: 38px; height: 38px;
+            border: 3.5px solid rgba(229, 9, 20, 0.2);
+            border-top-color: #E50914; border-radius: 50%;
+            animation: reflexSpin 0.75s linear infinite;
+        }
+        @keyframes reflexSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        #global_reflex_loading { display: none; }
+        body.process-running #global_reflex_loading {
+            display: flex !important; position: fixed !important;
+            top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important;
+            background: rgba(0, 0, 0, 0.5) !important; z-index: 99990 !important;
+            align-items: center !important; justify-content: center !important;
+        }
+
+        body:has(#success-modal-overlay) #global_reflex_loading,
+        body:has(#error-modal-overlay) #global_reflex_loading { display: none !important; }
+
+        #success-modal-overlay, #error-modal-overlay { z-index: 999999 !important; }
+
+        @keyframes popIn { 0% { transform: scale(0.5); opacity: 0; } 70% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+        .animate-pop { animation: popIn 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        
+        #shiny-notification-panel { top: 25px !important; right: 25px !important; bottom: auto !important; left: auto !important; position: fixed !important; z-index: 999999 !important; width: 360px !important; }
+        .shiny-notification { border-radius: 10px !important; box-shadow: 0 10px 25px rgba(0,0,0,0.18) !important; font-weight: 700 !important; font-size: 13px !important; padding: 14px 18px !important; margin-bottom: 10px !important; }
+        .shiny-notification-message { background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important; color: #FFFFFF !important; border: none !important; }
+        .shiny-notification-error { background: linear-gradient(135deg, #E50914 0%, #B20710 100%) !important; color: #FFFFFF !important; border: none !important; }
+        .shiny-notification-warning { background: linear-gradient(135deg, #DD6B20 0%, #C05621 100%) !important; color: #FFFFFF !important; border: none !important; }
+
+        .custom-clean-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
+        .custom-clean-table th { background: #EDF2F7; color: #1A202C; font-weight: bold; font-size: 12px; padding: 10px; white-space: nowrap; border-bottom: 1px solid #CBD5E0; }
+        .custom-clean-table td { color: #2D3748; padding: 8px 10px; white-space: nowrap; border-bottom: 1px solid #EDF2F7; }
+        .custom-clean-table tr:hover { background-color: #F8FAFC; }
+        
+        .btn-red-gradient {
+            background: linear-gradient(135deg, #E50914 0%, #B20710 100%) !important;
+            color: #FFFFFF !important; font-weight: 800 !important; border-radius: 6px !important;
+            border: none !important; cursor: pointer; box-shadow: 0 4px 12px rgba(229, 9, 20, 0.25);
+            padding: 0.75rem 1.5rem; transition: all 0.2s ease;
+        }
+        .btn-red-gradient:hover { filter: brightness(1.1); }
+        .btn-locked { background-color: #E50914 !important; opacity: 0.5 !important; color: white !important; font-weight: bold !important; border-radius: 6px !important; cursor: not-allowed !important; border: none !important; padding: 0.75rem 1.5rem; }
+
+        .btn-page-nav {
+            background: #FFFFFF; border: 1.5px solid #CBD5E0; border-radius: 6px;
+            padding: 4px 12px; font-weight: 700; font-size: 12px; color: #1A202C;
+            cursor: pointer; transition: all 0.2s ease;
+        }
+        .btn-page-nav:hover:not(:disabled) { background: #EDF2F7; border-color: #A0AEC0; }
+        .btn-page-nav:disabled { opacity: 0.35; cursor: not-allowed; }
+
         details { border: 1px solid #E2E8F0; border-radius: 6px; margin-bottom: 8px; background: #FFFFFF; }
         summary { font-weight: bold; padding: 10px 14px; cursor: pointer; color: #1A202C; background: #F8FAFC; border-radius: 6px; }
         details[open] summary { border-bottom: 1px solid #E2E8F0; border-radius: 6px 6px 0 0; }
         .accordion-content { padding: 14px; font-size: 13px; color: #4A5568; background: #F7FAFC; }
-        /* Cegah browser meloncat ke koordinat 0 saat input file menerima fokus */
-        .reflex-upload-container input[type="file"],
-        .btn-file input[type="file"] {
-            position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100% !important;
-            height: 100% !important;
-            opacity: 0 !important;
-            cursor: pointer !important;
-            z-index: 5 !important;
-        }
     """),
 
     # --- 5. SCRIPT LIVE TIMER ---
