@@ -60,10 +60,6 @@ def server(input: Inputs, output: Outputs, session: Session):
     def global_error_modal_ui():
         return error_modal(state.show_error_modal(), state.error_modal_message())
 
-    @render.ui
-    def ongkir_tab2_dynamic_ui():
-        return ongkir_tab2_view(state)
-
     # Authentication & Navigation
     @render.ui
     def ongkir_tab2_dynamic_ui():
@@ -1185,7 +1181,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         yield buf.getvalue()
 
-    # --- KARTU MANDIRI STEP 2 ---
+    # --- KARTU MANDIRI STEP 2 & 3 (CYCLE COUNT) ---
     @render.ui
     def cca_step2_card_ui():
         if not state.cca_step1_done(): return ui.div()
@@ -1204,10 +1200,38 @@ def server(input: Inputs, output: Outputs, session: Session):
                     ui.nav_panel("📦 SET UP REAL +", ui.div(render_clean_table(state.df_cca_setup_real_headers(), state.df_cca_setup_real_rows(), "tbl_cca_setup_real"), style="padding: 0.75rem 0;"))
                 ),
                 ui.hr(style="margin: 1.5rem 0; border-color: #E2E8F0;"),
-                ui.h4("📋 RECON REPORTS (HASIL STEP 1 - 3)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 1rem;"),
+                
+                # --- BAGIAN RECON STEP 3 DENGAN TOMBOL DOWNLOAD LENGKAP & STABIL ---
                 ui.div(
-                    ui.div(ui.h4("📋 REAL + RECON", style="font-size: 14px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"), render_clean_table(state.df_cca_rec_real_headers(), state.df_cca_rec_real_rows(), "tbl_cca_rec_real"), style="flex: 1; min-width: 300px;"),
-                    ui.div(ui.h4("🔐 SYSTEM + OUTSTANDING", style="font-size: 14px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"), render_clean_table(state.df_cca_rec_sys_headers(), state.df_cca_rec_sys_rows(), "tbl_cca_rec_sys"), style="flex: 1; min-width: 300px;"),
+                    ui.h4("📋 RECON REPORTS (HASIL STEP 1 - 3)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0;"),
+                    ui.download_button(
+                        "btn_dl_cca_rec_all", 
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-file-excel", style="margin-right: 6px; font-size: 13px;"), "DOWNLOAD RECON STEP 3 FULL (.xlsx)"), 
+                        style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer; font-size: 13px; box-shadow: 0 2px 6px rgba(16,185,129,0.25);"
+                    ),
+                    style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 1rem; flex-wrap: wrap; gap: 8px;"
+                ),
+                ui.div(
+                    # Box 1: Real + Recon
+                    ui.div(
+                        ui.div(
+                            ui.h5("📋 REAL + RECON", style="font-size: 14px; font-weight: 800; color: #1A202C; margin: 0;"),
+                            ui.download_button("btn_dl_cca_rec_real", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 12px;"), "Download (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 5px 12px; cursor: pointer; font-size: 12px;"),
+                            style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.6rem;"
+                        ),
+                        render_clean_table(state.df_cca_rec_real_headers(), state.df_cca_rec_real_rows(), "tbl_cca_rec_real"),
+                        style="flex: 1; min-width: 320px; background: #F8FAFC; padding: 1rem; border-radius: 8px; border: 1px solid #CBD5E0;"
+                    ),
+                    # Box 2: System + Outstanding
+                    ui.div(
+                        ui.div(
+                            ui.h5("🔐 SYSTEM + OUTSTANDING", style="font-size: 14px; font-weight: 800; color: #1A202C; margin: 0;"),
+                            ui.download_button("btn_dl_cca_rec_sys", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 12px;"), "Download (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 5px 12px; cursor: pointer; font-size: 12px;"),
+                            style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.6rem;"
+                        ),
+                        render_clean_table(state.df_cca_rec_sys_headers(), state.df_cca_rec_sys_rows(), "tbl_cca_rec_sys"),
+                        style="flex: 1; min-width: 320px; background: #F8FAFC; padding: 1rem; border-radius: 8px; border: 1px solid #CBD5E0;"
+                    ),
                     style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%;"
                 )
             )
@@ -1220,7 +1244,6 @@ def server(input: Inputs, output: Outputs, session: Session):
             class_="step-card-box",
             style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
         )
-
     @render.ui
     def cca_step2_btn_ui():
         f = input.cca_up_cov() if "cca_up_cov" in input else None
@@ -1254,7 +1277,35 @@ def server(input: Inputs, output: Outputs, session: Session):
             state._raw_df_cca_setup_real.to_excel(writer, sheet_name='SET_UP_REAL_PLUS', index=False)
         buf.seek(0)
         yield buf.getvalue()
+# Handler Download Recon Step 3 di Cycle Count
+    @render.download(filename="CycleCount_Real_Plus_Recon.xlsx")
+    def btn_dl_cca_rec_real():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            df = state._raw_df_cca_rec_real if not state._raw_df_cca_rec_real.empty else pd.DataFrame(columns=['BIN', 'SKU', 'ITEM NAME', 'QTY_SCAN', 'QTY_SYSTEM', 'DIFF', 'HASIL RECONCILIATION'])
+            df.to_excel(writer, sheet_name='REAL_PLUS_RECON', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
 
+    @render.download(filename="CycleCount_System_Plus_Recon.xlsx")
+    def btn_dl_cca_rec_sys():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            df = state._raw_df_cca_rec_sys if not state._raw_df_cca_rec_sys.empty else pd.DataFrame(columns=['BIN', 'SKU', 'DIFF', 'HASIL REKONSILIASI'])
+            df.to_excel(writer, sheet_name='SYSTEM_PLUS_RECON', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    @render.download(filename="CycleCount_Recon_Step3_Full.xlsx")
+    def btn_dl_cca_rec_all():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            df_r = state._raw_df_cca_rec_real if not state._raw_df_cca_rec_real.empty else pd.DataFrame(columns=['BIN', 'SKU', 'ITEM NAME', 'QTY_SCAN', 'QTY_SYSTEM', 'DIFF', 'HASIL RECONCILIATION'])
+            df_s = state._raw_df_cca_rec_sys if not state._raw_df_cca_rec_sys.empty else pd.DataFrame(columns=['BIN', 'SKU', 'DIFF', 'HASIL REKONSILIASI'])
+            df_r.to_excel(writer, sheet_name='REAL_PLUS_RECON', index=False)
+            df_s.to_excel(writer, sheet_name='SYSTEM_OUTSTANDING', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
     # --- KARTU MANDIRI STEP 4 ---
     @render.ui
     def cca_step4_card_ui():
@@ -1727,7 +1778,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         yield buf.getvalue()
 
-    # --- STEP 2 & 3: ALLOCATION & RECON ---
+    # --- KARTU MANDIRI STEP 2 & 3 (STOCK OPNAME) ---
     @render.ui
     def so_step2_card_ui():
         if not state.so_step1_done(): return ui.div()
@@ -1746,25 +1797,37 @@ def server(input: Inputs, output: Outputs, session: Session):
                     ui.nav_panel("📦 SET UP REAL +", ui.div(render_clean_table(state.df_so_setup_real_headers(), state.df_so_setup_real_rows(), "tbl_so_setup_real"), style="padding: 0.75rem 0;"))
                 ),
                 ui.hr(style="margin: 1.5rem 0; border-color: #E2E8F0;"),
-                ui.h4("📋 RECON REPORTS (HASIL STEP 1 - 3)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 1rem;"),
+                
+                # --- BAGIAN RECON STEP 3 DENGAN TOMBOL DOWNLOAD LENGKAP & STABIL ---
                 ui.div(
+                    ui.h4("📋 RECON REPORTS (HASIL STEP 1 - 3)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0;"),
+                    ui.download_button(
+                        "btn_dl_so_rec_all", 
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-file-excel", style="margin-right: 6px; font-size: 13px;"), "DOWNLOAD RECON STEP 3 FULL (.xlsx)"), 
+                        style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer; font-size: 13px; box-shadow: 0 2px 6px rgba(16,185,129,0.25);"
+                    ),
+                    style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 1rem; flex-wrap: wrap; gap: 8px;"
+                ),
+                ui.div(
+                    # Box 1: Real + Recon
                     ui.div(
                         ui.div(
-                            ui.h4("📋 REAL + RECON", style="font-size: 14px; font-weight: 800; color: #1A202C; margin: 0;"),
-                            ui.download_button("btn_dl_so_rec_real", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 13px;"), "Download (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 4px 10px; cursor: pointer; font-size: 12px;"),
-                            style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.5rem;"
+                            ui.h5("📋 REAL + RECON", style="font-size: 14px; font-weight: 800; color: #1A202C; margin: 0;"),
+                            ui.download_button("btn_dl_so_rec_real", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 12px;"), "Download (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 5px 12px; cursor: pointer; font-size: 12px;"),
+                            style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.6rem;"
                         ),
                         render_clean_table(state.df_so_rec_real_headers(), state.df_so_rec_real_rows(), "tbl_so_rec_real"),
-                        style="flex: 1; min-width: 300px;"
+                        style="flex: 1; min-width: 320px; background: #F8FAFC; padding: 1rem; border-radius: 8px; border: 1px solid #CBD5E0;"
                     ),
+                    # Box 2: System + Recon
                     ui.div(
                         ui.div(
-                            ui.h4("🔐 SYSTEM + RECON (OUTSTANDING)", style="font-size: 14px; font-weight: 800; color: #1A202C; margin: 0;"),
-                            ui.download_button("btn_dl_so_rec_sys", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 13px;"), "Download (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 4px 10px; cursor: pointer; font-size: 12px;"),
-                            style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.5rem;"
+                            ui.h5("🔐 SYSTEM + RECON (OUTSTANDING)", style="font-size: 14px; font-weight: 800; color: #1A202C; margin: 0;"),
+                            ui.download_button("btn_dl_so_rec_sys", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 12px;"), "Download (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 5px 12px; cursor: pointer; font-size: 12px;"),
+                            style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.6rem;"
                         ),
                         render_clean_table(state.df_so_rec_sys_headers(), state.df_so_rec_sys_rows(), "tbl_so_rec_sys"),
-                        style="flex: 1; min-width: 300px;"
+                        style="flex: 1; min-width: 320px; background: #F8FAFC; padding: 1rem; border-radius: 8px; border: 1px solid #CBD5E0;"
                     ),
                     style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%;"
                 )
@@ -1776,7 +1839,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             ui.div(
                 ui.tags.button(
                     ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "RUN ALLOCATION"),
-                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_so_step2', Math.random(), {priority: 'event'});",
+                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_run_so_step2', Math.random(), {priority: 'event'});",
                     class_="btn-red-gradient"
                 ),
                 style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
@@ -1814,7 +1877,8 @@ def server(input: Inputs, output: Outputs, session: Session):
     def btn_dl_so_rec_real():
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-            state._raw_df_so_rec_real.to_excel(writer, sheet_name='REAL_PLUS_RECON', index=False)
+            df = state._raw_df_so_rec_real if not state._raw_df_so_rec_real.empty else pd.DataFrame(columns=['BIN', 'SKU', 'ITEM NAME', 'QTY_SCAN', 'QTY_SYSTEM', 'DIFF', 'HASIL RECONCILIATION'])
+            df.to_excel(writer, sheet_name='REAL_PLUS_RECON', index=False)
         buf.seek(0)
         yield buf.getvalue()
 
@@ -1822,7 +1886,20 @@ def server(input: Inputs, output: Outputs, session: Session):
     def btn_dl_so_rec_sys():
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-            state._raw_df_so_rec_sys.to_excel(writer, sheet_name='SYSTEM_PLUS_RECON', index=False)
+            df = state._raw_df_so_rec_sys if not state._raw_df_so_rec_sys.empty else pd.DataFrame(columns=['BIN', 'SKU', 'DIFF', 'HASIL REKONSILIASI'])
+            df.to_excel(writer, sheet_name='SYSTEM_PLUS_RECON', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    # Tombol Download 2 Sheet Sekaligus untuk Stock Opname
+    @render.download(filename="Report_SO_Recon_Step3_Full.xlsx")
+    def btn_dl_so_rec_all():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            df_r = state._raw_df_so_rec_real if not state._raw_df_so_rec_real.empty else pd.DataFrame(columns=['BIN', 'SKU', 'ITEM NAME', 'QTY_SCAN', 'QTY_SYSTEM', 'DIFF', 'HASIL RECONCILIATION'])
+            df_s = state._raw_df_so_rec_sys if not state._raw_df_so_rec_sys.empty else pd.DataFrame(columns=['BIN', 'SKU', 'DIFF', 'HASIL REKONSILIASI'])
+            df_r.to_excel(writer, sheet_name='REAL_PLUS_RECON', index=False)
+            df_s.to_excel(writer, sheet_name='SYSTEM_OUTSTANDING', index=False)
         buf.seek(0)
         yield buf.getvalue()
 
