@@ -141,38 +141,60 @@ CUSTOM_HEAD = ui.head_content(
             }
         });
 
-        // --- 4. ZERO-GLITCH SYNCHRONOUS SCROLL LOCK ---
-        window._lockedScrollPos = 0;
-        let isUserActivelyScrolling = false;
-        let scrollResetTimer = null;
+        // --- 4. ZERO-GLITCH SCROLL LOCK & ANTI-JUMP FILE UPLOAD ---
+        let userScrollPos = 0;
+        let lockedUploadScroll = 0;
+        let isLockingScroll = false;
 
         function getContainer() {
             return document.getElementById("main-scroll-container") || document.querySelector('div[style*="overflow-y: auto"]');
         }
 
-        window.addEventListener('wheel', function() {
-            isUserActivelyScrolling = true;
-            clearTimeout(scrollResetTimer);
-            scrollResetTimer = setTimeout(function() { isUserActivelyScrolling = false; }, 200);
-        }, { passive: true, capture: true });
-
-        window.addEventListener('touchmove', function() {
-            isUserActivelyScrolling = true;
-            clearTimeout(scrollResetTimer);
-            scrollResetTimer = setTimeout(function() { isUserActivelyScrolling = false; }, 200);
-        }, { passive: true, capture: true });
-
-        document.addEventListener('scroll', function(e) {
+        // Catat posisi scroll aktual setiap kali user menggulung layar
+        window.addEventListener('scroll', function(e) {
             let c = getContainer();
-            if (c && isUserActivelyScrolling && c.scrollTop > 0) {
-                window._lockedScrollPos = c.scrollTop;
+            if (c && (e.target === c || e.target === document)) {
+                if (!isLockingScroll && c.scrollTop > 0) {
+                    userScrollPos = c.scrollTop;
+                }
             }
         }, true);
 
-        document.addEventListener('mousedown', function() {
+        // Kunci posisi scroll seketika saat user mengklik area upload file
+        document.addEventListener('pointerdown', function(e) {
             let c = getContainer();
-            if (c && c.scrollTop > 0) {
-                window._lockedScrollPos = c.scrollTop;
+            if (c) {
+                userScrollPos = c.scrollTop;
+                if (e.target && (e.target.closest('.reflex-upload-container') || e.target.closest('.btn-file') || e.target.type === 'file')) {
+                    lockedUploadScroll = c.scrollTop;
+                }
+            }
+        }, true);
+
+        // Tahan posisi saat file selesai dipilih dari Windows Explorer (Cegah lompat ke atas)
+        document.addEventListener('change', function(e) {
+            if (e.target && e.target.type === 'file') {
+                let c = getContainer();
+                let targetPos = lockedUploadScroll || userScrollPos;
+                if (c && targetPos > 0) {
+                    isLockingScroll = true;
+                    c.scrollTop = targetPos;
+
+                    // Kunci posisi selama 600ms selama browser & Shiny memproses upload
+                    let frames = 0;
+                    function holdScroll() {
+                        if (c && c.scrollTop !== targetPos) {
+                            c.scrollTop = targetPos;
+                        }
+                        frames++;
+                        if (frames < 35) {
+                            requestAnimationFrame(holdScroll);
+                        } else {
+                            isLockingScroll = false;
+                        }
+                    }
+                    requestAnimationFrame(holdScroll);
+                }
             }
         }, true);
 
@@ -185,32 +207,29 @@ CUSTOM_HEAD = ui.head_content(
             document.body.classList.add('process-running');
         };
 
-        // --- 6. EVENT LISTENER SHINY (SINKRON SCROLL & AUTO-DISMISS SPINNER) ---
+        // --- 6. EVENT LISTENER SHINY (RESTORASI POSISI SETELAH RE-RENDER) ---
         if (window.jQuery) {
-            $(document).on('shiny:inputchanged shiny:recalculating', function() {
+            $(document).on('shiny:inputchanged shiny:fileuploaded shiny:recalculated shiny:value', function() {
                 let c = getContainer();
-                if (c && c.scrollTop > 0) {
-                    window._lockedScrollPos = c.scrollTop;
+                let targetPos = lockedUploadScroll || userScrollPos;
+                if (c && targetPos > 0) {
+                    c.scrollTop = targetPos;
                 }
             });
 
-            $(document).on('shiny:value shiny:recalculated', function() {
-                let c = getContainer();
-                if (c && window._lockedScrollPos > 0 && !isUserActivelyScrolling) {
-                    c.scrollTop = window._lockedScrollPos;
-                }
-            });
-
-            // HANYA tutup spinner saat Shiny benar-benar IDLE (selesai seluruh kalkulasi)
+            // HANYA tutup spinner saat Shiny benar-benar IDLE
             $(document).on('shiny:idle', function() {
                 document.body.classList.remove('process-running');
                 let spinner = document.getElementById('global_reflex_loading');
                 if (spinner) {
                     spinner.style.removeProperty('display');
                 }
+                // Lepaskan kunci upload setelah stabil
+                setTimeout(function() {
+                    lockedUploadScroll = 0;
+                }, 300);
             });
         }
-
         // --- 7. ROUTING MENU & URL SYNC ---
         if (window.location.pathname.endsWith('index.html') && window.history.replaceState) {
             let cleanPath = window.location.pathname.replace(/index\.html$/, '');
@@ -408,6 +427,18 @@ CUSTOM_HEAD = ui.head_content(
         summary { font-weight: bold; padding: 10px 14px; cursor: pointer; color: #1A202C; background: #F8FAFC; border-radius: 6px; }
         details[open] summary { border-bottom: 1px solid #E2E8F0; border-radius: 6px 6px 0 0; }
         .accordion-content { padding: 14px; font-size: 13px; color: #4A5568; background: #F7FAFC; }
+        /* Cegah browser meloncat ke koordinat 0 saat input file menerima fokus */
+        .reflex-upload-container input[type="file"],
+        .btn-file input[type="file"] {
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            opacity: 0 !important;
+            cursor: pointer !important;
+            z-index: 5 !important;
+        }
     """),
 
     # --- 5. SCRIPT LIVE TIMER ---
