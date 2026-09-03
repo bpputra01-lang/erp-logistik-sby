@@ -1881,8 +1881,10 @@ class AppState:
             return False, f"Gagal Generate New Draft: {e}"
 
 # ==========================================================================
-    # STOCK OPNAME ANALYZER LOGIC & ALGORITHMS (LENGKAP STEP 1 - 6)
+    # STOCK OPNAME ANALYZER (DENGAN INTEGRASI STOCK MINUS CERDAS)
     # ==========================================================================
+
+    # --- STEP 1: COMPARE SCAN VS STOCK (POIN 2: QTY SYSTEM < 0 MASUK DENGAN NOTE 'Stock Minus') ---
     def run_so_step1(self, f_scan, f_stock, sub_sel, bin_sys_sel):
         try:
             df_s_raw = load_data_from_info(f_scan)
@@ -1890,12 +1892,14 @@ class AppState:
             if df_s_raw.empty or df_t_raw.empty:
                 return False, "File Data Scan dan Stock System tidak boleh kosong!"
 
+            # 1. Bersihkan Data Scan
             ds = df_s_raw.iloc[:, [0, 1, 2]].copy()
             ds.columns = ['BIN', 'SKU', 'QTY_SCAN']
             ds['BIN'] = ds['BIN'].astype(str).str.strip().str.upper()
             ds['SKU'] = ds['SKU'].astype(str).str.strip().str.upper()
             ds['QTY_SCAN'] = pd.to_numeric(ds['QTY_SCAN'], errors='coerce').fillna(0)
 
+            # 2. Bersihkan & Filter Stock System
             dt = df_t_raw.copy()
             col_b, col_s, col_q_sys = dt.columns[1], dt.columns[2], dt.columns[9]
 
@@ -1912,28 +1916,69 @@ class AppState:
             dt_sub.columns = ['BIN', 'SKU', 'QTY_SYSTEM']
             dt_grouped = dt_sub.groupby(['BIN', 'SKU'], as_index=False)['QTY_SYSTEM'].sum()
 
+            # Mapping Nama Item
+            item_map = dt.iloc[:, [2, 4]].dropna().astype(str)
+            item_map.columns = ['SKU', 'NAME']
+            item_map['SKU'] = item_map['SKU'].str.strip().str.upper()
+            map_dict = item_map.drop_duplicates('SKU').set_index('SKU')['NAME'].to_dict()
+
+            # 3. Compare Scan ke Stock
             res_scan = ds.merge(dt_grouped, on=['BIN', 'SKU'], how='left').fillna(0)
             res_scan['DIFF'] = res_scan['QTY_SCAN'] - res_scan['QTY_SYSTEM']
-            res_scan['NOTE'] = np.where(res_scan['DIFF'] > 0, "REAL +", np.where(res_scan['DIFF'] < 0, "SYSTEM +", "OK"))
 
+            # Labeling Note: Jika QTY_SYSTEM < 0 maka dilabeli "Stock Minus"
+            cond_scan = [
+                (res_scan['QTY_SYSTEM'] < 0),
+                (res_scan['DIFF'] > 0),
+                (res_scan['DIFF'] < 0)
+            ]
+            choices_scan = ["Stock Minus", "REAL +", "SYSTEM +"]
+            res_scan['NOTE'] = np.select(cond_scan, choices_scan, default="OK")
+
+            # CEK STOCK MINUS DARI SISTEM YANG TIDAK TERSCAN (QTY SCAN = 0)
+            scanned_keys = set(zip(res_scan['BIN'], res_scan['SKU']))
+            missing_minus = dt_grouped[dt_grouped['QTY_SYSTEM'] < 0].copy()
+            
+            unscanned_rows = []
+            for _, r in missing_minus.iterrows():
+                b_val, s_val, q_sys_val = r['BIN'], r['SKU'], r['QTY_SYSTEM']
+                if (b_val, s_val) not in scanned_keys:
+                    unscanned_rows.append({
+                        'BIN': b_val,
+                        'SKU': s_val,
+                        'QTY_SCAN': 0,
+                        'QTY_SYSTEM': q_sys_val,
+                        'DIFF': abs(q_sys_val),
+                        'NOTE': 'Stock Minus'
+                    })
+
+            if unscanned_rows:
+                df_unscanned = pd.DataFrame(unscanned_rows)
+                res_scan = pd.concat([res_scan, df_unscanned], ignore_index=True)
+
+            res_scan['ITEM NAME'] = res_scan['SKU'].map(map_dict).fillna("-")
+
+            # 4. Compare Stock ke Scan
             ds_g = ds.groupby(['BIN', 'SKU'], as_index=False)['QTY_SCAN'].sum()
             ds_g.columns = ['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN']
 
             dt_merged = dt.merge(ds_g, left_on=[col_b, col_s], right_on=['BIN_SCAN', 'SKU_SCAN'], how='left')
             dt_merged['QTY SO'] = dt_merged['QTY_TOTAL_SCAN'].fillna(0)
             dt_merged['DIFF'] = dt_merged[col_q_sys] - dt_merged['QTY SO']
-            dt_merged['NOTE'] = np.where(dt_merged['DIFF'] > 0, "SYSTEM +", np.where(dt_merged['DIFF'] < 0, "REAL +", "OK"))
+
+            cond_stock = [
+                (dt_merged[col_q_sys] < 0),
+                (dt_merged['DIFF'] > 0),
+                (dt_merged['DIFF'] < 0)
+            ]
+            choices_stock = ["Stock Minus", "SYSTEM +", "REAL +"]
+            dt_merged['NOTE'] = np.select(cond_stock, choices_stock, default="OK")
+
             res_stock = dt_merged.drop(columns=['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN'], errors='ignore')
-
-            item_map = dt.iloc[:, [2, 4]].dropna().astype(str)
-            item_map.columns = ['SKU', 'NAME']
-            item_map['SKU'] = item_map['SKU'].str.strip().str.upper()
-            map_dict = item_map.drop_duplicates('SKU').set_index('SKU')['NAME'].to_dict()
-
-            res_scan['ITEM NAME'] = res_scan['SKU'].map(map_dict).fillna("-")
             res_stock['ITEM NAME'] = res_stock.iloc[:, 2].astype(str).str.upper().map(map_dict).fillna("-")
 
-            real_plus = res_scan[res_scan['NOTE'] == "REAL +"].copy()
+            # Masukkan kedua kondisi (REAL + dan Stock Minus) ke dalam tabel real_plus
+            real_plus = res_scan[res_scan['NOTE'].isin(["REAL +", "Stock Minus"])].copy()
             system_plus = res_stock[res_stock['NOTE'] == "SYSTEM +"].copy()
 
             self.so_qty_real_plus.set(int(real_plus['DIFF'].sum()) if not real_plus.empty else 0)
@@ -1959,6 +2004,7 @@ class AppState:
         except Exception as e:
             return False, f"Gagal Compare Step 1: {e}"
 
+    # --- STEP 2: ALLOCATION (POIN 3: STOCK MINUS DIALOKASIKAN PALING AKHIR) ---
     def run_so_step2(self, f_bin_cov, selected_bin_cov):
         try:
             if self._raw_df_so_real_plus.empty or self._raw_df_so_sys_plus.empty:
@@ -1998,9 +2044,16 @@ class AppState:
             df_sys_updated = self._raw_df_so_sys_plus.copy()
             sys_reduction = {}
 
-            for _, row in self._raw_df_so_real_plus.iterrows():
+            # URUTKAN ITERASI: REAL + NORMAL DULUAN, BARU STOCK MINUS PALING AKHIR
+            normal_real = self._raw_df_so_real_plus[self._raw_df_so_real_plus['NOTE'] == "REAL +"].copy()
+            minus_real = self._raw_df_so_real_plus[self._raw_df_so_real_plus['NOTE'] == "Stock Minus"].copy()
+            ordered_real = pd.concat([normal_real, minus_real], ignore_index=True)
+
+            for _, row in ordered_real.iterrows():
                 sku = str(row['SKU']).strip().upper()
                 diff_needed = float(row['DIFF'])
+                is_minus = (row.get('NOTE') == "Stock Minus")
+
                 if diff_needed <= 0:
                     r_copy = row.to_dict()
                     r_copy.update({'BIN ALOKASI': '', 'QTY ALLOCATION': 0, 'STATUS': 'NO DIFF'})
@@ -2008,25 +2061,36 @@ class AppState:
                     continue
 
                 remaining = diff_needed
+                
+                # Cek stok di System +
                 if sku in system_by_sku:
                     for bin_src, qty_avail in list(system_by_sku[sku].items()):
                         if remaining <= 0: break
                         if qty_avail > 0:
                             alloc = min(qty_avail, remaining)
                             r_alloc = row.to_dict()
-                            r_alloc.update({'BIN ALOKASI': bin_src, 'QTY ALLOCATION': alloc, 'STATUS': 'FULL ALLOCATION' if alloc == remaining else 'PARTIAL ALLOCATION'})
+                            r_alloc.update({
+                                'BIN ALOKASI': bin_src, 
+                                'QTY ALLOCATION': alloc, 
+                                'STATUS': 'FULL ALLOCATION' if alloc == remaining else 'PARTIAL ALLOCATION'
+                            })
                             new_rows.append(r_alloc)
                             system_by_sku[sku][bin_src] -= alloc
                             sys_reduction[(bin_src, sku)] = sys_reduction.get((bin_src, sku), 0) + alloc
                             remaining -= alloc
 
+                # Cek sisa stok di BIN Coverage
                 if remaining > 0 and sku in coverage_by_sku:
                     for bin_src, qty_avail in list(coverage_by_sku[sku].items()):
                         if remaining <= 0: break
                         if qty_avail > 0:
                             alloc = min(qty_avail, remaining)
                             r_alloc = row.to_dict()
-                            r_alloc.update({'BIN ALOKASI': bin_src, 'QTY ALLOCATION': alloc, 'STATUS': 'FULL ALLOCATION' if alloc == remaining else 'PARTIAL ALLOCATION'})
+                            r_alloc.update({
+                                'BIN ALOKASI': bin_src, 
+                                'QTY ALLOCATION': alloc, 
+                                'STATUS': 'FULL ALLOCATION' if alloc == remaining else 'PARTIAL ALLOCATION'
+                            })
                             new_rows.append(r_alloc)
                             coverage_by_sku[sku][bin_src] -= alloc
                             remaining -= alloc
@@ -2048,12 +2112,13 @@ class AppState:
                 filtered_setup['BIN AWAL'] = filtered_setup['BIN ALOKASI']
                 filtered_setup['BIN TUJUAN'] = filtered_setup['BIN']
                 filtered_setup['QUANTITY'] = filtered_setup['QTY ALLOCATION']
-                filtered_setup['NOTES'] = "MISS LOCATION"
+                # Tandai notes khusus untuk Stock Minus
+                filtered_setup['NOTES'] = np.where(filtered_setup['NOTE'] == "Stock Minus", "STOCK MINUS", "MISS LOCATION")
                 df_setup_real = filtered_setup[['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES']].copy()
             else:
                 df_setup_real = pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
 
-            # Step 3 Auto-Gen
+            # Step 3 Recon Auto-Gen
             filtered_no_alloc = allocated[allocated['STATUS'] == "NO ALLOCATION"].copy()
             if not filtered_no_alloc.empty:
                 cols_r = [c for c in ['BIN', 'SKU', 'ITEM NAME', 'QTY_SCAN', 'QTY_SYSTEM', 'DIFF'] if c in filtered_no_alloc.columns]
@@ -2087,6 +2152,7 @@ class AppState:
         except Exception as e:
             return False, f"Gagal Allocation Step 2: {e}"
 
+    # --- STEP 4: FINAL ADJUSTMENT (POIN 4: QTY MINUS FISIK 0 MENJADI NILAI ADJ SAMPAI 0) ---
     def run_so_step4(self, f_r4, f_s4, f_m5):
         try:
             df_r4 = load_data_from_info(f_r4)
@@ -2111,12 +2177,21 @@ class AppState:
             recon_map = {}
             for _, row in df_r.iterrows():
                 b, s = super_clean(row.iloc[0]), super_clean(row.iloc[1])
-                q = pd.to_numeric(row.iloc[6], errors='coerce') or 0
+                # Kolom Index 6 adalah HASIL RECONCILIATION
+                val_rec = row.iloc[6] if len(row) > 6 else 0
+                try:
+                    q = float(val_rec)
+                except:
+                    q = 0.0
                 if b and s: recon_map[f"{b}|{s}"] = q
 
             new_qty_so = df_s['JOIN_KEY'].map(recon_map)
             sys_qty = pd.to_numeric(df_s.iloc[:, 9], errors='coerce').fillna(0)
-            new_diff = np.where(new_qty_so.notna(), (sys_qty - new_qty_so.fillna(0)).abs(), np.nan)
+            
+            # Hitung DIFF Cerdas: Jika sys_qty < 0, adjustment adalah abs(sys_qty) + hasil_so agar mencapai 0
+            so_clean = new_qty_so.fillna(0)
+            needed_adj = np.where(sys_qty < 0, np.abs(sys_qty) + so_clean, np.abs(sys_qty - so_clean))
+            new_diff = np.where(new_qty_so.notna(), needed_adj, np.nan)
 
             cols_to_keep = [i for i in range(len(df_s.columns)) if i not in [10, 11]]
             df_final_stock = df_s.iloc[:, cols_to_keep].copy()
@@ -2128,13 +2203,16 @@ class AppState:
 
             valid_missing_rows = []
             for _, row in df_missing_raw.iterrows():
-                q_rec_val = pd.to_numeric(row.iloc[6], errors='coerce') or 0
-                if q_rec_val > 0: valid_missing_rows.append(row)
+                q_rec_val = pd.to_numeric(row.iloc[6], errors='coerce') if len(row) > 6 and pd.notna(row.iloc[6]) else 0
+                q_sys_val = pd.to_numeric(row.iloc[4], errors='coerce') if len(row) > 4 and pd.notna(row.iloc[4]) else 0
+                # Tetap valid jika recon > 0 ATAU qty system < 0 (stok minus butuh di-nol-kan)
+                if q_rec_val > 0 or q_sys_val < 0:
+                    valid_missing_rows.append(row)
 
             if valid_missing_rows:
                 df_missing = pd.DataFrame(valid_missing_rows)
                 df_missing['FINAL_RECON_QTY'] = pd.to_numeric(df_missing.iloc[:, 6], errors='coerce').fillna(0)
-                df_missing['QTY_SYSTEM'] = 0
+                df_missing['QTY_SYSTEM'] = pd.to_numeric(df_missing.iloc[:, 4], errors='coerce').fillna(0)
             else:
                 df_missing = pd.DataFrame(columns=df_r.columns.tolist() + ['FINAL_RECON_QTY', 'QTY_SYSTEM'])
 
@@ -2146,7 +2224,9 @@ class AppState:
             col_sku_stock = next((c for c in df_final_stock.columns if 'SKU' in c.upper()), df_final_stock.columns[2])
             q_so_v = pd.to_numeric(df_final_stock["QTY SO"], errors='coerce').fillna(0)
             q_sys_v = pd.to_numeric(df_final_stock.iloc[:, 9], errors='coerce').fillna(0)
-            mask_plus = (q_so_v > q_sys_v) & (df_final_stock["DIFF"].notna())
+
+            # Kondisi Plus: QTY SO > QTY SYS ATAU QTY SYS < 0 (Stok minus selalu butuh penambahan)
+            mask_plus = ((q_so_v > q_sys_v) | (q_sys_v < 0)) & (df_final_stock["DIFF"].notna()) & (df_final_stock["DIFF"] > 0)
 
             if mask_plus.any():
                 for _, r in df_final_stock[mask_plus].iterrows():
@@ -2169,7 +2249,13 @@ class AppState:
                     if not s_rec: continue
                     q_r_v = pd.to_numeric(row[col_q_r], errors='coerce') or 0
                     q_s_v = pd.to_numeric(row[col_q_s], errors='coerce') if col_q_s else 0
-                    q_calc = q_r_v - q_s_v
+                    
+                    # Hitung Qty Adjustment: Jika minus, abs(sys) + recon agar jadi 0
+                    if q_s_v < 0:
+                        q_calc = abs(q_s_v) + q_r_v
+                    else:
+                        q_calc = q_r_v - q_s_v
+
                     if q_calc <= 0: continue
 
                     if s_rec in inbound_skus_set:
@@ -2224,57 +2310,6 @@ class AppState:
             return True, "Final Adjustment Step 4 Selesai!"
         except Exception as e:
             return False, f"Gagal Step 4: {e}"
-
-    def run_so_step4_setup_real(self):
-        try:
-            if self._raw_df_so_res4.empty or self._raw_df_so_mult.empty:
-                return False, "Jalankan Step 4 terlebih dahulu!"
-
-            def clean_val(x):
-                if pd.isna(x): return ""
-                s = str(x).strip().upper()
-                if s.startswith("SPE"): s = s[3:]
-                if s.endswith('.0'): s = s[:-2]
-                return s
-
-            allowed_skus = set()
-            col_s_m = self._raw_df_so_mult.columns[2] if len(self._raw_df_so_mult.columns) > 2 else self._raw_df_so_mult.columns[0]
-            allowed_skus = set(self._raw_df_so_mult[col_s_m].apply(clean_val).unique())
-
-            setup_real_data = []
-            seen_entry = set()
-
-            df_stock = self._raw_df_so_res4.copy()
-            qty_system = pd.to_numeric(df_stock.iloc[:, 9], errors='coerce').fillna(0)
-            qty_so = pd.to_numeric(df_stock.iloc[:, 10], errors='coerce').fillna(0)
-            diff_val = pd.to_numeric(df_stock.iloc[:, 11], errors='coerce').fillna(0)
-
-            for i in range(len(df_stock)):
-                if qty_so.iloc[i] > qty_system.iloc[i]:
-                    sku_key = clean_val(df_stock.iloc[i, 2])
-                    bin_tujuan = df_stock.iloc[i, 1]
-                    qty_mutasi = diff_val.iloc[i]
-                    if sku_key in allowed_skus:
-                        setup_real_data.append({"BIN AWAL": "STAGING INBOUND", "BIN TUJUAN": bin_tujuan, "SKU": sku_key, "QUANTITY": qty_mutasi, "NOTES": "MISS LOCATION"})
-                        seen_entry.add(f"{sku_key}|{bin_tujuan}")
-
-            if not self._raw_df_so_miss4.empty:
-                for _, row_m in self._raw_df_so_miss4.iterrows():
-                    bin_t_m = row_m.iloc[0]
-                    sku_k_m = clean_val(row_m.iloc[1])
-                    qty_m = pd.to_numeric(row_m.iloc[6], errors='coerce') or 0
-                    if sku_k_m in allowed_skus and f"{sku_k_m}|{bin_t_m}" not in seen_entry:
-                        setup_real_data.append({"BIN AWAL": "STAGING INBOUND", "BIN TUJUAN": bin_t_m, "SKU": sku_k_m, "QUANTITY": qty_m, "NOTES": "RELOCATION (MISSING)"})
-
-            df_real = pd.DataFrame(setup_real_data) if setup_real_data else pd.DataFrame(columns=["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"])
-            self._raw_df_so_setup4 = df_real.copy()
-            self.df_so_setup4_headers.set(df_real.columns.tolist())
-            self.df_so_setup4_rows.set(df_real.fillna("").astype(str).values.tolist())
-
-            self.so_step4_setup_done.set(True)
-            return True, "Set Up Real + Berhasil Dibuat!"
-        except Exception as e:
-            return False, f"Gagal Set Up Real +: {e}"
 
     def run_so_step5(self, f_k6, f_adj6):
         try:
