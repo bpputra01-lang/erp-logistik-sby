@@ -1723,6 +1723,33 @@ def server(input: Inputs, output: Outputs, session: Session):
         choices = BRANCH_BIN_MAPPING.get(b, [])
         return ui.input_selectize("so_bin_sys", "🏭 BIN System:", choices=choices, multiple=True, width="100%")
 
+# --- KUNCI OTOMATIS TOMBOL STEP 1 (STOCK OPNAME) ---
+    @render.ui
+    def so_step1_btn_ui():
+        f1 = input.so_up_scan() if "so_up_scan" in input else None
+        f2 = input.so_up_stock() if "so_up_stock" in input else None
+        
+        # Jika kedua file sudah di-upload -> Tombol Merah Aktif
+        if (f1 and len(f1) > 0) and (f2 and len(f2) > 0):
+            return ui.div(
+                ui.tags.button(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "RUN COMPARE"),
+                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_run_so_step1', Math.random(), {priority: 'event'});",
+                    class_="btn-red-gradient"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+            )
+        
+        # Jika belum ada file / belum lengkap -> Tombol Terkunci (Gembok Abu-abu)
+        return ui.div(
+            ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"),
+                "UPLOAD DATA SCAN & STOCK SYSTEM UNTUK MEMULAI",
+                disabled=True,
+                class_="btn-locked"
+            ),
+            style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+        )
     # --- STEP 1 ---
     @render.ui
     def so_step1_results_ui():

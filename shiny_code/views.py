@@ -837,16 +837,15 @@ def cycle_count_analyzer_view(state: AppState):
     step1_ui = ui.div(
         ui.h4("1️⃣ Upload Data Scan & All Data Stock", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
         ui.div(
-            custom_uploader_box("cca_up_scan", "📥 DATA SCAN"),
-            custom_uploader_box("cca_up_stock", "📥 STOCK SYSTEM"),
+            custom_uploader_box("so_up_scan", "📥 DATA SCAN"),
+            custom_uploader_box("so_up_stock", "📥 STOCK SYSTEM"),
             style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%; margin-bottom: 0.5rem;"
         ),
-        ui.output_ui("cca_step1_btn_ui"),
-        ui.output_ui("cca_step1_results_ui"),
-        class_="step-card-box",
+        # GANTI TOMBOL STATIS DENGAN SUB-RENDER DINAMIS INI:
+        ui.output_ui("so_step1_btn_ui"),
+        ui.output_ui("so_step1_results_ui"),
         style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
     )
-
     # Setiap Step Mandiri Tidak Tergabung
     return ui.div(
         filter_section,
