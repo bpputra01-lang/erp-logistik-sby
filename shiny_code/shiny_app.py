@@ -629,14 +629,25 @@ def server(input: Inputs, output: Outputs, session: Session):
         ))
 
         
-    # Sub-render Action Buttons
     @render.ui
     def stock_minus_action_btn_ui():
         f = input.upload_stock_file() if "upload_stock_file" in input else None
         if f and len(f) > 0:
-            return ui.div(ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "PROSES DATA"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_process_stock_minus', Math.random(), {priority: 'event'});", class_="btn-red-gradient"), style="display: flex; justify-content: flex-end; width: 100%; margin-top: 1rem;")
-        return ui.div(ui.tags.button(ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"), "PILIH FILE UNTUK MEMULAI", disabled=True, class_="btn-locked"), style="display: flex; justify-content: flex-end; width: 100%; margin-top: 1rem;")
-
+            return ui.div(
+                ui.tags.button(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "PROSES DATA"), 
+                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_process_stock_minus', Math.random(), {priority: 'event'});", 
+                    class_="btn-red-gradient"
+                ), 
+                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 1rem;"
+            )
+        return ui.div(
+            ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"), 
+                "PILIH FILE UNTUK MEMULAI", disabled=True, class_="btn-locked"
+            ), 
+            style="display: flex; justify-content: flex-end; width: 100%; margin-top: 1rem;"
+        )
     @render.ui
     def putaway_action_btn_ui():
         f_ds, f_as = input.ds_putaway_file() if "ds_putaway_file" in input else None, input.asal_putaway_file() if "asal_putaway_file" in input else None
@@ -806,9 +817,11 @@ def server(input: Inputs, output: Outputs, session: Session):
             state.error_modal_message.set("Pilih file Stock Minus terlebih dahulu!")
             state.show_error_modal.set(True)
             return
-        with open(f[0]["datapath"], "rb") as fp:
-            succ, msg = state.process_stock_minus_file(fp.read(), f[0]["name"])
-        if succ: state.show_success_modal.set(True)
+        
+        # Oper langsung file path dari temp folder shiny (tidak perlu fp.read() memakan RAM)
+        succ, msg = state.process_stock_minus_file(f[0]["datapath"], f[0]["name"])
+        if succ: 
+            state.show_success_modal.set(True)
         else:
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
