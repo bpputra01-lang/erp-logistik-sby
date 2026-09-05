@@ -598,11 +598,11 @@ class AppState:
     def metric_koli_datang(self) -> str: return f"{sum([safe_int(x.get('total_koli', x.get('koli', 0))) for x in self.get_filtered_ongkir() if 'RTO' not in str(x.get('supplier', ''))]):,.0f} Koli"
     def metric_biaya_rto(self) -> str: return f"Rp {sum([safe_int(x.get('total_ongkir', 0)) for x in self.get_filtered_ongkir() if 'RTO' in str(x.get('supplier', ''))]):,.0f}"
 
-    # --- Stock Minus Processing (SUPER FAST VECTORIZED ENGINE) ---
+    # --- Stock Minus Processing (SUPER FAST & IMMUNE TO COLUMN SPACES) ---
     def process_stock_minus_file(self, file_path_or_bytes, file_name: str):
         try:
             # 1. Fast Excel Reader (Calamine engine jika ada, fallback openpyxl)
-            if isinstance(file_path_or_bytes, (str, os.PathLike)):
+            if isinstance(file_path_or_bytes, str):
                 source = file_path_or_bytes
             else:
                 source = io.BytesIO(file_path_or_bytes)
@@ -629,13 +629,10 @@ class AppState:
             df_minus_awal = df[df[col_qty] < 0].copy()
             df_positif = df[df[col_qty] > 0]
 
-            # 3. Super Fast Aggregation (0.05 detik vs 30 detik iterrows)
-            # Groupby terlebih dahulu agar unik per (SKU, BIN)
-            pos_agg = df_positif.groupby([col_sku, col_bin])[col_qty].sum().reset_index()
-            
+            # 3. Super Fast Inventory Dict via Series.items() (Aman dari spasi kolom)
+            pos_agg = df_positif.groupby([col_sku, col_bin])[col_qty].sum()
             inventory = {}
-            for r in pos_agg.itertuples(index=False):
-                s, b, q = getattr(r, col_sku), getattr(r, col_bin), getattr(r, col_qty)
+            for (s, b), q in pos_agg.items():
                 if s not in inventory:
                     inventory[s] = {}
                 inventory[s][b] = q
@@ -650,11 +647,12 @@ class AppState:
             set_up_results = []
             df_need_adj_list = []
 
-            # 4. Loop hanya pada data MINUS (jauh lebih sedikit barisnya) dengan itertuples
-            for row in df_minus_awal.itertuples(index=False):
-                sku = getattr(row, col_sku)
-                bin_asal = getattr(row, col_bin)
-                qty_min = getattr(row, col_qty)
+            # 4. Loop hanya pada baris MINUS dengan to_dict('records') (Aman dari spasi & instan)
+            minus_records = df_minus_awal.to_dict(orient='records')
+            for row in minus_records:
+                sku = row[col_sku]
+                bin_asal = row[col_bin]
+                qty_min = row[col_qty]
                 sisa_minus = abs(qty_min)
 
                 if sku in inventory and any(v > 0 for v in inventory[sku].values()):
@@ -695,9 +693,9 @@ class AppState:
                             sisa_minus -= ambil
 
                 if sisa_minus > 0:
-                    r_dict = row._asdict()
-                    r_dict[col_qty] = -sisa_minus
-                    df_need_adj_list.append(r_dict)
+                    row_adj = dict(row)
+                    row_adj[col_qty] = -sisa_minus
+                    df_need_adj_list.append(row_adj)
 
             # 5. Bangun DataFrame Hasil
             df_s = pd.DataFrame(set_up_results)
@@ -722,6 +720,8 @@ class AppState:
             return True, "Data Stock Minus berhasil diproses!"
         except Exception as e:
             return False, f"Gagal memproses file: {e}"
+
+            
     # --- Putaway Compare Processing ---
     def process_putaway_compare(self, ds_bytes: bytes, ds_name: str, asal_bytes: bytes, asal_name: str):
         try:
