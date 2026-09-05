@@ -360,6 +360,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                 )
 
             guide_body = ui.div(
+
                 # ==============================================================
                 # PANDUAN MODE 1: JUSTIFIKASI REVERSAL
                 # ==============================================================
@@ -402,62 +403,156 @@ def server(input: Inputs, output: Outputs, session: Session):
                     ), open=True
                 ),
 
-                # ==============================================================
-                # PANDUAN MODE 2: JUSTIFIKASI NON REVERSAL
-                # ==============================================================
+                # --- SECTION 1: FORMAT FILE ---
                 ui.tags.details(
-                    ui.tags.summary("📥 MODE 2: PANDUAN & LOGIKA JUSTIFIKASI NON REVERSAL (SISTEM & MUTASI)"),
+                    ui.tags.summary("📋 Informasi Format File"),
                     ui.div(
-                        ui.div(
-                            ui.p(ui.strong("Catatan Penting Non Reversal:"), " Logika ", ui.code("Kesalahan Adjustment +"), " dan ", ui.code("Kesalahan Adjustment -"), " telah ", ui.strong("RESMI DI-TAKE OUT (DIHAPUS)"), " agar investigasi murni fokus pada kebocoran data sistem, selisih mutasi, dan transaksi gantung.", style="margin-bottom: 8px; color: #742A2A; font-size: 13px;"),
-                            style="background: #FFF5F5; border-left: 4px solid #E53E3E; padding: 10px 14px; border-radius: 6px; margin-bottom: 1rem;"
-                        ),
-                        ui.div(
-                            ui.span("RUMUS HITUNGAN MANUAL ➡️ : ", style="font-weight: 800; color: #2C5282;"),
-                            ui.span("BEGINNING STOCK + (TOTAL_STOCKIN + TOTAL TRF_IN) - (TOTAL SALES + TOTAL TRF_OUT + TOTAL DRAFT TRF_OUT)", style="font-weight: bold; font-family: monospace; color: #1A365D; font-size: 12px;"),
-                            style="background: #EBF8FF; border-left: 4px solid #3182CE; padding: 10px 14px; border-radius: 6px; margin-bottom: 1rem;"
-                        ),
-                        ui.tags.strong("📋 Ketentuan 4 Dokumen Uploader:"),
+                        ui.tags.strong("Format yang diharapkan:"),
                         ui.tags.ul(
-                            ui.tags.li(ui.strong("1. File Adjustment:"), " Gabungan Multiple Adjustment (Plus & Minus) dalam 1 file."),
-                            ui.tags.li(ui.strong("2. Summary Stock:"), " Download dari Jezpro pada menu Dashboard Asset (Store: JEZ SURABAYA)."),
-                            ui.tags.li(ui.strong("3. All Data Stock:"), " File All Stock Multiple Adjustment (Hanya Ada Stock)."),
-                            ui.tags.li(ui.strong("4. Data Scan (Opsional):"), " Jika diupload maka Real QTY mengambil qty data scan aktual.")
-                        ),
-                        ui.hr(style="margin: 10px 0; border-color: #CBD5E0;"),
-                        ui.tags.strong("💡 6 Logika Klasifikasi Non Reversal:"),
-                        ui.div(
-                            ui.h5("🛑 1. Kesalahan System (Begin Stock Minus)", style="font-weight: 800; color: #C53030; font-size: 13px; margin: 6px 0 2px 0;"),
-                            ui.p("Kondisi: Stok SO > Stok Sistem (ADJUSTMENT +), tetapi Beginning Stock bernilai minus (< 0). Sistem dari awal sudah bocor datanya.", style="margin: 0; font-size: 12px;"),
-                            style="background: #FFF5F5; padding: 8px 12px; border-radius: 6px; border: 1px solid #FED7D7; margin-bottom: 0.5rem;"
-                        ),
-                        ui.div(
-                            ui.h5("🛡️ 2. Kesalahan System (Ending Stock ≠ Total Stock Multiple)", style="font-weight: 800; color: #DD6B20; font-size: 13px; margin: 6px 0 2px 0;"),
-                            ui.p("Kondisi: GAP ADJ = 0 dan BEGIN STOCK = 0. Nilai (Ending Stock, Real Qty, Current Stock) kembar, tapi QTY SYSTEM ALL di multiple lebih kecil.", style="margin: 0; font-size: 12px;"),
-                            style="background: #FFFAF0; padding: 8px 12px; border-radius: 6px; border: 1px solid #FEEBC8; margin-bottom: 0.5rem;"
-                        ),
-                        ui.div(
-                            ui.h5("⚙️ 3. Kesalahan System (Mismatch Real QTY dengan Ending Stock)", style="font-weight: 800; color: #2B6CB0; font-size: 13px; margin: 6px 0 2px 0;"),
-                            ui.p("Kondisi: Stok SO > Stok Sistem, tidak ada transaksi gantung (Draft), GAP ADJ = 0, tetapi hasil hitungan manual tidak match dengan ENDING STOCK.", style="margin: 0; font-size: 12px;"),
-                            style="background: #EBF8FF; padding: 8px 12px; border-radius: 6px; border: 1px solid #BEE3F8; margin-bottom: 0.5rem;"
-                        ),
-                        ui.div(
-                            ui.h5("💻 4. Kesalahan System (Stock System Lost)", style="font-weight: 800; color: #805AD5; font-size: 13px; margin: 6px 0 2px 0;"),
-                            ui.p("Kondisi: GAP ADJ = 0. Selisih antara Sistem dan SO jika ditambah/dikurang ke master QTY SYSTEM ALL hasilnya pas dengan CURRENT STOCK.", style="margin: 0; font-size: 12px;"),
-                            style="background: #FAF5FF; padding: 8px 12px; border-radius: 6px; border: 1px solid #E9D8FD; margin-bottom: 0.5rem;"
-                        ),
-                        ui.div(
-                            ui.h5("🚚 5. Kesalahan RTO (Barang Gantung)", style="font-weight: 800; color: #2B6CB0; font-size: 13px; margin: 6px 0 2px 0;"),
-                            ui.p("Kondisi: Terdapat angka di kolom TOTAL DRAFT TRF IN atau TOTAL DRAFT TRF OUT yang belum di-approve/finish.", style="margin: 0; font-size: 12px;"),
-                            style="background: #EBF8FF; padding: 8px 12px; border-radius: 6px; border: 1px solid #BEE3F8; margin-bottom: 0.5rem;"
-                        ),
-                        ui.div(
-                            ui.h5("🔍 6. Cek Hasil Rekonsiliasi", style="font-weight: 800; color: #D69E2E; font-size: 13px; margin: 6px 0 2px 0;"),
-                            ui.p("Kondisi: Total stock di multiple (QTY SYSTEM ALL) sama persis dengan CURRENT STOCK & ENDING STOCK. Data total sinkron.", style="margin: 0; font-size: 12px;"),
-                            style="background: #FFFFF0; padding: 8px 12px; border-radius: 6px; border: 1px solid #FEFCBF; margin-bottom: 0.5rem;"
+                            ui.tags.li(ui.strong("ADJUSTMENT FILE:"), " Gabungkan antara Multiple Adjustment ", ui.strong("(Plus)"), " dan ", ui.strong("(Minus)"), " dalam 1 File."),
+                            ui.tags.li(ui.strong("SUMMARY STOCK:"), " Download dari ", ui.strong("JEZPRO"), " pada menu ", ui.strong("Dashboard Asset"), " (Store: ", ui.strong("JEZ SURABAYA"), ")."),
+                            ui.tags.li(ui.strong("ALL DATA STOCK:"), " Upload file All data Stock (Multiple Adjustment) ", ui.strong("HANYA ADA STOCK"), "."),
+                            ui.tags.li(ui.strong("DATA SCAN (Opsional):"), " Jika diupload maka perhitungan ", ui.strong("Real QTY"), " akan mengambil qty dari data scan dan apabila tidak diupload maka akan kembali ke perhitungan awal.")
                         ),
                         class_="accordion-content"
-                    ), open=False
+                    ), open=True
+                ),
+
+                # --- SECTION 2: 7 ATURAN LOGIKA LENGKAP & CONTOH KASUS ---
+                ui.tags.details(
+                    ui.tags.summary("💡 Logic Thinking (Justification) - 7 Aturan Lengkap"),
+                    ui.div(
+                        # Rumus Banner
+                        ui.div(
+                            ui.span("REAL QTY / HITUNGAN MANUAL ➡️ : ", style="font-weight: 800; color: #2C5282;"),
+                            ui.span("BEGINNING STOCK + (TOTAL_STOCKIN + TOTAL TRF_IN) - (TOTAL SALES + TOTAL TRF_OUT + TOTAL DRAFT TRF_OUT)", style="font-weight: bold; font-family: monospace; color: #1A365D;"),
+                            style="background: #EBF8FF; border-left: 4px solid #3182CE; padding: 10px 14px; border-radius: 6px; margin-bottom: 1rem;"
+                        ),
+
+                        # 1. Kesalahan System (Begin Stock Minus)
+                        ui.div(
+                            ui.h5("🛑 1. Kesalahan System (Begin Stock Minus)", style="font-weight: 800; color: #C53030; font-size: 13px; margin: 0 0 4px 0;"),
+                            ui.tags.ul(
+                                ui.tags.li(ui.strong("Kondisinya:"), " Stok SO lebih besar dari stok Sistem (ADJUSTMENT +), Tetapi ", ui.strong("Beginning Stock bernilai minus (di bawah 0)"), "."),
+                                ui.tags.li(ui.strong("Artinya:"), " Sistem dari awal sudah error/bocor datanya karena mencatat stok minus yang artinya memang perlu dilakukan Adjustment +.")
+                            ),
+                            ui.p("Contoh Kasus:", style="font-weight: bold; margin: 4px 0 2px 0; font-size: 11px;"),
+                            mini_tbl(
+                                ["Stok SO", "Stok Sistem", "BEGINNING STOCK", "GAP ADJUSTMENT"],
+                                [["10", "5", "<b style='color: #E53E3E;'>-2</b>", "0"]]
+                            ),
+                            style="background: #FFF5F5; padding: 10px; border-radius: 8px; border: 1px solid #FED7D7; margin-bottom: 0.75rem;"
+                        ),
+
+                        # 2. Kesalahan System (Ending Stock != Total Stock Multiple)
+                        ui.div(
+                            ui.h5("🛡️ 2. Kesalahan System (Ending Stock ≠ Total Stock dari Multiple)", style="font-weight: 800; color: #DD6B20; font-size: 13px; margin: 0 0 4px 0;"),
+                            ui.tags.ul(
+                                ui.tags.li(ui.strong("Kondisinya:"), " ", ui.code("GAP ADJUSTMENT"), " dan ", ui.code("BEGINNING STOCK"), " sama-sama nol. Total stock antara (", ui.strong("Ending Stock, Real Qty, Current Stock"), ") nilainya sama (senilai), tapi total stock di multiple (", ui.strong("QTY SYSTEM ALL"), ") malah lebih kecil dari stok akhir."),
+                                ui.tags.li(ui.strong("Artinya:"), " Ada mismatch antara data di multiple dan summary sehingga menyebabkan adjustment +.")
+                            ),
+                            ui.p("Contoh Kasus:", style="font-weight: bold; margin: 4px 0 2px 0; font-size: 11px;"),
+                            mini_tbl(
+                                ["GAP ADJ", "BEGINNING STOCK", "ENDING / REAL / CURR STOCK", "QTY SYSTEM ALL"],
+                                [["0", "0", "<b style='color: #3182CE;'>10 (Kembar)</b>", "<b style='color: #E53E3E;'>3 (Lebih Kecil)</b>"]]
+                            ),
+                            style="background: #FFFAF0; padding: 10px; border-radius: 8px; border: 1px solid #FEEBC8; margin-bottom: 0.75rem;"
+                        ),
+
+                        # 3. Kesalahan System (Miss Match Real QTY Manual dengan Ending Stock)
+                        ui.div(
+                            ui.h5("⚙️ 3. Kesalahan System (Miss Match Real QTY dengan Ending Stock/Current Stock)", style="font-weight: 800; color: #2B6CB0; font-size: 13px; margin: 0 0 4px 0;"),
+                            ui.tags.ul(
+                                ui.tags.li(ui.strong("Kondisinya:"), " Stok SO lebih besar dari stok Sistem (ADJUSTMENT +), tidak ada transaksi gantung (Draft TRF), tidak ada GAP ADJUSTMENT, ", ui.strong("TAPI hasil hitungan manual tidak match dengan nilai ENDING STOCK"), " di sistem."),
+                                ui.tags.li(ui.strong("Detail Hitungan Manual:"), " BEGINNING STOCK + (TOTAL_STOCKIN + TOTAL TRF_IN) - (TOTAL SALES + TOTAL TRF_OUT)."),
+                                ui.tags.li(ui.strong("Artinya:"), " Sistem salah hitung mutasi barang (hasil gabungan barang masuk dan keluar tidak sinkron dengan stok akhir).")
+                            ),
+                            ui.p("Contoh Kasus:", style="font-weight: bold; margin: 4px 0 2px 0; font-size: 11px;"),
+                            mini_tbl(
+                                ["BEGINNING", "STOCKIN + TRF_IN", "SALES + TRF_OUT", "Hitungan Manual", "ENDING STOCK"],
+                                [["10", "5", "2", "<b style='color: #276749;'>13</b>", "<b style='color: #E53E3E;'>15 (Gak Match!)</b>"]]
+                            ),
+                            style="background: #EBF8FF; padding: 10px; border-radius: 8px; border: 1px solid #BEE3F8; margin-bottom: 0.75rem;"
+                        ),
+
+                        # 4. Kesalahan System (Stock System Lost)
+                        ui.div(
+                            ui.h5("💻 4. Kesalahan System (Stock System Lost)", style="font-weight: 800; color: #805AD5; font-size: 13px; margin: 0 0 4px 0;"),
+                            ui.tags.ul(
+                                ui.tags.li(ui.strong("Kondisinya:"), " Tidak ada GAP ADJUSTMENT (= 0), tapi ada selisih antara Sistem dan SO. Ketika selisih itu ditambah/dikurang ke master QTY SYSTEM ALL, hasilnya pas dengan CURRENT STOCK."),
+                                ui.tags.li(ui.strong("Artinya:"), " Bug bawaan sistem yang membuat angka di layar tidak ter-update.")
+                            ),
+                            ui.p("Contoh Kasus:", style="font-weight: bold; margin: 4px 0 2px 0; font-size: 11px;"),
+                            mini_tbl(
+                                ["QTY SO", "QTY System", "Selisih (Diff)", "QTY SYSTEM ALL", "CURRENT STOCK"],
+                                [
+                                    ["12", "10", "<b>+2</b>", "15", "<b style='color: #276749;'>17 (15 + 2 Pas!)</b>"],
+                                    ["8", "10", "<b>-2</b>", "15", "<b style='color: #276749;'>13 (15 - 2 Pas!)</b>"]
+                                ]
+                            ),
+                            style="background: #FAF5FF; padding: 10px; border-radius: 8px; border: 1px solid #E9D8FD; margin-bottom: 0.75rem;"
+                        ),
+
+                        # 5. Cek Hasil Rekonsiliasi
+                        ui.div(
+                            ui.h5("🔍 5. Cek Hasil Rekonsiliasi", style="font-weight: 800; color: #D69E2E; font-size: 13px; margin: 0 0 4px 0;"),
+                            ui.tags.ul(
+                                ui.tags.li(ui.strong("Kondisinya:"), " Total stock di multiple (", ui.strong("QTY SYSTEM ALL"), ") ternyata pas/sama persis dengan ", ui.strong("CURRENT STOCK / ENDING STOCK"), "."),
+                                ui.tags.li(ui.strong("Artinya:"), " Data sebenarnya aman dan sinkron secara total keseluruhan.")
+                            ),
+                            ui.p("Contoh Kasus:", style="font-weight: bold; margin: 4px 0 2px 0; font-size: 11px;"),
+                            mini_tbl(
+                                ["QTY SYSTEM ALL", "CURRENT STOCK", "ENDING STOCK"],
+                                [["<b style='color: #276749;'>25</b>", "<b style='color: #276749;'>25</b>", "<b style='color: #276749;'>25</b>"]]
+                            ),
+                            style="background: #FFFFF0; padding: 10px; border-radius: 8px; border: 1px solid #FEFCBF; margin-bottom: 0.75rem;"
+                        ),
+
+                        # 6. Kesalahan Adjustment (+ / -)
+                        ui.div(
+                            ui.h5("⚠️ 6. Kesalahan Adjustment (+ / -)", style="font-weight: 800; color: #C53030; font-size: 13px; margin: 0 0 4px 0;"),
+                            ui.tags.ul(
+                                ui.tags.li("Stok Sistem > Stok SO, tapi ada data GAP ADJUSTMENT positif (+)."),
+                                ui.tags.li("Stok Sistem < Stok SO, tapi ada data GAP ADJUSTMENT negatif (-)."),
+                                ui.tags.li(ui.strong("Artinya:"), " Koreksi dari Proses Adjustment Sebelumnya (Reversal).")
+                            ),
+                            ui.p("Contoh Kasus:", style="font-weight: bold; margin: 4px 0 2px 0; font-size: 11px;"),
+                            mini_tbl(
+                                ["Kondisi Lapangan", "GAP ADJUSTMENT di Sistem", "Keterangan"],
+                                [
+                                    ["QTY Sistem (10) > QTY SO (5)", "<b style='color: #276749;'>+5</b>", "Ada Koreksi (Reversal)"],
+                                    ["QTY Sistem (5) < QTY SO (10)", "<b style='color: #E53E3E;'>-5</b>", "Ada Koreksi (Reversal)"]
+                                ]
+                            ),
+                            style="background: #FFF5F5; padding: 10px; border-radius: 8px; border: 1px solid #FED7D7; margin-bottom: 0.75rem;"
+                        ),
+
+                        # 7. Kesalahan RTO (Barang Gantung)
+                        ui.div(
+                            ui.h5("🚚 7. Kesalahan RTO (Barang Gantung)", style="font-weight: 800; color: #2B6CB0; font-size: 13px; margin: 0 0 4px 0;"),
+                            ui.tags.ul(
+                                ui.tags.li(ui.strong("Kondisinya:"), " Masih ada angka di kolom TOTAL DRAFT TRF IN atau TOTAL DRAFT TRF OUT yang menggantung (belum di-approve/finish)."),
+                                ui.tags.li(ui.strong("Artinya:"), " Masalah klasik RTO/mutasi barang yang statusnya masih draf.")
+                            ),
+                            ui.p("Contoh Kasus:", style="font-weight: bold; margin: 4px 0 2px 0; font-size: 11px;"),
+                            mini_tbl(
+                                ["TOTAL DRAFT TRF IN", "TOTAL DRAFT TRF OUT", "Status"],
+                                [
+                                    ["<b style='color: #DD6B20;'>5</b>", "0", "Ada barang gantung"],
+                                    ["0", "<b style='color: #DD6B20;'>3</b>", "Ada barang gantung"]
+                                ]
+                            ),
+                            style="background: #EBF8FF; padding: 10px; border-radius: 8px; border: 1px solid #BEE3F8; margin-bottom: 0.75rem;"
+                        ),
+
+                        # Catatan Tambahan (Undefined & Error Data)
+                        ui.div(
+                            ui.p("❓ Kenapa muncul UNDEFINED? ➔ Berarti kasus item tersebut tidak masuk ke dalam 7 kondisi di atas (butuh dicek manual).", style="margin: 0 0 4px 0; font-weight: bold; color: #4A5568; font-size: 12px;"),
+                            ui.p("❓ Kenapa muncul ERROR DATA? ➔ Ada kolom yang isinya kosong, teks rusak, atau tidak bisa dihitung angka.", style="margin: 0; font-weight: bold; color: #E53E3E; font-size: 12px;"),
+                            style="background: #EDF2F7; padding: 10px 14px; border-radius: 6px; margin-top: 0.5rem;"
+                        ),
+                        class_="accordion-content"
+                    ), open=True
                 )
             )
 
