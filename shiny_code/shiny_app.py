@@ -405,7 +405,7 @@ def server(input: Inputs, output: Outputs, session: Session):
 
                 # --- SECTION 1: FORMAT FILE ---
                 ui.tags.details(
-                    ui.tags.summary("📋 Informasi Format File"),
+                    ui.tags.summary("🔄 MODE 2: PANDUAN & LOGIKA JUSTIFIKASI NON REVERSAL"),
                     ui.div(
                         ui.tags.strong("Format yang diharapkan:"),
                         ui.tags.ul(
