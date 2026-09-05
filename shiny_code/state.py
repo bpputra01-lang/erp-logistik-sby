@@ -2651,8 +2651,8 @@ class AppState:
         except Exception as e:
             return False, f"Gagal Justifikasi SO Non Reversal: {e}"
 
-    # ==========================================================================
-    # JUSTIFICATION SO - REVERSAL (DENGAN FILE PBI & FILTER TANGGAL)
+# ==========================================================================
+    # JUSTIFICATION SO - REVERSAL (DITAMBAHKAN KOLOM ADJUSTMENT + DAN -)
     # ==========================================================================
     def process_justification_reversal(self, f_case, f_pbi, start_date=None, end_date=None):
         try:
@@ -2678,7 +2678,6 @@ class AppState:
             res['DIFF_GAP'] = res[qty_so_col] - res[qty_sys_col]
 
             # 1. Bersihkan Data PBI
-            # Kolom A = Index 0 (No Adj), Kolom C = Index 2 (SKU), Kolom E = Index 4 (Datetime), Kolom Q = Index 16 (Qty)
             pbi_df = pd.DataFrame({
                 'NO_ADJ': df_pbi_raw.iloc[:, 0].astype(str).str.strip(),
                 'SKU': df_pbi_raw.iloc[:, 2].astype(str).str.split('.').str[0].str.strip().str.upper(),
@@ -2686,7 +2685,7 @@ class AppState:
                 'QTY_ADJ': pd.to_numeric(df_pbi_raw.iloc[:, 16], errors='coerce').fillna(0)
             })
 
-            # Filter Tanggal PBI (Kebal Jam & Menit - Full Day Tercover)
+            # Filter Tanggal PBI (Kebal Jam & Menit)
             pbi_df = pbi_df.dropna(subset=['DATETIME'])
 
             if start_date:
@@ -2694,16 +2693,17 @@ class AppState:
                 pbi_df = pbi_df[pbi_df['DATETIME'] >= start_ts]
 
             if end_date:
-                # Tambahkan 1 hari dengan batas '<' agar transaksi jam berapapun di tanggal akhir tetap ikut masuk
                 end_ts = pd.to_datetime(end_date) + pd.Timedelta(days=1)
                 pbi_df = pbi_df[pbi_df['DATETIME'] < end_ts]
 
-            # 2. Logika Penelusuran Reversal per SKU
-            # Jika gap butuh ADJ + (DIFF > 0), berarti sebelumnya ada kesalahan kebanyakan ADJ -
-            # Jika gap butuh ADJ - (DIFF < 0), berarti sebelumnya ada kesalahan kebanyakan ADJ +
+            pbi_df = pbi_df.sort_values(by='DATETIME', ascending=True)
+
+            # 2. Logika Penelusuran Reversal & Perhitungan Adj + / -
             no_adj_list = []
             tgl_adj_list = []
             justification_list = []
+            adj_plus_list = []
+            adj_minus_list = []
 
             match_count = 0
             nomatch_count = 0
@@ -2712,13 +2712,24 @@ class AppState:
                 target_sku = row['CLEAN_SKU']
                 gap = row['DIFF_GAP']
 
+                sku_history = pbi_df[pbi_df['SKU'] == target_sku].copy()
+
+                # Hitung Total Qty Adjustment + dan - untuk SKU ini di rentang PBI
+                if not sku_history.empty:
+                    tot_plus = int(sku_history[sku_history['QTY_ADJ'] > 0]['QTY_ADJ'].sum())
+                    tot_minus = int(abs(sku_history[sku_history['QTY_ADJ'] < 0]['QTY_ADJ'].sum()))
+                else:
+                    tot_plus = 0
+                    tot_minus = 0
+
+                adj_plus_list.append(tot_plus)
+                adj_minus_list.append(tot_minus)
+
                 if gap == 0:
                     justification_list.append("OK / TIDAK ADA SELISIH")
                     no_adj_list.append("-")
                     tgl_adj_list.append("-")
                     continue
-
-                sku_history = pbi_df[pbi_df['SKU'] == target_sku].copy()
 
                 if sku_history.empty:
                     justification_list.append("BUKAN REVERSAL (TIDAK ADA HISTORY PBI)")
@@ -2727,12 +2738,9 @@ class AppState:
                     nomatch_count += 1
                     continue
 
-                # Kebutuhan lawan:
-                # Gap +3 ➔ Mencari transaksi histori bernilai -3 atau transaksi minus terakhir
-                # Gap -3 ➔ Mencari transaksi histori bernilai +3 atau transaksi plus terakhir
                 opposite_qty = -gap
-                
-                # 1. Cek Exact Match (Transaksi yang nilainya pas membikin salah)
+
+                # 1. Cek Exact Match
                 exact_tx = sku_history[sku_history['QTY_ADJ'] == opposite_qty]
                 if not exact_tx.empty:
                     last_tx = exact_tx.iloc[-1]
@@ -2742,7 +2750,7 @@ class AppState:
                     match_count += 1
                     continue
 
-                # 2. Cek Net Cumulative Sum di rentang periode
+                # 2. Cek Net Cumulative Sum
                 net_history_qty = sku_history['QTY_ADJ'].sum()
                 if net_history_qty == opposite_qty:
                     last_tx = sku_history.iloc[-1]
@@ -2752,7 +2760,7 @@ class AppState:
                     match_count += 1
                     continue
 
-                # 3. Cek apakah ada transaksi berlawanan arah (Indikasi Over-Adjustment)
+                # 3. Cek Transaksi Berlawanan Arah
                 if gap > 0:
                     opp_history = sku_history[sku_history['QTY_ADJ'] < 0]
                 else:
@@ -2770,8 +2778,10 @@ class AppState:
                     justification_list.append("BUKAN REVERSAL (ARAH TRANSAKSI TIDAK SESUAI)")
                     nomatch_count += 1
 
-            # 3. Rakit DataFrame Hasil Reversal
+            # 3. Masukkan Kolom Baru Persis Sebelum 'NO ADJUSTMENT'
             res['JUSTIFICATION'] = justification_list
+            res['ADJUSTMENT +'] = adj_plus_list
+            res['ADJUSTMENT -'] = adj_minus_list
             res['NO ADJUSTMENT'] = no_adj_list
             res['TANGGAL ADJUSTMENT'] = tgl_adj_list
 
