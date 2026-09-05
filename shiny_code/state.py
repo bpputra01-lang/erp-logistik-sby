@@ -339,7 +339,12 @@ class AppState:
         self._raw_df_so_adj_detail = pd.DataFrame()
         self._raw_df_so_adj_sum = pd.DataFrame()
 
-        # --- JUSTIFICATION SO STATE ---
+       # --- JUSTIFICATION SO STATE ---
+        self.jso_mode = reactive.Value("")  # "JUSTIFIKASI REVERSAL" atau "JUSTIFIKASI NON REVERSAL"
+        self.jso_rev_start_date = reactive.Value(datetime.now().strftime("%Y-%m-01"))
+        self.jso_rev_end_date = reactive.Value(datetime.now().strftime("%Y-%m-%d"))
+
+        # Non Reversal Results
         self.jso_processed = reactive.Value(False)
         self.jso_c_undef = reactive.Value(0)
         self.jso_c_sys = reactive.Value(0)
@@ -349,6 +354,14 @@ class AppState:
         self.df_jso_headers = reactive.Value([])
         self.df_jso_rows = reactive.Value([])
         self._raw_df_jso_res = pd.DataFrame()
+
+        # Reversal Results
+        self.jso_rev_processed = reactive.Value(False)
+        self.jso_rev_c_match = reactive.Value(0)
+        self.jso_rev_c_nomatch = reactive.Value(0)
+        self.df_jso_rev_headers = reactive.Value([])
+        self.df_jso_rev_rows = reactive.Value([])
+        self._raw_df_jso_rev_res = pd.DataFrame()
 
         # --- CROSS CHECK REAL & SYSTEM (MATCHING KARANTINA) ---
         self.crs_processed = reactive.Value(False)
@@ -2465,7 +2478,7 @@ class AppState:
             return False, f"Gagal Summary Adjustment: {e}"
 
 # ==========================================================================
-    # JUSTIFICATION SO ALGORITHM (PORTED FROM STREAMLIT)
+    # JUSTIFICATION SO - NON REVERSAL (LOGIKA KESALAHAN ADJ DI-TAKE OUT)
     # ==========================================================================
     def process_justification_so(self, f_case, f_track, f_all_stock, f_scan=None):
         try:
@@ -2486,13 +2499,13 @@ class AppState:
             df_all_stock = df_all_stock.copy()
             df_all_stock.columns = [str(c).upper().strip() for c in df_all_stock.columns]
 
-            sku_col_case = 'SKU'
-            qty_sys_col_case = 'QTY SYSTEM'
-            qty_so_col_case = 'QTY SO'
+            sku_col_case = 'SKU' if 'SKU' in res.columns else res.columns[2]
+            qty_sys_col_case = 'QTY SYSTEM' if 'QTY SYSTEM' in res.columns else res.columns[9]
+            qty_so_col_case = 'QTY SO' if 'QTY SO' in res.columns else res.columns[10]
 
             res['SKU_KEY_JOIN'] = res[sku_col_case].astype(str).str.split('.').str[0].str.strip().str.upper()
 
-            # 2. Aggregasi Tracking (Kolom A-O)
+            # Aggregasi Tracking
             sku_col_track = df_tracking.columns[2]
             track_agg = df_tracking.groupby(sku_col_track).agg({
                 df_tracking.columns[4]: 'sum',
@@ -2515,22 +2528,17 @@ class AppState:
             ]
             track_agg['SKU_KEY'] = track_agg['SKU_KEY'].astype(str).str.split('.').str[0].str.strip().str.upper()
 
-            # 3. Aggregasi All Data Stock
+            # Aggregasi All Data Stock
             sku_col_all = df_all_stock.columns[2]
             qty_sys_col_all = df_all_stock.columns[9]
-
-            all_stock_agg = df_all_stock.groupby(sku_col_all).agg({
-                qty_sys_col_all: 'sum'
-            }).reset_index()
-
+            all_stock_agg = df_all_stock.groupby(sku_col_all).agg({qty_sys_col_all: 'sum'}).reset_index()
             all_stock_agg.columns = ['SKU_KEY_ALL', '_QTY_SYS_ALL']
             all_stock_agg['SKU_KEY_ALL'] = all_stock_agg['SKU_KEY_ALL'].astype(str).str.split('.').str[0].str.strip().str.upper()
 
-            # 4. Merge Data
+            # Merge Data
             res = res.merge(track_agg, left_on='SKU_KEY_JOIN', right_on='SKU_KEY', how='left').fillna(0)
             res = res.merge(all_stock_agg, left_on='SKU_KEY_JOIN', right_on='SKU_KEY_ALL', how='left').fillna(0)
 
-            # 5. Mapping Kolom Final
             res['BEGINNING STOCK'] = res['BEGINNING STOCK']
             res['ENDING STOCK'] = res['_N_ENDING_STOCK']
             res['CURRENT STOCK'] = res['_O_CURR_STOCK']
@@ -2545,16 +2553,13 @@ class AppState:
             res['QTY SYSTEM ALL'] = res['_QTY_SYS_ALL']
             res['GAP ADJUSMENT'] = res['TOTAL_ADJ_PLUS'] - res['TOTAL_ADJ_MINUS']
 
-            # Real QTY Calculation
             if df_scan is not None and not df_scan.empty:
                 df_scan_copy = df_scan.copy()
                 sku_col_scan = df_scan_copy.columns[1]
                 qty_col_scan = df_scan_copy.columns[2]
-
                 scan_agg = df_scan_copy.groupby(sku_col_scan).agg({qty_col_scan: 'sum'}).reset_index()
                 scan_agg.columns = ['SKU_KEY_SCAN', 'REAL_QTY_SCAN']
                 scan_agg['SKU_KEY_SCAN'] = scan_agg['SKU_KEY_SCAN'].astype(str).str.split('.').str[0].str.strip().str.upper()
-
                 res = res.merge(scan_agg, left_on='SKU_KEY_JOIN', right_on='SKU_KEY_SCAN', how='left').fillna(0)
                 res['REAL QTY'] = res['REAL_QTY_SCAN']
                 res = res.drop(columns=['SKU_KEY_SCAN', 'REAL_QTY_SCAN'], errors='ignore')
@@ -2564,8 +2569,8 @@ class AppState:
                     - res['TOTAL SALES'] - res['TOTAL TRF_OUT'] - res['TOTAL DRAFT_TRF_OUT']
                 )
 
-            # 6. Formula Justifikasi Otomatis
-            def run_formula(row):
+            # FORMULA NON REVERSAL: LOGIKA KESALAHAN ADJUSTMENT DIBUANG (TAKE OUT)
+            def run_formula_non_reversal(row):
                 try:
                     qty_sys_row = round(float(row[qty_sys_col_case]), 2)
                     qty_so_row = round(float(row[qty_so_col_case]), 2)
@@ -2582,21 +2587,22 @@ class AppState:
                     ending_stock = round(float(row['ENDING STOCK']), 2)
                     real_qty = round(float(row['REAL QTY']), 2)
 
+                    # 1. Kesalahan System (Begin Stock Minus)
                     if qty_so_row > qty_sys_row and begin_stock < 0:
                         if gap_adj > 0 and gap_adj < abs(begin_stock): return "KESALAHAN SYSTEM (BEGIN STOCK -)"
                         elif gap_adj == 0: return "KESALAHAN SYSTEM (BEGIN STOCK -)"
 
+                    # 2. Kesalahan System (Ending Stock != Total Stock Multiple)
                     if gap_adj == 0 and begin_stock == 0:
                         if ending_stock == real_qty == curr_stock:
                             if qty_sys_all < ending_stock: return "KESALAHAN SYSTEM"
 
-                    if qty_sys_row > qty_so_row and gap_adj > 0: return "KESALAHAN ADJUSMENT +"
-                    elif qty_sys_row < qty_so_row and gap_adj < 0: return "KESALAHAN ADJUSMENT -"
-
+                    # 3. Kesalahan System (Mismatch Real QTY dengan Ending Stock)
                     if qty_so_row > qty_sys_row and begin_stock >= 0 and gap_adj == 0 and draft_in == 0 and draft_out == 0:
                         mutasi_bersih = round(begin_stock + (stock_in + trf_in) - (sales + trf_out), 2)
                         if mutasi_bersih != ending_stock: return "KESALAHAN SYSTEM"
 
+                    # 4. Kesalahan System (Stock System Lost)
                     if gap_adj == 0:
                         if qty_sys_row > qty_so_row:
                             diff = qty_sys_row - qty_so_row
@@ -2605,14 +2611,18 @@ class AppState:
                             diff = qty_so_row - qty_sys_row
                             if round(qty_sys_all + diff, 2) == curr_stock: return "KESALAHAN SYSTEM"
 
+                    # 5. Kesalahan RTO
                     if draft_in > 0 or draft_out > 0: return "KESALAHAN RTO"
+
+                    # 6. Cek Rekonsiliasi
                     if qty_sys_all == curr_stock: return "CEK HASIL REKONSILIASI"
 
+                    # (LOGIKA KESALAHAN ADJUSTMENT +/- TELAH DI-TAKE OUT)
                     return "UNDEFINED"
                 except:
                     return "ERROR DATA"
 
-            res['JUSTIFICATION'] = res.apply(run_formula, axis=1)
+            res['JUSTIFICATION'] = res.apply(run_formula_non_reversal, axis=1)
 
             ordered_headers = [
                 'IDENTIFY', 'BIN', 'SKU', 'BRAND', 'ITEM NAME', 'VARIANT', 'SUB KATEGORI',
@@ -2627,28 +2637,158 @@ class AppState:
             res = res.drop(columns=[c for c in drop_cols if c in res.columns], errors='ignore')
             final_df = res[[c for c in ordered_headers if c in res.columns]].copy()
 
-            # Hitung Metrik
-            c_undef = len(final_df[final_df['JUSTIFICATION'] == "UNDEFINED"])
-            c_sys = len(final_df[final_df['JUSTIFICATION'].isin(["KESALAHAN SYSTEM", "KESALAHAN SYSTEM (BEGIN STOCK -)"])])
-            c_adj = len(final_df[final_df['JUSTIFICATION'].isin(["KESALAHAN ADJUSMENT +", "KESALAHAN ADJUSMENT -"])])
-            c_rto = len(final_df[final_df['JUSTIFICATION'] == "KESALAHAN RTO"])
-            c_rekon = len(final_df[final_df['JUSTIFICATION'] == "CEK HASIL REKONSILIASI"])
-
-            self.jso_c_undef.set(c_undef)
-            self.jso_c_sys.set(c_sys)
-            self.jso_c_adj.set(c_adj)
-            self.jso_c_rto.set(c_rto)
-            self.jso_c_rekon.set(c_rekon)
+            self.jso_c_undef.set(len(final_df[final_df['JUSTIFICATION'] == "UNDEFINED"]))
+            self.jso_c_sys.set(len(final_df[final_df['JUSTIFICATION'].isin(["KESALAHAN SYSTEM", "KESALAHAN SYSTEM (BEGIN STOCK -)"])]))
+            self.jso_c_adj.set(0) # Sudah di-take out
+            self.jso_c_rto.set(len(final_df[final_df['JUSTIFICATION'] == "KESALAHAN RTO"]))
+            self.jso_c_rekon.set(len(final_df[final_df['JUSTIFICATION'] == "CEK HASIL REKONSILIASI"]))
 
             self._raw_df_jso_res = final_df.copy()
             self.df_jso_headers.set(final_df.columns.tolist())
             self.df_jso_rows.set(final_df.fillna("").astype(str).values.tolist())
-
             self.jso_processed.set(True)
-            return True, f"Justifikasi Selesai! ({len(final_df):,} Baris Diproses)"
+            return True, f"Justifikasi Non Reversal Selesai! ({len(final_df):,} Baris Diproses)"
         except Exception as e:
-            return False, f"Gagal Justifikasi SO: {e}"
+            return False, f"Gagal Justifikasi SO Non Reversal: {e}"
 
+    # ==========================================================================
+    # JUSTIFICATION SO - REVERSAL (DENGAN FILE PBI & FILTER TANGGAL)
+    # ==========================================================================
+    def process_justification_reversal(self, f_case, f_pbi, start_date=None, end_date=None):
+        try:
+            df_case = load_data_from_info(f_case)
+            df_pbi_raw = load_data_from_info(f_pbi)
+
+            if df_case.empty or df_pbi_raw.empty:
+                return False, "Kedua file (Multiple Adjustment & File PBI) wajib diupload!"
+
+            if df_pbi_raw.shape[1] < 17:
+                return False, "File PBI minimal harus 17 kolom (Kolom A=No Adj, C=SKU, E=Datetime, Q=Qty)!"
+
+            res = df_case.copy()
+            res.columns = [str(c).upper().strip() for c in res.columns]
+
+            sku_col_case = 'SKU' if 'SKU' in res.columns else res.columns[2]
+            qty_sys_col = 'QTY SYSTEM' if 'QTY SYSTEM' in res.columns else res.columns[9]
+            qty_so_col = 'QTY SO' if 'QTY SO' in res.columns else res.columns[10]
+
+            res['CLEAN_SKU'] = res[sku_col_case].astype(str).str.split('.').str[0].str.strip().str.upper()
+            res[qty_sys_col] = pd.to_numeric(res[qty_sys_col], errors='coerce').fillna(0)
+            res[qty_so_col] = pd.to_numeric(res[qty_so_col], errors='coerce').fillna(0)
+            res['DIFF_GAP'] = res[qty_so_col] - res[qty_sys_col]
+
+            # 1. Bersihkan Data PBI
+            # Kolom A = Index 0 (No Adj), Kolom C = Index 2 (SKU), Kolom E = Index 4 (Datetime), Kolom Q = Index 16 (Qty)
+            pbi_df = pd.DataFrame({
+                'NO_ADJ': df_pbi_raw.iloc[:, 0].astype(str).str.strip(),
+                'SKU': df_pbi_raw.iloc[:, 2].astype(str).str.split('.').str[0].str.strip().str.upper(),
+                'DATETIME': pd.to_datetime(df_pbi_raw.iloc[:, 4], errors='coerce'),
+                'QTY_ADJ': pd.to_numeric(df_pbi_raw.iloc[:, 16], errors='coerce').fillna(0)
+            })
+
+            # Filter Tanggal PBI (Kebal Jam & Menit - Full Day Tercover)
+            pbi_df = pbi_df.dropna(subset=['DATETIME'])
+
+            if start_date:
+                start_ts = pd.to_datetime(start_date)
+                pbi_df = pbi_df[pbi_df['DATETIME'] >= start_ts]
+
+            if end_date:
+                # Tambahkan 1 hari dengan batas '<' agar transaksi jam berapapun di tanggal akhir tetap ikut masuk
+                end_ts = pd.to_datetime(end_date) + pd.Timedelta(days=1)
+                pbi_df = pbi_df[pbi_df['DATETIME'] < end_ts]
+
+            # 2. Logika Penelusuran Reversal per SKU
+            # Jika gap butuh ADJ + (DIFF > 0), berarti sebelumnya ada kesalahan kebanyakan ADJ -
+            # Jika gap butuh ADJ - (DIFF < 0), berarti sebelumnya ada kesalahan kebanyakan ADJ +
+            no_adj_list = []
+            tgl_adj_list = []
+            justification_list = []
+
+            match_count = 0
+            nomatch_count = 0
+
+            for _, row in res.iterrows():
+                target_sku = row['CLEAN_SKU']
+                gap = row['DIFF_GAP']
+
+                if gap == 0:
+                    justification_list.append("OK / TIDAK ADA SELISIH")
+                    no_adj_list.append("-")
+                    tgl_adj_list.append("-")
+                    continue
+
+                sku_history = pbi_df[pbi_df['SKU'] == target_sku].copy()
+
+                if sku_history.empty:
+                    justification_list.append("BUKAN REVERSAL (TIDAK ADA HISTORY PBI)")
+                    no_adj_list.append("-")
+                    tgl_adj_list.append("-")
+                    nomatch_count += 1
+                    continue
+
+                # Kebutuhan lawan:
+                # Gap +3 ➔ Mencari transaksi histori bernilai -3 atau transaksi minus terakhir
+                # Gap -3 ➔ Mencari transaksi histori bernilai +3 atau transaksi plus terakhir
+                opposite_qty = -gap
+                
+                # 1. Cek Exact Match (Transaksi yang nilainya pas membikin salah)
+                exact_tx = sku_history[sku_history['QTY_ADJ'] == opposite_qty]
+                if not exact_tx.empty:
+                    last_tx = exact_tx.iloc[-1]
+                    no_adj_list.append(str(last_tx['NO_ADJ']))
+                    tgl_adj_list.append(last_tx['DATETIME'].strftime("%Y-%m-%d %H:%M"))
+                    justification_list.append("KESALAHAN ADJUSMENT (REVERSAL EXACT MATCH)")
+                    match_count += 1
+                    continue
+
+                # 2. Cek Net Cumulative Sum di rentang periode
+                net_history_qty = sku_history['QTY_ADJ'].sum()
+                if net_history_qty == opposite_qty:
+                    last_tx = sku_history.iloc[-1]
+                    no_adj_list.append(str(last_tx['NO_ADJ']))
+                    tgl_adj_list.append(last_tx['DATETIME'].strftime("%Y-%m-%d %H:%M"))
+                    justification_list.append("KESALAHAN ADJUSMENT (REVERSAL CUMULATIVE MATCH)")
+                    match_count += 1
+                    continue
+
+                # 3. Cek apakah ada transaksi berlawanan arah (Indikasi Over-Adjustment)
+                if gap > 0:
+                    opp_history = sku_history[sku_history['QTY_ADJ'] < 0]
+                else:
+                    opp_history = sku_history[sku_history['QTY_ADJ'] > 0]
+
+                if not opp_history.empty:
+                    last_opp = opp_history.iloc[-1]
+                    no_adj_list.append(str(last_opp['NO_ADJ']))
+                    tgl_adj_list.append(last_opp['DATETIME'].strftime("%Y-%m-%d %H:%M"))
+                    justification_list.append(f"INDIKASI REVERSAL (LAST OPPOSITE ADJ: {int(last_opp['QTY_ADJ'])})")
+                    match_count += 1
+                else:
+                    no_adj_list.append("-")
+                    tgl_adj_list.append("-")
+                    justification_list.append("BUKAN REVERSAL (ARAH TRANSAKSI TIDAK SESUAI)")
+                    nomatch_count += 1
+
+            # 3. Rakit DataFrame Hasil Reversal
+            res['JUSTIFICATION'] = justification_list
+            res['NO ADJUSTMENT'] = no_adj_list
+            res['TANGGAL ADJUSTMENT'] = tgl_adj_list
+
+            drop_temp = ['CLEAN_SKU', 'DIFF_GAP']
+            final_rev_df = res.drop(columns=[c for c in drop_temp if c in res.columns], errors='ignore')
+
+            self.jso_rev_c_match.set(match_count)
+            self.jso_rev_c_nomatch.set(nomatch_count)
+
+            self._raw_df_jso_rev_res = final_rev_df.copy()
+            self.df_jso_rev_headers.set(final_rev_df.columns.tolist())
+            self.df_jso_rev_rows.set(final_rev_df.fillna("").astype(str).values.tolist())
+
+            self.jso_rev_processed.set(True)
+            return True, f"Analisis Justifikasi Reversal Selesai! ({match_count} Item Terindikasi Reversal)"
+        except Exception as e:
+            return False, f"Gagal Memproses Reversal: {e}"
 # ==========================================================================
     # CROSS CHECK REAL & SYSTEM (INSTANT ENGINE)
     # ==========================================================================

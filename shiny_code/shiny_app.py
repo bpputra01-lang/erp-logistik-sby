@@ -2306,26 +2306,167 @@ def server(input: Inputs, output: Outputs, session: Session):
         yield buf.getvalue()
 
 # ==========================================================================
-    # JUSTIFICATION SO CONTROLLER & HANDLERS
+    # JUSTIFICATION SO CONTROLLER (DYNAMIC MODE: REVERSAL & NON REVERSAL)
     # ==========================================================================
+    @reactive.Effect
+    @reactive.event(input.change_jso_mode)
+    def _on_change_jso_mode():
+        state.jso_mode.set(input.change_jso_mode())
 
+    @render.ui
+    def jso_dynamic_body_ui():
+        mode = state.jso_mode()
+
+        # 0. Kondisi Belum Memilih Mode
+        if not mode or mode == "":
+            return ui.div(
+                ui.div(
+                    ui.tags.i(class_="fa-solid fa-hand-pointer", style="font-size: 32px; color: #C5A059; margin-bottom: 12px;"),
+                    ui.h4("Silakan Pilih Mode Justifikasi Terlebih Dahulu", style="font-size: 16px; font-weight: 800; color: #1A202C; margin: 0 0 6px 0;"),
+                    ui.p("Pilih antara 'JUSTIFIKASI REVERSAL' atau 'JUSTIFIKASI NON REVERSAL' pada dropdown di atas untuk memunculkan form uploader dokumen.", style="color: #718096; font-size: 13px; margin: 0;"),
+                    style="background: #FFFFFF; border: 2px dashed #CBD5E0; border-radius: 12px; padding: 3rem 1.5rem; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; box-shadow: 0 4px 12px rgba(0,0,0,0.02);"
+                )
+            )
+
+        # 1. MODE: JUSTIFIKASI REVERSAL (2 Uploader + Filter Tanggal)
+        elif mode == "JUSTIFIKASI REVERSAL":
+            upload_section = ui.div(
+                ui.h4("🔄 Upload Dokumen Justifikasi Reversal (Histori PBI)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+                # Filter Tanggal PBI
+                ui.div(
+                    ui.div(
+                        ui.span("📅 Tanggal Awal PBI:", style="font-size: 12px; font-weight: 800; color: #1A202C; margin-bottom: 4px; display: block;"),
+                        ui.input_date("jso_rev_start", None, value=state.jso_rev_start_date()),
+                        style="flex: 1; min-width: 180px;"
+                    ),
+                    ui.div(
+                        ui.span("📅 Tanggal Akhir PBI:", style="font-size: 12px; font-weight: 800; color: #1A202C; margin-bottom: 4px; display: block;"),
+                        ui.input_date("jso_rev_end", None, value=state.jso_rev_end_date()),
+                        style="flex: 1; min-width: 180px;"
+                    ),
+                    style="display: flex; gap: 1rem; width: 100%; margin-bottom: 1.25rem; flex-wrap: wrap; background: #F8FAFC; padding: 1rem; border-radius: 8px; border: 1px solid #E2E8F0;"
+                ),
+                ui.div(
+                    custom_uploader_box("uploader_jso_rev_case", "1. File Multiple Adjustment (Real & System)"),
+                    custom_uploader_box("uploader_jso_rev_pbi", "2. File Adjustment PBI (Excel / CSV)"),
+                    style="display: flex; gap: 1rem; width: 100%; margin-bottom: 0.5rem; flex-wrap: wrap;"
+                ),
+                ui.output_ui("jso_rev_action_btn_ui"),
+                style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+            )
+            return ui.div(upload_section, ui.output_ui("jso_rev_results_container"))
+
+        # 2. MODE: JUSTIFIKASI NON REVERSAL (4 Uploader Asli Tanpa Ubah)
+        elif mode == "JUSTIFIKASI NON REVERSAL":
+            upload_section = ui.div(
+                ui.h4("📥 Upload Dokumen Justifikasi Non Reversal (Sistem & Mutasi)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+                ui.div(
+                    custom_uploader_box("uploader_jso_case", "1. File Adjustment (Plus & Minus)"),
+                    custom_uploader_box("uploader_jso_track", "2. Summary Stock (Dashboard Asset)"),
+                    custom_uploader_box("uploader_jso_all", "3. All Data Stock (Multiple Adj.)"),
+                    custom_uploader_box("uploader_jso_scan", "4. Data Scan (Opsional)"),
+                    style="display: flex; gap: 1rem; width: 100%; margin-bottom: 0.5rem; flex-wrap: wrap;"
+                ),
+                ui.output_ui("justification_so_action_btn_ui"),
+                style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+            )
+            return ui.div(upload_section, ui.output_ui("justification_so_results_container"))
+
+    # --- CONTROLLER MODE REVERSAL ---
+    @render.ui
+    def jso_rev_action_btn_ui():
+        f1 = input.uploader_jso_rev_case() if "uploader_jso_rev_case" in input else None
+        f2 = input.uploader_jso_rev_pbi() if "uploader_jso_rev_pbi" in input else None
+
+        if (f1 and len(f1) > 0) and (f2 and len(f2) > 0):
+            return ui.div(
+                ui.tags.button(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "RUN ANALISIS REVERSAL"),
+                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_run_jso_rev', Math.random(), {priority: 'event'});",
+                    class_="btn-red-gradient"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+            )
+        return ui.div(
+            ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"),
+                "UPLOAD KEDUA FILE UNTUK MEMULAI REVERSAL",
+                disabled=True,
+                class_="btn-locked"
+            ),
+            style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+        )
+
+    @reactive.Effect
+    @reactive.event(input.btn_run_jso_rev)
+    def _proc_jso_rev():
+        f1 = input.uploader_jso_rev_case()
+        f2 = input.uploader_jso_rev_pbi()
+        sd = input.jso_rev_start() if "jso_rev_start" in input else None
+        ed = input.jso_rev_end() if "jso_rev_end" in input else None
+
+        if not f1 or not f2:
+            state.error_modal_message.set("Upload kedua file (Multiple Adjustment & File PBI) terlebih dahulu!")
+            state.show_error_modal.set(True)
+            return
+
+        succ, msg = state.process_justification_reversal(f1, f2, sd, ed)
+        if succ: state.show_success_modal.set(True)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+
+    @render.ui
+    def jso_rev_results_container():
+        if not state.jso_rev_processed(): return ui.div()
+        return ui.div(
+            ui.hr(style="margin: 1rem 0; border-color: #E2E8F0;"),
+            ui.h4("📋 RINGKASAN HASIL ANALISIS REVERSAL (HISTORI PBI)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 1rem;"),
+            ui.div(
+                dark_metric_box("🔄 TERINDIKASI REVERSAL", f"{state.jso_rev_c_match():,} SKU", "#10B981"),
+                dark_metric_box("❌ BUKAN REVERSAL / TIDAK COCOK", f"{state.jso_rev_c_nomatch():,} SKU", "#E53E3E"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+            ),
+            ui.div(
+                ui.div(
+                    ui.h4("📋 Data Rekonsiliasi Reversal", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0;"),
+                    ui.download_button(
+                        "btn_dl_jso_rev_excel",
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD HASIL REVERSAL (.XLSX)"),
+                        style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
+                    ),
+                    style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem;"
+                ),
+                render_clean_table(state.df_jso_rev_headers(), state.df_jso_rev_rows(), "tbl_jso_rev_summary"),
+                style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0;"
+            ),
+            style="width: 100%;"
+        )
+
+    @render.download(filename="Hasil_Justifikasi_Reversal.xlsx")
+    def btn_dl_jso_rev_excel():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_jso_rev_res.to_excel(writer, sheet_name='REVERSAL_ANALYSIS', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    # --- CONTROLLER MODE NON REVERSAL (EXISTING 4 UPLOADER) ---
     @render.ui
     def justification_so_action_btn_ui():
         f1 = input.uploader_jso_case() if "uploader_jso_case" in input else None
         f2 = input.uploader_jso_track() if "uploader_jso_track" in input else None
         f3 = input.uploader_jso_all() if "uploader_jso_all" in input else None
 
-        # Jika 3 file utama sudah di-upload -> Tombol Merah Aktif
         if (f1 and len(f1) > 0) and (f2 and len(f2) > 0) and (f3 and len(f3) > 0):
             return ui.div(
                 ui.tags.button(
-                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "RUN COMPARE JUSTIFICATION"),
-                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_jso', Math.random(), {priority: 'event'});",
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "RUN COMPARE JUSTIFIKASI NON REVERSAL"),
+                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_run_jso', Math.random(), {priority: 'event'});",
                     class_="btn-red-gradient"
                 ),
                 style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
             )
-        # Jika belum lengkap -> Tombol Terkunci Transparan
         return ui.div(
             ui.tags.button(
                 ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"),
@@ -2341,18 +2482,17 @@ def server(input: Inputs, output: Outputs, session: Session):
         if not state.jso_processed(): return ui.div()
         return ui.div(
             ui.hr(style="margin: 1rem 0; border-color: #E2E8F0;"),
-            ui.h4("📋 RINGKASAN METRIK JUSTIFIKASI ADJUSTMENT", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 1rem;"),
+            ui.h4("📋 RINGKASAN METRIK JUSTIFIKASI NON REVERSAL", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 1rem;"),
             ui.div(
                 dark_metric_box("❓ UNDEFINED", f"{state.jso_c_undef():,} SKU", "#DD6B20"),
                 dark_metric_box("💻 SYS ERROR", f"{state.jso_c_sys():,} SKU", "#E53E3E"),
-                dark_metric_box("❌ KESALAHAN ADJ", f"{state.jso_c_adj():,} SKU", "#E53E3E"),
                 dark_metric_box("🗳️ KESALAHAN RTO", f"{state.jso_c_rto():,} SKU", "#3182CE"),
                 dark_metric_box("🔁 CEK REKON", f"{state.jso_c_rekon():,} SKU", "#C5A059"),
                 style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
             ),
             ui.div(
                 ui.div(
-                    ui.h4("📋 Ringkasan Hasil Analisis Justifikasi", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0;"),
+                    ui.h4("📋 Ringkasan Hasil Analisis Non Reversal", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0;"),
                     ui.download_button(
                         "btn_dl_jso_excel",
                         ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD HASIL REKON (.XLSX)"),
@@ -2375,7 +2515,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         f4 = input.uploader_jso_scan()
 
         if not f1 or not f2 or not f3:
-            state.error_modal_message.set("Pilih ketiga file utama (File Adjustment, Summary Stock, All Data Stock) terlebih dahulu!")
+            state.error_modal_message.set("Pilih ketiga file utama terlebih dahulu!")
             state.show_error_modal.set(True)
             return
 
@@ -2385,7 +2525,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
 
-    @render.download(filename="rekon_stock_so.xlsx")
+    @render.download(filename="rekon_stock_so_non_reversal.xlsx")
     def btn_dl_jso_excel():
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine='openpyxl') as writer:

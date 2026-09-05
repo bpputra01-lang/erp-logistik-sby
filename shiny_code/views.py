@@ -977,28 +977,30 @@ def stock_opname_view(state: AppState):
     )
 
 # ==============================================================================
-# VIEW JUSTIFICATION SO (DENGAN LOGIKA KUNCI TOMBOL OTOMATIS)
+# VIEW JUSTIFICATION SO (DENGAN DROPDOWN MODE REVERSAL & NON REVERSAL)
 # ==============================================================================
 def justification_so_view(state: AppState):
-    upload_section = ui.div(
-        ui.h4("📥 Upload Dokumen Justifikasi Adjustment", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+    mode_selector = ui.div(
         ui.div(
-            custom_uploader_box("uploader_jso_case", "1. File Adjustment (Plus & Minus)"),
-            custom_uploader_box("uploader_jso_track", "2. Summary Stock (Dashboard Asset)"),
-            custom_uploader_box("uploader_jso_all", "3. All Data Stock (Multiple Adj.)"),
-            custom_uploader_box("uploader_jso_scan", "4. Data Scan (Opsional)"),
-            style="display: flex; gap: 1rem; width: 100%; margin-bottom: 0.5rem; flex-wrap: wrap;"
+            ui.span("🎯 PILIH METODE JUSTIFIKASI SO:", style="font-weight: 800; color: #1A202C; font-size: 13px; margin-bottom: 6px; display: block; letter-spacing: 0.5px;"),
+            ui.tags.select(
+                ui.tags.option("-- Pilih Mode Justifikasi SO --", value="", selected=(state.jso_mode() == "")),
+                ui.tags.option("1. JUSTIFIKASI REVERSAL (CROSS-CHECK PBI HISTORY)", value="JUSTIFIKASI REVERSAL", selected=(state.jso_mode() == "JUSTIFIKASI REVERSAL")),
+                ui.tags.option("2. JUSTIFIKASI NON REVERSAL (ANALISIS SYSTEM & STOCK)", value="JUSTIFIKASI NON REVERSAL", selected=(state.jso_mode() == "JUSTIFIKASI NON REVERSAL")),
+                id="select_jso_mode_input",
+                onchange="Shiny.setInputValue('change_jso_mode', this.value, {priority: 'event'})",
+                style="width: 100%; padding: 10px 14px; background-color: #FFFFFF; color: #1A202C; font-weight: 800; font-size: 14px; border: 2px solid #CBD5E0; border-radius: 8px; outline: none; cursor: pointer;"
+            ),
+            style="width: 100%;"
         ),
-        # Ganti tombol statis dengan sub-render tombol otomatis:
-        ui.output_ui("justification_so_action_btn_ui"),
-        style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+        style="background: white; padding: 1.25rem 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem; box-shadow: 0 4px 12px rgba(0,0,0,0.03);"
     )
 
-    results_ui = ui.output_ui("justification_so_results_container")
+    dynamic_body = ui.output_ui("jso_dynamic_body_ui")
 
     return ui.div(
-        upload_section,
-        results_ui,
+        mode_selector,
+        dynamic_body,
         style="width: 100%; padding: 1rem;"
     )
 
