@@ -96,8 +96,8 @@ def server(input: Inputs, output: Outputs, session: Session):
         "justification-so": "Justification SO",
         "cross-check-real-system": "Cross Check Real & System",
         "balancing-stock": "Balancing Stock",
-        "physical-inventory-list": "Physical Inventory List"
-        "validation-barcode-sku": "Validation Barcode SKU",
+        "physical-inventory-list": "Physical Inventory List",
+        "validation-barcode-sku": "Validation Barcode SKU"
     }
 
     # 1. Saat menu diklik di sidebar -> URL di browser otomatis berubah
