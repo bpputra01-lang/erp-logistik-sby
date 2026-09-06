@@ -3183,7 +3183,7 @@ class AppState:
             return False, f"Gagal memproses Balancing Stock: {e}"
 
     # ==========================================================================
-    # VALIDATION BARCODE SKU - STAGE 1 (BILINGUAL & COLOR ALIAS SMART MATCHER)
+    # VALIDATION BARCODE SKU - STAGE 1 (FULL WARNA, RASA & COMPOSITE VARIANTS)
     # ==========================================================================
     def process_vbs_stage1(self, f_scan, f_list):
         try:
@@ -3255,63 +3255,58 @@ class AppState:
             def clean_alnum(val):
                 return re.sub(r'[^A-Z0-9]', '', str(val).upper())
 
-            # KAMUS BILINGUAL LENGKAP SPORT & RETAIL (INDO <-> ENG <-> SINGKATAN)
-            COLOR_GROUPS = [
-                # Hitam
-                ["BLACK", "HITAM", "HIT", "BLK", "BK"],
-                # Putih
-                ["WHITE", "PUTIH", "WHI", "WHT", "WT", "PUT", "PTH"],
-                # Merah
-                ["RED", "MERAH", "MER", "MRH"],
-                # Biru
-                ["BLUE", "BIRU", "BLU", "BIR"],
-                # Kuning
-                ["YELLOW", "KUNING", "YEL", "YLW", "KUN"],
-                # Hijau
-                ["GREEN", "HIJAU", "GRN", "HIJ"],
-                # Abu-Abu
-                ["GREY", "GRAY", "ABU", "ABUABU", "GRY", "GRE"],
-                # Oranye
-                ["ORANGE", "ORANYE", "OREN", "ORN", "ORG"],
-                # Ungu
-                ["PURPLE", "UNGU", "PRP", "UNG", "VIOLET"],
-                # Cokelat
-                ["BROWN", "COKELAT", "COKLAT", "COK", "BRN"],
-                # Emas
-                ["GOLD", "EMAS", "GLD"],
-                # Perak
-                ["SILVER", "PERAK", "SLV"],
-                # Pink
-                ["PINK", "MERAHMUDA", "PNK"],
-                # Navy / Dongker
-                ["NAVY", "DONGKER", "NVY", "DNK"],
-                # Maroon
-                ["MAROON", "MARUN", "MRN"],
+            # ==================================================================
+            # KAMUS MASTER: LENGKAP WARNA & RASA (SPORT, FASHION & NUTRITION)
+            # ==================================================================
+            VARIANT_GROUPS = [
+                # --- VARIAN RASA (NUTRITION / ENERGY GEL / DRINK) ---
+                ["SALTED CARAMEL", "SALTEDCARAMEL", "STDCARAMEL", "SC", "SALTED"],
+                ["CHOCOLATE", "CHOCO", "COKLAT", "COKELAT", "CHOC", "COK"],
+                ["STRAWBERRY", "STROBERI", "STR", "STRAW", "BERRY"],
+                ["TRI-BERRY", "TRIBERRY", "TRI BERRY", "TB"],
+                ["CARAMEL", "KARAMEL", "CRM"],
+                ["ESPRESSO", "ESP", "COFFEE", "KOPI"],
+                ["VANILLA BEAN", "VANILLABEAN", "VANILLA", "VANILA", "VAN", "VB"],
+                ["COCO PANDAN", "COCOPANDAN", "PANDAN", "COCO", "CCP"],
+                ["KOPI HAZELNUT", "KOPIHAZELNUT", "HAZELNUT", "COFFEE HAZELNUT", "KH", "HZL"],
 
-                # --- WARNA BARU TAMBAHAN ---
-                # Stabilo / Volt / Neon / Lime
-                ["STABILO", "STB", "NEON", "VOLT", "LIME", "FLUO", "FLUORESCENT","STAB"],
-                # Turquoise / Tosca / Cyan
+                # --- VARIAN WARNA GANDA (COMPOSITE / DUA KATA) ---
+                ["LIGHT BLUE", "LIGHTBLUE", "LBL", "LTBLUE", "BIRUMUDA", "BM"],
+                ["LIGHT GREEN", "LIGHTGREEN", "LGR", "LTGREEN", "HIJAUMUDA", "HM"],
+                ["LIGHT GREY", "LIGHTGREY", "LIGHT GRAY", "LGY", "ABUMUDA"],
+                ["JET BLACK", "JETBLACK", "JB"],
+
+                # --- VARIAN WARNA STANDAR & KHUSUS SPORT ---
+                ["BLACK", "HITAM", "HIT", "BLK", "BK"],
+                ["WHITE", "PUTIH", "WHI", "WHT", "WT", "PUT", "PTH"],
+                ["RED", "MERAH", "MER", "MRH"],
+                ["BLUE", "BIRU", "BLU", "BIR"],
+                ["NAVY", "DONGKER", "NVY", "DNK"],
+                ["GREY", "GRAY", "ABU", "ABUABU", "GRY", "GRE"],
+                ["GREEN", "HIJAU", "GRN", "HIJ"],
+                ["PINK", "MERAHMUDA", "PNK"],
                 ["TURQUOISE", "TURQOISE", "TURQ", "TRQ", "TOSCA", "TOSKA", "CYAN", "TEAL"],
-                # Burgundy / Wine
+                ["YELLOW", "KUNING", "YEL", "YLW", "KUN"],
+                ["CREAM", "KREM", "BEIGE", "BEG", "CRM"],
+                ["ORANGE", "ORANYE", "OREN", "ORN", "ORG"],
+                ["MAROON", "MARUN", "MRN"],
+                ["STABILO", "STB", "NEON", "VOLT", "LIME", "FLUO", "FLUORESCENT"],
                 ["BURGUNDY", "BGD", "BRG", "BUR", "WINE"],
-                # Electricity / Electric
                 ["ELECTRICITY", "ELECTRIC", "ELEC", "ELC"],
-                # Coral
+                ["PURPLE", "UNGU", "PRP", "UNG", "VIOLET"],
+                ["BROWN", "COKELAT", "COKLAT", "COK", "BRN"],
+                ["GOLD", "EMAS", "GLD"],
+                ["SILVER", "PERAK", "SLV"],
                 ["CORAL", "CRL"],
-                # Magenta
-                ["MAGENTA", "MAG"],
-                # Cream / Beige
-                ["CREAM", "KREM", "BEIGE", "BEG", "CRM","CRE"],
-                #Tosca
-                ["TOSCA","TSC","TOSC","TOS"]
+                ["MAGENTA", "MAG"]
             ]
 
-            # Otomatis buat pemetaan dua arah (Bidirectional Map)
-            COLOR_SYNONYMS = {}
-            for grp in COLOR_GROUPS:
+            # Buat mapping dua arah (Bidirectional)
+            VARIANT_SYNONYMS = {}
+            for grp in VARIANT_GROUPS:
                 for word in grp:
-                    COLOR_SYNONYMS[word] = grp
+                    VARIANT_SYNONYMS[word.upper()] = grp
+                    VARIANT_SYNONYMS[clean_alnum(word)] = grp
 
             # Helper Penarik Seluruh Alias Varian
             def get_all_variant_aliases(variant_raw):
@@ -3319,26 +3314,24 @@ class AppState:
                 clean_v = clean_alnum(v_str)
                 aliases = {clean_v, v_str}
 
-                # Cek di kamus warna
-                if v_str in COLOR_SYNONYMS:
-                    for syn in COLOR_SYNONYMS[v_str]:
-                        aliases.add(clean_alnum(syn))
-                        aliases.add(syn)
-                if clean_v in COLOR_SYNONYMS:
-                    for syn in COLOR_SYNONYMS[clean_v]:
-                        aliases.add(clean_alnum(syn))
-                        aliases.add(syn)
+                # Cek di kamus
+                for key in [v_str, clean_v]:
+                    if key in VARIANT_SYNONYMS:
+                        for syn in VARIANT_SYNONYMS[key]:
+                            aliases.add(clean_alnum(syn))
+                            aliases.add(syn.upper())
 
-                # Jika ada kombinasi warna bergaris miring (misal BLACK/STABILO atau RED/TURQUOISE)
+                # Cek jika ada kombinasi slash (misal BLACK/WHITE)
                 if '/' in v_str:
                     parts = [p.strip() for p in v_str.split('/')]
-                    part_syns = [COLOR_SYNONYMS.get(p, [p]) for p in parts]
+                    part_syns = [VARIANT_SYNONYMS.get(p, [p]) for p in parts]
                     for combo in itertools.product(*part_syns):
                         aliases.add("".join([clean_alnum(c) for c in combo]))
                         aliases.add("/".join(combo))
 
-                # Urutkan alias dari yang karakter teksnya terpanjang
-                return sorted(list(aliases), key=len, reverse=True)
+                # Urutkan alias dari yang karakter alfanumeriknya terpanjang!
+                # (Penting agar 'LIGHT BLUE' dicek sebelum 'BLUE', 'SALTED CARAMEL' sebelum 'CARAMEL')
+                return sorted(list(aliases), key=lambda x: len(clean_alnum(x)), reverse=True)
 
             # Siapkan Database Pencarian
             list_lookup = []
@@ -3357,7 +3350,11 @@ class AppState:
                     'VARIANT_ALIASES': get_all_variant_aliases(variant)
                 })
 
-            # Helper Cek Kecocokan Varian (Mendukung Alias Bahasa & Suffix Proteksi)
+            # PENTING: Urutkan kandidat berdasarkan panjang varian bersih terpanjang
+            # (Contoh: 'SALTED CARAMEL' dicek sebelum 'CARAMEL', 'JET BLACK' sebelum 'BLACK')
+            list_lookup.sort(key=lambda x: len(clean_alnum(x['VARIANT'])), reverse=True)
+
+            # Helper Cek Kecocokan Varian
             def check_variant_match(s_raw, s_clean, cand):
                 aliases = cand['VARIANT_ALIASES']
 
@@ -3379,14 +3376,11 @@ class AppState:
                         if bool(re.search(pattern, s_raw)) or s_clean.endswith(a_clean):
                             return True
 
-                    # 2. Jika kode scan berakhiran dengan alias warna/ukuran
-                    # Contoh: ASAVO21MER -> berakhiran 'MER' (alias RED) -> COCOK!
-                    # Contoh: ASAVO22WHI -> berakhiran 'WHI' (alias WHITE) -> COCOK!
-                    # Contoh: ASAVO23HIT -> berakhiran 'HIT' (alias BLACK) -> COCOK!
+                    # 2. Jika kode scan berakhiran dengan alias warna/rasa
                     if s_clean.endswith(a_clean):
                         return True
 
-                    # 3. Atau dipisahkan tanda pemisah (misal ASAVO21-MER, ASAVO23_HIT)
+                    # 3. Atau dipisahkan tanda pemisah di raw string (misal: GEL-SC, ENERGY_ESP)
                     pattern_text = rf'(?:^|[\s\-_/]){re.escape(a_clean)}(?:[\s\-_/]|$)'
                     if re.search(pattern_text, s_raw, re.IGNORECASE):
                         return True
@@ -3407,19 +3401,17 @@ class AppState:
 
                     var_matched = check_variant_match(s_raw, s_clean, cand)
 
-                    # PRIORITAS 1: Model/Kata Awal Cocok DAN Varian/Alias Cocok 100%!
-                    # Contoh: 'ASAVO21MER' -> Cocok 'ASAVO21' + Alias 'MER' (RED)
-                    # Contoh: 'ASAVO22WHI' -> Cocok 'ASAVO22' + Alias 'WHI' (WHITE)
-                    # Contoh: 'ASAVO23HIT' -> Cocok 'ASAVO23' + Alias 'HIT' (BLACK)
+                    # PRIORITAS 1: Model/Kata Awal Cocok DAN Varian/Rasa Cocok 100%!
+                    # Contoh: ASAVO21MER -> ASAVO21 + MER (RED)
+                    # Contoh: STRCARAMEL -> STR + SC (SALTED CARAMEL)
                     if fw_clean and len(fw_clean) >= 2 and fw_clean in s_clean and var_matched:
                         return cand
 
-                    # PRIORITAS 2: Bagian Awal Nama Barang Cocok DAN Varian/Alias Cocok
+                    # PRIORITAS 2: Bagian Awal Nama Barang Cocok DAN Varian/Rasa Cocok
                     if len(s_clean) >= 3 and item_clean.startswith(s_clean) and var_matched:
                         return cand
 
                     # PRIORITAS 3: Fallback untuk Barang Tanpa Varian (seperti Kaos Kaki 'A1 2002 03')
-                    # Hanya dipakai jika tidak ada kecocokan varian
                     if len(s_clean) >= 3 and item_clean.startswith(s_clean):
                         if best_fallback_match is None:
                             best_fallback_match = cand
@@ -3501,6 +3493,7 @@ class AppState:
         except Exception as e:
             return False, f"Gagal Validasi Barcode: {e}"
 
+            
     def process_vbs_stage2(self):
         try:
             if self._raw_df_vbs_compare.empty:
