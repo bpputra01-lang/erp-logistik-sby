@@ -3183,11 +3183,12 @@ class AppState:
             return False, f"Gagal memproses Balancing Stock: {e}"
 
     # ==========================================================================
-    # VALIDATION BARCODE SKU - STAGE 1 (ANTI-COLLISION VARIANT MATCHER)
+    # VALIDATION BARCODE SKU - STAGE 1 (BILINGUAL & COLOR ALIAS SMART MATCHER)
     # ==========================================================================
     def process_vbs_stage1(self, f_scan, f_list):
         try:
             import re
+            import itertools
 
             def read_flexible_vbs(f_info):
                 if not f_info: return pd.DataFrame()
@@ -3254,7 +3255,90 @@ class AppState:
             def clean_alnum(val):
                 return re.sub(r'[^A-Z0-9]', '', str(val).upper())
 
-            # Siapkan database kandidat
+            # KAMUS BILINGUAL LENGKAP SPORT & RETAIL (INDO <-> ENG <-> SINGKATAN)
+            COLOR_GROUPS = [
+                # Hitam
+                ["BLACK", "HITAM", "HIT", "BLK", "BK"],
+                # Putih
+                ["WHITE", "PUTIH", "WHI", "WHT", "WT", "PUT", "PTH"],
+                # Merah
+                ["RED", "MERAH", "MER", "MRH"],
+                # Biru
+                ["BLUE", "BIRU", "BLU", "BIR"],
+                # Kuning
+                ["YELLOW", "KUNING", "YEL", "YLW", "KUN"],
+                # Hijau
+                ["GREEN", "HIJAU", "GRN", "HIJ"],
+                # Abu-Abu
+                ["GREY", "GRAY", "ABU", "ABUABU", "GRY", "GRE"],
+                # Oranye
+                ["ORANGE", "ORANYE", "OREN", "ORN", "ORG"],
+                # Ungu
+                ["PURPLE", "UNGU", "PRP", "UNG", "VIOLET"],
+                # Cokelat
+                ["BROWN", "COKELAT", "COKLAT", "COK", "BRN"],
+                # Emas
+                ["GOLD", "EMAS", "GLD"],
+                # Perak
+                ["SILVER", "PERAK", "SLV"],
+                # Pink
+                ["PINK", "MERAHMUDA", "PNK"],
+                # Navy / Dongker
+                ["NAVY", "DONGKER", "NVY", "DNK"],
+                # Maroon
+                ["MAROON", "MARUN", "MRN"],
+
+                # --- WARNA BARU TAMBAHAN ---
+                # Stabilo / Volt / Neon / Lime
+                ["STABILO", "STB", "NEON", "VOLT", "LIME", "FLUO", "FLUORESCENT"],
+                # Turquoise / Tosca / Cyan
+                ["TURQUOISE", "TURQOISE", "TURQ", "TRQ", "TOSCA", "TOSKA", "CYAN", "TEAL"],
+                # Burgundy / Wine
+                ["BURGUNDY", "BGD", "BRG", "BUR", "WINE"],
+                # Electricity / Electric
+                ["ELECTRICITY", "ELECTRIC", "ELEC", "ELC"],
+                # Coral
+                ["CORAL", "CRL"],
+                # Magenta
+                ["MAGENTA", "MAG"],
+                # Cream / Beige
+                ["CREAM", "KREM", "BEIGE", "BEG", "CRM"]
+            ]
+
+            # Otomatis buat pemetaan dua arah (Bidirectional Map)
+            COLOR_SYNONYMS = {}
+            for grp in COLOR_GROUPS:
+                for word in grp:
+                    COLOR_SYNONYMS[word] = grp
+
+            # Helper Penarik Seluruh Alias Varian
+            def get_all_variant_aliases(variant_raw):
+                v_str = str(variant_raw).strip().upper()
+                clean_v = clean_alnum(v_str)
+                aliases = {clean_v, v_str}
+
+                # Cek di kamus warna
+                if v_str in COLOR_SYNONYMS:
+                    for syn in COLOR_SYNONYMS[v_str]:
+                        aliases.add(clean_alnum(syn))
+                        aliases.add(syn)
+                if clean_v in COLOR_SYNONYMS:
+                    for syn in COLOR_SYNONYMS[clean_v]:
+                        aliases.add(clean_alnum(syn))
+                        aliases.add(syn)
+
+                # Jika ada kombinasi warna bergaris miring (misal BLACK/STABILO atau RED/TURQUOISE)
+                if '/' in v_str:
+                    parts = [p.strip() for p in v_str.split('/')]
+                    part_syns = [COLOR_SYNONYMS.get(p, [p]) for p in parts]
+                    for combo in itertools.product(*part_syns):
+                        aliases.add("".join([clean_alnum(c) for c in combo]))
+                        aliases.add("/".join(combo))
+
+                # Urutkan alias dari yang karakter teksnya terpanjang
+                return sorted(list(aliases), key=len, reverse=True)
+                
+            # Siapkan Database Pencarian
             list_lookup = []
             for _, r in df_list.iterrows():
                 target_sku = r['TARGET_SKU']
@@ -3267,43 +3351,47 @@ class AppState:
                     'VARIANT': variant,
                     'CLEAN_ITEM': clean_alnum(item_name),
                     'CLEAN_VAR': clean_alnum(variant),
-                    'CLEAN_FW': clean_alnum(first_word)
+                    'CLEAN_FW': clean_alnum(first_word),
+                    'VARIANT_ALIASES': get_all_variant_aliases(variant)
                 })
 
-            # PENTING: Urutkan varian dari yang terpanjang (misal XL sebelum L, XXL sebelum XL, 42.5 sebelum 42)
-            # Ini mencegah ukuran 'L' mencuri kode milik 'XL'!
-            list_lookup.sort(key=lambda x: len(x['CLEAN_VAR']), reverse=True)
+            # Helper Cek Kecocokan Varian (Mendukung Alias Bahasa & Suffix Proteksi)
+            def check_variant_match(s_raw, s_clean, cand):
+                aliases = cand['VARIANT_ALIASES']
 
-            # Helper Cek Varian Anti-Tabrakan
-            def check_variant_match(s_raw, s_clean, v_raw, v_clean):
-                if not v_clean: return False
+                for alias in aliases:
+                    a_clean = clean_alnum(alias)
+                    if not a_clean: continue
 
-                # Proteksi khusus huruf tunggal agar tidak salah mendeteksi varian bertingkat
-                if v_clean == 'L' and (s_clean.endswith('XL') or s_clean.endswith('XXL') or s_clean.endswith('3XL')):
-                    return False
-                if v_clean == 'S' and (s_clean.endswith('XS') or s_clean.endswith('XXS')):
-                    return False
-                if v_clean == 'M' and (s_clean.endswith('XM') or s_clean.endswith('XXM')):
-                    return False
+                    # Proteksi huruf tunggal agar L tidak mencocokkan XL, S tidak mencocokkan XS
+                    if a_clean == 'L' and (s_clean.endswith('XL') or s_clean.endswith('XXL') or s_clean.endswith('3XL')):
+                        continue
+                    if a_clean == 'S' and (s_clean.endswith('XS') or s_clean.endswith('XXS')):
+                        continue
+                    if a_clean == 'M' and (s_clean.endswith('XM') or s_clean.endswith('XXM')):
+                        continue
 
-                # 1. Jika varian berupa angka (misal size sepatu 39, 40, 42)
-                if v_clean.isdigit():
-                    pattern = rf'(?:^|[^0-9]){re.escape(v_clean)}(?:[^0-9]|$)'
-                    return bool(re.search(pattern, s_raw)) or s_clean.endswith(v_clean)
+                    # 1. Jika angka ukuran sepatu (misal 39, 40, 42)
+                    if a_clean.isdigit():
+                        pattern = rf'(?:^|[^0-9]){re.escape(a_clean)}(?:[^0-9]|$)'
+                        if bool(re.search(pattern, s_raw)) or s_clean.endswith(a_clean):
+                            return True
 
-                # 2. Jika varian berupa teks (S, M, L, XL, XXL)
-                # Harus tepat berakhiran dengan varian tersebut
-                if s_clean.endswith(v_clean):
-                    return True
+                    # 2. Jika kode scan berakhiran dengan alias warna/ukuran
+                    # Contoh: ASAVO21MER -> berakhiran 'MER' (alias RED) -> COCOK!
+                    # Contoh: ASAVO22WHI -> berakhiran 'WHI' (alias WHITE) -> COCOK!
+                    # Contoh: ASAVO23HIT -> berakhiran 'HIT' (alias BLACK) -> COCOK!
+                    if s_clean.endswith(a_clean):
+                        return True
 
-                # Atau dipisahkan tanda pemisah (misal: AJAVO06 - L atau AJAVO06_XL)
-                pattern_text = rf'(?:^|[\s\-_/]){re.escape(v_clean)}(?:[\s\-_/]|$)'
-                if re.search(pattern_text, s_raw, re.IGNORECASE):
-                    return True
+                    # 3. Atau dipisahkan tanda pemisah (misal ASAVO21-MER, ASAVO23_HIT)
+                    pattern_text = rf'(?:^|[\s\-_/]){re.escape(a_clean)}(?:[\s\-_/]|$)'
+                    if re.search(pattern_text, s_raw, re.IGNORECASE):
+                        return True
 
                 return False
 
-            # PENCARIAN CERDAS ANTI-TABRAKAN
+            # PENCARIAN CERDAS MULTI-TIER
             def match_candidate(scan_sku_raw):
                 s_raw = str(scan_sku_raw).strip().upper()
                 s_clean = clean_alnum(s_raw)
@@ -3313,23 +3401,23 @@ class AppState:
 
                 for cand in list_lookup:
                     item_clean = cand['CLEAN_ITEM']
-                    v_clean = cand['CLEAN_VAR']
                     fw_clean = cand['CLEAN_FW']
 
-                    var_matched = check_variant_match(s_raw, s_clean, cand['VARIANT'], v_clean)
+                    var_matched = check_variant_match(s_raw, s_clean, cand)
 
-                    # PRIORITAS 1: Model/Kata Awal Cocok DAN Varian Cocok 100%!
-                    # Contoh: 'AJAVO06L' -> cocok 'AJAVO06' dan tepat varian 'L'
-                    # Contoh: 'AJAVO06XL' -> cocok 'AJAVO06' dan tepat varian 'XL'
+                    # PRIORITAS 1: Model/Kata Awal Cocok DAN Varian/Alias Cocok 100%!
+                    # Contoh: 'ASAVO21MER' -> Cocok 'ASAVO21' + Alias 'MER' (RED)
+                    # Contoh: 'ASAVO22WHI' -> Cocok 'ASAVO22' + Alias 'WHI' (WHITE)
+                    # Contoh: 'ASAVO23HIT' -> Cocok 'ASAVO23' + Alias 'HIT' (BLACK)
                     if fw_clean and len(fw_clean) >= 2 and fw_clean in s_clean and var_matched:
                         return cand
 
-                    # PRIORITAS 2: Bagian Depan Item Name Cocok DAN Varian Cocok
+                    # PRIORITAS 2: Bagian Awal Nama Barang Cocok DAN Varian/Alias Cocok
                     if len(s_clean) >= 3 and item_clean.startswith(s_clean) and var_matched:
                         return cand
 
                     # PRIORITAS 3: Fallback untuk Barang Tanpa Varian (seperti Kaos Kaki 'A1 2002 03')
-                    # Hanya diambil jika belum menemukan kecocokan varian
+                    # Hanya dipakai jika tidak ada kecocokan varian
                     if len(s_clean) >= 3 and item_clean.startswith(s_clean):
                         if best_fallback_match is None:
                             best_fallback_match = cand
@@ -3340,7 +3428,7 @@ class AppState:
 
                 return best_fallback_match
 
-            # 3. Proses Validasi
+            # 3. Proses Validasi Baris demi Baris
             compare_records = []
             valid_count = 0
             change_count = 0
@@ -3410,7 +3498,7 @@ class AppState:
             return True, f"Validasi Selesai! Ditemukan {change_count} baris yang perlu diperbarui."
         except Exception as e:
             return False, f"Gagal Validasi Barcode: {e}"
-            
+
     def process_vbs_stage2(self):
         try:
             if self._raw_df_vbs_compare.empty:
