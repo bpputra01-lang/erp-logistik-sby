@@ -9,7 +9,7 @@ from views import (
     putaway_view, main_dashboard_view, sidebar, ongkir_tab2_view, compare_rto_view, 
     justification_so_view, cycle_count_view, login_page, ppa_audit_view, 
     cycle_count_analyzer_view, global_header, cross_check_real_system_view,
-    balancing_stock_view, physical_inventory_list_view
+    balancing_stock_view, physical_inventory_list_view, validation_barcode_sku_view
 )
 
 app_ui = ui.page_fluid(
