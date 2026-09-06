@@ -3183,7 +3183,7 @@ class AppState:
             return False, f"Gagal memproses Balancing Stock: {e}"
 
     # ==========================================================================
-    # VALIDATION BARCODE SKU - STAGE 1 (MULTI-TIER PREFIX & VARIANT MATCHER)
+    # VALIDATION BARCODE SKU - STAGE 1 (ANTI-COLLISION VARIANT MATCHER)
     # ==========================================================================
     def process_vbs_stage1(self, f_scan, f_list):
         try:
@@ -3251,7 +3251,6 @@ class AppState:
 
             valid_skus = set(df_list['TARGET_SKU'].unique())
 
-            # Helper pembersih karakter non-alphanumeric untuk perbandingan akurat
             def clean_alnum(val):
                 return re.sub(r'[^A-Z0-9]', '', str(val).upper())
 
@@ -3271,48 +3270,75 @@ class AppState:
                     'CLEAN_FW': clean_alnum(first_word)
                 })
 
-            # PENCARIAN CERDAS (MULTI-TIER MATCHER)
+            # PENTING: Urutkan varian dari yang terpanjang (misal XL sebelum L, XXL sebelum XL, 42.5 sebelum 42)
+            # Ini mencegah ukuran 'L' mencuri kode milik 'XL'!
+            list_lookup.sort(key=lambda x: len(x['CLEAN_VAR']), reverse=True)
+
+            # Helper Cek Varian Anti-Tabrakan
+            def check_variant_match(s_raw, s_clean, v_raw, v_clean):
+                if not v_clean: return False
+
+                # Proteksi khusus huruf tunggal agar tidak salah mendeteksi varian bertingkat
+                if v_clean == 'L' and (s_clean.endswith('XL') or s_clean.endswith('XXL') or s_clean.endswith('3XL')):
+                    return False
+                if v_clean == 'S' and (s_clean.endswith('XS') or s_clean.endswith('XXS')):
+                    return False
+                if v_clean == 'M' and (s_clean.endswith('XM') or s_clean.endswith('XXM')):
+                    return False
+
+                # 1. Jika varian berupa angka (misal size sepatu 39, 40, 42)
+                if v_clean.isdigit():
+                    pattern = rf'(?:^|[^0-9]){re.escape(v_clean)}(?:[^0-9]|$)'
+                    return bool(re.search(pattern, s_raw)) or s_clean.endswith(v_clean)
+
+                # 2. Jika varian berupa teks (S, M, L, XL, XXL)
+                # Harus tepat berakhiran dengan varian tersebut
+                if s_clean.endswith(v_clean):
+                    return True
+
+                # Atau dipisahkan tanda pemisah (misal: AJAVO06 - L atau AJAVO06_XL)
+                pattern_text = rf'(?:^|[\s\-_/]){re.escape(v_clean)}(?:[\s\-_/]|$)'
+                if re.search(pattern_text, s_raw, re.IGNORECASE):
+                    return True
+
+                return False
+
+            # PENCARIAN CERDAS ANTI-TABRAKAN
             def match_candidate(scan_sku_raw):
                 s_raw = str(scan_sku_raw).strip().upper()
                 s_clean = clean_alnum(s_raw)
                 if len(s_clean) < 2: return None
 
-                best_prefix_match = None
+                best_fallback_match = None
 
                 for cand in list_lookup:
                     item_clean = cand['CLEAN_ITEM']
                     v_clean = cand['CLEAN_VAR']
                     fw_clean = cand['CLEAN_FW']
 
-                    # Cek apakah varian ada di dalam kode scan
-                    var_in_scan = False
-                    if v_clean:
-                        if v_clean.isdigit():
-                            pattern = rf'(?:^|[^0-9]){re.escape(v_clean)}(?:[^0-9]|$)'
-                            var_in_scan = bool(re.search(pattern, s_clean))
-                        else:
-                            var_in_scan = v_clean in s_clean
+                    var_matched = check_variant_match(s_raw, s_clean, cand['VARIANT'], v_clean)
 
-                    # TIER 1: Kode Scan adalah Bagian Awal dari Nama Barang (Kasus: 'A1 2002 03' di 'A1 2002 03 SHORT SOCKS...')
+                    # PRIORITAS 1: Model/Kata Awal Cocok DAN Varian Cocok 100%!
+                    # Contoh: 'AJAVO06L' -> cocok 'AJAVO06' dan tepat varian 'L'
+                    # Contoh: 'AJAVO06XL' -> cocok 'AJAVO06' dan tepat varian 'XL'
+                    if fw_clean and len(fw_clean) >= 2 and fw_clean in s_clean and var_matched:
+                        return cand
+
+                    # PRIORITAS 2: Bagian Depan Item Name Cocok DAN Varian Cocok
+                    if len(s_clean) >= 3 and item_clean.startswith(s_clean) and var_matched:
+                        return cand
+
+                    # PRIORITAS 3: Fallback untuk Barang Tanpa Varian (seperti Kaos Kaki 'A1 2002 03')
+                    # Hanya diambil jika belum menemukan kecocokan varian
                     if len(s_clean) >= 3 and item_clean.startswith(s_clean):
-                        if var_in_scan:
-                            return cand # Sangat sempurna jika varian juga cocok
-                        if best_prefix_match is None:
-                            best_prefix_match = cand
+                        if best_fallback_match is None:
+                            best_fallback_match = cand
 
-                    # TIER 2: Kode Scan Termasuk di dalam Nama Barang
                     elif len(s_clean) >= 4 and s_clean in item_clean:
-                        if var_in_scan:
-                            return cand
-                        if best_prefix_match is None:
-                            best_prefix_match = cand
+                        if best_fallback_match is None:
+                            best_fallback_match = cand
 
-                    # TIER 3: Kode Scan Memuat Kata Awal Nama Barang + Variant (Kasus: 'AJAVO06-S' atau 'SPECS-42')
-                    elif fw_clean and len(fw_clean) >= 2 and fw_clean in s_clean:
-                        if var_in_scan:
-                            return cand
-
-                return best_prefix_match
+                return best_fallback_match
 
             # 3. Proses Validasi
             compare_records = []
@@ -3384,7 +3410,7 @@ class AppState:
             return True, f"Validasi Selesai! Ditemukan {change_count} baris yang perlu diperbarui."
         except Exception as e:
             return False, f"Gagal Validasi Barcode: {e}"
-
+            
     def process_vbs_stage2(self):
         try:
             if self._raw_df_vbs_compare.empty:
