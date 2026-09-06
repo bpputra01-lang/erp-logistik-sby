@@ -3290,7 +3290,7 @@ class AppState:
 
                 # --- WARNA BARU TAMBAHAN ---
                 # Stabilo / Volt / Neon / Lime
-                ["STABILO", "STB", "NEON", "VOLT", "LIME", "FLUO", "FLUORESCENT"],
+                ["STABILO", "STB", "NEON", "VOLT", "LIME", "FLUO", "FLUORESCENT","STAB"],
                 # Turquoise / Tosca / Cyan
                 ["TURQUOISE", "TURQOISE", "TURQ", "TRQ", "TOSCA", "TOSKA", "CYAN", "TEAL"],
                 # Burgundy / Wine
@@ -3302,7 +3302,9 @@ class AppState:
                 # Magenta
                 ["MAGENTA", "MAG"],
                 # Cream / Beige
-                ["CREAM", "KREM", "BEIGE", "BEG", "CRM"]
+                ["CREAM", "KREM", "BEIGE", "BEG", "CRM","CRE"],
+                #Tosca
+                ["TOSCA","TSC","TOSC","TOS"]
             ]
 
             # Otomatis buat pemetaan dua arah (Bidirectional Map)
@@ -3337,7 +3339,7 @@ class AppState:
 
                 # Urutkan alias dari yang karakter teksnya terpanjang
                 return sorted(list(aliases), key=len, reverse=True)
-                
+
             # Siapkan Database Pencarian
             list_lookup = []
             for _, r in df_list.iterrows():
