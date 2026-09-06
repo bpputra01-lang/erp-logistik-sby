@@ -1080,6 +1080,30 @@ def physical_inventory_list_view(state: AppState):
     )
 
 
+# ==============================================================================
+# VIEW: VALIDATION BARCODE SKU (2-STAGE VERIFICATION & PIVOT)
+# ==============================================================================
+def validation_barcode_sku_view(state: AppState):
+    upload_section = ui.div(
+        ui.h4("📥 Upload Dokumen Scan & List Perubahan SKU", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+        ui.div(
+            custom_uploader_box("uploader_vbs_scan", "1. File Data Scan (Kolom A=BIN, B=SKU, C=QTY)"),
+            custom_uploader_box("uploader_vbs_list", "2. File List Perubahan SKU (Kolom A=SKU, B=Item Name, C=Variant)"),
+            style="display: flex; gap: 1rem; width: 100%; margin-bottom: 0.5rem; flex-wrap: wrap;"
+        ),
+        ui.output_ui("vbs_action_btn_ui"),
+        style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+    )
+
+    results_section = ui.output_ui("vbs_results_container")
+
+    return ui.div(
+        upload_section,
+        results_section,
+        style="width: 100%; padding: 1rem;"
+    )
+
+    
 def menu_item(label: str, target_menu: str, current_menu: str):
     import re
     is_active = (current_menu == target_menu)

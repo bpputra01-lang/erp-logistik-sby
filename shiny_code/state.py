@@ -401,6 +401,28 @@ class AppState:
         self._raw_df_bs_off_missing = pd.DataFrame()
         self._raw_df_bs_on_missing = pd.DataFrame()
 
+# --- VALIDATION BARCODE SKU STATE ---
+        self.vbs_stage1_done = reactive.Value(False)
+        self.vbs_stage2_done = reactive.Value(False)
+        self.vbs_total_scan_qty = reactive.Value(0)
+        self.vbs_total_scan_rows = reactive.Value(0)
+        self.vbs_total_valid_rows = reactive.Value(0)
+        self.vbs_total_change_rows = reactive.Value(0)
+        self.vbs_total_unmatched_rows = reactive.Value(0)
+
+        self.df_vbs_compare_headers = reactive.Value([])
+        self.df_vbs_compare_rows = reactive.Value([])
+        self.df_vbs_changes_headers = reactive.Value([])
+        self.df_vbs_changes_rows = reactive.Value([])
+        self.df_vbs_pivot_headers = reactive.Value([])
+        self.df_vbs_pivot_rows = reactive.Value([])
+
+        self._raw_df_vbs_scan = pd.DataFrame()
+        self._raw_df_vbs_list = pd.DataFrame()
+        self._raw_df_vbs_compare = pd.DataFrame()
+        self._raw_df_vbs_changes = pd.DataFrame()
+        self._raw_df_vbs_pivot = pd.DataFrame()
+
         # --- PHYSICAL INVENTORY LIST STATE (UNIFIED) ---
         self.pil_mode = reactive.Value("")
 
@@ -444,7 +466,7 @@ class AppState:
 
     def get_menu_inventory(self) -> list[str]:
         if self.role() == "DC":
-            return ["Stock Opname", "Cycle Count", "Justification SO", "Stock Minus", "Compare System", "Physical Inventory List", "Cross Check Real & System", "List Retur Out", "Reloc Koli to Koli"]
+            return ["Stock Opname", "Cycle Count", "Justification SO", "Stock Minus", "Compare System", "Physical Inventory List", "Validation Barcode SKU", "Cross Check Real & System", "List Retur Out", "Reloc Koli to Koli"]
         return ["Stock Minus", "Cycle Count", "Compare System", "Justification SO"]
 
     def get_menu_reject(self) -> list[str]:
@@ -471,6 +493,7 @@ class AppState:
         elif cur_menu in ["Cross Check Real & System", "Match Real & System"]: return "cross_check_real_sys"
         elif cur_menu == "Balancing Stock": return "balancing_stock"
         elif cur_menu == "Physical Inventory List": return "physical_inventory_list"
+        elif cur_menu in ["Validation Barcode SKU", "Validasi Barcode SKU"]: return "validation_barcode_sku"
         return "under_development"
 
 
@@ -3158,3 +3181,173 @@ class AppState:
             return True, f"Balancing Stock Selesai! ({len(df_refill):,} instruksi mutasi refill dibuat)"
         except Exception as e:
             return False, f"Gagal memproses Balancing Stock: {e}"
+
+            # ==========================================================================
+    # VALIDATION BARCODE SKU ENGINES (STAGE 1 & STAGE 2)
+    # ==========================================================================
+    def process_vbs_stage1(self, f_scan, f_list):
+        try:
+            import re
+            df_scan_raw = load_data_from_info(f_scan)
+            df_list_raw = load_data_from_info(f_list)
+
+            if df_scan_raw.empty or df_list_raw.empty:
+                return False, "Kedua file (Data Scan & List Perubahan SKU) wajib diupload!"
+
+            if df_scan_raw.shape[1] < 3:
+                return False, "File Data Scan minimal harus 3 kolom (Kolom A=BIN, B=SKU, C=QTY)!"
+
+            if df_list_raw.shape[1] < 3:
+                return False, "File List Perubahan SKU minimal harus 3 kolom (Kolom A=SKU, B=ITEM NAME, C=VARIANT)!"
+
+            # 1. Bersihkan Data Scan
+            df_scan = pd.DataFrame({
+                'BIN': df_scan_raw.iloc[:, 0].astype(str).str.strip().str.upper(),
+                'SKU': df_scan_raw.iloc[:, 1].astype(str).str.split('.').str[0].str.strip().str.upper(),
+                'QTY': pd.to_numeric(df_scan_raw.iloc[:, 2], errors='coerce').fillna(0).astype(int)
+            })
+
+            # 2. Bersihkan Data List Perubahan SKU
+            df_list = pd.DataFrame({
+                'TARGET_SKU': df_list_raw.iloc[:, 0].astype(str).str.split('.').str[0].str.strip().str.upper(),
+                'ITEM_NAME': df_list_raw.iloc[:, 1].astype(str).str.strip().str.upper(),
+                'VARIANT': df_list_raw.iloc[:, 2].astype(str).str.split('.').str[0].str.strip().str.upper()
+            }).drop_duplicates(subset=['TARGET_SKU'])
+
+            valid_skus = set(df_list['TARGET_SKU'].unique())
+
+            # Ekstrak kata pertama dari Item Name & siapkan data list
+            list_lookup = []
+            for _, r in df_list.iterrows():
+                target_sku = r['TARGET_SKU']
+                item_name = r['ITEM_NAME']
+                variant = r['VARIANT']
+                first_word = item_name.split()[0] if len(item_name.split()) > 0 else item_name
+                list_lookup.append({
+                    'TARGET_SKU': target_sku,
+                    'ITEM_NAME': item_name,
+                    'VARIANT': variant,
+                    'FIRST_WORD': first_word.upper()
+                })
+
+            # Helper pencocokan cerdas kata pertama & variant
+            def match_candidate(scan_sku_str):
+                for cand in list_lookup:
+                    fw = cand['FIRST_WORD']
+                    v = cand['VARIANT']
+                    
+                    # Cek kata pertama ada di SKU scan
+                    if fw and fw in scan_sku_str:
+                        # Jika variant berupa angka, cek dengan boundary regex agar varian '4' tidak mencocokkan '42'
+                        if v.isdigit():
+                            pattern = rf'(?:^|[^0-9]){re.escape(v)}(?:[^0-9]|$)'
+                            if re.search(pattern, scan_sku_str):
+                                return cand
+                        else:
+                            if v and v in scan_sku_str:
+                                return cand
+                return None
+
+            # 3. Proses Validasi Baris demi Baris
+            compare_records = []
+            valid_count = 0
+            change_count = 0
+            unmatched_count = 0
+
+            for _, row in df_scan.iterrows():
+                bn = row['BIN']
+                sku_curr = row['SKU']
+                qty_curr = row['QTY']
+
+                # Kondisi 1: SKU Scan sudah ada di SKU resmi List Perubahan
+                if sku_curr in valid_skus:
+                    # Ambil nama dan variant dari list
+                    m = df_list[df_list['TARGET_SKU'] == sku_curr].iloc[0]
+                    compare_records.append({
+                        'BIN': bn,
+                        'SKU SCAN (BEFORE)': sku_curr,
+                        'STATUS': 'VALID (SUDAH SESUAI)',
+                        'SKU BARU (AFTER)': sku_curr,
+                        'ITEM NAME': m['ITEM_NAME'],
+                        'VARIANT': m['VARIANT'],
+                        'QTY SCAN': qty_curr
+                    })
+                    valid_count += 1
+                else:
+                    # Kondisi 2: SKU berbeda, cari apakah mengandung kata pertama item name + variant
+                    candidate = match_candidate(sku_curr)
+                    if candidate is not None:
+                        compare_records.append({
+                            'BIN': bn,
+                            'SKU SCAN (BEFORE)': sku_curr,
+                            'STATUS': 'PERLU UBAH SKU',
+                            'SKU BARU (AFTER)': candidate['TARGET_SKU'],
+                            'ITEM NAME': candidate['ITEM_NAME'],
+                            'VARIANT': candidate['VARIANT'],
+                            'QTY SCAN': qty_curr
+                        })
+                        change_count += 1
+                    else:
+                        # Kondisi 3: Tidak terdaftar dan tidak cocok polanya
+                        compare_records.append({
+                            'BIN': bn,
+                            'SKU SCAN (BEFORE)': sku_curr,
+                            'STATUS': 'TIDAK TERDAFTAR (TETAP)',
+                            'SKU BARU (AFTER)': sku_curr,
+                            'ITEM NAME': '-',
+                            'VARIANT': '-',
+                            'QTY SCAN': qty_curr
+                        })
+                        unmatched_count += 1
+
+            df_compare = pd.DataFrame(compare_records)
+
+            self.vbs_total_scan_qty.set(int(df_scan['QTY'].sum()))
+            self.vbs_total_scan_rows.set(len(df_scan))
+            self.vbs_total_valid_rows.set(valid_count)
+            self.vbs_total_change_rows.set(change_count)
+            self.vbs_total_unmatched_rows.set(unmatched_count)
+
+            self._raw_df_vbs_scan = df_scan.copy()
+            self._raw_df_vbs_list = df_list.copy()
+            self._raw_df_vbs_compare = df_compare.copy()
+
+            self.df_vbs_compare_headers.set(df_compare.columns.tolist())
+            self.df_vbs_compare_rows.set(df_compare.fillna("").astype(str).values.tolist())
+
+            self.vbs_stage1_done.set(True)
+            self.vbs_stage2_done.set(False)
+            return True, f"Validasi Tahap 1 Selesai! Ditemukan {change_count} baris yang perlu diperbarui."
+        except Exception as e:
+            return False, f"Gagal Validasi Barcode: {e}"
+
+    def process_vbs_stage2(self):
+        try:
+            if self._raw_df_vbs_compare.empty:
+                return False, "Data hasil validasi tahap 1 tidak ditemukan!"
+
+            df_comp = self._raw_df_vbs_compare.copy()
+
+            # 1. Buat Tabel Perubahan SKU Before & After (Hanya baris yang berubah)
+            df_changes = df_comp[df_comp['STATUS'] == 'PERLU UBAH SKU'][[
+                'BIN', 'SKU SCAN (BEFORE)', 'SKU BARU (AFTER)', 'ITEM NAME', 'VARIANT', 'QTY SCAN'
+            ]].copy()
+
+            # 2. Pivot Total Keseluruhan Data Scan Sesuai BIN dan SKU Baru
+            df_pivot = df_comp.groupby(['BIN', 'SKU BARU (AFTER)'], as_index=False)['QTY SCAN'].sum()
+            df_pivot.columns = ['BIN', 'SKU', 'TOTAL QTY SCAN']
+            df_pivot = df_pivot.sort_values(by=['BIN', 'SKU']).reset_index(drop=True)
+
+            self._raw_df_vbs_changes = df_changes.copy()
+            self._raw_df_vbs_pivot = df_pivot.copy()
+
+            self.df_vbs_changes_headers.set(df_changes.columns.tolist())
+            self.df_vbs_changes_rows.set(df_changes.fillna("").astype(str).values.tolist())
+
+            self.df_vbs_pivot_headers.set(df_pivot.columns.tolist())
+            self.df_vbs_pivot_rows.set(df_pivot.fillna("").astype(str).values.tolist())
+
+            self.vbs_stage2_done.set(True)
+            return True, f"Perubahan SKU Berhasil Dieksekusi! Data scan ter-pivot menjadi {len(df_pivot)} kombinasi BIN & SKU."
+        except Exception as e:
+            return False, f"Gagal Eksekusi Tahap 2: {e}"

@@ -97,6 +97,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         "cross-check-real-system": "Cross Check Real & System",
         "balancing-stock": "Balancing Stock",
         "physical-inventory-list": "Physical Inventory List"
+        "validation-barcode-sku": "Validation Barcode SKU",
     }
 
     # 1. Saat menu diklik di sidebar -> URL di browser otomatis berubah
@@ -652,6 +653,29 @@ def server(input: Inputs, output: Outputs, session: Session):
                     ), open=True
                 )
             )
+
+            elif cur == "Validation Barcode SKU":
+            guide_body = ui.div(
+                ui.tags.details(
+                    ui.tags.summary("📋 Panduan Validasi & Perubahan Barcode SKU"),
+                    ui.div(
+                        ui.tags.strong("Ketentuan 2 File Upload:"),
+                        ui.tags.ul(
+                            ui.tags.li(ui.strong("1. File Data Scan:"), " Kolom A = BIN, Kolom B = SKU fisik yang terscan, Kolom C = Qty Scan."),
+                            ui.tags.li(ui.strong("2. File List Perubahan SKU:"), " Kolom A = SKU Resmi/Baru, Kolom B = Item Name, Kolom C = Variant.")
+                        ),
+                        ui.hr(style="margin: 8px 0; border-color: #CBD5E0;"),
+                        ui.tags.strong("Alur Logika 2-Tahap:"),
+                        ui.tags.ol(
+                            ui.tags.li(ui.strong("Deteksi Cerdas:"), " Sistem mengecek apakah SKU scan mengandung kata pertama dari Item Name dan nomor variant-nya. Jika cocok, sistem menandai sebagai kandidat perubahan."),
+                            ui.tags.li(ui.strong("Tahap 1 (Review):"), " Anda dapat memeriksa detail perbandingan di Tab Compare Detail sebelum data diubah."),
+                            ui.tags.li(ui.strong("Tahap 2 (Eksekusi & Pivot):"), " Klik tombol 'EKSEKUSI PERUBAHAN SKU' untuk menerapkan SKU baru dan mengelompokkan (pivot) total stok per BIN dan SKU secara otomatis.")
+                        ),
+                        class_="accordion-content"
+                    ), open=True
+                )
+            )
+
         # FALLBACK JIKA MENU LAIN
         else:
             guide_body = ui.div(
@@ -936,6 +960,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         elif content_type == "cross_check_real_sys": page_content = cross_check_real_system_view(state)
         elif content_type == "balancing_stock": page_content = balancing_stock_view(state)
         elif content_type == "physical_inventory_list": page_content = physical_inventory_list_view(state)
+        elif content_type == "validation_barcode_sku": page_content = validation_barcode_sku_view(state)
         elif content_type == "access_denied":
             page_content = ui.div(ui.h2("⛔ Akses Ditolak", style="font-size: 28px; color: #E53E3E; font-weight: bold;"), ui.p("Maaf, halaman ini dibatasi hak aksesnya.", style="color: #718096; font-size: 15px;"), style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;")
         else:
@@ -2815,5 +2840,130 @@ def server(input: Inputs, output: Outputs, session: Session):
                 ),
                 ui.output_ui("cycle_count_results_container")
             )
+
+            # ==========================================================================
+    # VALIDATION BARCODE SKU CONTROLLER & HANDLERS
+    # ==========================================================================
+    @render.ui
+    def vbs_action_btn_ui():
+        f1 = input.uploader_vbs_scan() if "uploader_vbs_scan" in input else None
+        f2 = input.uploader_vbs_list() if "uploader_vbs_list" in input else None
+
+        if (f1 and len(f1) > 0) and (f2 and len(f2) > 0):
+            return ui.div(
+                ui.tags.button(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-magnifying-glass", style="margin-right: 6px; font-size: 14px;"), "CEK & VALIDASI BARCODE SKU"),
+                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_run_vbs_stage1', Math.random(), {priority: 'event'});",
+                    class_="btn-red-gradient"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+            )
+        return ui.div(
+            ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"),
+                "UPLOAD KEDUA FILE UNTUK MEMULAI VALIDASI",
+                disabled=True,
+                class_="btn-locked"
+            ),
+            style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+        )
+
+    @reactive.Effect
+    @reactive.event(input.btn_run_vbs_stage1)
+    def _proc_vbs_stage1():
+        f_scan = input.uploader_vbs_scan()
+        f_list = input.uploader_vbs_list()
+        if not f_scan or not f_list:
+            state.error_modal_message.set("Pilih kedua file terlebih dahulu!")
+            state.show_error_modal.set(True)
+            return
+
+        succ, msg = state.process_vbs_stage1(f_scan, f_list)
+        if succ: state.show_success_modal.set(True)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+
+    @reactive.Effect
+    @reactive.event(input.btn_run_vbs_stage2)
+    def _proc_vbs_stage2():
+        succ, msg = state.process_vbs_stage2()
+        if succ: state.show_success_modal.set(True)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+
+    @render.ui
+    def vbs_results_container():
+        if not state.vbs_stage1_done(): return ui.div()
+
+        # Banner Konfirmasi / Eksekusi Tahap 2
+        if not state.vbs_stage2_done():
+            action_stage2_banner = ui.div(
+                ui.div(
+                    ui.div(
+                        ui.h4("⚡ Konfirmasi Perubahan Barcode SKU", style="font-size: 15px; font-weight: 800; color: #92400E; margin: 0 0 4px 0;"),
+                        ui.p(f"Ditemukan {state.vbs_total_change_rows():,} baris SKU scan yang perlu diperbarui. Periksa daftar di Tab 'Compare Detail' di bawah. Jika data sudah sesuai, klik tombol di sebelah kanan untuk mengeksekusi.", style="color: #78350F; font-size: 13px; margin: 0;"),
+                    ),
+                    ui.tags.button(
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-wand-magic-sparkles", style="margin-right: 6px; font-size: 14px;"), "EKSEKUSI PERUBAHAN SKU & PIVOT"),
+                        onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_run_vbs_stage2', Math.random(), {priority: 'event'});",
+                        style="background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); color: white; font-weight: 800; border-radius: 8px; border: none; padding: 10px 20px; cursor: pointer; white-space: nowrap; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.3);"
+                    ),
+                    style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 10px;"
+                ),
+                style="background: #FEF3C7; border: 1.5px solid #FCD34D; border-radius: 10px; padding: 1.25rem; margin-bottom: 1.25rem;"
+            )
+            tabs_ui = ui.navset_card_tab(
+                ui.nav_panel("📋 DATA COMPARE DETAIL", ui.div(render_clean_table(state.df_vbs_compare_headers(), state.df_vbs_compare_rows(), "tbl_vbs_compare"), style="padding: 0.75rem 0;"))
+            )
+        else:
+            action_stage2_banner = ui.div(
+                ui.div(
+                    ui.div(
+                        ui.h4("✅ Perubahan SKU Berhasil Diterapkan!", style="font-size: 15px; font-weight: 800; color: #065F46; margin: 0 0 4px 0;"),
+                        ui.p("SKU scan telah diperbarui dan dikelompokkan (pivot) kembali per BIN & SKU. Anda dapat mengunduh laporannya di bawah.", style="color: #047857; font-size: 13px; margin: 0;"),
+                    ),
+                    ui.download_button(
+                        "btn_dl_vbs_all",
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-file-excel", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD LAPORAN VALIDASI (.XLSX)"),
+                        style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; font-weight: 800; border-radius: 8px; border: none; padding: 10px 20px; cursor: pointer; white-space: nowrap; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);"
+                    ),
+                    style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 10px;"
+                ),
+                style="background: #D1FAE5; border: 1.5px solid #A7F3D0; border-radius: 10px; padding: 1.25rem; margin-bottom: 1.25rem;"
+            )
+            tabs_ui = ui.navset_card_tab(
+                ui.nav_panel("📋 DATA COMPARE DETAIL", ui.div(render_clean_table(state.df_vbs_compare_headers(), state.df_vbs_compare_rows(), "tbl_vbs_compare"), style="padding: 0.75rem 0;")),
+                ui.nav_panel("🔄 PERUBAHAN SKU (BEFORE & AFTER)", ui.div(render_clean_table(state.df_vbs_changes_headers(), state.df_vbs_changes_rows(), "tbl_vbs_changes"), style="padding: 0.75rem 0;")),
+                ui.nav_panel("📊 DATA SCAN FINAL (PIVOT BIN & SKU)", ui.div(render_clean_table(state.df_vbs_pivot_headers(), state.df_vbs_pivot_rows(), "tbl_vbs_pivot"), style="padding: 0.75rem 0;"))
+            )
+
+        return ui.div(
+            ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
+            ui.h4("📋 RINGKASAN VALIDASI BARCODE SKU", style="font-size: 16px; color: #010B13; font-weight: 800; margin-bottom: 1rem;"),
+            
+            # 4 Kotak Metrik
+            ui.div(
+                dark_metric_box("📦 TOTAL BARIS SCAN", f"{state.vbs_total_scan_rows():,} BARIS", "#C5A059"),
+                dark_metric_box("✅ SUDAH VALID / SESUAI", f"{state.vbs_total_valid_rows():,} BARIS", "#10B981"),
+                dark_metric_box("🔄 PERLU UBAH SKU", f"{state.vbs_total_change_rows():,} BARIS", "#DD6B20"),
+                dark_metric_box("❓ TIDAK DITEMUKAN (TETAP)", f"{state.vbs_total_unmatched_rows():,} BARIS", "#E53E3E"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+            ),
+            action_stage2_banner,
+            tabs_ui,
+            style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
+        )
+
+    @render.download(filename="LAPORAN_VALIDASI_BARCODE_SKU.xlsx")
+    def btn_dl_vbs_all():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_vbs_pivot.to_excel(writer, sheet_name='DATA_SCAN_PIVOT_FINAL', index=False)
+            state._raw_df_vbs_changes.to_excel(writer, sheet_name='PERUBAHAN_BEFORE_AFTER', index=False)
+            state._raw_df_vbs_compare.to_excel(writer, sheet_name='COMPARE_DETAIL', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
 
 app = App(app_ui, server)
