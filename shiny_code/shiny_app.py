@@ -654,7 +654,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                 )
             )
 
-            elif cur == "Validation Barcode SKU":
+        elif cur == "Validation Barcode SKU":
             guide_body = ui.div(
                 ui.tags.details(
                     ui.tags.summary("📋 Panduan Validasi & Perubahan Barcode SKU"),
