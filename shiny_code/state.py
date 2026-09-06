@@ -3182,23 +3182,58 @@ class AppState:
         except Exception as e:
             return False, f"Gagal memproses Balancing Stock: {e}"
 
-            # ==========================================================================
-    # VALIDATION BARCODE SKU ENGINES (STAGE 1 & STAGE 2)
+    # ==========================================================================
+    # VALIDATION BARCODE SKU - STAGE 1 (MULTI-TIER PREFIX & VARIANT MATCHER)
     # ==========================================================================
     def process_vbs_stage1(self, f_scan, f_list):
         try:
             import re
-            df_scan_raw = load_data_from_info(f_scan)
-            df_list_raw = load_data_from_info(f_list)
+
+            def read_flexible_vbs(f_info):
+                if not f_info: return pd.DataFrame()
+                path = f_info[0]["datapath"]
+                name = f_info[0]["name"].lower()
+                df = pd.DataFrame()
+
+                if name.endswith(('.xlsx', '.xls', '.xlsm')):
+                    try:
+                        xl = pd.ExcelFile(path)
+                        for sheet in xl.sheet_names:
+                            temp_df = xl.parse(sheet)
+                            if temp_df.shape[1] >= 3:
+                                df = temp_df
+                                break
+                        if df.empty: df = pd.read_excel(path)
+                    except Exception:
+                        df = pd.read_excel(path)
+                else:
+                    try:
+                        df = pd.read_csv(path, sep=None, engine='python')
+                    except Exception:
+                        try: df = pd.read_csv(path, sep=';')
+                        except Exception: df = pd.read_csv(path)
+
+                if df.shape[1] == 1 and len(df) > 0:
+                    first_col = str(df.columns[0])
+                    sep = ';' if ';' in first_col else (',' if ',' in first_col else None)
+                    if sep:
+                        try: df = pd.read_csv(path, sep=sep)
+                        except Exception: pass
+
+                df = df.loc[:, ~df.columns.astype(str).str.contains('^Unnamed')]
+                return df
+
+            df_scan_raw = read_flexible_vbs(f_scan)
+            df_list_raw = read_flexible_vbs(f_list)
 
             if df_scan_raw.empty or df_list_raw.empty:
                 return False, "Kedua file (Data Scan & List Perubahan SKU) wajib diupload!"
 
             if df_scan_raw.shape[1] < 3:
-                return False, "File Data Scan minimal harus 3 kolom (Kolom A=BIN, B=SKU, C=QTY)!"
+                return False, f"File Data Scan hanya terdeteksi {df_scan_raw.shape[1]} kolom! Minimal 3 kolom (Kolom A=BIN, B=SKU, C=QTY)."
 
             if df_list_raw.shape[1] < 3:
-                return False, "File List Perubahan SKU minimal harus 3 kolom (Kolom A=SKU, B=ITEM NAME, C=VARIANT)!"
+                return False, f"File List Perubahan SKU hanya terdeteksi {df_list_raw.shape[1]} kolom! Minimal 3 kolom (Kolom A=SKU, B=ITEM NAME, C=VARIANT)."
 
             # 1. Bersihkan Data Scan
             df_scan = pd.DataFrame({
@@ -3216,7 +3251,11 @@ class AppState:
 
             valid_skus = set(df_list['TARGET_SKU'].unique())
 
-            # Ekstrak kata pertama dari Item Name & siapkan data list
+            # Helper pembersih karakter non-alphanumeric untuk perbandingan akurat
+            def clean_alnum(val):
+                return re.sub(r'[^A-Z0-9]', '', str(val).upper())
+
+            # Siapkan database kandidat
             list_lookup = []
             for _, r in df_list.iterrows():
                 target_sku = r['TARGET_SKU']
@@ -3227,28 +3266,55 @@ class AppState:
                     'TARGET_SKU': target_sku,
                     'ITEM_NAME': item_name,
                     'VARIANT': variant,
-                    'FIRST_WORD': first_word.upper()
+                    'CLEAN_ITEM': clean_alnum(item_name),
+                    'CLEAN_VAR': clean_alnum(variant),
+                    'CLEAN_FW': clean_alnum(first_word)
                 })
 
-            # Helper pencocokan cerdas kata pertama & variant
-            def match_candidate(scan_sku_str):
-                for cand in list_lookup:
-                    fw = cand['FIRST_WORD']
-                    v = cand['VARIANT']
-                    
-                    # Cek kata pertama ada di SKU scan
-                    if fw and fw in scan_sku_str:
-                        # Jika variant berupa angka, cek dengan boundary regex agar varian '4' tidak mencocokkan '42'
-                        if v.isdigit():
-                            pattern = rf'(?:^|[^0-9]){re.escape(v)}(?:[^0-9]|$)'
-                            if re.search(pattern, scan_sku_str):
-                                return cand
-                        else:
-                            if v and v in scan_sku_str:
-                                return cand
-                return None
+            # PENCARIAN CERDAS (MULTI-TIER MATCHER)
+            def match_candidate(scan_sku_raw):
+                s_raw = str(scan_sku_raw).strip().upper()
+                s_clean = clean_alnum(s_raw)
+                if len(s_clean) < 2: return None
 
-            # 3. Proses Validasi Baris demi Baris
+                best_prefix_match = None
+
+                for cand in list_lookup:
+                    item_clean = cand['CLEAN_ITEM']
+                    v_clean = cand['CLEAN_VAR']
+                    fw_clean = cand['CLEAN_FW']
+
+                    # Cek apakah varian ada di dalam kode scan
+                    var_in_scan = False
+                    if v_clean:
+                        if v_clean.isdigit():
+                            pattern = rf'(?:^|[^0-9]){re.escape(v_clean)}(?:[^0-9]|$)'
+                            var_in_scan = bool(re.search(pattern, s_clean))
+                        else:
+                            var_in_scan = v_clean in s_clean
+
+                    # TIER 1: Kode Scan adalah Bagian Awal dari Nama Barang (Kasus: 'A1 2002 03' di 'A1 2002 03 SHORT SOCKS...')
+                    if len(s_clean) >= 3 and item_clean.startswith(s_clean):
+                        if var_in_scan:
+                            return cand # Sangat sempurna jika varian juga cocok
+                        if best_prefix_match is None:
+                            best_prefix_match = cand
+
+                    # TIER 2: Kode Scan Termasuk di dalam Nama Barang
+                    elif len(s_clean) >= 4 and s_clean in item_clean:
+                        if var_in_scan:
+                            return cand
+                        if best_prefix_match is None:
+                            best_prefix_match = cand
+
+                    # TIER 3: Kode Scan Memuat Kata Awal Nama Barang + Variant (Kasus: 'AJAVO06-S' atau 'SPECS-42')
+                    elif fw_clean and len(fw_clean) >= 2 and fw_clean in s_clean:
+                        if var_in_scan:
+                            return cand
+
+                return best_prefix_match
+
+            # 3. Proses Validasi
             compare_records = []
             valid_count = 0
             change_count = 0
@@ -3259,9 +3325,8 @@ class AppState:
                 sku_curr = row['SKU']
                 qty_curr = row['QTY']
 
-                # Kondisi 1: SKU Scan sudah ada di SKU resmi List Perubahan
+                # Jika SKU scan memang sudah merupakan SKU resmi
                 if sku_curr in valid_skus:
-                    # Ambil nama dan variant dari list
                     m = df_list[df_list['TARGET_SKU'] == sku_curr].iloc[0]
                     compare_records.append({
                         'BIN': bn,
@@ -3274,7 +3339,7 @@ class AppState:
                     })
                     valid_count += 1
                 else:
-                    # Kondisi 2: SKU berbeda, cari apakah mengandung kata pertama item name + variant
+                    # Cari kandidat perubahan
                     candidate = match_candidate(sku_curr)
                     if candidate is not None:
                         compare_records.append({
@@ -3288,7 +3353,6 @@ class AppState:
                         })
                         change_count += 1
                     else:
-                        # Kondisi 3: Tidak terdaftar dan tidak cocok polanya
                         compare_records.append({
                             'BIN': bn,
                             'SKU SCAN (BEFORE)': sku_curr,
@@ -3317,7 +3381,7 @@ class AppState:
 
             self.vbs_stage1_done.set(True)
             self.vbs_stage2_done.set(False)
-            return True, f"Validasi Tahap 1 Selesai! Ditemukan {change_count} baris yang perlu diperbarui."
+            return True, f"Validasi Selesai! Ditemukan {change_count} baris yang perlu diperbarui."
         except Exception as e:
             return False, f"Gagal Validasi Barcode: {e}"
 
