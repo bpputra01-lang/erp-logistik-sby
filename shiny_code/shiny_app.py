@@ -976,7 +976,9 @@ def server(input: Inputs, output: Outputs, session: Session):
             ),
             style="display: flex; width: 100vw; height: 100vh; overflow: hidden; background-color: #111318;"
         )
-# --- CYCLE COUNT BUTTON & HASIL ---
+# ==========================================================================
+    # CYCLE COUNT / NON AUDIT CONTROLLER (FIXED: ANTI-RESET FILTER)
+    # ==========================================================================
     @render.ui
     def cycle_count_action_btn_ui():
         f = input.upload_cycle_count_file() if "upload_cycle_count_file" in input else None
@@ -997,13 +999,14 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="display: flex; justify-content: flex-end; width: 100%; margin-top: 1rem;"
         )
 
+    # 1. Container Filter: HANYA merender kontrol input (TIDAK membaca cc_total_* agar tidak ter-reset)
     @render.ui
     def cycle_count_results_container():
         if not state.cc_processed():
             return ui.div()
 
         return ui.div(
-            # --- 1. FILTER MULTI-SELECT ---
+            # --- 1. FILTER MULTI-SELECT (Stabil & Tetap Terbuka) ---
             ui.div(
                 ui.h4("🔍 Filter Brand, Sub Kategori & Kategori Harga", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
                 ui.div(
@@ -1014,7 +1017,18 @@ def server(input: Inputs, output: Outputs, session: Session):
                 ),
                 style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
             ),
+            # --- WADAH METRIK & TABEL TERPISAH ---
+            ui.output_ui("cycle_count_data_display_ui"),
+            style="width: 100%;"
+        )
 
+    # 2. Container Data: Khusus merender Metrik & Tabel yang update secara reaktif tanpa mengganggu filter
+    @render.ui
+    def cycle_count_data_display_ui():
+        if not state.cc_processed():
+            return ui.div()
+
+        return ui.div(
             # --- 2. KOTAK METRIK DARK GOLD THEME ---
             ui.div(
                 dark_metric_box("🏭 Total BIN Harus Di-Scan", f"{state.cc_total_bin():,}", "#C5A059"),
@@ -1034,19 +1048,19 @@ def server(input: Inputs, output: Outputs, session: Session):
                     ),
                     style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem;"
                 ),
-                render_clean_table(state.df_cc_headers(), state.df_cc_rows()),
+                render_clean_table(state.df_cc_headers(), state.df_cc_rows(), "tbl_cc_filtered_preview"),
                 style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0;"
             ),
             style="width: 100%;"
         )
 
-    # Listener Filter Interaktif (Real-time Filter)
+    # Listener Filter Interaktif (Real-time Filter dengan casting list aman)
     @reactive.Effect
     def _on_cc_filter_change():
         if state.cc_processed():
-            sub = input.cc_filter_sub() if "cc_filter_sub" in input else []
-            brand = input.cc_filter_brand() if "cc_filter_brand" in input else []
-            tier = input.cc_filter_tier() if "cc_filter_tier" in input else []
+            sub = list(input.cc_filter_sub()) if "cc_filter_sub" in input and input.cc_filter_sub() is not None else []
+            brand = list(input.cc_filter_brand()) if "cc_filter_brand" in input and input.cc_filter_brand() is not None else []
+            tier = list(input.cc_filter_tier()) if "cc_filter_tier" in input and input.cc_filter_tier() is not None else []
             state.apply_cc_filters(sub, brand, tier)
 
     # Eksekusi Proses File
