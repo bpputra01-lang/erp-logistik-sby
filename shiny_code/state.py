@@ -426,6 +426,46 @@ class AppState:
         # --- PHYSICAL INVENTORY LIST STATE (UNIFIED) ---
         self.pil_mode = reactive.Value("")
 
+        # --- JUSTIFICATION SO STATE ---
+        self.jso_mode = reactive.Value("")  # "JUSTIFIKASI REVERSAL" atau "JUSTIFIKASI NON REVERSAL"
+        self.jso_rev_start_date = reactive.Value(datetime.now().strftime("%Y-%m-01"))
+        self.jso_rev_end_date = reactive.Value(datetime.now().strftime("%Y-%m-%d"))
+
+        # Non Reversal Results
+        self.jso_processed = reactive.Value(False)
+        self.jso_c_undef = reactive.Value(0)
+        self.jso_c_sys = reactive.Value(0)
+        self.jso_c_adj = reactive.Value(0)
+        self.jso_c_rto = reactive.Value(0)
+        self.jso_c_rekon = reactive.Value(0)
+        self.df_jso_headers = reactive.Value([])
+        self.df_jso_rows = reactive.Value([])
+        self._raw_df_jso_res = pd.DataFrame()
+
+        # [BARU] 2 DataFrame Multiple untuk Non-Reversal (Kolom Asli 100%)
+        self.df_jso_mult_justified_headers = reactive.Value([])
+        self.df_jso_mult_justified_rows = reactive.Value([])
+        self._raw_df_jso_mult_justified = pd.DataFrame()
+        self.df_jso_mult_undefined_headers = reactive.Value([])
+        self.df_jso_mult_undefined_rows = reactive.Value([])
+        self._raw_df_jso_mult_undefined = pd.DataFrame()
+
+        # Reversal Results
+        self.jso_rev_processed = reactive.Value(False)
+        self.jso_rev_c_match = reactive.Value(0)
+        self.jso_rev_c_nomatch = reactive.Value(0)
+        self.df_jso_rev_headers = reactive.Value([])
+        self.df_jso_rev_rows = reactive.Value([])
+        self._raw_df_jso_rev_res = pd.DataFrame()
+
+        # [BARU] 2 DataFrame Multiple untuk Reversal (Kolom Asli 100%)
+        self.df_jso_rev_mult_rev_headers = reactive.Value([])
+        self.df_jso_rev_mult_rev_rows = reactive.Value([])
+        self._raw_df_jso_rev_mult_rev = pd.DataFrame()
+        self.df_jso_rev_mult_nonrev_headers = reactive.Value([])
+        self.df_jso_rev_mult_nonrev_rows = reactive.Value([])
+        self._raw_df_jso_rev_mult_nonrev = pd.DataFrame()
+
     def set_main_menu(self, menu: str): self.main_menu.set(menu)
     def toggle_sidebar(self): self.sidebar_open.set(not self.sidebar_open())
     def toggle_dropdown(self, key: str):
@@ -2514,7 +2554,11 @@ class AppState:
             if df_case.empty or df_tracking.empty or df_all_stock.empty:
                 return False, "File Adjustment, Summary Stock, dan All Data Stock wajib diupload!"
 
-            res = df_case.copy()
+            # Simpan data asli dengan nomor baris
+            df_case_original = df_case.copy()
+            df_case_original['_ROW_INDEX_MATCH'] = range(len(df_case_original))
+
+            res = df_case_original.copy()
             res.columns = [str(c).upper().strip() for c in res.columns]
 
             df_tracking = df_tracking.copy()
@@ -2593,7 +2637,6 @@ class AppState:
                     - res['TOTAL SALES'] - res['TOTAL TRF_OUT'] - res['TOTAL DRAFT_TRF_OUT']
                 )
 
-            # FORMULA NON REVERSAL: LOGIKA KESALAHAN ADJUSTMENT DIBUANG (TAKE OUT)
             def run_formula_non_reversal(row):
                 try:
                     qty_sys_row = round(float(row[qty_sys_col_case]), 2)
@@ -2641,12 +2684,22 @@ class AppState:
                     # 6. Cek Rekonsiliasi
                     if qty_sys_all == curr_stock: return "CEK HASIL REKONSILIASI"
 
-                    # (LOGIKA KESALAHAN ADJUSTMENT +/- TELAH DI-TAKE OUT)
                     return "UNDEFINED"
                 except:
                     return "ERROR DATA"
 
             res['JUSTIFICATION'] = res.apply(run_formula_non_reversal, axis=1)
+
+            # --- GENERATE 2 FILE MULTIPLE DENGAN KOLOM ASLI 100% ---
+            mask_justified = res['JUSTIFICATION'].isin([
+                "KESALAHAN SYSTEM", 
+                "KESALAHAN SYSTEM (BEGIN STOCK -)", 
+                "KESALAHAN RTO", 
+                "CEK HASIL REKONSILIASI"
+            ])
+            
+            df_mult_justified = df_case.iloc[res[mask_justified].index].copy()
+            df_mult_undefined = df_case.iloc[res[~mask_justified].index].copy()
 
             ordered_headers = [
                 'IDENTIFY', 'BIN', 'SKU', 'BRAND', 'ITEM NAME', 'VARIANT', 'SUB KATEGORI',
@@ -2657,21 +2710,29 @@ class AppState:
                 'QTY SYSTEM ALL', 'GAP ADJUSMENT', 'JUSTIFICATION'
             ]
 
-            drop_cols = ['SKU_KEY_JOIN', 'SKU_KEY', 'SKU_KEY_ALL', '_F_STOCK_IN', '_G_ADJ_IN', '_H_TRF_IN', '_I_DRAFT_IN', '_J_SALES', '_K_ADJ_OUT', '_L_DRAFT_OUT', '_M_TRF_OUT', '_N_ENDING_STOCK', '_O_CURR_STOCK', '_QTY_SYS_ALL']
+            drop_cols = ['_ROW_INDEX_MATCH', 'SKU_KEY_JOIN', 'SKU_KEY', 'SKU_KEY_ALL', '_F_STOCK_IN', '_G_ADJ_IN', '_H_TRF_IN', '_I_DRAFT_IN', '_J_SALES', '_K_ADJ_OUT', '_L_DRAFT_OUT', '_M_TRF_OUT', '_N_ENDING_STOCK', '_O_CURR_STOCK', '_QTY_SYS_ALL']
             res = res.drop(columns=[c for c in drop_cols if c in res.columns], errors='ignore')
             final_df = res[[c for c in ordered_headers if c in res.columns]].copy()
 
             self.jso_c_undef.set(len(final_df[final_df['JUSTIFICATION'] == "UNDEFINED"]))
             self.jso_c_sys.set(len(final_df[final_df['JUSTIFICATION'].isin(["KESALAHAN SYSTEM", "KESALAHAN SYSTEM (BEGIN STOCK -)"])]))
-            self.jso_c_adj.set(0) # Sudah di-take out
+            self.jso_c_adj.set(0)
             self.jso_c_rto.set(len(final_df[final_df['JUSTIFICATION'] == "KESALAHAN RTO"]))
             self.jso_c_rekon.set(len(final_df[final_df['JUSTIFICATION'] == "CEK HASIL REKONSILIASI"]))
 
             self._raw_df_jso_res = final_df.copy()
+            self._raw_df_jso_mult_justified = df_mult_justified.copy()
+            self._raw_df_jso_mult_undefined = df_mult_undefined.copy()
+
             self.df_jso_headers.set(final_df.columns.tolist())
             self.df_jso_rows.set(final_df.fillna("").astype(str).values.tolist())
+            self.df_jso_mult_justified_headers.set(df_mult_justified.columns.tolist() if not df_mult_justified.empty else [])
+            self.df_jso_mult_justified_rows.set(df_mult_justified.fillna("").astype(str).values.tolist() if not df_mult_justified.empty else [])
+            self.df_jso_mult_undefined_headers.set(df_mult_undefined.columns.tolist() if not df_mult_undefined.empty else [])
+            self.df_jso_mult_undefined_rows.set(df_mult_undefined.fillna("").astype(str).values.tolist() if not df_mult_undefined.empty else [])
+
             self.jso_processed.set(True)
-            return True, f"Justifikasi Non Reversal Selesai! ({len(final_df):,} Baris Diproses)"
+            return True, f"Justifikasi Non Reversal Selesai! ({len(df_mult_justified):,} Terjustifikasi, {len(df_mult_undefined):,} Sisa / Undefined)"
         except Exception as e:
             return False, f"Gagal Justifikasi SO Non Reversal: {e}"
 
@@ -2688,6 +2749,9 @@ class AppState:
 
             if df_pbi_raw.shape[1] < 17:
                 return False, "File PBI minimal harus 17 kolom (Kolom A=No Adj, C=SKU, E=Datetime, Q=Qty)!"
+
+            # Simpan data asli dengan index terjamin
+            df_case_original = df_case.copy()
 
             res = df_case.copy()
             res.columns = [str(c).upper().strip() for c in res.columns]
@@ -2709,7 +2773,6 @@ class AppState:
                 'QTY_ADJ': pd.to_numeric(df_pbi_raw.iloc[:, 16], errors='coerce').fillna(0)
             })
 
-            # Filter Tanggal PBI (Kebal Jam & Menit)
             pbi_df = pbi_df.dropna(subset=['DATETIME'])
 
             if start_date:
@@ -2722,12 +2785,12 @@ class AppState:
 
             pbi_df = pbi_df.sort_values(by='DATETIME', ascending=True)
 
-            # 2. Logika Penelusuran Reversal & Perhitungan Adj + / -
             no_adj_list = []
             tgl_adj_list = []
             justification_list = []
             adj_plus_list = []
             adj_minus_list = []
+            is_reversal_mask = []
 
             match_count = 0
             nomatch_count = 0
@@ -2738,7 +2801,6 @@ class AppState:
 
                 sku_history = pbi_df[pbi_df['SKU'] == target_sku].copy()
 
-                # Hitung Total Qty Adjustment + dan - untuk SKU ini di rentang PBI
                 if not sku_history.empty:
                     tot_plus = int(sku_history[sku_history['QTY_ADJ'] > 0]['QTY_ADJ'].sum())
                     tot_minus = int(abs(sku_history[sku_history['QTY_ADJ'] < 0]['QTY_ADJ'].sum()))
@@ -2753,6 +2815,7 @@ class AppState:
                     justification_list.append("OK / TIDAK ADA SELISIH")
                     no_adj_list.append("-")
                     tgl_adj_list.append("-")
+                    is_reversal_mask.append(False)
                     continue
 
                 if sku_history.empty:
@@ -2760,6 +2823,7 @@ class AppState:
                     no_adj_list.append("-")
                     tgl_adj_list.append("-")
                     nomatch_count += 1
+                    is_reversal_mask.append(False)
                     continue
 
                 opposite_qty = -gap
@@ -2772,6 +2836,7 @@ class AppState:
                     tgl_adj_list.append(last_tx['DATETIME'].strftime("%Y-%m-%d %H:%M"))
                     justification_list.append("KESALAHAN ADJUSMENT (REVERSAL EXACT MATCH)")
                     match_count += 1
+                    is_reversal_mask.append(True)
                     continue
 
                 # 2. Cek Net Cumulative Sum
@@ -2782,6 +2847,7 @@ class AppState:
                     tgl_adj_list.append(last_tx['DATETIME'].strftime("%Y-%m-%d %H:%M"))
                     justification_list.append("KESALAHAN ADJUSMENT (REVERSAL CUMULATIVE MATCH)")
                     match_count += 1
+                    is_reversal_mask.append(True)
                     continue
 
                 # 3. Cek Transaksi Berlawanan Arah
@@ -2796,13 +2862,14 @@ class AppState:
                     tgl_adj_list.append(last_opp['DATETIME'].strftime("%Y-%m-%d %H:%M"))
                     justification_list.append(f"INDIKASI REVERSAL (LAST OPPOSITE ADJ: {int(last_opp['QTY_ADJ'])})")
                     match_count += 1
+                    is_reversal_mask.append(True)
                 else:
                     no_adj_list.append("-")
                     tgl_adj_list.append("-")
                     justification_list.append("BUKAN REVERSAL (ARAH TRANSAKSI TIDAK SESUAI)")
                     nomatch_count += 1
+                    is_reversal_mask.append(False)
 
-            # 3. Masukkan Kolom Baru Persis Sebelum 'NO ADJUSTMENT'
             res['JUSTIFICATION'] = justification_list
             res['ADJUSTMENT +'] = adj_plus_list
             res['ADJUSTMENT -'] = adj_minus_list
@@ -2812,15 +2879,27 @@ class AppState:
             drop_temp = ['CLEAN_SKU', 'DIFF_GAP']
             final_rev_df = res.drop(columns=[c for c in drop_temp if c in res.columns], errors='ignore')
 
+            # --- GENERATE 2 FILE MULTIPLE DENGAN KOLOM ASLI 100% ---
+            mask_series = pd.Series(is_reversal_mask, index=df_case_original.index)
+            df_mult_rev = df_case_original[mask_series].copy()
+            df_mult_nonrev = df_case_original[~mask_series].copy()
+
             self.jso_rev_c_match.set(match_count)
             self.jso_rev_c_nomatch.set(nomatch_count)
 
             self._raw_df_jso_rev_res = final_rev_df.copy()
+            self._raw_df_jso_rev_mult_rev = df_mult_rev.copy()
+            self._raw_df_jso_rev_mult_nonrev = df_mult_nonrev.copy()
+
             self.df_jso_rev_headers.set(final_rev_df.columns.tolist())
             self.df_jso_rev_rows.set(final_rev_df.fillna("").astype(str).values.tolist())
+            self.df_jso_rev_mult_rev_headers.set(df_mult_rev.columns.tolist() if not df_mult_rev.empty else [])
+            self.df_jso_rev_mult_rev_rows.set(df_mult_rev.fillna("").astype(str).values.tolist() if not df_mult_rev.empty else [])
+            self.df_jso_rev_mult_nonrev_headers.set(df_mult_nonrev.columns.tolist() if not df_mult_nonrev.empty else [])
+            self.df_jso_rev_mult_nonrev_rows.set(df_mult_nonrev.fillna("").astype(str).values.tolist() if not df_mult_nonrev.empty else [])
 
             self.jso_rev_processed.set(True)
-            return True, f"Analisis Justifikasi Reversal Selesai! ({match_count} Item Terindikasi Reversal)"
+            return True, f"Analisis Justifikasi Reversal Selesai! ({match_count} Reversal, {nomatch_count} Bukan Reversal)"
         except Exception as e:
             return False, f"Gagal Memproses Reversal: {e}"
 # ==========================================================================

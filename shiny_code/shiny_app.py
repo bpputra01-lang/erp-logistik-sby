@@ -2414,7 +2414,6 @@ def server(input: Inputs, output: Outputs, session: Session):
         elif mode == "JUSTIFIKASI REVERSAL":
             upload_section = ui.div(
                 ui.h4("🔄 Upload Dokumen Justifikasi Reversal (Histori PBI)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
-                # Filter Tanggal PBI
                 ui.div(
                     ui.div(
                         ui.span("📅 Tanggal Awal PBI:", style="font-size: 12px; font-weight: 800; color: #1A202C; margin-bottom: 4px; display: block;"),
@@ -2438,7 +2437,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             )
             return ui.div(upload_section, ui.output_ui("jso_rev_results_container"))
 
-        # 2. MODE: JUSTIFIKASI NON REVERSAL (4 Uploader Asli Tanpa Ubah)
+        # 2. MODE: JUSTIFIKASI NON REVERSAL
         elif mode == "JUSTIFIKASI NON REVERSAL":
             upload_section = ui.div(
                 ui.h4("📥 Upload Dokumen Justifikasi Non Reversal (Sistem & Mutasi)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
@@ -2509,23 +2508,69 @@ def server(input: Inputs, output: Outputs, session: Session):
                 dark_metric_box("❌ BUKAN REVERSAL / TIDAK COCOK", f"{state.jso_rev_c_nomatch():,} SKU", "#E53E3E"),
                 style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
             ),
-            ui.div(
-                ui.div(
-                    ui.h4("📋 Data Rekonsiliasi Reversal", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0;"),
-                    ui.download_button(
-                        "btn_dl_jso_rev_excel",
-                        ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD HASIL REVERSAL (.XLSX)"),
-                        style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
-                    ),
-                    style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem;"
+            ui.navset_card_tab(
+                # TAB 1: FULL DETAIL REVERSAL
+                ui.nav_panel(
+                    "📊 HASIL ANALISIS LENGKAP",
+                    ui.div(
+                        ui.div(
+                            ui.p("Rekapitulasi lengkap hasil penelusuran PBI dan status reversal untuk setiap baris adjustment.", style="font-size: 13px; color: #718096; margin: 0;"),
+                            ui.download_button(
+                                "btn_dl_jso_rev_excel",
+                                ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD ANALISIS FULL (.XLSX)"),
+                                style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
+                            ),
+                            style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 8px;"
+                        ),
+                        render_clean_table(state.df_jso_rev_headers(), state.df_jso_rev_rows(), "tbl_jso_rev_summary"),
+                        style="padding: 0.75rem 0;"
+                    )
                 ),
-                render_clean_table(state.df_jso_rev_headers(), state.df_jso_rev_rows(), "tbl_jso_rev_summary"),
-                style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0;"
+                # TAB 2: MULTIPLE REVERSAL
+                ui.nav_panel(
+                    "🔄 MULTIPLE ADJ (REVERSAL)",
+                    ui.div(
+                        ui.div(
+                            ui.div(
+                                ui.strong("Format File Multiple Asli: "),
+                                ui.span(f"Hanya baris yang terbukti Reversal ({len(state._raw_df_jso_rev_mult_rev):,} baris). Kolom sama persis dengan file awal.", style="color: #2D3748; font-size: 13px;")
+                            ),
+                            ui.download_button(
+                                "btn_dl_jso_rev_mult_rev",
+                                ui.tags.span(ui.tags.i(class_="fa-solid fa-file-excel", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD FILE MULTIPLE REVERSAL (.XLSX)"),
+                                style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
+                            ),
+                            style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 8px;"
+                        ),
+                        render_clean_table(state.df_jso_rev_mult_rev_headers(), state.df_jso_rev_mult_rev_rows(), "tbl_jso_rev_mult_rev"),
+                        style="padding: 0.75rem 0;"
+                    )
+                ),
+                # TAB 3: MULTIPLE BUKAN REVERSAL (SIAP DI-UPLOAD KE NON REVERSAL)
+                ui.nav_panel(
+                    "➡️ MULTIPLE ADJ (BUKAN REVERSAL ➔ UNTUK NON-REVERSAL)",
+                    ui.div(
+                        ui.div(
+                            ui.div(
+                                ui.div(ui.strong("💡 File Siap Pakai Untuk Cek Non-Reversal:"), style="color: #C53030; font-weight: 800; font-size: 13px; margin-bottom: 2px;"),
+                                ui.span(f"Berisi {len(state._raw_df_jso_rev_mult_nonrev):,} baris yang BUKAN Reversal dengan struktur kolom sama persis dengan file awal. Download file ini dan langsung upload ke Mode 'JUSTIFIKASI NON REVERSAL'.", style="color: #742A2A; font-size: 12px;")
+                            ),
+                            ui.download_button(
+                                "btn_dl_jso_rev_mult_nonrev",
+                                ui.tags.span(ui.tags.i(class_="fa-solid fa-cloud-arrow-down", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD MULTIPLE BUKAN REVERSAL (.XLSX)"),
+                                style="background: linear-gradient(135deg, #E53E3E 0%, #C53030 100%); color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer; box-shadow: 0 2px 6px rgba(229,62,62,0.3);"
+                            ),
+                            style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 8px; background: #FFF5F5; border: 1px solid #FEB2B2; padding: 10px 14px; border-radius: 8px;"
+                        ),
+                        render_clean_table(state.df_jso_rev_mult_nonrev_headers(), state.df_jso_rev_mult_nonrev_rows(), "tbl_jso_rev_mult_nonrev"),
+                        style="padding: 0.75rem 0;"
+                    )
+                )
             ),
-            style="width: 100%;"
+            style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
         )
 
-    @render.download(filename="Hasil_Justifikasi_Reversal.xlsx")
+    @render.download(filename="Hasil_Justifikasi_Reversal_Full.xlsx")
     def btn_dl_jso_rev_excel():
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine='openpyxl') as writer:
@@ -2533,7 +2578,23 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         yield buf.getvalue()
 
-    # --- CONTROLLER MODE NON REVERSAL (EXISTING 4 UPLOADER) ---
+    @render.download(filename="Multiple_Adj_Terindikasi_Reversal.xlsx")
+    def btn_dl_jso_rev_mult_rev():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_jso_rev_mult_rev.to_excel(writer, sheet_name='MULTIPLE_ADJ_REVERSAL', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    @render.download(filename="Multiple_Adj_Bukan_Reversal_Untuk_NonRev.xlsx")
+    def btn_dl_jso_rev_mult_nonrev():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_jso_rev_mult_nonrev.to_excel(writer, sheet_name='BUKAN_REVERSAL', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    # --- CONTROLLER MODE NON REVERSAL ---
     @render.ui
     def justification_so_action_btn_ui():
         f1 = input.uploader_jso_case() if "uploader_jso_case" in input else None
@@ -2572,20 +2633,66 @@ def server(input: Inputs, output: Outputs, session: Session):
                 dark_metric_box("🔁 CEK REKON", f"{state.jso_c_rekon():,} SKU", "#C5A059"),
                 style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
             ),
-            ui.div(
-                ui.div(
-                    ui.h4("📋 Ringkasan Hasil Analisis Non Reversal", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0;"),
-                    ui.download_button(
-                        "btn_dl_jso_excel",
-                        ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD HASIL REKON (.XLSX)"),
-                        style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
-                    ),
-                    style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem;"
+            ui.navset_card_tab(
+                # TAB 1: FULL SUMMARY NON REVERSAL
+                ui.nav_panel(
+                    "📊 HASIL ANALISIS LENGKAP",
+                    ui.div(
+                        ui.div(
+                            ui.p("Ringkasan hasil perbandingan mutasi, summary asset, dan kalkulasi hitungan sistem.", style="font-size: 13px; color: #718096; margin: 0;"),
+                            ui.download_button(
+                                "btn_dl_jso_excel",
+                                ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD HASIL REKON FULL (.XLSX)"),
+                                style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
+                            ),
+                            style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 8px;"
+                        ),
+                        render_clean_table(state.df_jso_headers(), state.df_jso_rows(), "tbl_jso_summary"),
+                        style="padding: 0.75rem 0;"
+                    )
                 ),
-                render_clean_table(state.df_jso_headers(), state.df_jso_rows(), "tbl_jso_summary"),
-                style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0;"
+                # TAB 2: MULTIPLE TERJUSTIFIKASI
+                ui.nav_panel(
+                    "✅ MULTIPLE ADJ (TERJUSTIFIKASI NON REVERSAL)",
+                    ui.div(
+                        ui.div(
+                            ui.div(
+                                ui.strong("Format File Multiple Asli: "),
+                                ui.span(f"Baris yang sudah terjustifikasi ({len(state._raw_df_jso_mult_justified):,} baris: Kesalahan System, Kesalahan RTO, atau Cek Rekon). Kolom sama persis dengan file awal.", style="color: #2D3748; font-size: 13px;")
+                            ),
+                            ui.download_button(
+                                "btn_dl_jso_mult_justified",
+                                ui.tags.span(ui.tags.i(class_="fa-solid fa-file-excel", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD MULTIPLE TERJUSTIFIKASI (.XLSX)"),
+                                style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
+                            ),
+                            style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 8px;"
+                        ),
+                        render_clean_table(state.df_jso_mult_justified_headers(), state.df_jso_mult_justified_rows(), "tbl_jso_mult_justified"),
+                        style="padding: 0.75rem 0;"
+                    )
+                ),
+                # TAB 3: MULTIPLE UNDEFINED / SISA (UNTUK CEK REVERSAL)
+                ui.nav_panel(
+                    "🔄 MULTIPLE ADJ (SISA / UNDEFINED ➔ UNTUK CEK REVERSAL)",
+                    ui.div(
+                        ui.div(
+                            ui.div(
+                                ui.div(ui.strong("💡 File Siap Pakai Untuk Cek Reversal:"), style="color: #C53030; font-weight: 800; font-size: 13px; margin-bottom: 2px;"),
+                                ui.span(f"Berisi {len(state._raw_df_jso_mult_undefined):,} baris yang berstatus UNDEFINED (belum terjustifikasi di Non-Reversal). Download file ini dan langsung upload ke Mode 'JUSTIFIKASI REVERSAL' untuk dicek silang dengan histori PBI!", style="color: #742A2A; font-size: 12px;")
+                            ),
+                            ui.download_button(
+                                "btn_dl_jso_mult_undefined",
+                                ui.tags.span(ui.tags.i(class_="fa-solid fa-cloud-arrow-down", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD MULTIPLE SISA / UNDEFINED (.XLSX)"),
+                                style="background: linear-gradient(135deg, #DD6B20 0%, #C05621 100%); color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer; box-shadow: 0 2px 6px rgba(221,107,32,0.3);"
+                            ),
+                            style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 8px; background: #FFFAF0; border: 1px solid #FEEBC8; padding: 10px 14px; border-radius: 8px;"
+                        ),
+                        render_clean_table(state.df_jso_mult_undefined_headers(), state.df_jso_mult_undefined_rows(), "tbl_jso_mult_undefined"),
+                        style="padding: 0.75rem 0;"
+                    )
+                )
             ),
-            style="width: 100%;"
+            style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
         )
 
     @reactive.Effect
@@ -2607,11 +2714,27 @@ def server(input: Inputs, output: Outputs, session: Session):
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
 
-    @render.download(filename="rekon_stock_so_non_reversal.xlsx")
+    @render.download(filename="rekon_stock_so_non_reversal_full.xlsx")
     def btn_dl_jso_excel():
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine='openpyxl') as writer:
             state._raw_df_jso_res.to_excel(writer, sheet_name='Summary', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    @render.download(filename="Multiple_Adj_Terjustifikasi_NonRev.xlsx")
+    def btn_dl_jso_mult_justified():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_jso_mult_justified.to_excel(writer, sheet_name='TERJUSTIFIKASI_NONREV', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    @render.download(filename="Multiple_Adj_Sisa_Untuk_Cek_Reversal.xlsx")
+    def btn_dl_jso_mult_undefined():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_jso_mult_undefined.to_excel(writer, sheet_name='SISA_UNTUK_REVERSAL', index=False)
         buf.seek(0)
         yield buf.getvalue()
 
