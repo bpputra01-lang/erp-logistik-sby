@@ -2602,6 +2602,52 @@ def server(input: Inputs, output: Outputs, session: Session):
     # JUSTIFICATION SO - NON REVERSAL RESULTS CONTAINER (KEMBALI KE TAMPILAN AWAL)
     # ==========================================================================
     @render.ui
+    def justification_so_action_btn_ui():
+        f1 = input.uploader_jso_case() if "uploader_jso_case" in input else None
+        f2 = input.uploader_jso_track() if "uploader_jso_track" in input else None
+        f3 = input.uploader_jso_all() if "uploader_jso_all" in input else None
+
+        # Jika ketiga file utama sudah di-upload -> Tombol Merah Aktif
+        if (f1 and len(f1) > 0) and (f2 and len(f2) > 0) and (f3 and len(f3) > 0):
+            return ui.div(
+                ui.tags.button(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "RUN COMPARE JUSTIFIKASI NON REVERSAL"),
+                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_run_jso', Math.random(), {priority: 'event'});",
+                    class_="btn-red-gradient"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+            )
+        # Jika belum lengkap -> Tombol Terkunci (Gembok)
+        return ui.div(
+            ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"),
+                "UPLOAD 3 FILE UTAMA UNTUK MEMULAI",
+                disabled=True,
+                class_="btn-locked"
+            ),
+            style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+        )
+
+    @reactive.Effect
+    @reactive.event(input.btn_run_jso)
+    def _proc_jso():
+        f1 = input.uploader_jso_case()
+        f2 = input.uploader_jso_track()
+        f3 = input.uploader_jso_all()
+        f4 = input.uploader_jso_scan() if "uploader_jso_scan" in input else None
+
+        if not f1 or not f2 or not f3:
+            state.error_modal_message.set("Pilih ketiga file utama terlebih dahulu!")
+            state.show_error_modal.set(True)
+            return
+
+        succ, msg = state.process_justification_so(f1, f2, f3, f4)
+        if succ:
+            state.show_success_modal.set(True)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+    @render.ui
     def justification_so_results_container():
         if not state.jso_processed(): return ui.div()
         return ui.div(
