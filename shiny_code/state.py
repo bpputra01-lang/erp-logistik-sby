@@ -345,7 +345,7 @@ class AppState:
         self.jso_rev_start_date = reactive.Value(datetime.now().strftime("%Y-%m-01"))
         self.jso_rev_end_date = reactive.Value(datetime.now().strftime("%Y-%m-%d"))
 
-        # Non Reversal Results
+        # Non Reversal Results (Kembali Normal)
         self.jso_processed = reactive.Value(False)
         self.jso_c_undef = reactive.Value(0)
         self.jso_c_sys = reactive.Value(0)
@@ -356,13 +356,20 @@ class AppState:
         self.df_jso_rows = reactive.Value([])
         self._raw_df_jso_res = pd.DataFrame()
 
-        # Reversal Results
+       # Reversal Results (Tetap Menyimpan 2 File Multiple Kolom Asli)
         self.jso_rev_processed = reactive.Value(False)
         self.jso_rev_c_match = reactive.Value(0)
         self.jso_rev_c_nomatch = reactive.Value(0)
         self.df_jso_rev_headers = reactive.Value([])
         self.df_jso_rev_rows = reactive.Value([])
         self._raw_df_jso_rev_res = pd.DataFrame()
+
+        self.df_jso_rev_mult_rev_headers = reactive.Value([])
+        self.df_jso_rev_mult_rev_rows = reactive.Value([])
+        self._raw_df_jso_rev_mult_rev = pd.DataFrame()
+        self.df_jso_rev_mult_nonrev_headers = reactive.Value([])
+        self.df_jso_rev_mult_nonrev_rows = reactive.Value([])
+        self._raw_df_jso_rev_mult_nonrev = pd.DataFrame()
 
         # --- CROSS CHECK REAL & SYSTEM (MATCHING KARANTINA) ---
         self.crs_processed = reactive.Value(False)
@@ -426,45 +433,7 @@ class AppState:
         # --- PHYSICAL INVENTORY LIST STATE (UNIFIED) ---
         self.pil_mode = reactive.Value("")
 
-        # --- JUSTIFICATION SO STATE ---
-        self.jso_mode = reactive.Value("")  # "JUSTIFIKASI REVERSAL" atau "JUSTIFIKASI NON REVERSAL"
-        self.jso_rev_start_date = reactive.Value(datetime.now().strftime("%Y-%m-01"))
-        self.jso_rev_end_date = reactive.Value(datetime.now().strftime("%Y-%m-%d"))
-
-        # Non Reversal Results
-        self.jso_processed = reactive.Value(False)
-        self.jso_c_undef = reactive.Value(0)
-        self.jso_c_sys = reactive.Value(0)
-        self.jso_c_adj = reactive.Value(0)
-        self.jso_c_rto = reactive.Value(0)
-        self.jso_c_rekon = reactive.Value(0)
-        self.df_jso_headers = reactive.Value([])
-        self.df_jso_rows = reactive.Value([])
-        self._raw_df_jso_res = pd.DataFrame()
-
-        # [BARU] 2 DataFrame Multiple untuk Non-Reversal (Kolom Asli 100%)
-        self.df_jso_mult_justified_headers = reactive.Value([])
-        self.df_jso_mult_justified_rows = reactive.Value([])
-        self._raw_df_jso_mult_justified = pd.DataFrame()
-        self.df_jso_mult_undefined_headers = reactive.Value([])
-        self.df_jso_mult_undefined_rows = reactive.Value([])
-        self._raw_df_jso_mult_undefined = pd.DataFrame()
-
-        # Reversal Results
-        self.jso_rev_processed = reactive.Value(False)
-        self.jso_rev_c_match = reactive.Value(0)
-        self.jso_rev_c_nomatch = reactive.Value(0)
-        self.df_jso_rev_headers = reactive.Value([])
-        self.df_jso_rev_rows = reactive.Value([])
-        self._raw_df_jso_rev_res = pd.DataFrame()
-
-        # [BARU] 2 DataFrame Multiple untuk Reversal (Kolom Asli 100%)
-        self.df_jso_rev_mult_rev_headers = reactive.Value([])
-        self.df_jso_rev_mult_rev_rows = reactive.Value([])
-        self._raw_df_jso_rev_mult_rev = pd.DataFrame()
-        self.df_jso_rev_mult_nonrev_headers = reactive.Value([])
-        self.df_jso_rev_mult_nonrev_rows = reactive.Value([])
-        self._raw_df_jso_rev_mult_nonrev = pd.DataFrame()
+        
 
     def set_main_menu(self, menu: str): self.main_menu.set(menu)
     def toggle_sidebar(self): self.sidebar_open.set(not self.sidebar_open())
@@ -2554,11 +2523,7 @@ class AppState:
             if df_case.empty or df_tracking.empty or df_all_stock.empty:
                 return False, "File Adjustment, Summary Stock, dan All Data Stock wajib diupload!"
 
-            # Simpan data asli dengan nomor baris
-            df_case_original = df_case.copy()
-            df_case_original['_ROW_INDEX_MATCH'] = range(len(df_case_original))
-
-            res = df_case_original.copy()
+            res = df_case.copy()
             res.columns = [str(c).upper().strip() for c in res.columns]
 
             df_tracking = df_tracking.copy()
@@ -2690,17 +2655,6 @@ class AppState:
 
             res['JUSTIFICATION'] = res.apply(run_formula_non_reversal, axis=1)
 
-            # --- GENERATE 2 FILE MULTIPLE DENGAN KOLOM ASLI 100% ---
-            mask_justified = res['JUSTIFICATION'].isin([
-                "KESALAHAN SYSTEM", 
-                "KESALAHAN SYSTEM (BEGIN STOCK -)", 
-                "KESALAHAN RTO", 
-                "CEK HASIL REKONSILIASI"
-            ])
-            
-            df_mult_justified = df_case.iloc[res[mask_justified].index].copy()
-            df_mult_undefined = df_case.iloc[res[~mask_justified].index].copy()
-
             ordered_headers = [
                 'IDENTIFY', 'BIN', 'SKU', 'BRAND', 'ITEM NAME', 'VARIANT', 'SUB KATEGORI',
                 'HARGA BELI', 'HARGA JUAL', 'QTY SYSTEM', 'QTY SO',
@@ -2710,7 +2664,7 @@ class AppState:
                 'QTY SYSTEM ALL', 'GAP ADJUSMENT', 'JUSTIFICATION'
             ]
 
-            drop_cols = ['_ROW_INDEX_MATCH', 'SKU_KEY_JOIN', 'SKU_KEY', 'SKU_KEY_ALL', '_F_STOCK_IN', '_G_ADJ_IN', '_H_TRF_IN', '_I_DRAFT_IN', '_J_SALES', '_K_ADJ_OUT', '_L_DRAFT_OUT', '_M_TRF_OUT', '_N_ENDING_STOCK', '_O_CURR_STOCK', '_QTY_SYS_ALL']
+            drop_cols = ['SKU_KEY_JOIN', 'SKU_KEY', 'SKU_KEY_ALL', '_F_STOCK_IN', '_G_ADJ_IN', '_H_TRF_IN', '_I_DRAFT_IN', '_J_SALES', '_K_ADJ_OUT', '_L_DRAFT_OUT', '_M_TRF_OUT', '_N_ENDING_STOCK', '_O_CURR_STOCK', '_QTY_SYS_ALL']
             res = res.drop(columns=[c for c in drop_cols if c in res.columns], errors='ignore')
             final_df = res[[c for c in ordered_headers if c in res.columns]].copy()
 
@@ -2721,18 +2675,10 @@ class AppState:
             self.jso_c_rekon.set(len(final_df[final_df['JUSTIFICATION'] == "CEK HASIL REKONSILIASI"]))
 
             self._raw_df_jso_res = final_df.copy()
-            self._raw_df_jso_mult_justified = df_mult_justified.copy()
-            self._raw_df_jso_mult_undefined = df_mult_undefined.copy()
-
             self.df_jso_headers.set(final_df.columns.tolist())
             self.df_jso_rows.set(final_df.fillna("").astype(str).values.tolist())
-            self.df_jso_mult_justified_headers.set(df_mult_justified.columns.tolist() if not df_mult_justified.empty else [])
-            self.df_jso_mult_justified_rows.set(df_mult_justified.fillna("").astype(str).values.tolist() if not df_mult_justified.empty else [])
-            self.df_jso_mult_undefined_headers.set(df_mult_undefined.columns.tolist() if not df_mult_undefined.empty else [])
-            self.df_jso_mult_undefined_rows.set(df_mult_undefined.fillna("").astype(str).values.tolist() if not df_mult_undefined.empty else [])
-
             self.jso_processed.set(True)
-            return True, f"Justifikasi Non Reversal Selesai! ({len(df_mult_justified):,} Terjustifikasi, {len(df_mult_undefined):,} Sisa / Undefined)"
+            return True, f"Justifikasi Non Reversal Selesai! ({len(final_df):,} Baris Diproses)"
         except Exception as e:
             return False, f"Gagal Justifikasi SO Non Reversal: {e}"
 
