@@ -946,7 +946,7 @@ def stock_opname_view(state: AppState):
         ui.div(
             ui.div(ui.input_selectize("so_sub_kat", "📁 Sub Kategori:", choices=list_sub_kat, multiple=True, width="100%"), style="flex: 1; min-width: 200px;"),
             ui.div(ui.output_ui("so_bin_sys_ui"), style="flex: 1; min-width: 200px;"),
-            ui.div(ui.input_selectize("so_bin_cov", "📡 BIN Coverage (Step 2):", choices=list_bin_cov, multiple=True, width="100%"), style="flex: 1; min-width: 200px;"),
+            ui.div(ui.input_selectize("so_bin_cov", "📡 BIN Coverage :", choices=list_bin_cov, multiple=True, width="100%"), style="flex: 1; min-width: 200px;"),
             style="display: flex; gap: 1rem; width: 100%; flex-wrap: wrap;"
         ),
         style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
