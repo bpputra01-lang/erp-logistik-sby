@@ -1087,8 +1087,8 @@ def validation_barcode_sku_view(state: AppState):
     upload_section = ui.div(
         ui.h4("📥 Upload Dokumen Scan & List Perubahan SKU", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
         ui.div(
-            custom_uploader_box("uploader_vbs_scan", "1. File Data Scan (Kolom A=BIN, B=SKU, C=QTY)"),
-            custom_uploader_box("uploader_vbs_list", "2. File List Perubahan SKU (Kolom A=SKU, B=Item Name, C=Variant)"),
+            custom_uploader_box("uploader_vbs_scan", "1. File Data Scan"),
+            custom_uploader_box("uploader_vbs_list", "2. File List Perubahan SKU"),
             style="display: flex; gap: 1rem; width: 100%; margin-bottom: 0.5rem; flex-wrap: wrap;"
         ),
         ui.output_ui("vbs_action_btn_ui"),
