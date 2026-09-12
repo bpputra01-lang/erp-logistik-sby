@@ -2683,7 +2683,7 @@ class AppState:
             return False, f"Gagal Justifikasi SO Non Reversal: {e}"
 
 # ==========================================================================
-    # JUSTIFICATION SO - REVERSAL (DITAMBAHKAN KOLOM ADJUSTMENT + DAN -)
+    # JUSTIFICATION SO - REVERSAL (DIPERBAIKI: LOGIKA WAJIB BERLAWANAN ARAH)
     # ==========================================================================
     def process_justification_reversal(self, f_case, f_pbi, start_date=None, end_date=None):
         try:
@@ -2696,7 +2696,7 @@ class AppState:
             if df_pbi_raw.shape[1] < 17:
                 return False, "File PBI minimal harus 17 kolom (Kolom A=No Adj, C=SKU, E=Datetime, Q=Qty)!"
 
-            # Simpan data asli dengan index terjamin
+            # Simpan data asli untuk tab download multiple
             df_case_original = df_case.copy()
 
             res = df_case.copy()
@@ -2736,6 +2736,7 @@ class AppState:
             justification_list = []
             adj_plus_list = []
             adj_minus_list = []
+            gap_pbi_list = []
             is_reversal_mask = []
 
             match_count = 0
@@ -2743,7 +2744,7 @@ class AppState:
 
             for _, row in res.iterrows():
                 target_sku = row['CLEAN_SKU']
-                gap = row['DIFF_GAP']
+                gap = row['DIFF_GAP']  # QTY SO - QTY SYSTEM
 
                 sku_history = pbi_df[pbi_df['SKU'] == target_sku].copy()
 
@@ -2754,9 +2755,13 @@ class AppState:
                     tot_plus = 0
                     tot_minus = 0
 
+                gap_pbi = tot_plus - tot_minus  # Net Gap di PBI
+
                 adj_plus_list.append(tot_plus)
                 adj_minus_list.append(tot_minus)
+                gap_pbi_list.append(gap_pbi)
 
+                # A. Jika tidak ada selisih di SO
                 if gap == 0:
                     justification_list.append("OK / TIDAK ADA SELISIH")
                     no_adj_list.append("-")
@@ -2764,6 +2769,7 @@ class AppState:
                     is_reversal_mask.append(False)
                     continue
 
+                # B. Jika SKU sama sekali tidak ada riwayat di PBI
                 if sku_history.empty:
                     justification_list.append("BUKAN REVERSAL (TIDAK ADA HISTORY PBI)")
                     no_adj_list.append("-")
@@ -2774,7 +2780,33 @@ class AppState:
 
                 opposite_qty = -gap
 
-                # 1. Cek Exact Match
+                # C. VALIDASI MUTLAK: ARAH PBI WAJIB BERLAWANAN DENGAN ARAH SELISIH SO
+                # 1. Jika SO butuh Adjustment (-) [gap < 0], maka di PBI NET GAP HARUS POSITIF (+) [gap_pbi > 0]
+                if gap < 0 and gap_pbi <= 0:
+                    if gap_pbi == 0:
+                        justification_list.append("BUKAN REVERSAL (HISTORI PBI SUDAH IMPAS / NET 0)")
+                    else:
+                        justification_list.append("BUKAN REVERSAL (ARAH TRANSAKSI TIDAK SESUAI)")
+                    no_adj_list.append("-")
+                    tgl_adj_list.append("-")
+                    nomatch_count += 1
+                    is_reversal_mask.append(False)
+                    continue
+
+                # 2. Jika SO butuh Adjustment (+) [gap > 0], maka di PBI NET GAP HARUS NEGATIF (-) [gap_pbi < 0]
+                if gap > 0 and gap_pbi >= 0:
+                    if gap_pbi == 0:
+                        justification_list.append("BUKAN REVERSAL (HISTORI PBI SUDAH IMPAS / NET 0)")
+                    else:
+                        justification_list.append("BUKAN REVERSAL (ARAH TRANSAKSI TIDAK SESUAI)")
+                    no_adj_list.append("-")
+                    tgl_adj_list.append("-")
+                    nomatch_count += 1
+                    is_reversal_mask.append(False)
+                    continue
+
+                # D. JIKA SUDAH TERBUKTI BERLAWANAN ARAH, CEK NILAINYA:
+                # 1. Cek Exact Match Dokumen Tunggal
                 exact_tx = sku_history[sku_history['QTY_ADJ'] == opposite_qty]
                 if not exact_tx.empty:
                     last_tx = exact_tx.iloc[-1]
@@ -2785,10 +2817,10 @@ class AppState:
                     is_reversal_mask.append(True)
                     continue
 
-                # 2. Cek Net Cumulative Sum
-                net_history_qty = sku_history['QTY_ADJ'].sum()
-                if net_history_qty == opposite_qty:
-                    last_tx = sku_history.iloc[-1]
+                # 2. Cek Net Cumulative Match
+                if gap_pbi == opposite_qty:
+                    opp_tx = sku_history[sku_history['QTY_ADJ'] > 0 if opposite_qty > 0 else sku_history['QTY_ADJ'] < 0]
+                    last_tx = opp_tx.iloc[-1] if not opp_tx.empty else sku_history.iloc[-1]
                     no_adj_list.append(str(last_tx['NO_ADJ']))
                     tgl_adj_list.append(last_tx['DATETIME'].strftime("%Y-%m-%d %H:%M"))
                     justification_list.append("KESALAHAN ADJUSMENT (REVERSAL CUMULATIVE MATCH)")
@@ -2796,17 +2828,13 @@ class AppState:
                     is_reversal_mask.append(True)
                     continue
 
-                # 3. Cek Transaksi Berlawanan Arah
-                if gap > 0:
-                    opp_history = sku_history[sku_history['QTY_ADJ'] < 0]
-                else:
-                    opp_history = sku_history[sku_history['QTY_ADJ'] > 0]
-
+                # 3. Indikasi Reversal (Arah berlawanan namun angka selisih tidak pas 1:1)
+                opp_history = sku_history[sku_history['QTY_ADJ'] > 0 if opposite_qty > 0 else sku_history['QTY_ADJ'] < 0]
                 if not opp_history.empty:
                     last_opp = opp_history.iloc[-1]
                     no_adj_list.append(str(last_opp['NO_ADJ']))
                     tgl_adj_list.append(last_opp['DATETIME'].strftime("%Y-%m-%d %H:%M"))
-                    justification_list.append(f"INDIKASI REVERSAL (LAST OPPOSITE ADJ: {int(last_opp['QTY_ADJ'])})")
+                    justification_list.append(f"INDIKASI REVERSAL (GAP PBI: {gap_pbi:+d}, LAST OPPOSITE ADJ: {int(last_opp['QTY_ADJ'])})")
                     match_count += 1
                     is_reversal_mask.append(True)
                 else:
@@ -2816,16 +2844,18 @@ class AppState:
                     nomatch_count += 1
                     is_reversal_mask.append(False)
 
+            # Tambahkan Kolom Tambahan yang Lengkap
             res['JUSTIFICATION'] = justification_list
             res['ADJUSTMENT +'] = adj_plus_list
             res['ADJUSTMENT -'] = adj_minus_list
+            res['GAP PBI'] = gap_pbi_list
             res['NO ADJUSTMENT'] = no_adj_list
             res['TANGGAL ADJUSTMENT'] = tgl_adj_list
 
             drop_temp = ['CLEAN_SKU', 'DIFF_GAP']
             final_rev_df = res.drop(columns=[c for c in drop_temp if c in res.columns], errors='ignore')
 
-            # --- GENERATE 2 FILE MULTIPLE DENGAN KOLOM ASLI 100% ---
+            # Filter data Multiple Asli untuk 2 tab download
             mask_series = pd.Series(is_reversal_mask, index=df_case_original.index)
             df_mult_rev = df_case_original[mask_series].copy()
             df_mult_nonrev = df_case_original[~mask_series].copy()
