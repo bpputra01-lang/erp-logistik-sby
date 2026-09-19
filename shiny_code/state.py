@@ -2279,11 +2279,24 @@ class AppState:
             df_final_stock.drop(columns=['JOIN_KEY'], errors='ignore', inplace=True)
             df_missing.drop(columns=['JOIN_KEY'], errors='ignore', inplace=True)
 
-            # 6. Pivot List dari Stock Positif
-            col_bin_stock = df_final_stock.columns[1]
-            col_sku_stock = next((c for c in df_final_stock.columns if 'SKU' in str(c).upper()), df_final_stock.columns[2])
+           # ================= AFTER =================
+            # Helper deteksi kolom dinamis (tahan pergeseran indeks)
+            def find_col(df_target, keywords, default_idx):
+                for col in df_target.columns:
+                    col_str = str(col).strip().upper()
+                    if any(k in col_str for k in keywords):
+                        return col
+                return df_target.columns[default_idx]
+
+            # Deteksi kolom BIN dan SKU secara akurat dari nama kolom
+            col_bin_stock = find_col(df_final_stock, ['BIN', 'LOKASI', 'RAK'], 1)
+            col_sku_stock = find_col(df_final_stock, ['SKU', 'ITEM CODE', 'BARCODE'], 2)
+
             q_so_v = pd.to_numeric(df_final_stock["QTY SO"], errors='coerce').fillna(0.0)
-            q_sys_v = pd.to_numeric(df_final_stock.iloc[:, 9], errors='coerce').fillna(0.0)
+            
+            # Deteksi kolom QTY System secara dinamis
+            col_qty_sys = find_col(df_final_stock, ['QTY SYSTEM', 'QTY SYS', 'SYSTEM QTY'], 9)
+            q_sys_v = pd.to_numeric(df_final_stock[col_qty_sys], errors='coerce').fillna(0.0)
             diff_v = pd.to_numeric(df_final_stock["DIFF"], errors='coerce')
 
             mask_plus = ((q_so_v > q_sys_v) | (q_sys_v < 0)) & (diff_v.notna()) & (diff_v > 0)
@@ -2302,9 +2315,9 @@ class AppState:
                     'QTY_TOTAL': diff_clean_p.tolist()
                 }))
 
-                # Buat baris mutasi Set Up Real +: Dari STAGING INBOUND ke Rak Fisik Asal
+                # Mutasi: Dari STAGING INBOUND -> Ke Rak Fisik (b_tgt)
                 for b_tgt, s_val, q_val in zip(bin_dest_p, sku_clean_p, diff_clean_p.round().astype(int)):
-                    if b_tgt != 'STAGING INBOUND' and q_val > 0 and s_val != "":
+                    if b_tgt not in ['STAGING INBOUND', ''] and q_val > 0 and s_val != "":
                         setup_records.append({
                             'BIN AWAL': 'STAGING INBOUND',
                             'BIN TUJUAN': b_tgt,
@@ -2312,7 +2325,6 @@ class AppState:
                             'QUANTITY': q_val,
                             'NOTES': 'SET UP REAL +'
                         })
-
             # Master Staging Inbound
             inbound_master = df_m5.copy()
             col_sku_inb = next((c for c in inbound_master.columns if 'SKU' in str(c).upper()), inbound_master.columns[2])
