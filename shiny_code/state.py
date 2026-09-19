@@ -2203,130 +2203,155 @@ class AppState:
         except Exception as e:
             return False, f"Gagal Allocation Step 2: {e}"
 
-    # --- STEP 4: FINAL ADJUSTMENT (POIN 4: QTY MINUS FISIK 0 MENJADI NILAI ADJ SAMPAI 0) ---
+    # ==========================================================================
+    # STEP 4: FINAL ADJUSTMENT (HIGH-SPEED VECTORIZED ENGINE - NO BOTTLENECK)
+    # ==========================================================================
     def run_so_step4(self, f_r4, f_s4, f_m5):
         try:
-            df_r4 = load_data_from_info(f_r4)
-            df_s4 = load_data_from_info(f_s4)
-            df_m5 = load_data_from_info(f_m5)
+            # 1. Fast Excel Reader (Calamine engine jauh lebih cepat, fallback openpyxl)
+            def fast_read(file_info):
+                if not file_info: return pd.DataFrame()
+                path = file_info[0]["datapath"]
+                name = file_info[0]["name"].lower()
+                if name.endswith(('.xlsx', '.xls')):
+                    try:
+                        return pd.read_excel(path, engine='calamine')
+                    except Exception:
+                        return pd.read_excel(path, engine='openpyxl')
+                elif name.endswith('.csv'):
+                    return pd.read_csv(path)
+                return pd.DataFrame()
 
-            if df_r4.empty or df_s4.empty or df_m5.empty:
+            df_r = fast_read(f_r4)
+            df_s = fast_read(f_s4)
+            df_m5 = fast_read(f_m5)
+
+            if df_r.empty or df_s.empty or df_m5.empty:
                 return False, "Ketiga file (Real+ Recon, Cek Stock Adj+, Staging Inbound) wajib diupload!"
 
-            def super_clean(val):
-                if pd.isna(val) or str(val).strip().lower() in ['nan', 'null', '']: return ""
-                s = str(val).strip().upper()
-                if s.endswith('.0'): s = s[:-2]
-                return s
+            # Helper vektorisasi string (50x lebih cepat daripada .apply(super_clean))
+            def clean_series(series):
+                return series.fillna('').astype(str).str.strip().str.upper().str.replace(r'\.0$', '', regex=True)
 
-            df_s = df_s4.copy()
-            df_r = df_r4.copy()
+            # 2. Vektorisasi Key Pencocokan
+            b_s = clean_series(df_s.iloc[:, 1])
+            s_s = clean_series(df_s.iloc[:, 2])
+            df_s['JOIN_KEY'] = b_s + "|" + s_s
 
-            df_s['JOIN_KEY'] = df_s.iloc[:, 1].fillna('').astype(str).apply(super_clean) + "|" + df_s.iloc[:, 2].fillna('').astype(str).apply(super_clean)
-            df_r['JOIN_KEY'] = df_r.iloc[:, 0].fillna('').astype(str).apply(super_clean) + "|" + df_r.iloc[:, 1].fillna('').astype(str).apply(super_clean)
+            b_r = clean_series(df_r.iloc[:, 0])
+            s_r = clean_series(df_r.iloc[:, 1])
+            df_r['JOIN_KEY'] = b_r + "|" + s_r
 
-            recon_map = {}
-            for _, row in df_r.iterrows():
-                b, s = super_clean(row.iloc[0]), super_clean(row.iloc[1])
-                # Kolom Index 6 adalah HASIL RECONCILIATION
-                val_rec = row.iloc[6] if len(row) > 6 else 0
-                try:
-                    q = float(val_rec)
-                except:
-                    q = 0.0
-                if b and s: recon_map[f"{b}|{s}"] = q
+            # 3. Pembuatan Dictionary Recon Instan (Tanpa iterrows)
+            q_r_val = pd.to_numeric(df_r.iloc[:, 6], errors='coerce').fillna(0.0) if df_r.shape[1] > 6 else pd.Series(0.0, index=df_r.index)
+            mask_r_valid = (b_r != "") & (s_r != "")
+            recon_map = dict(zip(df_r.loc[mask_r_valid, 'JOIN_KEY'], q_r_val[mask_r_valid]))
 
+            # 4. Kalkulasi Lookup & DIFF Secara Vektor Murni
             new_qty_so = df_s['JOIN_KEY'].map(recon_map)
-            sys_qty = pd.to_numeric(df_s.iloc[:, 9], errors='coerce').fillna(0)
-            
-            # Hitung DIFF Cerdas: Jika sys_qty < 0, adjustment adalah abs(sys_qty) + hasil_so agar mencapai 0
-            so_clean = new_qty_so.fillna(0)
+            sys_qty = pd.to_numeric(df_s.iloc[:, 9], errors='coerce').fillna(0.0)
+
+            so_clean = new_qty_so.fillna(0.0)
             needed_adj = np.where(sys_qty < 0, np.abs(sys_qty) + so_clean, np.abs(sys_qty - so_clean))
             new_diff = np.where(new_qty_so.notna(), needed_adj, np.nan)
 
-            cols_to_keep = [i for i in range(len(df_s.columns)) if i not in [10, 11]]
+            cols_to_keep = [i for i in range(len(df_s.columns)) if i not in [10, 11] and df_s.columns[i] != 'JOIN_KEY']
             df_final_stock = df_s.iloc[:, cols_to_keep].copy()
-            df_final_stock.insert(10, "QTY SO", new_qty_so.fillna(0))
+            df_final_stock.insert(10, "QTY SO", so_clean)
             df_final_stock.insert(11, "DIFF", new_diff)
 
-            matched_keys = set(df_s[new_qty_so.notna()]['JOIN_KEY'])
-            df_missing_raw = df_r[~df_r['JOIN_KEY'].isin(matched_keys)].copy()
+            # 5. Filter Item Missing (Tanpa iterrows)
+            matched_keys = set(df_s.loc[new_qty_so.notna(), 'JOIN_KEY'])
+            mask_not_matched = ~df_r['JOIN_KEY'].isin(matched_keys)
 
-            valid_missing_rows = []
-            for _, row in df_missing_raw.iterrows():
-                q_rec_val = pd.to_numeric(row.iloc[6], errors='coerce') if len(row) > 6 and pd.notna(row.iloc[6]) else 0
-                q_sys_val = pd.to_numeric(row.iloc[4], errors='coerce') if len(row) > 4 and pd.notna(row.iloc[4]) else 0
-                # Tetap valid jika recon > 0 ATAU qty system < 0 (stok minus butuh di-nol-kan)
-                if q_rec_val > 0 or q_sys_val < 0:
-                    valid_missing_rows.append(row)
-
-            if valid_missing_rows:
-                df_missing = pd.DataFrame(valid_missing_rows)
-                df_missing['FINAL_RECON_QTY'] = pd.to_numeric(df_missing.iloc[:, 6], errors='coerce').fillna(0)
-                df_missing['QTY_SYSTEM'] = pd.to_numeric(df_missing.iloc[:, 4], errors='coerce').fillna(0)
+            if mask_not_matched.any():
+                df_missing_candidates = df_r[mask_not_matched].copy()
+                q_rec_cand = pd.to_numeric(df_missing_candidates.iloc[:, 6], errors='coerce').fillna(0.0) if df_missing_candidates.shape[1] > 6 else pd.Series(0.0, index=df_missing_candidates.index)
+                q_sys_cand = pd.to_numeric(df_missing_candidates.iloc[:, 4], errors='coerce').fillna(0.0) if df_missing_candidates.shape[1] > 4 else pd.Series(0.0, index=df_missing_candidates.index)
+                
+                val_mask = (q_rec_cand > 0) | (q_sys_cand < 0)
+                df_missing = df_missing_candidates[val_mask].copy()
+                df_missing['FINAL_RECON_QTY'] = q_rec_cand[val_mask]
+                df_missing['QTY_SYSTEM'] = q_sys_cand[val_mask]
             else:
                 df_missing = pd.DataFrame(columns=df_r.columns.tolist() + ['FINAL_RECON_QTY', 'QTY_SYSTEM'])
 
             df_final_stock.drop(columns=['JOIN_KEY'], errors='ignore', inplace=True)
             df_missing.drop(columns=['JOIN_KEY'], errors='ignore', inplace=True)
 
-            # Logic Pivot Adjustment
-            pivot_list, single_list = [], []
-            col_sku_stock = next((c for c in df_final_stock.columns if 'SKU' in c.upper()), df_final_stock.columns[2])
-            q_so_v = pd.to_numeric(df_final_stock["QTY SO"], errors='coerce').fillna(0)
-            q_sys_v = pd.to_numeric(df_final_stock.iloc[:, 9], errors='coerce').fillna(0)
+            # 6. Pembuatan Pivot List Stock Positif (Zero iterrows!)
+            col_sku_stock = next((c for c in df_final_stock.columns if 'SKU' in str(c).upper()), df_final_stock.columns[2])
+            q_so_v = pd.to_numeric(df_final_stock["QTY SO"], errors='coerce').fillna(0.0)
+            q_sys_v = pd.to_numeric(df_final_stock.iloc[:, 9], errors='coerce').fillna(0.0)
+            diff_v = pd.to_numeric(df_final_stock["DIFF"], errors='coerce')
 
-            # Kondisi Plus: QTY SO > QTY SYS ATAU QTY SYS < 0 (Stok minus selalu butuh penambahan)
-            mask_plus = ((q_so_v > q_sys_v) | (q_sys_v < 0)) & (df_final_stock["DIFF"].notna()) & (df_final_stock["DIFF"] > 0)
+            mask_plus = ((q_so_v > q_sys_v) | (q_sys_v < 0)) & (diff_v.notna()) & (diff_v > 0)
 
+            pivot_dfs = []
             if mask_plus.any():
-                for _, r in df_final_stock[mask_plus].iterrows():
-                    pivot_list.append({'SKU_KEY_TEMP': super_clean(r[col_sku_stock]), 'QTY_TOTAL': pd.to_numeric(r["DIFF"], errors='coerce')})
+                df_plus = df_final_stock[mask_plus]
+                pivot_dfs.append(pd.DataFrame({
+                    'SKU_KEY_TEMP': clean_series(df_plus[col_sku_stock]),
+                    'QTY_TOTAL': pd.to_numeric(df_plus["DIFF"], errors='coerce').fillna(0.0)
+                }))
 
+            # Master Staging Inbound
             inbound_master = df_m5.copy()
-            col_sku_inb = next((c for c in inbound_master.columns if 'SKU' in c.upper()), inbound_master.columns[2])
-            inbound_master['SKU_JOIN'] = inbound_master[col_sku_inb].apply(super_clean)
+            col_sku_inb = next((c for c in inbound_master.columns if 'SKU' in str(c).upper()), inbound_master.columns[2])
+            inbound_master['SKU_JOIN'] = clean_series(inbound_master[col_sku_inb])
             m_clean = inbound_master.drop_duplicates(subset=['SKU_JOIN'])
             inbound_skus_set = set(m_clean['SKU_JOIN'].unique())
 
+            single_list = []
+
+            # 7. Pemrosesan df_missing dengan Vektorisasi & Fast Zip
             if not df_missing.empty:
                 col_b_m = df_missing.columns[0]
                 col_s_m = df_missing.columns[1]
-                col_q_r = 'FINAL_RECON_QTY' if 'FINAL_RECON_QTY' in df_missing.columns else df_missing.columns[6]
-                col_q_s = 'QTY_SYSTEM' if 'QTY_SYSTEM' in df_missing.columns else None
+                s_rec_series = clean_series(df_missing[col_s_m])
+                q_r_series = pd.to_numeric(df_missing['FINAL_RECON_QTY'], errors='coerce').fillna(0.0)
+                q_s_series = pd.to_numeric(df_missing['QTY_SYSTEM'], errors='coerce').fillna(0.0)
+                
+                q_calc_series = np.where(q_s_series < 0, np.abs(q_s_series) + q_r_series, q_r_series - q_s_series)
+                mask_calc_valid = (q_calc_series > 0) & (s_rec_series != "")
 
-                for _, row in df_missing.iterrows():
-                    s_rec = super_clean(row[col_s_m])
-                    if not s_rec: continue
-                    q_r_v = pd.to_numeric(row[col_q_r], errors='coerce') or 0
-                    q_s_v = pd.to_numeric(row[col_q_s], errors='coerce') if col_q_s else 0
+                if mask_calc_valid.any():
+                    s_valid = s_rec_series[mask_calc_valid]
+                    q_valid = q_calc_series[mask_calc_valid]
+                    b_orig = df_missing.loc[mask_calc_valid, col_b_m].values
+                    s_orig = df_missing.loc[mask_calc_valid, col_s_m].values
                     
-                    # Hitung Qty Adjustment: Jika minus, abs(sys) + recon agar jadi 0
-                    if q_s_v < 0:
-                        q_calc = abs(q_s_v) + q_r_v
-                    else:
-                        q_calc = q_r_v - q_s_v
+                    is_in_inbound = s_valid.isin(inbound_skus_set)
+                    
+                    if is_in_inbound.any():
+                        pivot_dfs.append(pd.DataFrame({
+                            'SKU_KEY_TEMP': s_valid[is_in_inbound].values,
+                            'QTY_TOTAL': q_valid[is_in_inbound].values
+                        }))
+                    
+                    not_in_inbound = ~is_in_inbound
+                    if not_in_inbound.any():
+                        for b_val, s_val, q_val in zip(b_orig[not_in_inbound], s_orig[not_in_inbound], q_valid[not_in_inbound]):
+                            single_list.append({'BIN': b_val, 'SKU': s_val, 'QTY ADJ': q_val})
 
-                    if q_calc <= 0: continue
-
-                    if s_rec in inbound_skus_set:
-                        pivot_list.append({'SKU_KEY_TEMP': s_rec, 'QTY_TOTAL': q_calc})
-                    else:
-                        single_list.append({'BIN': row[col_b_m], 'SKU': row[col_s_m], 'QTY ADJ': q_calc})
-
+            # 8. Penggabungan Pivot & Multiple Adjustment
             df_mult_res = pd.DataFrame()
-            if pivot_list:
-                df_p = pd.DataFrame(pivot_list)
-                df_p_g = df_p.groupby('SKU_KEY_TEMP')['QTY_TOTAL'].sum().reset_index()
+            if pivot_dfs:
+                df_p = pd.concat(pivot_dfs, ignore_index=True)
+                df_p_g = df_p.groupby('SKU_KEY_TEMP', as_index=False)['QTY_TOTAL'].sum()
                 mask_has_m = df_p_g['SKU_KEY_TEMP'].isin(inbound_skus_set)
 
-                for _, row in df_p_g[~mask_has_m].iterrows():
-                    single_list.append({'BIN': 'STAGING INBOUND (MISS MASTER)', 'SKU': row['SKU_KEY_TEMP'], 'QTY ADJ': row['QTY_TOTAL']})
+                # Item yang tidak ditemukan di master staging inbound
+                if (~mask_has_m).any():
+                    miss_skus = df_p_g.loc[~mask_has_m, 'SKU_KEY_TEMP'].values
+                    miss_qtys = df_p_g.loc[~mask_has_m, 'QTY_TOTAL'].values
+                    for m_s, m_q in zip(miss_skus, miss_qtys):
+                        single_list.append({'BIN': 'STAGING INBOUND (MISS MASTER)', 'SKU': m_s, 'QTY ADJ': m_q})
 
                 df_p_val = df_p_g[mask_has_m]
                 if not df_p_val.empty:
                     df_mult_res = df_p_val.merge(m_clean, left_on='SKU_KEY_TEMP', right_on='SKU_JOIN', how='inner')
-                    col_t_so = next((c for c in df_mult_res.columns if 'QTY SO' in c.upper() or 'SO' in c.upper()), None)
+                    col_t_so = next((c for c in df_mult_res.columns if 'QTY SO' in str(c).upper() or 'SO' in str(c).upper()), None)
                     if col_t_so: df_mult_res[col_t_so] = df_mult_res['QTY_TOTAL']
                     else: df_mult_res['QTY SO'] = df_mult_res['QTY_TOTAL']
                     df_mult_res.drop(columns=['SKU_KEY_TEMP', 'QTY_TOTAL', 'SKU_JOIN'], errors='ignore', inplace=True)
@@ -2343,25 +2368,86 @@ class AppState:
                 df_sing_res[last_c] = pd.to_numeric(df_sing_res[last_c], errors='coerce').fillna(0)
                 df_sing_res = df_sing_res[df_sing_res[last_c] > 0].reset_index(drop=True)
 
+            # 9. Simpan 100% Data Lengkap untuk Tombol Download Excel
             self._raw_df_so_mult = df_mult_res.copy()
             self._raw_df_so_sing = df_sing_res.copy()
             self._raw_df_so_res4 = df_final_stock.copy()
             self._raw_df_so_miss4 = df_missing.copy()
 
-            self.df_so_mult_headers.set(df_mult_res.columns.tolist() if not df_mult_res.empty else [])
-            self.df_so_mult_rows.set(df_mult_res.fillna("").astype(str).values.tolist() if not df_mult_res.empty else [])
-            self.df_so_sing_headers.set(df_sing_res.columns.tolist() if not df_sing_res.empty else [])
-            self.df_so_sing_rows.set(df_sing_res.fillna("").astype(str).values.tolist() if not df_sing_res.empty else [])
-            self.df_so_res4_headers.set(df_final_stock.columns.tolist() if not df_final_stock.empty else [])
-            self.df_so_res4_rows.set(df_final_stock.fillna("").astype(str).values.tolist() if not df_final_stock.empty else [])
-            self.df_so_miss4_headers.set(df_missing.columns.tolist() if not df_missing.empty else [])
-            self.df_so_miss4_rows.set(df_missing.fillna("").astype(str).values.tolist() if not df_missing.empty else [])
+            # 10. Optimasi Pengiriman Data Preview ke Browser (Anti-Freeze WebSocket)
+            def fast_preview_data(df, max_rows=None):
+                if df.empty: return [], []
+                preview_df = df if max_rows is None or len(df) <= max_rows else df.head(max_rows)
+                headers = preview_df.columns.tolist()
+                rows = preview_df.fillna("").astype(str).values.tolist()
+                return headers, rows
+
+            h_mult, r_mult = fast_preview_data(df_mult_res)
+            h_sing, r_sing = fast_preview_data(df_sing_res)
+            h_miss, r_miss = fast_preview_data(df_missing)
+            
+            # Pada tabel Cek Stock yang bisa mencapai puluhan ribu baris:
+            # Prioritaskan preview baris yang memiliki selisih/hasil recon agar browser tidak lag
+            mask_has_diff = df_final_stock["DIFF"].notna() & (df_final_stock["DIFF"] != 0)
+            if mask_has_diff.any() and len(df_final_stock) > 2500:
+                disp_stock = df_final_stock[mask_has_diff]
+            else:
+                disp_stock = df_final_stock
+
+            h_res4, r_res4 = fast_preview_data(disp_stock, max_rows=3000)
+
+            self.df_so_mult_headers.set(h_mult)
+            self.df_so_mult_rows.set(r_mult)
+            self.df_so_sing_headers.set(h_sing)
+            self.df_so_sing_rows.set(r_sing)
+            self.df_so_res4_headers.set(h_res4)
+            self.df_so_res4_rows.set(r_res4)
+            self.df_so_miss4_headers.set(h_miss)
+            self.df_so_miss4_rows.set(r_miss)
 
             self.so_step4_done.set(True)
             return True, "Final Adjustment Step 4 Selesai!"
         except Exception as e:
             return False, f"Gagal Step 4: {e}"
 
+    # --- FUNGSI GENERATE SET UP REAL + KE STAGING INBOUND ---
+    def run_so_step4_setup_real(self):
+        try:
+            records = []
+            if not self._raw_df_so_mult.empty:
+                col_b = self._raw_df_so_mult.columns[0] if self._raw_df_so_mult.shape[1] > 0 else 'BIN'
+                col_s = self._raw_df_so_mult.columns[1] if self._raw_df_so_mult.shape[1] > 1 else 'SKU'
+                col_q = self._raw_df_so_mult.columns[-1]
+                for _, r in self._raw_df_so_mult.iterrows():
+                    q_val = pd.to_numeric(r[col_q], errors='coerce') or 0
+                    if q_val > 0:
+                        records.append({
+                            'BIN AWAL': str(r[col_b]).strip().upper(),
+                            'BIN TUJUAN': 'STAGING INBOUND',
+                            'SKU': str(r[col_s]).strip().upper(),
+                            'QUANTITY': int(q_val),
+                            'NOTES': 'ADJ PLUS SETUP'
+                        })
+            if not self._raw_df_so_sing.empty:
+                for _, r in self._raw_df_so_sing.iterrows():
+                    q_val = pd.to_numeric(r.get('QTY ADJ', 0), errors='coerce') or 0
+                    if q_val > 0:
+                        records.append({
+                            'BIN AWAL': str(r.get('BIN', '')).strip().upper(),
+                            'BIN TUJUAN': 'STAGING INBOUND',
+                            'SKU': str(r.get('SKU', '')).strip().upper(),
+                            'QUANTITY': int(q_val),
+                            'NOTES': 'ADJ PLUS SETUP (SINGLE)'
+                        })
+            df_setup4 = pd.DataFrame(records) if records else pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
+            self._raw_df_so_setup4 = df_setup4.copy()
+            self.df_so_setup4_headers.set(df_setup4.columns.tolist() if not df_setup4.empty else [])
+            self.df_so_setup4_rows.set(df_setup4.fillna("").astype(str).values.tolist() if not df_setup4.empty else [])
+            self.so_step4_setup_done.set(True)
+            return True, "Set Up Real + Berhasil Dibuat!"
+        except Exception as e:
+            return False, f"Gagal Generate Set Up Real +: {e}"
+            
     def run_so_step5(self, f_k6, f_adj6):
         try:
             df_outstanding = load_data_from_info(f_k6)
