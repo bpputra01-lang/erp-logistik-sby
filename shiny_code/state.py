@@ -2203,12 +2203,12 @@ class AppState:
         except Exception as e:
             return False, f"Gagal Allocation Step 2: {e}"
 
-    # ==========================================================================
-    # STEP 4: FINAL ADJUSTMENT (HIGH-SPEED VECTORIZED ENGINE - NO BOTTLENECK)
+# ==========================================================================
+    # STEP 4: FINAL ADJUSTMENT (HIGH-SPEED VECTORIZED ENGINE - BUG FIXED)
     # ==========================================================================
     def run_so_step4(self, f_r4, f_s4, f_m5):
         try:
-            # 1. Fast Excel Reader (Calamine engine jauh lebih cepat, fallback openpyxl)
+            # 1. Fast Excel Reader (Calamine engine jika ada, fallback openpyxl)
             def fast_read(file_info):
                 if not file_info: return pd.DataFrame()
                 path = file_info[0]["datapath"]
@@ -2229,7 +2229,7 @@ class AppState:
             if df_r.empty or df_s.empty or df_m5.empty:
                 return False, "Ketiga file (Real+ Recon, Cek Stock Adj+, Staging Inbound) wajib diupload!"
 
-            # Helper vektorisasi string (50x lebih cepat daripada .apply(super_clean))
+            # Helper pembersih teks vektor
             def clean_series(series):
                 return series.fillna('').astype(str).str.strip().str.upper().str.replace(r'\.0$', '', regex=True)
 
@@ -2242,12 +2242,12 @@ class AppState:
             s_r = clean_series(df_r.iloc[:, 1])
             df_r['JOIN_KEY'] = b_r + "|" + s_r
 
-            # 3. Pembuatan Dictionary Recon Instan (Tanpa iterrows)
+            # 3. Pembuatan Dictionary Recon Instan
             q_r_val = pd.to_numeric(df_r.iloc[:, 6], errors='coerce').fillna(0.0) if df_r.shape[1] > 6 else pd.Series(0.0, index=df_r.index)
             mask_r_valid = (b_r != "") & (s_r != "")
             recon_map = dict(zip(df_r.loc[mask_r_valid, 'JOIN_KEY'], q_r_val[mask_r_valid]))
 
-            # 4. Kalkulasi Lookup & DIFF Secara Vektor Murni
+            # 4. Lookup QTY SO & DIFF Cerdas
             new_qty_so = df_s['JOIN_KEY'].map(recon_map)
             sys_qty = pd.to_numeric(df_s.iloc[:, 9], errors='coerce').fillna(0.0)
 
@@ -2260,7 +2260,7 @@ class AppState:
             df_final_stock.insert(10, "QTY SO", so_clean)
             df_final_stock.insert(11, "DIFF", new_diff)
 
-            # 5. Filter Item Missing (Tanpa iterrows)
+            # 5. Deteksi Item Missing Recon
             matched_keys = set(df_s.loc[new_qty_so.notna(), 'JOIN_KEY'])
             mask_not_matched = ~df_r['JOIN_KEY'].isin(matched_keys)
 
@@ -2279,7 +2279,7 @@ class AppState:
             df_final_stock.drop(columns=['JOIN_KEY'], errors='ignore', inplace=True)
             df_missing.drop(columns=['JOIN_KEY'], errors='ignore', inplace=True)
 
-            # 6. Pembuatan Pivot List Stock Positif (Zero iterrows!)
+            # 6. Pivot List dari Stock Positif
             col_sku_stock = next((c for c in df_final_stock.columns if 'SKU' in str(c).upper()), df_final_stock.columns[2])
             q_so_v = pd.to_numeric(df_final_stock["QTY SO"], errors='coerce').fillna(0.0)
             q_sys_v = pd.to_numeric(df_final_stock.iloc[:, 9], errors='coerce').fillna(0.0)
@@ -2291,11 +2291,11 @@ class AppState:
             if mask_plus.any():
                 df_plus = df_final_stock[mask_plus]
                 pivot_dfs.append(pd.DataFrame({
-                    'SKU_KEY_TEMP': clean_series(df_plus[col_sku_stock]),
-                    'QTY_TOTAL': pd.to_numeric(df_plus["DIFF"], errors='coerce').fillna(0.0)
+                    'SKU_KEY_TEMP': clean_series(df_plus[col_sku_stock]).tolist(),
+                    'QTY_TOTAL': pd.to_numeric(df_plus["DIFF"], errors='coerce').fillna(0.0).tolist()
                 }))
 
-            # Master Staging Inbound
+            # Master Inbound
             inbound_master = df_m5.copy()
             col_sku_inb = next((c for c in inbound_master.columns if 'SKU' in str(c).upper()), inbound_master.columns[2])
             inbound_master['SKU_JOIN'] = clean_series(inbound_master[col_sku_inb])
@@ -2304,7 +2304,7 @@ class AppState:
 
             single_list = []
 
-            # 7. Pemrosesan df_missing dengan Vektorisasi & Fast Zip
+            # 7. Pemrosesan Missing Items (Aman dari Array vs Series)
             if not df_missing.empty:
                 col_b_m = df_missing.columns[0]
                 col_s_m = df_missing.columns[1]
@@ -2312,39 +2312,49 @@ class AppState:
                 q_r_series = pd.to_numeric(df_missing['FINAL_RECON_QTY'], errors='coerce').fillna(0.0)
                 q_s_series = pd.to_numeric(df_missing['QTY_SYSTEM'], errors='coerce').fillna(0.0)
                 
-                q_calc_series = np.where(q_s_series < 0, np.abs(q_s_series) + q_r_series, q_r_series - q_s_series)
+                # Pertahankan sebagai Series agar index sinkron
+                q_calc_series = pd.Series(
+                    np.where(q_s_series < 0, np.abs(q_s_series) + q_r_series, q_r_series - q_s_series),
+                    index=df_missing.index
+                )
                 mask_calc_valid = (q_calc_series > 0) & (s_rec_series != "")
 
                 if mask_calc_valid.any():
-                    s_valid = s_rec_series[mask_calc_valid]
-                    q_valid = q_calc_series[mask_calc_valid]
-                    b_orig = df_missing.loc[mask_calc_valid, col_b_m].values
-                    s_orig = df_missing.loc[mask_calc_valid, col_s_m].values
+                    df_miss_sub = df_missing[mask_calc_valid].copy()
+                    s_valid_series = s_rec_series[mask_calc_valid]
+                    q_valid_series = q_calc_series[mask_calc_valid]
                     
-                    is_in_inbound = s_valid.isin(inbound_skus_set)
+                    is_in_inbound = s_valid_series.isin(inbound_skus_set)
                     
+                    # 1. Yang ada di master Staging Inbound -> gabung ke pivot
                     if is_in_inbound.any():
                         pivot_dfs.append(pd.DataFrame({
-                            'SKU_KEY_TEMP': s_valid[is_in_inbound].values,
-                            'QTY_TOTAL': q_valid[is_in_inbound].values
+                            'SKU_KEY_TEMP': s_valid_series[is_in_inbound].tolist(),
+                            'QTY_TOTAL': q_valid_series[is_in_inbound].tolist()
                         }))
                     
+                    # 2. Yang tidak ada di master Inbound -> masuk ke Single Adj
                     not_in_inbound = ~is_in_inbound
                     if not_in_inbound.any():
-                        for b_val, s_val, q_val in zip(b_orig[not_in_inbound], s_orig[not_in_inbound], q_valid[not_in_inbound]):
+                        df_single_add = df_miss_sub[not_in_inbound]
+                        b_vals = df_single_add[col_b_m].fillna('').astype(str).tolist()
+                        s_vals = df_single_add[col_s_m].fillna('').astype(str).tolist()
+                        q_vals = q_valid_series[not_in_inbound].tolist()
+                        for b_val, s_val, q_val in zip(b_vals, s_vals, q_vals):
                             single_list.append({'BIN': b_val, 'SKU': s_val, 'QTY ADJ': q_val})
 
-            # 8. Penggabungan Pivot & Multiple Adjustment
+            # 8. Merge & Pivot Aggregation
             df_mult_res = pd.DataFrame()
             if pivot_dfs:
                 df_p = pd.concat(pivot_dfs, ignore_index=True)
                 df_p_g = df_p.groupby('SKU_KEY_TEMP', as_index=False)['QTY_TOTAL'].sum()
                 mask_has_m = df_p_g['SKU_KEY_TEMP'].isin(inbound_skus_set)
 
-                # Item yang tidak ditemukan di master staging inbound
+                # Item yang tidak ditemukan di master Staging Inbound
                 if (~mask_has_m).any():
-                    miss_skus = df_p_g.loc[~mask_has_m, 'SKU_KEY_TEMP'].values
-                    miss_qtys = df_p_g.loc[~mask_has_m, 'QTY_TOTAL'].values
+                    df_miss_m = df_p_g[~mask_has_m]
+                    miss_skus = df_miss_m['SKU_KEY_TEMP'].tolist()
+                    miss_qtys = df_miss_m['QTY_TOTAL'].tolist()
                     for m_s, m_q in zip(miss_skus, miss_qtys):
                         single_list.append({'BIN': 'STAGING INBOUND (MISS MASTER)', 'SKU': m_s, 'QTY ADJ': m_q})
 
@@ -2385,9 +2395,7 @@ class AppState:
             h_mult, r_mult = fast_preview_data(df_mult_res)
             h_sing, r_sing = fast_preview_data(df_sing_res)
             h_miss, r_miss = fast_preview_data(df_missing)
-            
-            # Pada tabel Cek Stock yang bisa mencapai puluhan ribu baris:
-            # Prioritaskan preview baris yang memiliki selisih/hasil recon agar browser tidak lag
+
             mask_has_diff = df_final_stock["DIFF"].notna() & (df_final_stock["DIFF"] != 0)
             if mask_has_diff.any() and len(df_final_stock) > 2500:
                 disp_stock = df_final_stock[mask_has_diff]
@@ -2447,7 +2455,7 @@ class AppState:
             return True, "Set Up Real + Berhasil Dibuat!"
         except Exception as e:
             return False, f"Gagal Generate Set Up Real +: {e}"
-            
+
     def run_so_step5(self, f_k6, f_adj6):
         try:
             df_outstanding = load_data_from_info(f_k6)
