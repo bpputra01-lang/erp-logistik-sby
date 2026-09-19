@@ -2204,7 +2204,7 @@ class AppState:
             return False, f"Gagal Allocation Step 2: {e}"
 
 # ==========================================================================
-    # STEP 4: FINAL ADJUSTMENT (HIGH-SPEED VECTORIZED ENGINE - BUG FIXED)
+    # STEP 4: FINAL ADJUSTMENT & AUTO GENERATE SET UP REAL + (FIXED 100%)
     # ==========================================================================
     def run_so_step4(self, f_r4, f_s4, f_m5):
         try:
@@ -2280,6 +2280,7 @@ class AppState:
             df_missing.drop(columns=['JOIN_KEY'], errors='ignore', inplace=True)
 
             # 6. Pivot List dari Stock Positif
+            col_bin_stock = df_final_stock.columns[1]
             col_sku_stock = next((c for c in df_final_stock.columns if 'SKU' in str(c).upper()), df_final_stock.columns[2])
             q_so_v = pd.to_numeric(df_final_stock["QTY SO"], errors='coerce').fillna(0.0)
             q_sys_v = pd.to_numeric(df_final_stock.iloc[:, 9], errors='coerce').fillna(0.0)
@@ -2288,14 +2289,31 @@ class AppState:
             mask_plus = ((q_so_v > q_sys_v) | (q_sys_v < 0)) & (diff_v.notna()) & (diff_v > 0)
 
             pivot_dfs = []
+            setup_records = []
+
             if mask_plus.any():
                 df_plus = df_final_stock[mask_plus]
+                sku_clean_p = clean_series(df_plus[col_sku_stock])
+                diff_clean_p = pd.to_numeric(df_plus["DIFF"], errors='coerce').fillna(0.0)
+                bin_dest_p = df_plus[col_bin_stock].fillna('').astype(str).str.strip().str.upper()
+
                 pivot_dfs.append(pd.DataFrame({
-                    'SKU_KEY_TEMP': clean_series(df_plus[col_sku_stock]).tolist(),
-                    'QTY_TOTAL': pd.to_numeric(df_plus["DIFF"], errors='coerce').fillna(0.0).tolist()
+                    'SKU_KEY_TEMP': sku_clean_p.tolist(),
+                    'QTY_TOTAL': diff_clean_p.tolist()
                 }))
 
-            # Master Inbound
+                # Buat baris mutasi Set Up Real +: Dari STAGING INBOUND ke Rak Fisik Asal
+                for b_tgt, s_val, q_val in zip(bin_dest_p, sku_clean_p, diff_clean_p.round().astype(int)):
+                    if b_tgt != 'STAGING INBOUND' and q_val > 0 and s_val != "":
+                        setup_records.append({
+                            'BIN AWAL': 'STAGING INBOUND',
+                            'BIN TUJUAN': b_tgt,
+                            'SKU': s_val,
+                            'QUANTITY': q_val,
+                            'NOTES': 'SET UP REAL +'
+                        })
+
+            # Master Staging Inbound
             inbound_master = df_m5.copy()
             col_sku_inb = next((c for c in inbound_master.columns if 'SKU' in str(c).upper()), inbound_master.columns[2])
             inbound_master['SKU_JOIN'] = clean_series(inbound_master[col_sku_inb])
@@ -2323,10 +2341,11 @@ class AppState:
                     df_miss_sub = df_missing[mask_calc_valid].copy()
                     s_valid_series = s_rec_series[mask_calc_valid]
                     q_valid_series = q_calc_series[mask_calc_valid]
+                    b_targets_m = df_miss_sub[col_b_m].fillna('').astype(str).str.strip().str.upper()
                     
                     is_in_inbound = s_valid_series.isin(inbound_skus_set)
                     
-                    # 1. Yang ada di master Staging Inbound -> gabung ke pivot
+                    # 1. Yang ada di master Inbound -> masuk ke pivot
                     if is_in_inbound.any():
                         pivot_dfs.append(pd.DataFrame({
                             'SKU_KEY_TEMP': s_valid_series[is_in_inbound].tolist(),
@@ -2339,9 +2358,20 @@ class AppState:
                         df_single_add = df_miss_sub[not_in_inbound]
                         b_vals = df_single_add[col_b_m].fillna('').astype(str).tolist()
                         s_vals = df_single_add[col_s_m].fillna('').astype(str).tolist()
-                        q_vals = q_valid_series[not_in_inbound].tolist()
+                        q_vals = q_valid_series[not_in_inbound].round().astype(int).tolist()
                         for b_val, s_val, q_val in zip(b_vals, s_vals, q_vals):
                             single_list.append({'BIN': b_val, 'SKU': s_val, 'QTY ADJ': q_val})
+
+                    # Masukkan juga missing items ke Set Up Real + (Dari STAGING INBOUND ke Rak Asal)
+                    for b_tgt, s_val, q_val in zip(b_targets_m, s_valid_series, q_valid_series.round().astype(int)):
+                        if b_tgt != 'STAGING INBOUND' and q_val > 0 and s_val != "":
+                            setup_records.append({
+                                'BIN AWAL': 'STAGING INBOUND',
+                                'BIN TUJUAN': b_tgt,
+                                'SKU': s_val,
+                                'QUANTITY': q_val,
+                                'NOTES': 'SET UP REAL +'
+                            })
 
             # 8. Merge & Pivot Aggregation
             df_mult_res = pd.DataFrame()
@@ -2378,13 +2408,22 @@ class AppState:
                 df_sing_res[last_c] = pd.to_numeric(df_sing_res[last_c], errors='coerce').fillna(0)
                 df_sing_res = df_sing_res[df_sing_res[last_c] > 0].reset_index(drop=True)
 
-            # 9. Simpan 100% Data Lengkap untuk Tombol Download Excel
+            # 9. Format Tabel Set Up Real + yang Presisi (Grouping agar rapi)
+            if setup_records:
+                df_setup4 = pd.DataFrame(setup_records)
+                df_setup4 = df_setup4.groupby(['BIN AWAL', 'BIN TUJUAN', 'SKU', 'NOTES'], as_index=False)['QUANTITY'].sum()
+                df_setup4 = df_setup4[['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES']]
+            else:
+                df_setup4 = pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
+
+            # 10. Simpan 100% Data Lengkap untuk Tombol Download Excel
             self._raw_df_so_mult = df_mult_res.copy()
             self._raw_df_so_sing = df_sing_res.copy()
             self._raw_df_so_res4 = df_final_stock.copy()
             self._raw_df_so_miss4 = df_missing.copy()
+            self._raw_df_so_setup4 = df_setup4.copy()
 
-            # 10. Optimasi Pengiriman Data Preview ke Browser (Anti-Freeze WebSocket)
+            # 11. Optimasi Data Preview ke Browser
             def fast_preview_data(df, max_rows=None):
                 if df.empty: return [], []
                 preview_df = df if max_rows is None or len(df) <= max_rows else df.head(max_rows)
@@ -2395,13 +2434,10 @@ class AppState:
             h_mult, r_mult = fast_preview_data(df_mult_res)
             h_sing, r_sing = fast_preview_data(df_sing_res)
             h_miss, r_miss = fast_preview_data(df_missing)
+            h_setup4, r_setup4 = fast_preview_data(df_setup4)
 
             mask_has_diff = df_final_stock["DIFF"].notna() & (df_final_stock["DIFF"] != 0)
-            if mask_has_diff.any() and len(df_final_stock) > 2500:
-                disp_stock = df_final_stock[mask_has_diff]
-            else:
-                disp_stock = df_final_stock
-
+            disp_stock = df_final_stock[mask_has_diff] if mask_has_diff.any() and len(df_final_stock) > 2500 else df_final_stock
             h_res4, r_res4 = fast_preview_data(disp_stock, max_rows=3000)
 
             self.df_so_mult_headers.set(h_mult)
@@ -2412,50 +2448,20 @@ class AppState:
             self.df_so_res4_rows.set(r_res4)
             self.df_so_miss4_headers.set(h_miss)
             self.df_so_miss4_rows.set(r_miss)
+            self.df_so_setup4_headers.set(h_setup4)
+            self.df_so_setup4_rows.set(r_setup4)
 
+            # Otomatis langsung siap (tidak perlu klik tombol kedua kali)
             self.so_step4_done.set(True)
+            self.so_step4_setup_done.set(True)
             return True, "Final Adjustment Step 4 Selesai!"
         except Exception as e:
             return False, f"Gagal Step 4: {e}"
 
-    # --- FUNGSI GENERATE SET UP REAL + KE STAGING INBOUND ---
     def run_so_step4_setup_real(self):
-        try:
-            records = []
-            if not self._raw_df_so_mult.empty:
-                col_b = self._raw_df_so_mult.columns[0] if self._raw_df_so_mult.shape[1] > 0 else 'BIN'
-                col_s = self._raw_df_so_mult.columns[1] if self._raw_df_so_mult.shape[1] > 1 else 'SKU'
-                col_q = self._raw_df_so_mult.columns[-1]
-                for _, r in self._raw_df_so_mult.iterrows():
-                    q_val = pd.to_numeric(r[col_q], errors='coerce') or 0
-                    if q_val > 0:
-                        records.append({
-                            'BIN AWAL': str(r[col_b]).strip().upper(),
-                            'BIN TUJUAN': 'STAGING INBOUND',
-                            'SKU': str(r[col_s]).strip().upper(),
-                            'QUANTITY': int(q_val),
-                            'NOTES': 'ADJ PLUS SETUP'
-                        })
-            if not self._raw_df_so_sing.empty:
-                for _, r in self._raw_df_so_sing.iterrows():
-                    q_val = pd.to_numeric(r.get('QTY ADJ', 0), errors='coerce') or 0
-                    if q_val > 0:
-                        records.append({
-                            'BIN AWAL': str(r.get('BIN', '')).strip().upper(),
-                            'BIN TUJUAN': 'STAGING INBOUND',
-                            'SKU': str(r.get('SKU', '')).strip().upper(),
-                            'QUANTITY': int(q_val),
-                            'NOTES': 'ADJ PLUS SETUP (SINGLE)'
-                        })
-            df_setup4 = pd.DataFrame(records) if records else pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
-            self._raw_df_so_setup4 = df_setup4.copy()
-            self.df_so_setup4_headers.set(df_setup4.columns.tolist() if not df_setup4.empty else [])
-            self.df_so_setup4_rows.set(df_setup4.fillna("").astype(str).values.tolist() if not df_setup4.empty else [])
-            self.so_step4_setup_done.set(True)
-            return True, "Set Up Real + Berhasil Dibuat!"
-        except Exception as e:
-            return False, f"Gagal Generate Set Up Real +: {e}"
-
+        self.so_step4_setup_done.set(True)
+        return True, "Set Up Real + Berhasil Dibuat!"
+        
     def run_so_step5(self, f_k6, f_adj6):
         try:
             df_outstanding = load_data_from_info(f_k6)
