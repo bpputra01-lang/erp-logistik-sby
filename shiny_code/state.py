@@ -1928,55 +1928,41 @@ class AppState:
 
 # ==========================================================================
     # STOCK OPNAME ANALYZER (STEP 1 & STEP 2 - DENGAN INTEGRASI STOCK MINUS)
-    # ==========================================================================
-
-    # --- STEP 1: COMPARE SCAN VS STOCK (NOTE: 'STOCK MINUS' HURUF BESAR) ---
+    # ================================================# --- STEP 1: COMPARE SCAN VS STOCK (PATOKAN FORMAT: STOCK SYSTEM) ---
     def run_so_step1(self, f_scan, f_stock, sub_sel, bin_sys_sel):
         try:
-            import re  # Pastikan re di-import
+            import re
 
             df_s_raw = load_data_from_info(f_scan)
             df_t_raw = load_data_from_info(f_stock)
             if df_s_raw.empty or df_t_raw.empty:
                 return False, "File Data Scan dan Stock System tidak boleh kosong!"
 
-            # =========================================================
-            # TARUH FUNGSI NORMALISASI SKU DI SINI
-            # =========================================================
-            def normalize_sku(val):
+            # Helper pembersih dasar teks string
+            def clean_str(val):
                 if pd.isna(val) or val is None:
                     return ""
-                
                 s = str(val).strip().upper()
-                
-                # 1. Tangani akhiran .0 bawaan export float Excel
+                # Tangani float bawaan excel jika tidak sengaja terbaca .0 di akhir
                 if s.endswith('.0') and s[:-2].replace('.', '', 1).isdigit():
                     if isinstance(val, (float, int)) or (isinstance(val, str) and val.endswith('.0')):
                         s = s[:-2]
+                return s
 
-                # 2. Cek apakah representasi angka (bulat maupun size desimal seperti 42.5)
+            # Helper strip leading zero HANYA untuk kunci pencocokan (lookup key)
+            def get_base_numeric_key(s):
+                # Tangani angka bulat atau angka berkoma (misal 42.5)
                 if re.match(r'^\d+(\.\d+)?$', s):
                     if '.' in s:
                         depan, belakang = s.split('.', 1)
                         depan_clean = depan.lstrip('0')
-                        depan_fix = depan_clean if depan_clean != "" else "0"
-                        return f"{depan_fix}.{belakang}"
+                        return f"{depan_clean if depan_clean != '' else '0'}.{belakang}"
                     else:
                         s_clean = s.lstrip('0')
                         return s_clean if s_clean != "" else "0"
-
-                # 3. Jika SKU mengandung huruf, biarkan apa adanya
                 return s
 
-            # 1. Bersihkan Data Scan
-            ds = df_s_raw.iloc[:, [0, 1, 2]].copy()
-            ds.columns = ['BIN', 'SKU', 'QTY_SCAN']
-            ds['BIN'] = ds['BIN'].astype(str).str.strip().str.upper()
-            ds['SKU_RAW'] = ds['SKU'].astype(str).str.strip().str.upper() # Simpan nama SKU asli scan
-            ds['SKU'] = ds['SKU'].apply(normalize_sku)                     # SKU Normal untuk merge
-            ds['QTY_SCAN'] = pd.to_numeric(ds['QTY_SCAN'], errors='coerce').fillna(0)
-
-            # 2. Bersihkan & Filter Stock System
+            # 1. Bersihkan & Filter Stock System Terlebih Dahulu (Sebagai Master Acuan)
             dt = df_t_raw.copy()
             col_b, col_s, col_q_sys = dt.columns[1], dt.columns[2], dt.columns[9]
 
@@ -1986,24 +1972,54 @@ class AppState:
                 dt = dt[dt.iloc[:, 1].astype(str).str.upper().apply(lambda x: any(c.upper() in x for c in bin_sys_sel))]
 
             dt[col_b] = dt[col_b].astype(str).str.strip().str.upper()
-            dt['ORIGINAL_SKU'] = dt[col_s].astype(str).str.strip().str.upper() # Simpan SKU asli sistem
-            dt[col_s] = dt[col_s].apply(normalize_sku)                         # SKU Normal untuk merge
+            dt[col_s] = dt[col_s].apply(clean_str)
             dt[col_q_sys] = pd.to_numeric(dt[col_q_sys], errors='coerce').fillna(0)
 
+            # Master SKU resmi dari Stock System
+            system_skus_set = set(dt[col_s].unique())
+            
+            # Map: {base_key: SKU_RESMI_SISTEM}
+            # Contoh: {"1023232": "01023232", "110212142.5": "0110212142.5"}
+            base_to_system_sku = {}
+            for s_sys in system_skus_set:
+                if s_sys:
+                    k = get_base_numeric_key(s_sys)
+                    base_to_system_sku[k] = s_sys
+
+            # 2. Bersihkan Data Scan & SESUAIKAN DENGAN FORMAT STOCK SYSTEM
+            ds = df_s_raw.iloc[:, [0, 1, 2]].copy()
+            ds.columns = ['BIN', 'SKU', 'QTY_SCAN']
+            ds['BIN'] = ds['BIN'].astype(str).str.strip().str.upper()
+            ds['SKU'] = ds['SKU'].apply(clean_str)
+            ds['QTY_SCAN'] = pd.to_numeric(ds['QTY_SCAN'], errors='coerce').fillna(0)
+
+            # Fungsi cerdas menyesuaikan SKU Scan agar sama persis dengan Stock System
+            def align_scan_sku_to_stock(scan_sku):
+                # A. Jika sudah cocok persis dengan SKU di sistem
+                if scan_sku in system_skus_set:
+                    return scan_sku
+                # B. Jika di sistem ada SKU berawalan '0' (misal scan 1023232 -> stock 01023232)
+                base_k = get_base_numeric_key(scan_sku)
+                if base_k in base_to_system_sku:
+                    return base_to_system_sku[base_k]
+                # C. Jika memang barang baru / tidak ada di sistem
+                return scan_sku
+
+            # Terapkan penyesuaian: SKU scan otomatis bertambah angka 0 jika di stock ada nolnya
+            ds['SKU'] = ds['SKU'].apply(align_scan_sku_to_stock)
+
+            # 3. Aggregasi Stock System
             dt_sub = dt[[col_b, col_s, col_q_sys]].copy()
             dt_sub.columns = ['BIN', 'SKU', 'QTY_SYSTEM']
             dt_grouped = dt_sub.groupby(['BIN', 'SKU'], as_index=False)['QTY_SYSTEM'].sum()
 
-            # Mapping Nama Item (Gunakan SKU yang dinormalisasi agar ketemu namanya)
+            # Mapping Nama Item (Menggunakan SKU resmi sistem)
             item_map = dt[[col_s, dt.columns[4]]].dropna().astype(str)
             item_map.columns = ['SKU', 'NAME']
             item_map['SKU'] = item_map['SKU'].str.strip().str.upper()
             map_dict = item_map.drop_duplicates('SKU').set_index('SKU')['NAME'].to_dict()
 
-            # Mapping SKU Resmi Sistem (untuk menampilkan kembali kode asli sistem)
-            official_sku_map = dt.drop_duplicates(col_s).set_index(col_s)['ORIGINAL_SKU'].to_dict()
-
-            # 3. Compare Scan ke Stock
+            # 4. Compare Scan ke Stock
             res_scan = ds.merge(dt_grouped, on=['BIN', 'SKU'], how='left').fillna(0)
             res_scan['DIFF'] = res_scan['QTY_SCAN'] - res_scan['QTY_SYSTEM']
 
@@ -2027,7 +2043,6 @@ class AppState:
                     unscanned_rows.append({
                         'BIN': b_val,
                         'SKU': s_val,
-                        'SKU_RAW': s_val,
                         'QTY_SCAN': 0,
                         'QTY_SYSTEM': q_sys_val,
                         'DIFF': abs(q_sys_val),
@@ -2040,11 +2055,7 @@ class AppState:
 
             res_scan['ITEM NAME'] = res_scan['SKU'].map(map_dict).fillna("-")
 
-            # Tampilkan SKU menggunakan kode resmi sistem (atau kode scan aslinya)
-            res_scan['SKU'] = res_scan['SKU'].map(official_sku_map).fillna(res_scan['SKU_RAW'])
-            res_scan.drop(columns=['SKU_RAW'], inplace=True, errors='ignore')
-
-            # 4. Compare Stock ke Scan
+            # 5. Compare Stock ke Scan
             ds_g = ds.groupby(['BIN', 'SKU'], as_index=False)['QTY_SCAN'].sum()
             ds_g.columns = ['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN']
 
@@ -2061,12 +2072,7 @@ class AppState:
             dt_merged['NOTE'] = np.select(cond_stock, choices_stock, default="OK")
 
             res_stock = dt_merged.drop(columns=['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN'], errors='ignore')
-
-            # Kembalikan kolom SKU stock system ke kode asli sistem
-            res_stock[col_s] = res_stock['ORIGINAL_SKU']
-            res_stock.drop(columns=['ORIGINAL_SKU'], inplace=True, errors='ignore')
-
-            res_stock['ITEM NAME'] = res_stock[col_s].apply(normalize_sku).map(map_dict).fillna("-")
+            res_stock['ITEM NAME'] = res_stock[col_s].map(map_dict).fillna("-")
 
             # Masukkan REAL + dan STOCK MINUS ke dalam tabel real_plus
             real_plus = res_scan[res_scan['NOTE'].isin(["REAL +", "STOCK MINUS"])].copy()
