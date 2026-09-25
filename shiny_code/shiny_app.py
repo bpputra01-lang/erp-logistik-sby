@@ -2805,7 +2805,10 @@ def server(input: Inputs, output: Outputs, session: Session):
             state.show_error_modal.set(True)
             return
 
-        succ, msg = state.process_balancing_stock(f_stock, f_sales)
+        # Ambil filter Sub Kategori dari input UI
+        sub_filter = input.bs_filter_sub() if "bs_filter_sub" in input else []
+
+        succ, msg = state.process_balancing_stock(f_stock, f_sales, sub_filter)
         if succ:
             state.show_success_modal.set(True)
         else:
