@@ -3133,7 +3133,7 @@ class AppState:
             return False, f"Gagal Match Real & System: {e}"
 
 # ==========================================================================
-    # BALANCING STOCK & DYNAMIC ALLOCATION HYBRID ENGINE (DENGAN FILTER SUB & BIN ASAL)
+    # BALANCING STOCK: ROW-PER-BIN BREAKDOWN ENGINE
     # ==========================================================================
     def process_balancing_stock(self, f_stock, f_sales, sub_filter=None):
         try:
@@ -3194,7 +3194,7 @@ class AppState:
             col_sub_raw = df_stk_raw.iloc[:, 6].astype(str).str.strip().str.upper() if df_stk_raw.shape[1] > 6 else ""
             col_qty_raw = pd.to_numeric(df_stk_raw.iloc[:, 9], errors='coerce').fillna(0)
 
-            # Filter Eksklusi BIN Non-Jual
+            # Filter Eksklusi BIN Non-Jual / Rusak
             excl_kw = "DEFECT|REJECT|KARANTINA|MARKOM|AMP|LIVE|RUSAK"
             mask_valid = ~col_bin_raw.str.contains(excl_kw, na=False) & (col_sku_raw != "") & (col_sku_raw != "NAN")
 
@@ -3210,7 +3210,7 @@ class AppState:
             sku_name_map = df_valid_stk.drop_duplicates('SKU').set_index('SKU')['NAMA'].to_dict()
             sku_sub_map = df_valid_stk.drop_duplicates('SKU').set_index('SKU')['SUB_KATEGORI'].to_dict()
 
-            # Kategorisasi Lokasi BIN
+            # Klasifikasi Lokasi BIN
             is_source = df_valid_stk['BIN'].str.contains('LOG|INB|GL4|GL1-DC|GL3-DC', na=False) & ~df_valid_stk['BIN'].str.contains('OFF|ONL|TOKO|STORE', na=False)
             is_target_off = df_valid_stk['BIN'].str.contains('OFF|TOKO|STORE|GL2-STORE|GUDANG LT.2|OUT', na=False)
             is_target_on = df_valid_stk['BIN'].str.contains('ONL|ONLINE|HUB', na=False)
@@ -3219,7 +3219,7 @@ class AppState:
             df_valid_stk['IS_OFF'] = is_target_off
             df_valid_stk['IS_ON'] = is_target_on
 
-            # Agregasi Stok per SKU
+            # Agregasi Total Stok Seluruh Area per SKU (untuk perhitungan rasio target global)
             sku_agg = df_valid_stk.groupby('SKU').agg(
                 TOTAL_STOCK=('QTY', lambda x: x[x > 0].sum()),
                 STOCK_SOURCE=('QTY', lambda x: x[df_valid_stk.loc[x.index, 'IS_SOURCE'] & (x > 0)].sum()),
@@ -3227,18 +3227,8 @@ class AppState:
                 STOCK_ON_ACTUAL=('QTY', lambda x: x[df_valid_stk.loc[x.index, 'IS_ON'] & (x > 0)].sum())
             ).reset_index()
 
-            # Rincian Lokasi BIN Asal Sumber (LOG / INB)
-            source_stock_df = df_valid_stk[df_valid_stk['IS_SOURCE'] & (df_valid_stk['QTY'] > 0)]
-            
-            # Map untuk daftar seluruh BIN sumber per SKU: "GL4-DC-KL1 (10), INBOUND (5)"
-            source_bins_summary = {}
-            source_bins_dict = {}
-            for (sku_val, bin_val), q_val in source_stock_df.groupby(['SKU', 'BIN'])['QTY'].sum().items():
-                if sku_val not in source_bins_summary:
-                    source_bins_summary[sku_val] = []
-                    source_bins_dict[sku_val] = {}
-                source_bins_summary[sku_val].append(f"{bin_val} ({int(q_val)})")
-                source_bins_dict[sku_val][bin_val] = int(q_val)
+            # Breakdown stok BIN Sumber per baris riil
+            source_rows_df = df_valid_stk[df_valid_stk['IS_SOURCE'] & (df_valid_stk['QTY'] > 0)].groupby(['SKU', 'BIN'], as_index=False)['QTY'].sum()
 
             allocation_rows = []
             refill_instructions = []
@@ -3278,7 +3268,7 @@ class AppState:
                         pct_on, pct_off, pct_log = 0.40, 0.40, 0.20
                         kategori = "BALANCED (40:40:20)"
 
-                # Hitung Qty Ideal Target
+                # Hitung Qty Target Global
                 target_on = int(np.ceil(tot_stk * pct_on))
                 target_off = int(np.ceil(tot_stk * pct_off))
                 target_log = tot_stk - target_on - target_off
@@ -3293,119 +3283,196 @@ class AppState:
 
                 item_desc = sku_name_map.get(sku, "-")
                 item_sub = sku_sub_map.get(sku, "-")
-                asal_bin_desc = ", ".join(source_bins_summary.get(sku, [])) if sku in source_bins_summary else "-"
 
-                # Matrix Alokasi dengan Kolom BIN Asal & Sub Kategori
-                allocation_rows.append({
-                    "SKU": sku,
-                    "SUB KATEGORI": item_sub,
-                    "ITEM NAME": item_desc,
-                    "ASAL BIN SUMBER (LOG/INB)": asal_bin_desc,
-                    "TOTAL STOCK": tot_stk,
-                    "SALES ONL": int(s_on),
-                    "SALES OFF": int(s_off),
-                    "KLASIFIKASI": kategori,
-                    "IDEAL LOG": target_log,
-                    "IDEAL OFF": target_off,
-                    "IDEAL ONL": target_on,
-                    "ACTUAL SOURCE": stk_src,
-                    "ACTUAL OFF": act_off,
-                    "ACTUAL ONL": act_on
-                })
+                # Ambil seluruh baris BIN sumber fisik untuk SKU ini
+                sku_sources = source_rows_df[source_rows_df['SKU'] == sku].to_dict(orient='records')
 
-                # Copy stok sumber per BIN untuk instruksi mutasi
-                avail_source_bins = dict(source_bins_dict.get(sku, {}))
+                # ==============================================================
+                # 1. PEMECAHAN BARIS MATRIX ALOKASI SESUAI BIN SUMBER FISIK
+                # ==============================================================
+                if sku_sources:
+                    # Alokasikan ideal quota secara berurutan ke masing-masing BIN sumber
+                    rem_log = target_log
+                    rem_off = target_off
+                    rem_on = target_on
 
-                # Helper penarik stok dari BIN sumber secara berurutan
-                def take_stock_from_source(needed_qty):
-                    allocated_list = []
+                    for src_r in sku_sources:
+                        b_name = src_r['BIN']
+                        b_qty = int(src_r['QTY'])
+
+                        # Hitung berapa porsi BIN ini menyumbang untuk Logistik, Offline, Online
+                        avail_in_bin = b_qty
+
+                        # 1. Jatah untuk Buffer Logistik
+                        portion_log = min(rem_log, avail_in_bin)
+                        avail_in_bin -= portion_log
+                        rem_log -= portion_log
+
+                        # 2. Jatah untuk Offline Store
+                        portion_off = min(rem_off, avail_in_bin)
+                        avail_in_bin -= portion_off
+                        rem_off -= portion_off
+
+                        # 3. Jatah untuk Online Hub
+                        portion_on = min(rem_on, avail_in_bin)
+                        avail_in_bin -= portion_on
+                        rem_on -= portion_on
+
+                        # Sisa kuota (jika total stok sumber > target yang dihitung)
+                        if avail_in_bin > 0:
+                            portion_log += avail_in_bin
+
+                        allocation_rows.append({
+                            "SKU": sku,
+                            "SUB KATEGORI": item_sub,
+                            "ITEM NAME": item_desc,
+                            "ASAL BIN SUMBER (LOG/INB)": b_name,
+                            "QTY DI BIN INI": b_qty,
+                            "TOTAL STOK SKU": tot_stk,
+                            "SALES ONL": int(s_on),
+                            "SALES OFF": int(s_off),
+                            "KLASIFIKASI": kategori,
+                            "ALOKASI LOG": portion_log,
+                            "ALOKASI OFF": portion_off,
+                            "ALOKASI ONL": portion_on,
+                            "ACTUAL OFF": act_off,
+                            "ACTUAL ONL": act_on
+                        })
+                else:
+                    # Kasus jika stok hanya ada di BIN Offline/Online (stok sumber 0)
+                    allocation_rows.append({
+                        "SKU": sku,
+                        "SUB KATEGORI": item_sub,
+                        "ITEM NAME": item_desc,
+                        "ASAL BIN SUMBER (LOG/INB)": "TIDAK ADA STOK SUMBER (0 QTY)",
+                        "QTY DI BIN INI": 0,
+                        "TOTAL STOK SKU": tot_stk,
+                        "SALES ONL": int(s_on),
+                        "SALES OFF": int(s_off),
+                        "KLASIFIKASI": kategori,
+                        "ALOKASI LOG": target_log,
+                        "ALOKASI OFF": target_off,
+                        "ALOKASI ONL": target_on,
+                        "ACTUAL OFF": act_off,
+                        "ACTUAL ONL": act_on
+                    })
+
+                # ==============================================================
+                # 2. PEMECAHAN REFILL & DEFISIT SESUAI DENGAN BIN SUMBER
+                # ==============================================================
+                # Siapkan saldo qty per BIN sumber untuk dieksekusi mutasi
+                bin_stock_map = {r['BIN']: int(r['QTY']) for r in sku_sources}
+
+                def take_stock_from_bins(needed_qty):
+                    allocated = []
                     rem = needed_qty
-                    for b_src, q_avail in list(avail_source_bins.items()):
+                    for b_src, q_avail in list(bin_stock_map.items()):
                         if rem <= 0: break
                         if q_avail > 0:
                             take = min(rem, q_avail)
-                            allocated_list.append((b_src, take))
-                            avail_source_bins[b_src] -= take
+                            allocated.append((b_src, take, q_avail))
+                            bin_stock_map[b_src] -= take
                             rem -= take
-                    return allocated_list
+                    return allocated
 
-                # 1. Cek Kebutuhan Refill Offline
+                # A. Kebutuhan Refill Offline (Store)
                 if act_off < target_off:
                     defisit_off = target_off - act_off
                     status_off = "HABIS DI STORE (0 QTY)" if act_off == 0 else "KURANG DARI TARGET IDEAL"
 
-                    # Ambil stok dari BIN sumber
-                    allocated_off = take_stock_from_source(defisit_off)
-                    qty_refill_off = sum(t[1] for t in allocated_off)
+                    alloc_off = take_stock_from_bins(defisit_off)
+                    if alloc_off:
+                        for b_src, q_take, q_orig_bin in alloc_off:
+                            if q_take > 0:
+                                off_missing_list.append({
+                                    "SKU": sku,
+                                    "SUB KATEGORI": item_sub,
+                                    "ITEM NAME": item_desc,
+                                    "ASAL BIN SUMBER": b_src,
+                                    "STOK DI BIN SUMBER": q_orig_bin,
+                                    "STOK OFFLINE SAAT INI": act_off,
+                                    "TARGET IDEAL OFFLINE": target_off,
+                                    "DEFISIT QTY": defisit_off,
+                                    "QTY DIAMBIL DARI BIN INI": q_take,
+                                    "STATUS": status_off
+                                })
+                                refill_instructions.append({
+                                    "BIN AWAL": b_src,
+                                    "BIN TUJUAN": "TOKO / OFFLINE ZONE",
+                                    "SKU": sku,
+                                    "SUB KATEGORI": item_sub,
+                                    "ITEM NAME": item_desc,
+                                    "QTY REFILL": q_take,
+                                    "NOTES": f"BALANCING OFFLINE ({status_off})"
+                                })
+                    else:
+                        # Jika butuh refill tapi tidak ada stok di sumber
+                        off_missing_list.append({
+                            "SKU": sku,
+                            "SUB KATEGORI": item_sub,
+                            "ITEM NAME": item_desc,
+                            "ASAL BIN SUMBER": "TIDAK ADA STOK SUMBER",
+                            "STOK DI BIN SUMBER": 0,
+                            "STOK OFFLINE SAAT INI": act_off,
+                            "TARGET IDEAL OFFLINE": target_off,
+                            "DEFISIT QTY": defisit_off,
+                            "QTY DIAMBIL DARI BIN INI": 0,
+                            "STATUS": f"{status_off} (STOK SUMBER KOSONG)"
+                        })
 
-                    off_missing_list.append({
-                        "SKU": sku,
-                        "SUB KATEGORI": item_sub,
-                        "ITEM NAME": item_desc,
-                        "ASAL BIN SUMBER (LOG/INB)": asal_bin_desc,
-                        "STOK OFFLINE SAAT INI": act_off,
-                        "TARGET IDEAL OFFLINE": target_off,
-                        "DEFISIT QTY": defisit_off,
-                        "TOTAL STOK SUMBER": stk_src,
-                        "QTY DAPAT DI-REFILL": qty_refill_off,
-                        "STATUS": status_off
-                    })
-
-                    for b_src, q_take in allocated_off:
-                        if q_take > 0:
-                            refill_instructions.append({
-                                "BIN AWAL": b_src,
-                                "BIN TUJUAN": "TOKO / OFFLINE ZONE",
-                                "SKU": sku,
-                                "SUB KATEGORI": item_sub,
-                                "ITEM NAME": item_desc,
-                                "QTY REFILL": q_take,
-                                "NOTES": f"BALANCING OFFLINE ({status_off})"
-                            })
-
-                # 2. Cek Kebutuhan Refill Online
+                # B. Kebutuhan Refill Online (Hub)
                 if act_on < target_on:
                     defisit_on = target_on - act_on
                     status_on = "HABIS DI ONLINE (0 QTY)" if act_on == 0 else "KURANG DARI TARGET IDEAL"
 
-                    # Ambil sisa stok dari BIN sumber
-                    allocated_on = take_stock_from_source(defisit_on)
-                    qty_refill_on = sum(t[1] for t in allocated_on)
-
-                    on_missing_list.append({
-                        "SKU": sku,
-                        "SUB KATEGORI": item_sub,
-                        "ITEM NAME": item_desc,
-                        "ASAL BIN SUMBER (LOG/INB)": asal_bin_desc,
-                        "STOK ONLINE SAAT INI": act_on,
-                        "TARGET IDEAL ONLINE": target_on,
-                        "DEFISIT QTY": defisit_on,
-                        "TOTAL STOK SUMBER": stk_src,
-                        "QTY DAPAT DI-REFILL": qty_refill_on,
-                        "STATUS": status_on
-                    })
-
-                    for b_src, q_take in allocated_on:
-                        if q_take > 0:
-                            refill_instructions.append({
-                                "BIN AWAL": b_src,
-                                "BIN TUJUAN": "ONLINE / HUB ZONE",
-                                "SKU": sku,
-                                "SUB KATEGORI": item_sub,
-                                "ITEM NAME": item_desc,
-                                "QTY REFILL": q_take,
-                                "NOTES": f"BALANCING ONLINE ({status_on})"
-                            })
+                    alloc_on = take_stock_from_bins(defisit_on)
+                    if alloc_on:
+                        for b_src, q_take, q_orig_bin in alloc_on:
+                            if q_take > 0:
+                                on_missing_list.append({
+                                    "SKU": sku,
+                                    "SUB KATEGORI": item_sub,
+                                    "ITEM NAME": item_desc,
+                                    "ASAL BIN SUMBER": b_src,
+                                    "STOK DI BIN SUMBER": q_orig_bin,
+                                    "STOK ONLINE SAAT INI": act_on,
+                                    "TARGET IDEAL ONLINE": target_on,
+                                    "DEFISIT QTY": defisit_on,
+                                    "QTY DIAMBIL DARI BIN INI": q_take,
+                                    "STATUS": status_on
+                                })
+                                refill_instructions.append({
+                                    "BIN AWAL": b_src,
+                                    "BIN TUJUAN": "ONLINE / HUB ZONE",
+                                    "SKU": sku,
+                                    "SUB KATEGORI": item_sub,
+                                    "ITEM NAME": item_desc,
+                                    "QTY REFILL": q_take,
+                                    "NOTES": f"BALANCING ONLINE ({status_on})"
+                                })
+                    else:
+                        on_missing_list.append({
+                            "SKU": sku,
+                            "SUB KATEGORI": item_sub,
+                            "ITEM NAME": item_desc,
+                            "ASAL BIN SUMBER": "TIDAK ADA STOK SUMBER",
+                            "STOK DI BIN SUMBER": 0,
+                            "STOK ONLINE SAAT INI": act_on,
+                            "TARGET IDEAL ONLINE": target_on,
+                            "DEFISIT QTY": defisit_on,
+                            "QTY DIAMBIL DARI BIN INI": 0,
+                            "STATUS": f"{status_on} (STOK SUMBER KOSONG)"
+                        })
 
             df_alloc = pd.DataFrame(allocation_rows)
             df_refill = pd.DataFrame(refill_instructions)
             df_off_miss = pd.DataFrame(off_missing_list)
             df_on_miss = pd.DataFrame(on_missing_list)
 
-            tot_sku_count = len(df_alloc)
-            tot_stock_pcs = int(df_alloc['TOTAL STOCK'].sum()) if not df_alloc.empty else 0
-            need_off_sku = len(df_off_miss)
-            need_on_sku = len(df_on_miss)
+            tot_sku_count = sku_agg['SKU'].nunique()
+            tot_stock_pcs = int(sku_agg['TOTAL_STOCK'].sum()) if not sku_agg.empty else 0
+            need_off_sku = df_off_miss['SKU'].nunique() if not df_off_miss.empty else 0
+            need_on_sku = df_on_miss['SKU'].nunique() if not df_on_miss.empty else 0
             total_refill_qty = int(df_refill['QTY REFILL'].sum()) if not df_refill.empty else 0
 
             ready_off = tot_sku_count - need_off_sku
