@@ -2747,8 +2747,8 @@ def server(input: Inputs, output: Outputs, session: Session):
             
             # --- 5 KOTAK METRIK DARK THEME LENGKAP ---
             ui.div(
-                dark_metric_box("📦 TOTAL QTY REAL + (KOLOM M)", f"{state.crs_total_real():,} QTY", "#C5A059"),
-                dark_metric_box("💻 TOTAL QTY SYSTEM + (KOLOM L)", f"{state.crs_total_system():,} QTY", "#3182CE"),
+                dark_metric_box("📦 TOTAL QTY REAL +", f"{state.crs_total_real():,} QTY", "#C5A059"),
+                dark_metric_box("💻 TOTAL QTY SYSTEM", f"{state.crs_total_system():,} QTY", "#3182CE"),
                 dark_metric_box("✅ TOTAL MATCHED", f"{state.crs_total_matched():,} QTY", "#10B981"),
                 dark_metric_box("⚠️ TOTAL UNMATCHED", f"{state.crs_total_unmatched():,} QTY", "#E53E3E"),
                 dark_metric_box("🏪 SISA QTY SYSTEM", f"{state.crs_system_left():,} QTY", "#DD6B20"),
