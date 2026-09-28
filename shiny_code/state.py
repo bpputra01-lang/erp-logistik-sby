@@ -3042,28 +3042,78 @@ class AppState:
         except Exception as e:
             return False, f"Gagal Memproses Reversal: {e}"
 # ==========================================================================
-    # CROSS CHECK REAL & SYSTEM (INSTANT ENGINE)
+    # CROSS CHECK REAL & SYSTEM (FLEXIBLE COLUMN FINDER & IMMUNE TO FORMAT ERRORS)
     # ==========================================================================
     def process_cross_check_real_system(self, f_sys, f_real):
         try:
-            df_sys_raw = load_data_from_info(f_sys)
-            df_real_raw = load_data_from_info(f_real)
+            # 1. Pembaca File Fleksibel
+            def flexible_read(f_info):
+                if not f_info: return pd.DataFrame()
+                path = f_info[0]["datapath"]
+                name = f_info[0]["name"].lower()
+                df = pd.DataFrame()
+
+                if name.endswith(('.xlsx', '.xls', '.xlsm')):
+                    try:
+                        df = pd.read_excel(path, engine='calamine')
+                    except Exception:
+                        df = pd.read_excel(path, engine='openpyxl')
+                else:
+                    try:
+                        df = pd.read_csv(path, sep=None, engine='python')
+                    except Exception:
+                        try:
+                            df = pd.read_csv(path, sep=';')
+                        except Exception:
+                            df = pd.read_csv(path)
+
+                # Bersihkan kolom tanpa nama (unnamed)
+                df = df.loc[:, ~df.columns.astype(str).str.contains('^Unnamed')]
+                return df
+
+            df_sys_raw = flexible_read(f_sys)
+            df_real_raw = flexible_read(f_real)
 
             if df_sys_raw.empty or df_real_raw.empty:
-                return False, "Kedua file (Laporan System & Real) wajib diupload!"
+                return False, "Kedua file (Laporan System & Real) wajib diupload dan tidak boleh kosong!"
 
-            if df_sys_raw.shape[1] < 11:
-                return False, "File System kurang dari 11 kolom (Kolom A=Cabang, D=SKU, K=Qty)!"
-            if df_real_raw.shape[1] < 13:
-                return False, "File Real kurang dari 13 kolom (Kolom A=Cabang, E=SKU, M=Qty)!"
+            # 2. Helper Deteksi Kolom Dinamis Berdasarkan Keyword
+            def get_col_series(df, keywords, default_idx):
+                for col in df.columns:
+                    col_str = str(col).strip().upper()
+                    if any(k in col_str for k in keywords):
+                        return df[col]
+                # Fallback ke indeks jika keyword tidak ketemu
+                if df.shape[1] > default_idx:
+                    return df.iloc[:, default_idx]
+                return df.iloc[:, -1]
 
-            cab_sys_arr = df_sys_raw.iloc[:, 0].astype(str).str.strip().str.upper().to_numpy()
-            sku_sys_arr = df_sys_raw.iloc[:, 3].astype(str).str.strip().str.upper().to_numpy()
-            qty_sys_arr = pd.to_numeric(df_sys_raw.iloc[:, 10], errors='coerce').fillna(0).to_numpy()
+            # 3. Deteksi Kolom File System
+            cab_sys_s = get_col_series(df_sys_raw, ['CABANG', 'STORE', 'BRANCH'], 0)
+            sku_sys_s = get_col_series(df_sys_raw, ['SKU', 'ITEM CODE', 'BARCODE'], 3)
+            qty_sys_s = get_col_series(df_sys_raw, ['QTY SYSTEM', 'QTY SYS', 'QUANTITY', 'QTY', 'JUMLAH'], 10)
 
-            cab_real_arr = df_real_raw.iloc[:, 0].astype(str).str.strip().str.upper().to_numpy()
-            sku_real_arr = df_real_raw.iloc[:, 4].astype(str).str.strip().str.upper().to_numpy()
-            qty_real_arr = pd.to_numeric(df_real_raw.iloc[:, 12], errors='coerce').fillna(0).to_numpy()
+            # 4. Deteksi Kolom File Real
+            cab_real_s = get_col_series(df_real_raw, ['CABANG', 'STORE', 'BRANCH'], 0)
+            sku_real_s = get_col_series(df_real_raw, ['SKU', 'ITEM CODE', 'BARCODE'], 4)
+            qty_real_s = get_col_series(df_real_raw, ['QTY REAL', 'QTY SCAN', 'QUANTITY', 'QTY', 'JUMLAH'], 12)
+
+            # Helper pembersih kode SKU (hapus .0 bawaan float Excel)
+            def clean_sku_val(val):
+                if pd.isna(val) or val is None:
+                    return ""
+                s = str(val).strip().upper()
+                if s.endswith('.0') and s[:-2].replace('.', '', 1).isdigit():
+                    s = s[:-2]
+                return s
+
+            cab_sys_arr = cab_sys_s.astype(str).str.strip().str.upper().to_numpy()
+            sku_sys_arr = sku_sys_s.apply(clean_sku_val).to_numpy()
+            qty_sys_arr = pd.to_numeric(qty_sys_s, errors='coerce').fillna(0).to_numpy()
+
+            cab_real_arr = cab_real_s.astype(str).str.strip().str.upper().to_numpy()
+            sku_real_arr = sku_real_s.apply(clean_sku_val).to_numpy()
+            qty_real_arr = pd.to_numeric(qty_real_s, errors='coerce').fillna(0).to_numpy()
 
             # Hash Map O(1) Lookup: {SKU: {CABANG: QTY}}
             system_pool = {}
