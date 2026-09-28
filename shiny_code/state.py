@@ -3049,7 +3049,7 @@ class AppState:
         except Exception as e:
             return False, f"Gagal Memproses Reversal: {e}"
 # ==========================================================================
-    # CROSS CHECK REAL & SYSTEM (FIXED AUTO-DETECT QTY COLUMN & MATCH RESTORED)
+    # CROSS CHECK REAL & SYSTEM (DENGAN QTY ADJ REAL + DAN QTY ADJ SYSTEM +)
     # ==========================================================================
     def process_cross_check_real_system(self, f_sys, f_real):
         try:
@@ -3059,55 +3059,48 @@ class AppState:
             if df_sys_raw.empty or df_real_raw.empty:
                 return False, "Kedua file (Laporan System & Real) wajib diupload!"
 
-            # Helper deteksi kolom cerdas (prioritaskan nama header, fallback ke indeks yang ada isinya)
+            # Helper deteksi kolom cerdas (prioritaskan header, fallback ke indeks berangka)
             def find_qty_series(df, preferred_indices):
-                # 1. Coba cari berdasarkan nama header kolom yang mengandung 'QTY' / 'JUMLAH'
                 for col in df.columns:
                     col_name = str(col).strip().upper()
                     if any(k in col_name for k in ['QTY', 'QUANTITY', 'JUMLAH', 'TOTAL']):
                         s = pd.to_numeric(df[col], errors='coerce').fillna(0)
                         if s.sum() > 0:
                             return s
-
-                # 2. Coba indeks yang disarankan (misal index 10 / Kolom K, atau index 11 / Kolom L)
                 for idx in preferred_indices:
                     if df.shape[1] > idx:
                         s = pd.to_numeric(df.iloc[:, idx], errors='coerce').fillna(0)
                         if s.sum() > 0:
                             return s
-
-                # 3. Fallback jika semua nol, ambil indeks pertama yang valid
                 fallback_idx = preferred_indices[0] if df.shape[1] > preferred_indices[0] else -1
                 return pd.to_numeric(df.iloc[:, fallback_idx], errors='coerce').fillna(0)
 
             # File System: Kolom A=Cabang (idx 0), Kolom D=SKU (idx 3)
             cab_sys_arr = df_sys_raw.iloc[:, 0].astype(str).str.strip().str.upper().to_numpy()
             sku_sys_arr = df_sys_raw.iloc[:, 3].astype(str).str.split('.').str[0].str.strip().str.upper().to_numpy()
-            
-            # Cek otomatis QTY System (Cek Kolom L/idx 11 dulu, jika 0 otomatis ambil Kolom K/idx 10 seperti kode lama)
             qty_sys_series = find_qty_series(df_sys_raw, [11, 10, 9])
             qty_sys_arr = qty_sys_series.to_numpy()
 
             # File Real: Kolom A=Cabang (idx 0), Kolom E=SKU (idx 4)
             cab_real_arr = df_real_raw.iloc[:, 0].astype(str).str.strip().str.upper().to_numpy()
             sku_real_arr = df_real_raw.iloc[:, 4].astype(str).str.split('.').str[0].str.strip().str.upper().to_numpy()
-            
-            # Cek QTY Real (Cek Kolom M/idx 12)
             qty_real_series = find_qty_series(df_real_raw, [12, 11, 10])
             qty_real_arr = qty_real_series.to_numpy()
 
-            # Hitung Total Keseluruhan Qty System (+) dan Real (+)
+            # Total Ringkasan Metrik
             total_qty_system_plus = int(np.sum(qty_sys_arr))
             total_qty_real_plus = int(np.sum(qty_real_arr))
 
-            # Hash Map O(1) Lookup: {SKU: {CABANG: QTY}}
+            # Pool System: simpan sisa kuota dan simpan QTY ASLI AWAL sistem
             system_pool = {}
+            original_sys_qty = {} # {(SKU, CABANG): TOTAL_QTY_AWAL}
             for i in range(len(sku_sys_arr)):
                 s, q, c = sku_sys_arr[i], qty_sys_arr[i], cab_sys_arr[i]
                 if q > 0 and s not in ("", "NAN", "NONE"):
                     if s not in system_pool:
                         system_pool[s] = {}
                     system_pool[s][c] = system_pool[s].get(c, 0.0) + q
+                    original_sys_qty[(s, c)] = original_sys_qty.get((s, c), 0.0) + q
 
             matched_records = []
             total_allocated_qty = 0
@@ -3128,7 +3121,10 @@ class AppState:
                         pool_sku[cab_r] -= take
                         qty_sisa -= take
                         total_allocated_qty += take
-                        matched_records.append((sku_r, cab_r, cab_r, int(take), "MATCH PERFECT"))
+                        q_sys_initial = int(original_sys_qty.get((sku_r, cab_r), 0))
+                        matched_records.append((
+                            sku_r, cab_r, cab_r, int(qty_r), q_sys_initial, int(take), "MATCH PERFECT"
+                        ))
 
                     # 2. Lintas Cabang (Cross-Branch)
                     if qty_sisa > 0:
@@ -3138,20 +3134,29 @@ class AppState:
                                 pool_sku[cab_other] -= take
                                 qty_sisa -= take
                                 total_allocated_qty += take
-                                matched_records.append((sku_r, cab_r, cab_other, int(take), "MATCH CROSS-BRANCH"))
+                                q_sys_initial = int(original_sys_qty.get((sku_r, cab_other), 0))
+                                matched_records.append((
+                                    sku_r, cab_r, cab_other, int(qty_r), q_sys_initial, int(take), "MATCH CROSS-BRANCH"
+                                ))
                                 if qty_sisa <= 0:
                                     break
 
                 # 3. Unmatched
                 if qty_sisa > 0:
-                    matched_records.append((sku_r, cab_r, "TIDAK KETEMU / SYSTEM HABIS", int(qty_sisa), "UNMATCHED / NO SYSTEM QTY"))
+                    matched_records.append((
+                        sku_r, cab_r, "TIDAK KETEMU / SYSTEM HABIS", int(qty_r), 0, int(qty_sisa), "UNMATCHED / NO SYSTEM QTY"
+                    ))
 
             total_system_left = sum(sum(branches.values()) for branches in system_pool.values())
 
-            headers = ["SKU", "Cabang Real", "Cabang System", "Qty Match", "Status"]
+            # Header baru memuat Qty Adj Real + dan Qty Adj System +
+            headers = [
+                "SKU", "Cabang Real", "Cabang System", 
+                "Qty Adj Real +", "Qty Adj System +", "Qty Match", "Status"
+            ]
             df_all = pd.DataFrame(matched_records, columns=headers) if matched_records else pd.DataFrame(columns=headers)
 
-            # TAB 2: HANYA YANG MATCH CROSS-BRANCH (Cabang Real != Cabang System)
+            # TAB 2: Hanya Cross-Branch (Cabang Real != Cabang System)
             df_cross = df_all[(df_all["Status"] == "MATCH CROSS-BRANCH") & (df_all["Cabang Real"] != df_all["Cabang System"])].copy()
 
             # Set Reactive Values
