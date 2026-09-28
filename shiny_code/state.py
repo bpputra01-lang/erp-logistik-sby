@@ -374,6 +374,7 @@ class AppState:
         # --- CROSS CHECK REAL & SYSTEM (MATCHING KARANTINA) ---
         self.crs_processed = reactive.Value(False)
         self.crs_total_real = reactive.Value(0)
+        self.crs_total_system = reactive.Value(0)       # <-- TAMBAHAN: Qty System + (Kolom L)
         self.crs_total_matched = reactive.Value(0)
         self.crs_total_unmatched = reactive.Value(0)
         self.crs_system_left = reactive.Value(0)
@@ -381,7 +382,13 @@ class AppState:
 
         self.df_crs_headers = reactive.Value([])
         self.df_crs_rows = reactive.Value([])
+        
+        # State Tab 2: Khusus Match Lintas Cabang (Beda Cabang Saja)
+        self.df_crs_cross_headers = reactive.Value([])  # <-- TAMBAHAN: Header Tab 2
+        self.df_crs_cross_rows = reactive.Value([])     # <-- TAMBAHAN: Rows Tab 2
+        
         self._raw_df_crs_all = pd.DataFrame()
+        self._raw_df_crs_cross = pd.DataFrame()        # <-- TAMBAHAN: Raw DF Tab 2
         self._raw_df_crs_filtered = pd.DataFrame()
 
         # --- BALANCING STOCK & DYNAMIC ALLOCATION STATE ---
@@ -3042,7 +3049,7 @@ class AppState:
         except Exception as e:
             return False, f"Gagal Memproses Reversal: {e}"
 # ==========================================================================
-    # CROSS CHECK REAL & SYSTEM (INSTANT ENGINE)
+    # CROSS CHECK REAL & SYSTEM (INSTANT ENGINE DENGAN TAB CROSS-BRANCH)
     # ==========================================================================
     def process_cross_check_real_system(self, f_sys, f_real):
         try:
@@ -3052,18 +3059,25 @@ class AppState:
             if df_sys_raw.empty or df_real_raw.empty:
                 return False, "Kedua file (Laporan System & Real) wajib diupload!"
 
-            if df_sys_raw.shape[1] < 11:
-                return False, "File System kurang dari 11 kolom (Kolom A=Cabang, D=SKU, K=Qty)!"
+            if df_sys_raw.shape[1] < 12:
+                return False, "File System kurang dari 12 kolom (Kolom A=Cabang, D=SKU, L=Qty System+)!"
             if df_real_raw.shape[1] < 13:
-                return False, "File Real kurang dari 13 kolom (Kolom A=Cabang, E=SKU, M=Qty)!"
+                return False, "File Real kurang dari 13 kolom (Kolom A=Cabang, E=SKU, M=Qty Real+)!"
 
+            # Format Acuan Kolom:
+            # File System: Kolom A (idx 0) = Cabang, Kolom D (idx 3) = SKU, Kolom L (idx 11) = Qty System +
             cab_sys_arr = df_sys_raw.iloc[:, 0].astype(str).str.strip().str.upper().to_numpy()
             sku_sys_arr = df_sys_raw.iloc[:, 3].astype(str).str.strip().str.upper().to_numpy()
-            qty_sys_arr = pd.to_numeric(df_sys_raw.iloc[:, 10], errors='coerce').fillna(0).to_numpy()
+            qty_sys_arr = pd.to_numeric(df_sys_raw.iloc[:, 11], errors='coerce').fillna(0).to_numpy()
 
+            # File Real: Kolom A (idx 0) = Cabang, Kolom E (idx 4) = SKU, Kolom M (idx 12) = Qty Real +
             cab_real_arr = df_real_raw.iloc[:, 0].astype(str).str.strip().str.upper().to_numpy()
             sku_real_arr = df_real_raw.iloc[:, 4].astype(str).str.strip().str.upper().to_numpy()
             qty_real_arr = pd.to_numeric(df_real_raw.iloc[:, 12], errors='coerce').fillna(0).to_numpy()
+
+            # Hitung Total Keseluruhan Qty System (+) dan Real (+)
+            total_qty_system_plus = int(np.sum(qty_sys_arr))
+            total_qty_real_plus = int(np.sum(qty_real_arr))
 
             # Hash Map O(1) Lookup: {SKU: {CABANG: QTY}}
             system_pool = {}
@@ -3075,7 +3089,6 @@ class AppState:
                     system_pool[s][c] = system_pool[s].get(c, 0.0) + q
 
             matched_records = []
-            total_real_qty = 0
             total_allocated_qty = 0
 
             for i in range(len(sku_real_arr)):
@@ -3083,7 +3096,6 @@ class AppState:
                 if not sku_r or sku_r in ("", "NAN", "NONE") or qty_r <= 0:
                     continue
 
-                total_real_qty += qty_r
                 qty_sisa = qty_r
                 pool_sku = system_pool.get(sku_r)
 
@@ -3116,16 +3128,26 @@ class AppState:
             total_system_left = sum(sum(branches.values()) for branches in system_pool.values())
 
             headers = ["SKU", "Cabang Real", "Cabang System", "Qty Match", "Status"]
-            df_res = pd.DataFrame(matched_records, columns=headers) if matched_records else pd.DataFrame(columns=headers)
+            df_all = pd.DataFrame(matched_records, columns=headers) if matched_records else pd.DataFrame(columns=headers)
 
-            self.crs_total_real.set(int(total_real_qty))
+            # TAB 2: HANYA YANG MATCH CROSS-BRANCH (Cabang Real != Cabang System)
+            df_cross = df_all[(df_all["Status"] == "MATCH CROSS-BRANCH") & (df_all["Cabang Real"] != df_all["Cabang System"])].copy()
+
+            # Set Reactive Values
+            self.crs_total_real.set(total_qty_real_plus)
+            self.crs_total_system.set(total_qty_system_plus)
             self.crs_total_matched.set(int(total_allocated_qty))
-            self.crs_total_unmatched.set(int(total_real_qty - total_allocated_qty))
+            self.crs_total_unmatched.set(int(total_qty_real_plus - total_allocated_qty))
             self.crs_system_left.set(int(total_system_left))
 
-            self._raw_df_crs_all = df_res.copy()
+            self._raw_df_crs_all = df_all.copy()
+            self._raw_df_crs_cross = df_cross.copy()
+
             self.df_crs_headers.set(headers)
-            self.df_crs_rows.set(df_res.fillna("").astype(str).values.tolist())
+            self.df_crs_rows.set(df_all.fillna("").astype(str).values.tolist())
+
+            self.df_crs_cross_headers.set(headers)
+            self.df_crs_cross_rows.set(df_cross.fillna("").astype(str).values.tolist())
 
             self.crs_processed.set(True)
             return True, "Matching Selesai!"
