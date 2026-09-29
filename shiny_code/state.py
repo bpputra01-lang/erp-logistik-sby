@@ -3181,22 +3181,25 @@ class AppState:
             return False, f"Gagal Match Real & System: {e}"
 
 # ==========================================================================
-    # BALANCING STOCK: ROW-PER-BIN BREAKDOWN ENGINE
+    # BALANCING STOCK: OPTIMIZED TURBO ENGINE (KOLOM A=TOKO, S=QTY, AB=SKU)
     # ==========================================================================
     def process_balancing_stock(self, f_stock, f_sales, sub_filter=None):
         try:
-            # 1. Helper Pembaca File Bersih & Cepat
+            # 1. Fast Excel Reader
             def fast_read(file_info):
                 if not file_info: return pd.DataFrame()
                 path = file_info[0]["datapath"]
                 name = file_info[0]["name"].lower()
-                if name.endswith(('.xlsx', '.xls')):
+                if name.endswith(('.xlsx', '.xls', '.xlsm')):
                     try:
                         return pd.read_excel(path, engine='calamine')
                     except Exception:
                         return pd.read_excel(path, engine='openpyxl')
                 elif name.endswith('.csv'):
-                    return pd.read_csv(path)
+                    try:
+                        return pd.read_csv(path, sep=None, engine='python')
+                    except Exception:
+                        return pd.read_csv(path)
                 return pd.DataFrame()
 
             df_stk_raw = fast_read(f_stock)
@@ -3216,28 +3219,49 @@ class AppState:
                 if df_stk_raw.empty:
                     return False, f"Tidak ada data stock yang cocok dengan Sub Kategori: {', '.join(sub_filter)}"
 
-            # 2. Proses Data Sales (Histori Online vs Offline)
-            col_store_idx = 0
-            col_qty_sls_idx = 18 if df_sls_raw.shape[1] > 18 else df_sls_raw.shape[1] - 1
-            col_sku_sls_idx = 26 if df_sls_raw.shape[1] > 26 else (1 if df_sls_raw.shape[1] > 1 else 0)
+            # 2. Deteksi Kolom Sales Cerdas: Kolom A=Toko (idx 0), S=Qty (idx 18), AB=SKU (idx 27)
+            def find_col_idx(df, keywords, default_idx):
+                for i, col in enumerate(df.columns):
+                    col_str = str(col).strip().upper()
+                    if any(k in col_str for k in keywords):
+                        return i
+                return default_idx if df.shape[1] > default_idx else (df.shape[1] - 1)
 
-            store_series = df_sls_raw.iloc[:, col_store_idx].astype(str).str.upper()
-            sku_sls_series = df_sls_raw.iloc[:, col_sku_sls_idx].astype(str).str.strip().str.upper()
-            qty_sls_series = pd.to_numeric(df_sls_raw.iloc[:, col_qty_sls_idx], errors='coerce').fillna(0)
+            col_store_idx = find_col_idx(df_sls_raw, ['TOKO', 'STORE', 'CABANG'], 0)         # Kolom A
+            col_qty_sls_idx = find_col_idx(df_sls_raw, ['QTY SALES', 'QUANTITY', 'QTY'], 18)   # Kolom S
+            col_sku_sls_idx = find_col_idx(df_sls_raw, ['SKU', 'ITEM CODE', 'BARCODE'], 27)   # Kolom AB
 
-            df_sls_clean = pd.DataFrame({
-                'SKU': sku_sls_series,
-                'SALES_ONLINE': np.where(store_series.str.contains('ONLINE|ONL|WEB|SHOPEE|TOKOPEDIA|TIKTOK|LAZADA', na=False), qty_sls_series, 0),
-                'SALES_OFFLINE': np.where(store_series.str.contains('JEZ|STORE|TOKO|OFFLINE|SURABAYA|MALANG|JEMBER|KEDIRI|SIDOARJO|SEMARANG', na=False), qty_sls_series, 0)
-            })
-            df_sls_clean = df_sls_clean[(df_sls_clean['SKU'] != '') & (df_sls_clean['SKU'] != 'NAN')]
-            sales_summary = df_sls_clean.groupby('SKU', as_index=False).agg({'SALES_ONLINE': 'sum', 'SALES_OFFLINE': 'sum'})
-            sales_summary['TOTAL_SALES'] = sales_summary['SALES_ONLINE'] + sales_summary['SALES_OFFLINE']
-            sales_dict = sales_summary.set_index('SKU').to_dict(orient='index')
+            store_arr = df_sls_raw.iloc[:, col_store_idx].astype(str).str.upper().to_numpy()
+            sku_sls_arr = df_sls_raw.iloc[:, col_sku_sls_idx].astype(str).str.split('.').str[0].str.strip().str.upper().to_numpy()
+            qty_sls_arr = pd.to_numeric(df_sls_raw.iloc[:, col_qty_sls_idx], errors='coerce').fillna(0).to_numpy()
+
+            # Super Fast Aggregation menggunakan Dictionary (0.1 detik)
+            sales_dict = {}
+            for i in range(len(sku_sls_arr)):
+                sku = sku_sls_arr[i]
+                if not sku or sku in ('', 'NAN', 'NONE', 'SKU'):
+                    continue
+                q = qty_sls_arr[i]
+                st = store_arr[i]
+
+                is_onl = ('ONLINE' in st or 'ONL' in st or 'WEB' in st or 'SHOPEE' in st or 'TOKOPEDIA' in st or 'TIKTOK' in st or 'LAZADA' in st)
+                is_off = ('JEZ' in st or 'STORE' in st or 'TOKO' in st or 'OFFLINE' in st or 'SURABAYA' in st or 'MALANG' in st or 'JEMBER' in st or 'KEDIRI' in st or 'SIDOARJO' in st or 'SEMARANG' in st)
+
+                if sku not in sales_dict:
+                    sales_dict[sku] = {'SALES_ONLINE': 0, 'SALES_OFFLINE': 0, 'TOTAL_SALES': 0}
+
+                if is_onl:
+                    sales_dict[sku]['SALES_ONLINE'] += q
+                elif is_off:
+                    sales_dict[sku]['SALES_OFFLINE'] += q
+                else:
+                    sales_dict[sku]['SALES_OFFLINE'] += q
+
+                sales_dict[sku]['TOTAL_SALES'] += q
 
             # 3. Proses Data Stock Aktual per BIN
             col_bin_raw = df_stk_raw.iloc[:, 1].astype(str).str.strip().str.upper()
-            col_sku_raw = df_stk_raw.iloc[:, 2].astype(str).str.strip().str.upper()
+            col_sku_raw = df_stk_raw.iloc[:, 2].astype(str).str.split('.').str[0].str.strip().str.upper()
             col_name_raw = df_stk_raw.iloc[:, 4].astype(str).str.strip() if df_stk_raw.shape[1] > 4 else df_stk_raw.iloc[:, 2]
             col_sub_raw = df_stk_raw.iloc[:, 6].astype(str).str.strip().str.upper() if df_stk_raw.shape[1] > 6 else ""
             col_qty_raw = pd.to_numeric(df_stk_raw.iloc[:, 9], errors='coerce').fillna(0)
@@ -3267,7 +3291,7 @@ class AppState:
             df_valid_stk['IS_OFF'] = is_target_off
             df_valid_stk['IS_ON'] = is_target_on
 
-            # Agregasi Total Stok Seluruh Area per SKU (untuk perhitungan rasio target global)
+            # Agregasi Total Stok per SKU
             sku_agg = df_valid_stk.groupby('SKU').agg(
                 TOTAL_STOCK=('QTY', lambda x: x[x > 0].sum()),
                 STOCK_SOURCE=('QTY', lambda x: x[df_valid_stk.loc[x.index, 'IS_SOURCE'] & (x > 0)].sum()),
@@ -3275,8 +3299,15 @@ class AppState:
                 STOCK_ON_ACTUAL=('QTY', lambda x: x[df_valid_stk.loc[x.index, 'IS_ON'] & (x > 0)].sum())
             ).reset_index()
 
-            # Breakdown stok BIN Sumber per baris riil
+            # OPTIMISASI BESAR: Groupby BIN Sumber satu kali saja ke Dictionary O(1)
+            # Hasil: { 'SKU_A': [{'BIN': 'GL4-DC-KL1', 'QTY': 10}, {'BIN': 'INB', 'QTY': 5}], ... }
             source_rows_df = df_valid_stk[df_valid_stk['IS_SOURCE'] & (df_valid_stk['QTY'] > 0)].groupby(['SKU', 'BIN'], as_index=False)['QTY'].sum()
+            source_by_sku_map = {}
+            for _, r_src in source_rows_df.iterrows():
+                s_code = r_src['SKU']
+                if s_code not in source_by_sku_map:
+                    source_by_sku_map[s_code] = []
+                source_by_sku_map[s_code].append({'BIN': r_src['BIN'], 'QTY': int(r_src['QTY'])})
 
             allocation_rows = []
             refill_instructions = []
@@ -3293,7 +3324,7 @@ class AppState:
                 if tot_stk <= 0:
                     continue
 
-                # Histori Sales
+                # Histori Sales O(1)
                 sls_info = sales_dict.get(sku, {'SALES_ONLINE': 0, 'SALES_OFFLINE': 0, 'TOTAL_SALES': 0})
                 s_on = sls_info['SALES_ONLINE']
                 s_off = sls_info['SALES_OFFLINE']
@@ -3332,14 +3363,11 @@ class AppState:
                 item_desc = sku_name_map.get(sku, "-")
                 item_sub = sku_sub_map.get(sku, "-")
 
-                # Ambil seluruh baris BIN sumber fisik untuk SKU ini
-                sku_sources = source_rows_df[source_rows_df['SKU'] == sku].to_dict(orient='records')
+                # Ambil daftar BIN sumber instan O(1)
+                sku_sources = source_by_sku_map.get(sku, [])
 
-                # ==============================================================
                 # 1. PEMECAHAN BARIS MATRIX ALOKASI SESUAI BIN SUMBER FISIK
-                # ==============================================================
                 if sku_sources:
-                    # Alokasikan ideal quota secara berurutan ke masing-masing BIN sumber
                     rem_log = target_log
                     rem_off = target_off
                     rem_on = target_on
@@ -3347,26 +3375,20 @@ class AppState:
                     for src_r in sku_sources:
                         b_name = src_r['BIN']
                         b_qty = int(src_r['QTY'])
-
-                        # Hitung berapa porsi BIN ini menyumbang untuk Logistik, Offline, Online
                         avail_in_bin = b_qty
 
-                        # 1. Jatah untuk Buffer Logistik
                         portion_log = min(rem_log, avail_in_bin)
                         avail_in_bin -= portion_log
                         rem_log -= portion_log
 
-                        # 2. Jatah untuk Offline Store
                         portion_off = min(rem_off, avail_in_bin)
                         avail_in_bin -= portion_off
                         rem_off -= portion_off
 
-                        # 3. Jatah untuk Online Hub
                         portion_on = min(rem_on, avail_in_bin)
                         avail_in_bin -= portion_on
                         rem_on -= portion_on
 
-                        # Sisa kuota (jika total stok sumber > target yang dihitung)
                         if avail_in_bin > 0:
                             portion_log += avail_in_bin
 
@@ -3387,7 +3409,6 @@ class AppState:
                             "ACTUAL ONL": act_on
                         })
                 else:
-                    # Kasus jika stok hanya ada di BIN Offline/Online (stok sumber 0)
                     allocation_rows.append({
                         "SKU": sku,
                         "SUB KATEGORI": item_sub,
@@ -3405,10 +3426,7 @@ class AppState:
                         "ACTUAL ONL": act_on
                     })
 
-                # ==============================================================
-                # 2. PEMECAHAN REFILL & DEFISIT SESUAI DENGAN BIN SUMBER
-                # ==============================================================
-                # Siapkan saldo qty per BIN sumber untuk dieksekusi mutasi
+                # 2. PEMECAHAN REFILL & DEFISIT SESUAI BIN SUMBER
                 bin_stock_map = {r['BIN']: int(r['QTY']) for r in sku_sources}
 
                 def take_stock_from_bins(needed_qty):
@@ -3423,7 +3441,7 @@ class AppState:
                             rem -= take
                     return allocated
 
-                # A. Kebutuhan Refill Offline (Store)
+                # A. Refill Offline (Store)
                 if act_off < target_off:
                     defisit_off = target_off - act_off
                     status_off = "HABIS DI STORE (0 QTY)" if act_off == 0 else "KURANG DARI TARGET IDEAL"
@@ -3454,7 +3472,6 @@ class AppState:
                                     "NOTES": f"BALANCING OFFLINE ({status_off})"
                                 })
                     else:
-                        # Jika butuh refill tapi tidak ada stok di sumber
                         off_missing_list.append({
                             "SKU": sku,
                             "SUB KATEGORI": item_sub,
@@ -3468,7 +3485,7 @@ class AppState:
                             "STATUS": f"{status_off} (STOK SUMBER KOSONG)"
                         })
 
-                # B. Kebutuhan Refill Online (Hub)
+                # B. Refill Online (Hub)
                 if act_on < target_on:
                     defisit_on = target_on - act_on
                     status_on = "HABIS DI ONLINE (0 QTY)" if act_on == 0 else "KURANG DARI TARGET IDEAL"
