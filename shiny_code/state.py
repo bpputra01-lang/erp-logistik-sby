@@ -3181,10 +3181,19 @@ class AppState:
             return False, f"Gagal Match Real & System: {e}"
 
 # ==========================================================================
-    # BALANCING STOCK: OPTIMIZED TURBO ENGINE (KOLOM A=TOKO, S=QTY, AB=SKU)
+    # BALANCING STOCK: ROW-PER-BIN BREAKDOWN ENGINE (IMMUNE TO 'NaN' INT ERROR)
     # ==========================================================================
     def process_balancing_stock(self, f_stock, f_sales, sub_filter=None):
         try:
+            # Helper parsing angka ke integer yang anti-crash terhadap NaN / string kosong
+            def to_int(val):
+                try:
+                    if pd.isna(val) or val is None or str(val).strip().upper() in ('NAN', 'NONE', ''):
+                        return 0
+                    return int(round(float(val)))
+                except (ValueError, TypeError):
+                    return 0
+
             # 1. Fast Excel Reader
             def fast_read(file_info):
                 if not file_info: return pd.DataFrame()
@@ -3219,7 +3228,7 @@ class AppState:
                 if df_stk_raw.empty:
                     return False, f"Tidak ada data stock yang cocok dengan Sub Kategori: {', '.join(sub_filter)}"
 
-            # 2. Deteksi Kolom Sales Cerdas: Kolom A=Toko (idx 0), S=Qty (idx 18), AB=SKU (idx 27)
+            # 2. Deteksi Kolom Sales: Kolom A=Toko (idx 0), S=Qty (idx 18), AB=SKU (idx 27)
             def find_col_idx(df, keywords, default_idx):
                 for i, col in enumerate(df.columns):
                     col_str = str(col).strip().upper()
@@ -3235,7 +3244,6 @@ class AppState:
             sku_sls_arr = df_sls_raw.iloc[:, col_sku_sls_idx].astype(str).str.split('.').str[0].str.strip().str.upper().to_numpy()
             qty_sls_arr = pd.to_numeric(df_sls_raw.iloc[:, col_qty_sls_idx], errors='coerce').fillna(0).to_numpy()
 
-            # Super Fast Aggregation menggunakan Dictionary (0.1 detik)
             sales_dict = {}
             for i in range(len(sku_sls_arr)):
                 sku = sku_sls_arr[i]
@@ -3278,11 +3286,9 @@ class AppState:
                 'QTY': col_qty_raw[mask_valid]
             })
 
-            # Mapping Deskripsi & Sub Kategori
             sku_name_map = df_valid_stk.drop_duplicates('SKU').set_index('SKU')['NAMA'].to_dict()
             sku_sub_map = df_valid_stk.drop_duplicates('SKU').set_index('SKU')['SUB_KATEGORI'].to_dict()
 
-            # Klasifikasi Lokasi BIN
             is_source = df_valid_stk['BIN'].str.contains('LOG|INB|GL4|GL1-DC|GL3-DC', na=False) & ~df_valid_stk['BIN'].str.contains('OFF|ONL|TOKO|STORE', na=False)
             is_target_off = df_valid_stk['BIN'].str.contains('OFF|TOKO|STORE|GL2-STORE|GUDANG LT.2|OUT', na=False)
             is_target_on = df_valid_stk['BIN'].str.contains('ONL|ONLINE|HUB', na=False)
@@ -3299,15 +3305,14 @@ class AppState:
                 STOCK_ON_ACTUAL=('QTY', lambda x: x[df_valid_stk.loc[x.index, 'IS_ON'] & (x > 0)].sum())
             ).reset_index()
 
-            # OPTIMISASI BESAR: Groupby BIN Sumber satu kali saja ke Dictionary O(1)
-            # Hasil: { 'SKU_A': [{'BIN': 'GL4-DC-KL1', 'QTY': 10}, {'BIN': 'INB', 'QTY': 5}], ... }
+            # Pre-grouping BIN Sumber ke Dictionary O(1) aman dari NaN
             source_rows_df = df_valid_stk[df_valid_stk['IS_SOURCE'] & (df_valid_stk['QTY'] > 0)].groupby(['SKU', 'BIN'], as_index=False)['QTY'].sum()
             source_by_sku_map = {}
             for _, r_src in source_rows_df.iterrows():
                 s_code = r_src['SKU']
                 if s_code not in source_by_sku_map:
                     source_by_sku_map[s_code] = []
-                source_by_sku_map[s_code].append({'BIN': r_src['BIN'], 'QTY': int(r_src['QTY'])})
+                source_by_sku_map[s_code].append({'BIN': r_src['BIN'], 'QTY': to_int(r_src['QTY'])})
 
             allocation_rows = []
             refill_instructions = []
@@ -3316,21 +3321,19 @@ class AppState:
 
             for _, row in sku_agg.iterrows():
                 sku = row['SKU']
-                tot_stk = int(row['TOTAL_STOCK'])
-                stk_src = int(row['STOCK_SOURCE'])
-                act_off = int(row['STOCK_OFF_ACTUAL'])
-                act_on = int(row['STOCK_ON_ACTUAL'])
+                tot_stk = to_int(row['TOTAL_STOCK'])
+                stk_src = to_int(row['STOCK_SOURCE'])
+                act_off = to_int(row['STOCK_OFF_ACTUAL'])
+                act_on = to_int(row['STOCK_ON_ACTUAL'])
 
                 if tot_stk <= 0:
                     continue
 
-                # Histori Sales O(1)
                 sls_info = sales_dict.get(sku, {'SALES_ONLINE': 0, 'SALES_OFFLINE': 0, 'TOTAL_SALES': 0})
-                s_on = sls_info['SALES_ONLINE']
-                s_off = sls_info['SALES_OFFLINE']
-                s_tot = sls_info['TOTAL_SALES']
+                s_on = to_int(sls_info['SALES_ONLINE'])
+                s_off = to_int(sls_info['SALES_OFFLINE'])
+                s_tot = to_int(sls_info['TOTAL_SALES'])
 
-                # Target Rasio
                 if s_tot == 0:
                     pct_on, pct_off, pct_log = 0.10, 0.10, 0.80
                     kategori = "NO SALES HISTORY (80% LOGISTIK)"
@@ -3347,9 +3350,8 @@ class AppState:
                         pct_on, pct_off, pct_log = 0.40, 0.40, 0.20
                         kategori = "BALANCED (40:40:20)"
 
-                # Hitung Qty Target Global
-                target_on = int(np.ceil(tot_stk * pct_on))
-                target_off = int(np.ceil(tot_stk * pct_off))
+                target_on = to_int(np.ceil(tot_stk * pct_on))
+                target_off = to_int(np.ceil(tot_stk * pct_off))
                 target_log = tot_stk - target_on - target_off
 
                 if target_log < 0:
@@ -3363,7 +3365,6 @@ class AppState:
                 item_desc = sku_name_map.get(sku, "-")
                 item_sub = sku_sub_map.get(sku, "-")
 
-                # Ambil daftar BIN sumber instan O(1)
                 sku_sources = source_by_sku_map.get(sku, [])
 
                 # 1. PEMECAHAN BARIS MATRIX ALOKASI SESUAI BIN SUMBER FISIK
@@ -3374,7 +3375,7 @@ class AppState:
 
                     for src_r in sku_sources:
                         b_name = src_r['BIN']
-                        b_qty = int(src_r['QTY'])
+                        b_qty = to_int(src_r['QTY'])
                         avail_in_bin = b_qty
 
                         portion_log = min(rem_log, avail_in_bin)
@@ -3399,8 +3400,8 @@ class AppState:
                             "ASAL BIN SUMBER (LOG/INB)": b_name,
                             "QTY DI BIN INI": b_qty,
                             "TOTAL STOK SKU": tot_stk,
-                            "SALES ONL": int(s_on),
-                            "SALES OFF": int(s_off),
+                            "SALES ONL": s_on,
+                            "SALES OFF": s_off,
                             "KLASIFIKASI": kategori,
                             "ALOKASI LOG": portion_log,
                             "ALOKASI OFF": portion_off,
@@ -3416,8 +3417,8 @@ class AppState:
                         "ASAL BIN SUMBER (LOG/INB)": "TIDAK ADA STOK SUMBER (0 QTY)",
                         "QTY DI BIN INI": 0,
                         "TOTAL STOK SKU": tot_stk,
-                        "SALES ONL": int(s_on),
-                        "SALES OFF": int(s_off),
+                        "SALES ONL": s_on,
+                        "SALES OFF": s_off,
                         "KLASIFIKASI": kategori,
                         "ALOKASI LOG": target_log,
                         "ALOKASI OFF": target_off,
@@ -3427,7 +3428,7 @@ class AppState:
                     })
 
                 # 2. PEMECAHAN REFILL & DEFISIT SESUAI BIN SUMBER
-                bin_stock_map = {r['BIN']: int(r['QTY']) for r in sku_sources}
+                bin_stock_map = {r['BIN']: to_int(r['QTY']) for r in sku_sources}
 
                 def take_stock_from_bins(needed_qty):
                     allocated = []
@@ -3535,10 +3536,10 @@ class AppState:
             df_on_miss = pd.DataFrame(on_missing_list)
 
             tot_sku_count = sku_agg['SKU'].nunique()
-            tot_stock_pcs = int(sku_agg['TOTAL_STOCK'].sum()) if not sku_agg.empty else 0
+            tot_stock_pcs = to_int(sku_agg['TOTAL_STOCK'].sum())
             need_off_sku = df_off_miss['SKU'].nunique() if not df_off_miss.empty else 0
             need_on_sku = df_on_miss['SKU'].nunique() if not df_on_miss.empty else 0
-            total_refill_qty = int(df_refill['QTY REFILL'].sum()) if not df_refill.empty else 0
+            total_refill_qty = to_int(df_refill['QTY REFILL'].sum()) if not df_refill.empty else 0
 
             ready_off = tot_sku_count - need_off_sku
             ready_on = tot_sku_count - need_on_sku
