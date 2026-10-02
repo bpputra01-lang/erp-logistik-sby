@@ -3148,6 +3148,30 @@ def server(input: Inputs, output: Outputs, session: Session):
             sub = list(input.rt_filter_sub()) if "rt_filter_sub" in input and input.rt_filter_sub() is not None else []
             state.apply_refill_filter(sub)
 
+# ==========================================================================
+    # TOMBOL AKSI PERCENTAGE DISPLAY & REFILL TOKO
+    # ==========================================================================
+    @render.ui
+    def percentage_display_action_btn_ui():
+        f = input.upload_percentage_display_file() if "upload_percentage_display_file" in input else None
+        if f and len(f) > 0:
+            return ui.div(
+                ui.tags.button(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "JALANKAN ANALISIS DISPLAY & REFILL"),
+                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_process_percentage_display', Math.random(), {priority: 'event'});",
+                    class_="btn-red-gradient"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 1rem;"
+            )
+        return ui.div(
+            ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"),
+                "UPLOAD FILE STOCK UNTUK MEMULAI",
+                disabled=True,
+                class_="btn-locked"
+            ),
+            style="display: flex; justify-content: flex-end; width: 100%; margin-top: 1rem;"
+        )
     @render.ui
     def percentage_display_results_container():
         if not state.pd_processed():
