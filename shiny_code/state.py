@@ -437,6 +437,31 @@ class AppState:
         self._raw_df_vbs_changes = pd.DataFrame()
         self._raw_df_vbs_pivot = pd.DataFrame()
 
+        # --- PERCENTAGE DISPLAY & REFILL TOKO STATE ---
+        self.pd_processed = reactive.Value(False)
+        self.pd_total_art = reactive.Value(0)
+        self.pd_on_display = reactive.Value(0)
+        self.pd_perc_display = reactive.Value(0.0)
+        self.pd_need_display = reactive.Value(0)
+        self.pd_perc_need = reactive.Value(0.0)
+        self.pd_need_gudang = reactive.Value(0)
+        self.pd_need_dc = reactive.Value(0)
+        self.pd_karantina_lock = reactive.Value(0)
+
+        self.df_pd_display_headers = reactive.Value([])
+        self.df_pd_display_rows = reactive.Value([])
+        self._raw_df_pd_display = pd.DataFrame()
+
+        # Refill Toko Sub-tab
+        self.rt_total_sku = reactive.Value(0)
+        self.rt_priority_sku = reactive.Value(0)
+        self.rt_sub_categories = reactive.Value([])
+        self.df_rt_headers = reactive.Value([])
+        self.df_rt_rows = reactive.Value([])
+        self._raw_df_rt_base = pd.DataFrame()
+        self._raw_df_rt_filtered = pd.DataFrame()
+
+
         # --- PHYSICAL INVENTORY LIST STATE (UNIFIED) ---
         self.pil_mode = reactive.Value("")
 
@@ -3581,7 +3606,7 @@ class AppState:
             return True, f"Balancing Stock Selesai! ({len(df_refill):,} instruksi mutasi refill dibuat)"
         except Exception as e:
             return False, f"Gagal memproses Balancing Stock: {e}"
-            
+
     # ==========================================================================
     # VALIDATION BARCODE SKU - STAGE 1 (FULL WARNA, RASA & COMPOSITE VARIANTS)
     # ==========================================================================
@@ -3924,3 +3949,235 @@ class AppState:
             return True, f"Perubahan SKU Berhasil Dieksekusi! Data scan ter-pivot menjadi {len(df_pivot)} kombinasi BIN & SKU."
         except Exception as e:
             return False, f"Gagal Eksekusi Tahap 2: {e}"
+
+    
+    # ==========================================================================
+    # METODE LOGIKA PROSES: PERCENTAGE DISPLAY & REFILL TOKO (DUAL ENGINE)
+    # ==========================================================================
+    def process_percentage_display(self, file_info):
+        try:
+            if not file_info:
+                return False, "File All Stock wajib diupload!"
+
+            path = file_info[0]["datapath"]
+            name = file_info[0]["name"].lower()
+
+            if name.endswith(('.xlsx', '.xls', '.xlsm')):
+                try:
+                    df = pd.read_excel(path, engine='calamine')
+                except Exception:
+                    df = pd.read_excel(path, engine='openpyxl')
+            else:
+                try:
+                    df = pd.read_csv(path, sep=None, engine='python')
+                except Exception:
+                    df = pd.read_csv(path)
+
+            if df.empty or df.shape[1] < 10:
+                return False, "File minimal harus 10 kolom (Format Multiple Adjustment Jezpro)!"
+
+            # Standarisasi Kolom Indeks
+            # Col 1: BIN, Col 2: SKU, Col 3: BRAND, Col 4: ITEM NAME, Col 5: VARIANT/SIZE, Col 6: SUB KAT, Col 9: QTY
+            col_b = df.columns[1]
+            col_s = df.columns[2]
+            col_br = df.columns[3] if df.shape[1] > 3 else df.columns[2]
+            col_desc = df.columns[4]
+            col_size = df.columns[5]
+            col_sub = df.columns[6]
+            col_q = df.columns[9]
+
+            # Bersihkan tipe data dasar
+            df['BIN_CLEAN'] = df[col_b].fillna('').astype(str).str.strip().str.upper()
+            df['SKU_CLEAN'] = df[col_s].fillna('').astype(str).str.split('.').str[0].str.strip().str.upper()
+            df['QTY_NUM'] = pd.to_numeric(df[col_q], errors='coerce').fillna(0)
+            df['ARTICLE'] = df[col_desc].fillna('').astype(str).str.strip().apply(lambda x: x.split(' ')[0].upper() if x else '')
+            df['SUB_CLEAN'] = df[col_sub].fillna('').astype(str).str.strip().str.upper()
+
+            # ------------------------------------------------------------------
+            # 1. LOGIKA MODUL A: PERCENTAGE DISPLAY CONTROL (ARTICLE BASE)
+            # ------------------------------------------------------------------
+            excl_kw = "OFFLINE|ONLINE|AMP|MARKOM|DEFECT|REJECT|STAGING|STAGGING|KARANTINA|EVENT|BANDING|INB|OUT|PUTAWAY"
+            mask_no_excl = ~df['BIN_CLEAN'].str.contains(excl_kw, na=False)
+
+            is_toko_disp = df['BIN_CLEAN'].str.contains('TOKO|DISPLAY', na=False)
+            is_gudang_src = (~is_toko_disp) & mask_no_excl
+
+            # SKU yang sedang berada di BIN OUT
+            skus_in_out = set(df[df['BIN_CLEAN'].str.contains('OUT', na=False) & (df['QTY_NUM'] > 0)]['SKU_CLEAN'].unique())
+
+            # Agregasi per Article
+            df['QTY_GUDANG_SRC'] = np.where(is_gudang_src, df['QTY_NUM'], 0)
+            df['QTY_TOKO_TGT'] = np.where(is_toko_disp, df['QTY_NUM'], 0)
+            df['QTY_BIN_OUT'] = np.where(df['BIN_CLEAN'].str.contains('OUT', na=False), df['QTY_NUM'], 0)
+            df['QTY_KARANTINA'] = np.where(df['BIN_CLEAN'].str.contains('KARANTINA', na=False), df['QTY_NUM'], 0)
+
+            art_agg = df.groupby('ARTICLE', as_index=False).agg(
+                GUDANG_QTY=('QTY_GUDANG_SRC', 'sum'),
+                TOKO_QTY=('QTY_TOKO_TGT', 'sum'),
+                OUT_QTY=('QTY_BIN_OUT', 'sum'),
+                KARANTINA_QTY=('QTY_KARANTINA', 'sum')
+            )
+
+            # Artikel yang On Display
+            art_on_display_set = set(art_agg[art_agg['TOKO_QTY'] > 0]['ARTICLE'])
+
+            # Artikel yang wajib tambah Display: Stok gudang > 0, Toko <= 0, dan tidak ada di OUT
+            need_display_articles = set(art_agg[
+                (art_agg['GUDANG_QTY'] > 0) & 
+                (art_agg['TOKO_QTY'] <= 0) & 
+                (art_agg['OUT_QTY'] <= 0)
+            ]['ARTICLE'])
+
+            # Karantina Lock
+            karantina_articles = art_agg[(art_agg['TOKO_QTY'] <= 0) & (art_agg['KARANTINA_QTY'] > 0)]
+            karantina_count = len(karantina_articles)
+
+            # Penarikan Data Detail Prioritas Refill Display
+            raw_gudang = df[
+                (df['ARTICLE'].isin(need_display_articles)) & 
+                is_gudang_src & 
+                (df['QTY_NUM'] > 0) & 
+                (~df['SKU_CLEAN'].isin(skus_in_out))
+            ].copy()
+
+            if not raw_gudang.empty:
+                # Prioritas 1: Bin Toko / Store / Gudang Lt. 2
+                raw_gudang['IS_PRIORITY'] = raw_gudang['BIN_CLEAN'].str.contains('GUDANG|STR|STORE', na=False)
+                raw_gudang = raw_gudang.sort_values(by=['IS_PRIORITY', 'QTY_NUM'], ascending=[False, False])
+                
+                # Ambil 1 representatif terbaik per Article
+                detail_disp = raw_gudang.drop_duplicates(subset=['ARTICLE']).copy()
+                detail_disp = detail_disp.sort_values(by='QTY_NUM', ascending=False)
+
+                df_detail_view = pd.DataFrame({
+                    "Article": detail_disp['ARTICLE'],
+                    "SKU": detail_disp['SKU_CLEAN'],
+                    "Deskripsi Barang": detail_disp[col_desc],
+                    "Size Display": detail_disp[col_size],
+                    "Bin Lokasi": detail_disp['BIN_CLEAN'],
+                    "Qty In Bin": detail_disp['QTY_NUM'].astype(int)
+                })
+            else:
+                df_detail_view = pd.DataFrame(columns=["Article", "SKU", "Deskripsi Barang", "Size Display", "Bin Lokasi", "Qty In Bin"])
+
+            on_disp_cnt = len(art_on_display_set)
+            need_disp_cnt = len(df_detail_view)
+            tot_art_cnt = on_disp_cnt + need_disp_cnt
+
+            perc_disp = (on_disp_cnt / tot_art_cnt * 100) if tot_art_cnt > 0 else 0.0
+            perc_need = (need_disp_cnt / tot_art_cnt * 100) if tot_art_cnt > 0 else 0.0
+
+            if not df_detail_view.empty:
+                need_gudang_cnt = int(df_detail_view['Bin Lokasi'].str.contains('STR|STORE|GUDANG', na=False).sum())
+                need_dc_cnt = int(df_detail_view['Bin Lokasi'].str.contains('DC', na=False).sum())
+            else:
+                need_gudang_cnt, need_dc_cnt = 0, 0
+
+            # Set Reactive Values Modul A
+            self.pd_total_art.set(tot_art_cnt)
+            self.pd_on_display.set(on_disp_cnt)
+            self.pd_perc_display.set(perc_disp)
+            self.pd_need_display.set(need_disp_cnt)
+            self.pd_perc_need.set(perc_need)
+            self.pd_need_gudang.set(need_gudang_cnt)
+            self.pd_need_dc.set(need_dc_cnt)
+            self.pd_karantina_lock.set(karantina_count)
+
+            self._raw_df_pd_display = df_detail_view.copy()
+            self.df_pd_display_headers.set(df_detail_view.columns.tolist() if not df_detail_view.empty else [])
+            self.df_pd_display_rows.set(df_detail_view.fillna("").astype(str).values.tolist() if not df_detail_view.empty else [])
+
+            # ------------------------------------------------------------------
+            # 2. LOGIKA MODUL B: REFILL TOKO ANALYZER (SKU BASE)
+            # ------------------------------------------------------------------
+            exclude_kat = ["SHOES", "SANDALS", "FOOTWEAR"]
+            df_refill = df[~df['SUB_CLEAN'].isin(exclude_kat)].copy()
+
+            excl_bin_refill = "DEFECT|REJECT|STAGING|STAGGING|BALANCING|PUTAWAY|EVENT|OFFLINE|KARANTINA"
+            is_rt_toko = df_refill['BIN_CLEAN'] == "TOKO"
+            is_rt_gudang = (~is_rt_toko) & (~df_refill['BIN_CLEAN'].str.contains(excl_bin_refill, na=False))
+
+            df_rt_toko_agg = df_refill[is_rt_toko].groupby('SKU_CLEAN', as_index=False)['QTY_NUM'].sum()
+            df_rt_toko_agg.columns = ['SKU_CLEAN', 'QTY_TOKO']
+
+            # Grouping Bin Gudang beserta Lokasi
+            gudang_sub = df_refill[is_rt_gudang & (df_refill['QTY_NUM'] > 0)]
+            bin_map = gudang_sub.groupby('SKU_CLEAN')['BIN_CLEAN'].apply(lambda x: ", ".join(sorted(set(x)))).to_dict()
+
+            df_rt_gudang_agg = df_refill[is_rt_gudang].groupby('SKU_CLEAN', as_index=False)['QTY_NUM'].sum()
+            df_rt_gudang_agg.columns = ['SKU_CLEAN', 'QTY_GUDANG']
+            df_rt_gudang_agg['LOKASI_BIN'] = df_rt_gudang_agg['SKU_CLEAN'].map(bin_map).fillna('-')
+
+            # Master info SKU
+            df_rt_master = df_refill.drop_duplicates(subset=['SKU_CLEAN'])[[
+                'SKU_CLEAN', col_br, col_desc, col_size, 'SUB_CLEAN'
+            ]].copy()
+            df_rt_master.columns = ['SKU_CLEAN', 'BRAND', 'ITEM_NAME', 'VARIANT', 'SUB_KATEGORI']
+
+            df_rt_merged = df_rt_master.merge(df_rt_toko_agg, on='SKU_CLEAN', how='left').merge(df_rt_gudang_agg, on='SKU_CLEAN', how='left')
+            df_rt_merged['QTY_TOKO'] = df_rt_merged['QTY_TOKO'].fillna(0).astype(int)
+            df_rt_merged['QTY_GUDANG'] = df_rt_merged['QTY_GUDANG'].fillna(0).astype(int)
+            df_rt_merged['LOKASI_BIN'] = df_rt_merged['LOKASI_BIN'].fillna('-')
+
+            # Aturan Refill Toko:
+            # - Gudang wajib > 0
+            # - Lower Body: Qty Toko < 6
+            # - Lainnya: Qty Toko < 2
+            def check_need_refill(row):
+                if row['QTY_GUDANG'] <= 0: return False
+                if "LOWER BODY" in str(row['SUB_KATEGORI']):
+                    return row['QTY_TOKO'] < 6
+                return row['QTY_TOKO'] < 2
+
+            df_rt_merged['IS_REFILL'] = df_rt_merged.apply(check_need_refill, axis=1)
+            df_rt_candidates = df_rt_merged[df_rt_merged['IS_REFILL']].copy()
+
+            if not df_rt_candidates.empty:
+                df_rt_view = pd.DataFrame({
+                    "SKU": df_rt_candidates['SKU_CLEAN'],
+                    "BRAND": df_rt_candidates['BRAND'],
+                    "ITEM NAME": df_rt_candidates['ITEM_NAME'],
+                    "VARIANT": df_rt_candidates['VARIANT'],
+                    "SUB KATEGORI": df_rt_candidates['SUB_KATEGORI'],
+                    "QTY TOKO": df_rt_candidates['QTY_TOKO'],
+                    "QTY GUDANG": df_rt_candidates['QTY_GUDANG'],
+                    "LOKASI BIN": df_rt_candidates['LOKASI_BIN']
+                })
+            else:
+                df_rt_view = pd.DataFrame(columns=["SKU", "BRAND", "ITEM NAME", "VARIANT", "SUB KATEGORI", "QTY TOKO", "QTY GUDANG", "LOKASI BIN"])
+
+            # Opsi Kategori untuk Filter UI
+            sub_options = sorted([str(s) for s in df_rt_view['SUB KATEGORI'].unique() if str(s) != ''])
+            self.rt_sub_categories.set(sub_options)
+            self._raw_df_rt_base = df_rt_view.copy()
+
+            # Terapkan filter awal
+            self.apply_refill_filter([])
+
+            self.pd_processed.set(True)
+            return True, "Analisis Percentage Display & Refill Toko Berhasil!"
+        except Exception as e:
+            return False, f"Gagal memproses data: {e}"
+
+    def apply_refill_filter(self, selected_subs):
+        if self._raw_df_rt_base.empty:
+            self.rt_total_sku.set(0)
+            self.rt_priority_sku.set(0)
+            self._raw_df_rt_filtered = pd.DataFrame()
+            self.df_rt_headers.set([])
+            self.df_rt_rows.set([])
+            return
+
+        df = self._raw_df_rt_base.copy()
+        if selected_subs and len(selected_subs) > 0:
+            df = df[df['SUB KATEGORI'].isin(selected_subs)]
+
+        total_sku = len(df)
+        priority_sku = int((df['QTY TOKO'] == 0).sum()) if not df.empty else 0
+
+        self.rt_total_sku.set(total_sku)
+        self.rt_priority_sku.set(priority_sku)
+
+        self._raw_df_rt_filtered = df.copy()
+        self.df_rt_headers.set(df.columns.tolist() if not df.empty else [])
+        self.df_rt_rows.set(df.fillna("").astype(str).values.tolist() if not df.empty else [])

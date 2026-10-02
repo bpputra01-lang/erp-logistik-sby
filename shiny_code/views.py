@@ -1120,6 +1120,27 @@ def validation_barcode_sku_view(state: AppState):
         style="width: 100%; padding: 1rem;"
     )
 
+# ==============================================================================
+# VIEW: PERCENTAGE DISPLAY CONTROL & REFILL TOKO (DUAL TAB VIEW)
+# ==============================================================================
+def percentage_display_view(state: AppState):
+    upload_section = ui.div(
+        ui.div(
+            ui.h4("📥 Upload Stock System (All Stock Multiple Adjustment)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+            custom_uploader_box("upload_percentage_display_file", "Pilih File Stock (Excel / CSV)"),
+            ui.output_ui("percentage_display_action_btn_ui"),
+            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+        )
+    )
+
+    results_section = ui.output_ui("percentage_display_results_container")
+
+    return ui.div(
+        upload_section,
+        results_section,
+        style="width: 100%; padding: 1rem;"
+    )
+
     
 def menu_item(label: str, target_menu: str, current_menu: str):
     import re

@@ -97,7 +97,8 @@ def server(input: Inputs, output: Outputs, session: Session):
         "cross-check-real-system": "Cross Check Real & System",
         "balancing-stock": "Balancing Stock",
         "physical-inventory-list": "Physical Inventory List",
-        "validation-barcode-sku": "Validation Barcode SKU"
+        "validation-barcode-sku": "Validation Barcode SKU",
+        "percentage-display": "Percentage Display"
     }
 
     # 1. Saat menu diklik di sidebar -> URL di browser otomatis berubah
@@ -624,6 +625,30 @@ def server(input: Inputs, output: Outputs, session: Session):
                 )
             )
 
+elif cur in ["Percentage Display", "Precentage Display"]:
+         guide_body = ui.div(
+             ui.tags.details(
+                 ui.tags.summary("📋 Logika Penarikan Display (Article Base)"),
+                 ui.div(
+                     ui.tags.ul(
+                         ui.tags.li(ui.strong("Filter Eksklusi:"), " Mengabaikan BIN OFFLINE, ONLINE, AMP, MARKOM, DEFECT, REJECT, STAGING, KARANTINA, EVENT, INB, OUT, PUTAWAY."),
+                         ui.tags.li(ui.strong("Proteksi BIN OUT:"), " Jika SKU memiliki stok di BIN OUT > 0, otomatis dikecualikan dari list penarikan display."),
+                         ui.tags.li(ui.strong("Prioritas Sumber:"), " Diprioritaskan mengambil dari Gudang Lt. 2 (STR/STORE/GUDANG), baru kemudian dari DC.")
+                     ), class_="accordion-content"
+                 ), open=True
+             ),
+             ui.tags.details(
+                 ui.tags.summary("🏬 Logika Refill Toko (SKU Base)"),
+                 ui.div(
+                     ui.tags.ul(
+                         ui.tags.li("Mengabaikan kategori: ", ui.strong("Shoes, Sandals, Footwear"), "."),
+                         ui.tags.li(ui.strong("Lower Body:"), " Wajib refill jika stok di Toko < 6."),
+                         ui.tags.li(ui.strong("Kategori Lainnya:"), " Wajib refill jika stok di Toko < 2 (minimal stok gudang > 0).")
+                     ), class_="accordion-content"
+                 ), open=True
+             )
+         )
+
             # PANDUAN: PHYSICAL INVENTORY LIST (2-IN-1 MODE)
         elif cur == "Physical Inventory List":
             guide_body = ui.div(
@@ -961,6 +986,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         elif content_type == "balancing_stock": page_content = balancing_stock_view(state)
         elif content_type == "physical_inventory_list": page_content = physical_inventory_list_view(state)
         elif content_type == "validation_barcode_sku": page_content = validation_barcode_sku_view(state)
+        elif content_type in ["percentage_display", "percentage-display"]: page_content = percentage_display_view(state)
         elif content_type == "access_denied":
             page_content = ui.div(ui.h2("⛔ Akses Ditolak", style="font-size: 28px; color: #E53E3E; font-weight: bold;"), ui.p("Maaf, halaman ini dibatasi hak aksesnya.", style="color: #718096; font-size: 15px;"), style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;")
         else:
@@ -3093,6 +3119,138 @@ def server(input: Inputs, output: Outputs, session: Session):
             state._raw_df_vbs_pivot.to_excel(writer, sheet_name='DATA_SCAN_PIVOT_FINAL', index=False)
             state._raw_df_vbs_changes.to_excel(writer, sheet_name='PERUBAHAN_BEFORE_AFTER', index=False)
             state._raw_df_vbs_compare.to_excel(writer, sheet_name='COMPARE_DETAIL', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+@render.ui
+    def percentage_display_action_btn_ui():
+        f = input.upload_percentage_display_file() if "upload_percentage_display_file" in input else None
+        if f and len(f) > 0:
+            return ui.div(
+                ui.tags.button(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "JALANKAN ANALISIS DISPLAY & REFILL"),
+                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_process_percentage_display', Math.random(), {priority: 'event'});",
+                    class_="btn-red-gradient"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+            )
+        return ui.div(
+            ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"),
+                "UPLOAD FILE STOCK UNTUK MEMULAI",
+                disabled=True,
+                class_="btn-locked"
+            ),
+            style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+        )
+
+    @reactive.Effect
+    @reactive.event(input.btn_process_percentage_display)
+    def _proc_percentage_display():
+        f = input.upload_percentage_display_file()
+        if not f:
+            state.error_modal_message.set("Upload file Stock terlebih dahulu!")
+            state.show_error_modal.set(True)
+            return
+
+        succ, msg = state.process_percentage_display(f)
+        if succ:
+            state.show_success_modal.set(True)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+
+    # Listener Filter Interaktif Kategori Refill Toko (Tab 2)
+    @reactive.Effect
+    def _on_rt_filter_change():
+        if state.pd_processed():
+            sub = list(input.rt_filter_sub()) if "rt_filter_sub" in input and input.rt_filter_sub() is not None else []
+            state.apply_refill_filter(sub)
+
+@render.ui
+    def percentage_display_results_container():
+        if not state.pd_processed():
+            return ui.div()
+
+        # Tab 1 Content: Percentage Display Control
+        tab1_display_content = ui.div(
+            ui.div(
+                dark_metric_box("🧥 TOTAL ARTICLE", f"{state.pd_total_art():,} ART", "#7B61FF"),
+                dark_metric_box("✅ ON DISPLAY", f"{state.pd_on_display():,} ({state.pd_perc_display():.1f}%)", "#10B981"),
+                dark_metric_box("⚠️ NEED DISPLAY", f"{state.pd_need_display():,} ({state.pd_perc_need():.1f}%)", "#E53E3E"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
+            ),
+            ui.div(
+                dark_metric_box("🏬 FROM STORE (LT. 2)", f"{state.pd_need_gudang():,} ART", "#DD6B20"),
+                dark_metric_box("🏭 FROM DC", f"{state.pd_need_dc():,} ART", "#3182CE"),
+                dark_metric_box("☣️ KARANTINA (KOSONG DI TOKO)", f"{state.pd_karantina_lock():,} ART", "#C5A059"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+            ),
+            ui.div(
+                ui.div(
+                    ui.h4("📋 List Article Kosong di Toko (Wajib Refill Display)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0;"),
+                    ui.download_button(
+                        "btn_dl_display_refill",
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "Download List Display (.xlsx)"),
+                        style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
+                    ),
+                    style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem;"
+                ),
+                render_clean_table(state.df_pd_display_headers(), state.df_pd_display_rows(), "tbl_pd_display"),
+                style="padding: 0.75rem 0;"
+            )
+        )
+
+        # Tab 2 Content: Refill Toko List
+        tab2_refill_content = ui.div(
+            ui.div(
+                ui.h4("🔍 Filter Sub Kategori:", style="font-size: 14px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
+                ui.input_selectize("rt_filter_sub", None, choices=state.rt_sub_categories(), multiple=True, width="100%"),
+                style="background: #F8FAFC; border: 1px solid #E2E8F0; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;"
+            ),
+            ui.div(
+                dark_metric_box("📦 TOTAL SKU PERLU REFILL", f"{state.rt_total_sku():,} SKU", "#3182CE"),
+                dark_metric_box("🔥 PRIORITY (QTY TOKO 0)", f"{state.rt_priority_sku():,} SKU", "#DD6B20"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
+            ),
+            ui.div(
+                ui.div(
+                    ui.h4("📋 Detail List SKU Perlu Refill ke Toko", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0;"),
+                    ui.download_button(
+                        "btn_dl_rt_refill",
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "Download List Refill (.xlsx)"),
+                        style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
+                    ),
+                    style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem;"
+                ),
+                render_clean_table(state.df_rt_headers(), state.df_rt_rows(), "tbl_rt_refill"),
+                style="padding: 0.75rem 0;"
+            )
+        )
+
+        return ui.div(
+            ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
+            ui.navset_card_tab(
+                ui.nav_panel("📊 DISPLAY AVAILABILITY (ARTICLE BASE)", tab1_display_content),
+                ui.nav_panel("🏬 REFILL TOKO (SKU BASE)", tab2_refill_content)
+            ),
+            style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
+        )
+
+    # Handler Download Excel
+    @render.download(filename="LIST_PENARIKAN_DISPLAY.xlsx")
+    def btn_dl_display_refill():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_pd_display.to_excel(writer, sheet_name='DISPLAY_REFILL', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    @render.download(filename="LIST_REFILL_TOKO.xlsx")
+    def btn_dl_rt_refill():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_rt_filtered.to_excel(writer, sheet_name='REFILL_TOKO', index=False)
         buf.seek(0)
         yield buf.getvalue()
 
