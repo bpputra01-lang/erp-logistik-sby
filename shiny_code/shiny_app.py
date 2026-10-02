@@ -625,29 +625,29 @@ def server(input: Inputs, output: Outputs, session: Session):
                 )
             )
 
-elif cur in ["Percentage Display", "Precentage Display"]:
-         guide_body = ui.div(
-             ui.tags.details(
-                 ui.tags.summary("📋 Logika Penarikan Display (Article Base)"),
-                 ui.div(
-                     ui.tags.ul(
-                         ui.tags.li(ui.strong("Filter Eksklusi:"), " Mengabaikan BIN OFFLINE, ONLINE, AMP, MARKOM, DEFECT, REJECT, STAGING, KARANTINA, EVENT, INB, OUT, PUTAWAY."),
-                         ui.tags.li(ui.strong("Proteksi BIN OUT:"), " Jika SKU memiliki stok di BIN OUT > 0, otomatis dikecualikan dari list penarikan display."),
-                         ui.tags.li(ui.strong("Prioritas Sumber:"), " Diprioritaskan mengambil dari Gudang Lt. 2 (STR/STORE/GUDANG), baru kemudian dari DC.")
-                     ), class_="accordion-content"
-                 ), open=True
-             ),
-             ui.tags.details(
-                 ui.tags.summary("🏬 Logika Refill Toko (SKU Base)"),
-                 ui.div(
-                     ui.tags.ul(
-                         ui.tags.li("Mengabaikan kategori: ", ui.strong("Shoes, Sandals, Footwear"), "."),
-                         ui.tags.li(ui.strong("Lower Body:"), " Wajib refill jika stok di Toko < 6."),
-                         ui.tags.li(ui.strong("Kategori Lainnya:"), " Wajib refill jika stok di Toko < 2 (minimal stok gudang > 0).")
-                     ), class_="accordion-content"
-                 ), open=True
-             )
-         )
+        elif cur in ["Percentage Display", "Precentage Display"]:
+            guide_body = ui.div(
+                ui.tags.details(
+                    ui.tags.summary("📋 Logika Penarikan Display (Article Base)"),
+                    ui.div(
+                        ui.tags.ul(
+                            ui.tags.li(ui.strong("Filter Eksklusi:"), " Mengabaikan BIN OFFLINE, ONLINE, AMP, MARKOM, DEFECT, REJECT, STAGING, KARANTINA, EVENT, INB, OUT, PUTAWAY."),
+                            ui.tags.li(ui.strong("Proteksi BIN OUT:"), " Jika SKU memiliki stok di BIN OUT > 0, otomatis dikecualikan dari list penarikan display."),
+                            ui.tags.li(ui.strong("Prioritas Sumber:"), " Diprioritaskan mengambil dari Gudang Lt. 2 (STR/STORE/GUDANG), baru kemudian dari DC.")
+                        ), class_="accordion-content"
+                    ), open=True
+                ),
+                ui.tags.details(
+                    ui.tags.summary("🏬 Logika Refill Toko (SKU Base)"),
+                    ui.div(
+                        ui.tags.ul(
+                            ui.tags.li("Mengabaikan kategori: ", ui.strong("Shoes, Sandals, Footwear"), "."),
+                            ui.tags.li(ui.strong("Lower Body:"), " Wajib refill jika stok di Toko < 6."),
+                            ui.tags.li(ui.strong("Kategori Lainnya:"), " Wajib refill jika stok di Toko < 2 (minimal stok gudang > 0).")
+                        ), class_="accordion-content"
+                    ), open=True
+                )
+            )
 
             # PANDUAN: PHYSICAL INVENTORY LIST (2-IN-1 MODE)
         elif cur == "Physical Inventory List":
