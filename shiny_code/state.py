@@ -535,6 +535,7 @@ class AppState:
         elif cur_menu == "Balancing Stock": return "balancing_stock"
         elif cur_menu == "Physical Inventory List": return "physical_inventory_list"
         elif cur_menu in ["Validation Barcode SKU", "Validasi Barcode SKU"]: return "validation_barcode_sku"
+        elif cur_menu in ["Precentage Display", "Percentage Display", "Refill Toko"]: return "percentage_display"
         return "under_development"
 
 

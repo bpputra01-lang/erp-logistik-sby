@@ -98,6 +98,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         "balancing-stock": "Balancing Stock",
         "physical-inventory-list": "Physical Inventory List",
         "validation-barcode-sku": "Validation Barcode SKU",
+        "precentage-display": "Precentage Display",
         "percentage-display": "Percentage Display"
     }
 
