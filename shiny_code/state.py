@@ -3181,11 +3181,11 @@ class AppState:
             return False, f"Gagal Match Real & System: {e}"
 
 # ==========================================================================
-    # BALANCING STOCK: ROW-PER-BIN BREAKDOWN ENGINE (IMMUNE TO 'NaN' INT ERROR)
+    # BALANCING STOCK: ROW-PER-BIN BREAKDOWN ENGINE (100% AMAN DARI ERROR 'NaN')
     # ==========================================================================
     def process_balancing_stock(self, f_stock, f_sales, sub_filter=None):
         try:
-            # Helper parsing angka ke integer yang 100% aman dari 'NaN' / string kosong
+            # Helper parsing angka ke integer yang anti-crash terhadap NaN / string kosong
             def to_int(val):
                 try:
                     if pd.isna(val) or val is None:
@@ -3231,7 +3231,7 @@ class AppState:
                 if df_stk_raw.empty:
                     return False, f"Tidak ada data stock yang cocok dengan Sub Kategori: {', '.join(sub_filter)}"
 
-            # 2. Deteksi Kolom Sales yang Akurat
+            # 2. Deteksi Kolom Sales yang Presisi
             def find_col_idx(df, keywords, default_idx):
                 if df.shape[1] > default_idx:
                     col_def = str(df.columns[default_idx]).strip().upper()
@@ -3299,7 +3299,7 @@ class AppState:
             is_target_off = df_valid_stk['BIN'].str.contains('OFF|TOKO|STORE|GL2-STORE|GUDANG LT.2|OUT', na=False)
             is_target_on = df_valid_stk['BIN'].str.contains('ONL|ONLINE|HUB', na=False)
 
-            # Hitung kolom stok positif secara cepat & anti-crash (tanpa lambda .loc)
+            # Hitung kolom stok positif secara cepat & bebas dari lambda .loc
             df_valid_stk['QTY_POS'] = df_valid_stk['QTY'].clip(lower=0)
             df_valid_stk['QTY_SOURCE'] = np.where(is_source, df_valid_stk['QTY_POS'], 0)
             df_valid_stk['QTY_OFF'] = np.where(is_target_off, df_valid_stk['QTY_POS'], 0)
@@ -3581,7 +3581,7 @@ class AppState:
             return True, f"Balancing Stock Selesai! ({len(df_refill):,} instruksi mutasi refill dibuat)"
         except Exception as e:
             return False, f"Gagal memproses Balancing Stock: {e}"
-
+            
     # ==========================================================================
     # VALIDATION BARCODE SKU - STAGE 1 (FULL WARNA, RASA & COMPOSITE VARIANTS)
     # ==========================================================================
