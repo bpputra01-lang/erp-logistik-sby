@@ -3141,7 +3141,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
 
-    # ==========================================================================
+   # ==========================================================================
     # CONTROLLER PERCENTAGE DISPLAY & REFILL TOKO (ANTI-RESET TAB)
     # ==========================================================================
     
@@ -3152,6 +3152,30 @@ def server(input: Inputs, output: Outputs, session: Session):
             sub = list(input.rt_filter_sub()) if "rt_filter_sub" in input and input.rt_filter_sub() is not None else []
             state.apply_refill_filter(sub)
 
+# ==========================================================================
+    # TOMBOL AKSI PERCENTAGE DISPLAY & REFILL TOKO
+    # ==========================================================================
+    @render.ui
+    def percentage_display_action_btn_ui():
+        f = input.upload_percentage_display_file() if "upload_percentage_display_file" in input else None
+        if f and len(f) > 0:
+            return ui.div(
+                ui.tags.button(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "JALANKAN ANALISIS DISPLAY & REFILL"),
+                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_process_percentage_display', Math.random(), {priority: 'event'});",
+                    class_="btn-red-gradient"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 1rem;"
+            )
+        return ui.div(
+            ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"),
+                "UPLOAD FILE STOCK UNTUK MEMULAI",
+                disabled=True,
+                class_="btn-locked"
+            ),
+            style="display: flex; justify-content: flex-end; width: 100%; margin-top: 1rem;"
+        )
     # 2. Wadah Utama Tab (Render Sekali - Tidak membaca state.rt_* agar Tab tidak loncat)
     @render.ui
     def percentage_display_results_container():
@@ -3214,6 +3238,33 @@ def server(input: Inputs, output: Outputs, session: Session):
             return ui.div()
 
         return ui.div(
+            ui.div(
+                dark_metric_box("📦 TOTAL SKU PERLU REFILL", f"{state.rt_total_sku():,} SKU", "#3182CE"),
+                dark_metric_box("🔥 PRIORITY (QTY TOKO 0)", f"{state.rt_priority_sku():,} SKU", "#DD6B20"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
+            ),
+            ui.div(
+                ui.div(
+                    ui.h4("📋 Detail List SKU Perlu Refill ke Toko", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0;"),
+                    ui.download_button(
+                        "btn_dl_rt_refill",
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "Download List Refill (.xlsx)"),
+                        style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
+                    ),
+                    style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem;"
+                ),
+                render_clean_table(state.df_rt_headers(), state.df_rt_rows(), "tbl_rt_refill"),
+                style="padding: 0.75rem 0;"
+            )
+        )
+
+        # Tab 2 Content: Refill Toko List
+        tab2_refill_content = ui.div(
+            ui.div(
+                ui.h4("🔍 Filter Sub Kategori:", style="font-size: 14px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
+                ui.input_selectize("rt_filter_sub", None, choices=state.rt_sub_categories(), multiple=True, width="100%"),
+                style="background: #F8FAFC; border: 1px solid #E2E8F0; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;"
+            ),
             ui.div(
                 dark_metric_box("📦 TOTAL SKU PERLU REFILL", f"{state.rt_total_sku():,} SKU", "#3182CE"),
                 dark_metric_box("🔥 PRIORITY (QTY TOKO 0)", f"{state.rt_priority_sku():,} SKU", "#DD6B20"),
