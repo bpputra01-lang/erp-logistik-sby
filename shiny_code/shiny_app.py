@@ -9,7 +9,7 @@ from views import (
     putaway_view, main_dashboard_view, sidebar, ongkir_tab2_view, compare_rto_view, 
     justification_so_view, cycle_count_view, login_page, ppa_audit_view, 
     cycle_count_analyzer_view, global_header, cross_check_real_system_view,
-    balancing_stock_view, physical_inventory_list_view, validation_barcode_sku_view, percentage_display_view
+    balancing_stock_view, physical_inventory_list_view, validation_barcode_sku_view, percentage_display_view,excel_practice_view
 )
 
 app_ui = ui.page_fluid(
@@ -988,6 +988,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         elif content_type == "physical_inventory_list": page_content = physical_inventory_list_view(state)
         elif content_type == "validation_barcode_sku": page_content = validation_barcode_sku_view(state)
         elif content_type in ["percentage_display", "percentage-display"]: page_content = percentage_display_view(state)
+        elif content_type in ["excel_practice", "latihan_excel"]: page_content = excel_practice_view(state)
         elif content_type == "access_denied":
             page_content = ui.div(ui.h2("⛔ Akses Ditolak", style="font-size: 28px; color: #E53E3E; font-weight: bold;"), ui.p("Maaf, halaman ini dibatasi hak aksesnya.", style="color: #718096; font-size: 15px;"), style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;")
         else:
@@ -3310,5 +3311,102 @@ def server(input: Inputs, output: Outputs, session: Session):
             state._raw_df_rt_filtered.to_excel(writer, sheet_name='REFILL_TOKO', index=False)
         buf.seek(0)
         yield buf.getvalue()
+
+# ==========================================================================
+    # CONTROLLER: LATIHAN EXCEL & AUTO-GRADING SYSTEM
+    # ==========================================================================
+
+    # 1. Tombol Aksi Upload & Koreksi
+    @render.ui
+    def excel_practice_action_btn_ui():
+        f = input.upload_exam_answer_file() if "upload_exam_answer_file" in input else None
+        if f and len(f) > 0:
+            return ui.div(
+                ui.tags.button(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-wand-magic-sparkles", style="margin-right: 6px; font-size: 14px;"), "RUN KOREKSI JAWABAN OTOMATIS"),
+                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_process_exam_grading', Math.random(), {priority: 'event'});",
+                    class_="btn-red-gradient"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.75rem;"
+            )
+        return ui.div(
+            ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"),
+                "UPLOAD FILE JAWABAN UNTUK KOREKSI OTOMATIS",
+                disabled=True,
+                class_="btn-locked"
+            ),
+            style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.75rem;"
+        )
+
+    # 2. Eksekusi Koreksi Otomatis
+    @reactive.Effect
+    @reactive.event(input.btn_process_exam_grading)
+    def _proc_exam_grading():
+        f = input.upload_exam_answer_file()
+        if not f:
+            state.error_modal_message.set("Upload file jawaban terlebih dahulu!")
+            state.show_error_modal.set(True)
+            return
+
+        succ, msg = state.grade_excel_practice(f)
+        if succ:
+            state.show_success_modal.set(True)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+
+    # 3. Tampilan Hasil Scorecard & Evaluasi Detail
+    @render.ui
+    def excel_practice_results_container():
+        if not state.excel_exam_graded():
+            return ui.div()
+
+        score = state.excel_exam_score()
+        score_color = "#10B981" if score >= 75 else ("#DD6B20" if score >= 50 else "#E53E3E")
+
+        return ui.div(
+            ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
+            ui.h4("🏆 HASIL KOREKSI OTOMATIS & EVALUASI FORMULA EXCEL", style="font-size: 16px; font-weight: 800; color: #1A202C; margin-bottom: 1rem;"),
+            
+            # Kartu Metrik Skor & Ringkasan Benar/Salah
+            ui.div(
+                dark_metric_box("🎯 NILAI / SKOR AKHIR", f"{score} / 100", score_color),
+                dark_metric_box("✅ TOTAL JAWABAN BENAR", f"{state.excel_exam_correct()} SOAL", "#10B981"),
+                dark_metric_box("❌ TOTAL JAWABAN SALAH", f"{state.excel_exam_wrong()} SOAL", "#E53E3E"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+            ),
+
+            # Tabel Detail Scorecard Per Soal
+            ui.div(
+                ui.div(
+                    ui.h4("📋 Detail Evaluasi Per Rumus (Auto-Grading Scorecard)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0;"),
+                    ui.download_button(
+                        "btn_dl_exam_report",
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-file-excel", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD HASIL EVALUASI (.xlsx)"),
+                        style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
+                    ),
+                    style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem;"
+                ),
+                render_clean_table(state.df_exam_result_headers(), state.df_exam_result_rows(), "tbl_exam_report"),
+                style="padding: 0.75rem 0;"
+            ),
+            style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
+        )
+
+    # 4. Handler Download Laporan Evaluasi Ujian
+    @render.download(filename="LAPORAN_EVALUASI_EXCEL_PESERTA.xlsx")
+    def btn_dl_exam_report():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_exam_result.to_excel(writer, sheet_name='SCORECARD_EVALUASI', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    # 5. Handler Download Soal (Dinamis & Tanpa Kunci Jawaban)
+    @render.download(filename="SOAL_LATIHAN_EXCEL_RETAIL_SEPATU.xlsx")
+    def btn_dl_excel_practice():
+        content = state.generate_excel_practice_package()
+        yield content
 
 app = App(app_ui, server)

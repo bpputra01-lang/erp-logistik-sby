@@ -1141,6 +1141,70 @@ def percentage_display_view(state: AppState):
         style="width: 100%; padding: 1rem;"
     )
 
+# ==============================================================================
+# VIEW: LATIHAN RUMUS EXCEL & KOREKSI OTOMATIS (CBT SYSTEM)
+# ==============================================================================
+def excel_practice_view(state: AppState):
+    preview_data = state.excel_exam_questions()
+    
+    if preview_data and len(preview_data) > 0:
+        headers = ["NO", "RUMUS", "TUGAS", "INSTRUKSI"]
+        rows = [[d["NO"], d["RUMUS"], d["TUGAS"], d["INSTRUKSI"]] for d in preview_data]
+        table_preview = render_clean_table(headers, rows, "tbl_soal_preview")
+    else:
+        table_preview = ui.div(
+            ui.tags.i(class_="fa-solid fa-file-excel", style="font-size: 38px; color: #CBD5E0; margin-bottom: 8px;"),
+            ui.p("Klik tombol 'GENERATE SOAL BARU' untuk membuat paket soal teracak baru.", style="color: #718096; font-style: italic; margin: 0;"),
+            style="text-align: center; padding: 2rem; background: #F8FAFC; border-radius: 8px; border: 1.5px dashed #CBD5E0;"
+        )
+
+    return ui.div(
+        # Header Banner
+        ui.div(
+            ui.div(
+                ui.div(
+                    ui.tags.i(class_="fa-solid fa-graduation-cap", style="color: #FFFFFF; font-size: 24px;"),
+                    style="width: 44px; height: 44px; background: linear-gradient(135deg, #10B981 0%, #059669 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-right: 12px;"
+                ),
+                ui.div(
+                    ui.h3("Latihan Kemahiran Rumus Excel Retail & Warehouse", style="font-size: 18px; font-weight: 800; color: #1A202C; margin: 0;"),
+                    ui.p("Soal otomatis diacak seputar stok sepatu olahraga. Kunci jawaban tersembunyi & otomatis dikoreksi oleh sistem.", style="font-size: 13px; color: #718096; margin: 0;")
+                ),
+                style="display: flex; align-items: center;"
+            ),
+            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+        ),
+
+        # TAHAP 1: GENERATE & DOWNLOAD SOAL
+        ui.div(
+            ui.div(
+                ui.div(
+                    ui.h4("1️⃣ TAHAP 1: Ambil Paket Soal Ujian (Acak & Tanpa Kunci)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
+                    ui.p("Klik tombol di sebelah kanan untuk men-download file Excel (.xlsx). Kunci jawaban tidak ditampilkan di file peserta.", style="color: #718096; font-size: 13px; margin: 0;"),
+                ),
+                ui.download_button(
+                    "btn_dl_excel_practice",
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-cloud-arrow-down", style="margin-right: 8px; font-size: 14px;"), "GENERATE & DOWNLOAD SOAL EXCEL"),
+                    style="background: linear-gradient(135deg, #3182CE 0%, #2B6CB0 100%); color: white; font-weight: 800; border-radius: 8px; border: none; padding: 10px 20px; cursor: pointer; font-size: 13px; box-shadow: 0 4px 12px rgba(49, 130, 206, 0.3);"
+                ),
+                style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 10px; margin-bottom: 1rem;"
+            ),
+            table_preview,
+            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+        ),
+
+        # TAHAP 2: UPLOAD JAWABAN & KOREKSI OTOMATIS
+        ui.div(
+            ui.h4("2️⃣ TAHAP 2: Upload Jawaban Peserta & Koreksi Otomatis by Sistem", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+            custom_uploader_box("upload_exam_answer_file", "Upload File Excel yang Sudah Diisi Peserta"),
+            ui.output_ui("excel_practice_action_btn_ui"),
+            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+        ),
+
+        # WADAH HASIL PENILAIAN (SCORECARD & AUTO-GRADING REPORT)
+        ui.output_ui("excel_practice_results_container"),
+        style="width: 100%; padding: 1rem;"
+    )
     
 def menu_item(label: str, target_menu: str, current_menu: str):
     import re
