@@ -99,7 +99,9 @@ def server(input: Inputs, output: Outputs, session: Session):
         "physical-inventory-list": "Physical Inventory List",
         "validation-barcode-sku": "Validation Barcode SKU",
         "precentage-display": "Precentage Display",
-        "percentage-display": "Percentage Display"
+        "percentage-display": "Percentage Display",
+        "latihan-excel": "Latihan Excel",
+        "excel-practice": "Latihan Excel"
     }
 
     # 1. Saat menu diklik di sidebar -> URL di browser otomatis berubah

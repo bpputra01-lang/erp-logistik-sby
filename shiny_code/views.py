@@ -219,12 +219,41 @@ CUSTOM_HEAD = ui.head_content(
             }
         }, true);
 
-        // --- 5. SPINNER CONTROLLER ---
+        // --- 5. SPINNER CONTROLLER (PENGAMAN ANTI-LAYAR GELAP) ---
+        window.hideGlobalSpinner = function() {
+            document.body.classList.remove('process-running');
+            let spinner = document.getElementById('global_reflex_loading');
+            if (spinner) spinner.style.display = 'none';
+        };
+
         window.showGlobalSpinner = function() {
             let spinner = document.getElementById('global_reflex_loading');
             if (spinner) spinner.style.removeProperty('display');
             document.body.classList.add('process-running');
+
+            // Pengaman 1: Maksimal 5 detik layar gelap wajib hilang
+            clearTimeout(window.spinnerSafetyTimer);
+            window.spinnerSafetyTimer = setTimeout(function() {
+                window.hideGlobalSpinner();
+            }, 5000);
         };
+
+        // Pengaman 2: Klik di mana saja pada area gelap langsung menutupnya
+        document.addEventListener('click', function(e) {
+            let overlay = document.getElementById('global_reflex_loading');
+            if (overlay && (e.target === overlay)) {
+                window.hideGlobalSpinner();
+            }
+        });
+
+        // Pengaman 3: Semua tombol download langsung mencabut layar gelap setelah 1 detik
+        document.addEventListener('click', function(e) {
+            if (e.target && (e.target.closest('.shiny-download-link') || e.target.closest('a[download]'))) {
+                setTimeout(function() {
+                    window.hideGlobalSpinner();
+                }, 1000);
+            }
+        });
 
         // --- 6. SHINY EVENT LISTENERS ---
         if (window.jQuery) {
@@ -402,7 +431,7 @@ CUSTOM_HEAD = ui.head_content(
         }
         @keyframes reflexSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        #global_reflex_loading { display: none; }
+        #global_reflex_loading { display: none; cursor: pointer; }
         body.process-running #global_reflex_loading {
             display: flex !important; position: fixed !important;
             top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important;
@@ -1147,14 +1176,15 @@ def percentage_display_view(state: AppState):
 def excel_practice_view(state: AppState):
     preview_data = state.excel_exam_questions()
     
+    # Render tabel preview langsung
     if preview_data and len(preview_data) > 0:
-        headers = ["BAGIAN / KOLOM", "RUMUS", "TUGAS", "INSTRUKSI PENGERJAAN DI EXCEL"]
+        headers = ["BAGIAN / TABEL", "RUMUS", "TUGAS", "INSTRUKSI PENGERJAAN DI EXCEL"]
         rows = [[d["BAGIAN"], d["RUMUS"], d["TUGAS"], d["INSTRUKSI"]] for d in preview_data]
         table_preview = render_clean_table(headers, rows, "tbl_soal_preview")
     else:
         table_preview = ui.div(
             ui.tags.i(class_="fa-solid fa-table-list", style="font-size: 38px; color: #CBD5E0; margin-bottom: 8px;"),
-            ui.p("Klik tombol 'GENERATE & DOWNLOAD PAKET SOAL' untuk mengunduh lembar laporan dengan tabel dan kolom kosong.", style="color: #718096; font-style: italic; margin: 0;"),
+            ui.p("Daftar tabel soal sedang disiapkan...", style="color: #718096; font-style: italic; margin: 0;"),
             style="text-align: center; padding: 2rem; background: #F8FAFC; border-radius: 8px; border: 1.5px dashed #CBD5E0;"
         )
 
@@ -1168,7 +1198,7 @@ def excel_practice_view(state: AppState):
                 ),
                 ui.div(
                     ui.h3("Uji Kemahiran Formula Excel Retail Sepatu (Auto-Grading)", style="font-size: 18px; font-weight: 800; color: #1A202C; margin: 0;"),
-                    ui.p("Format soal berbentuk tabel laporan kerja nyata dengan kolom kuning kosong (SUM, COUNT, SUMIF, COUNTIF, SUMIFS, COUNTIFS, IF, XLOOKUP).", style="font-size: 13px; color: #718096; margin: 0;")
+                    ui.p("Format soal berbentuk tabel laporan kerja nyata dengan kolom kuning kosong (SUM, COUNT/COUNTA, SUMIF, COUNTIF, SUMIFS, COUNTIFS, IF, XLOOKUP).", style="font-size: 13px; color: #718096; margin: 0;")
                 ),
                 style="display: flex; align-items: center;"
             ),
@@ -1185,7 +1215,7 @@ def excel_practice_view(state: AppState):
                 ui.download_button(
                     "btn_dl_excel_practice",
                     ui.tags.span(ui.tags.i(class_="fa-solid fa-cloud-arrow-down", style="margin-right: 8px; font-size: 14px;"), "GENERATE & DOWNLOAD PAKET SOAL (.XLSX)"),
-                    onclick="setTimeout(function() { document.body.classList.remove('process-running'); }, 1500);",
+                    onclick="setTimeout(function() { window.hideGlobalSpinner(); }, 1200);",
                     style="background: linear-gradient(135deg, #3182CE 0%, #2B6CB0 100%); color: white; font-weight: 800; border-radius: 8px; border: none; padding: 10px 20px; cursor: pointer; font-size: 13px; box-shadow: 0 4px 12px rgba(49, 130, 206, 0.3);"
                 ),
                 style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 10px; margin-bottom: 1rem;"
