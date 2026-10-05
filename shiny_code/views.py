@@ -1214,8 +1214,12 @@ def excel_practice_view(state: AppState):
                 ),
                 ui.download_button(
                     "btn_dl_excel_practice",
-                    ui.tags.span(ui.tags.i(class_="fa-solid fa-cloud-arrow-down", style="margin-right: 8px; font-size: 14px;"), "GENERATE & DOWNLOAD PAKET SOAL (.XLSX)"),
-                    onclick="setTimeout(function() { window.hideGlobalSpinner(); }, 1200);",
+                    ui.tags.span(
+                        ui.tags.i(class_="fa-solid fa-cloud-arrow-down", style="margin-right: 8px; font-size: 14px;"),
+                        "GENERATE & DOWNLOAD PAKET SOAL (.XLSX)"
+                    ),
+                    # 👇 Bersihkan spinner & class running secara langsung
+                    onclick="window.hideGlobalSpinner(); document.body.classList.remove('process-running'); setTimeout(function() { window.hideGlobalSpinner(); }, 500);",
                     style="background: linear-gradient(135deg, #3182CE 0%, #2B6CB0 100%); color: white; font-weight: 800; border-radius: 8px; border: none; padding: 10px 20px; cursor: pointer; font-size: 13px; box-shadow: 0 4px 12px rgba(49, 130, 206, 0.3);"
                 ),
                 style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 10px; margin-bottom: 1rem;"

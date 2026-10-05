@@ -3344,15 +3344,24 @@ def server(input: Inputs, output: Outputs, session: Session):
     def _proc_exam_grading():
         f = input.upload_exam_answer_file()
         if not f:
+            # Hilangkan layar gelap seketika
+            ui.insert_ui(ui.tags.script("window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
             state.error_modal_message.set("Upload file jawaban terlebih dahulu!")
             state.show_error_modal.set(True)
             return
 
-        succ, msg = state.grade_excel_practice(f)
-        if succ:
-            state.show_success_modal.set(True)
-        else:
-            state.error_modal_message.set(msg)
+        try:
+            succ, msg = state.grade_excel_practice(f)
+            # Hilangkan layar gelap
+            ui.insert_ui(ui.tags.script("window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+            if succ:
+                state.show_success_modal.set(True)
+            else:
+                state.error_modal_message.set(msg)
+                state.show_error_modal.set(True)
+        except Exception as e:
+            ui.insert_ui(ui.tags.script("window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+            state.error_modal_message.set(f"Terjadi kesalahan: {str(e)}")
             state.show_error_modal.set(True)
 
     @render.ui
@@ -3401,7 +3410,18 @@ def server(input: Inputs, output: Outputs, session: Session):
 
     @render.download(filename="LATIHAN_EXCEL_RETAIL_SEPATU.xlsx")
     def btn_dl_excel_practice():
-        content = state.generate_excel_practice_package()
-        yield content
+        try:
+            content = state.generate_excel_practice_package()
+            # Jika mengembalikan BytesIO, ambil value bytes-nya
+            if hasattr(content, "getvalue"):
+                yield content.getvalue()
+            elif hasattr(content, "read"):
+                content.seek(0)
+                yield content.read()
+            else:
+                yield content
+        except Exception as e:
+            print(f"Error generate excel practice: {e}")
+            yield b""
 
 app = App(app_ui, server)
