@@ -4196,7 +4196,7 @@ class AppState:
 
 
 # ==========================================================================
-    # 1. GENERATOR SOAL LATIHAN EXCEL TANPA KUNCI JAWABAN (ACAK & DINAMIS)
+    # 1. GENERATOR PAKET SOAL BERBENTUK TABEL DENGAN KOLOM KOSONG (RETAIL SEPATU)
     # ==========================================================================
     def generate_excel_practice_package(self):
         import random
@@ -4205,16 +4205,15 @@ class AppState:
         from openpyxl.utils import get_column_letter
 
         wb = Workbook()
-        ws_soal = wb.active
-        ws_soal.title = "LEMBAR_SOAL"
+        ws_rekap = wb.active
+        ws_rekap.title = "LAPORAN_REKAPITULASI"
         ws_data = wb.create_sheet(title="DATA_STOK_SEPATU")
         ws_ref = wb.create_sheet(title="REF_DISTRIBUTOR")
         
-        # Sheet Metadata Rahasia untuk Auto-Grading (veryHidden = tidak bisa di-unhide lewat GUI Excel)
+        # Sheet Metadata Evaluasi (veryHidden agar peserta tidak bisa unhide via Excel)
         ws_meta = wb.create_sheet(title="_SYS_EVAL_META")
         ws_meta.sheet_state = 'veryHidden'
 
-        # Master Data Pool Acak
         BRANDS = ["SPECS", "ORTUSEIGHT", "MILLS", "PIERO", "NINETEN", "MIZUNO", "ADIDAS", "PUMA"]
         SERIES = {
             "SPECS": ["Lightspeed Reborn", "Hyperspeed Pro", "Swervo Thunder", "Galactica", "Illuzion"],
@@ -4256,26 +4255,35 @@ class AppState:
             lead_time = random.choice(["2 HARI", "3 HARI", "5 HARI", "7 HARI"])
             sku_ref_map[sku_code] = (distrib, lead_time)
 
+            # Kolom M (Distributor: XLOOKUP) & N (Status: IF) SENGAJA DIKOSONGKAN
             rows_data.append([
                 i, sku_code, brand, f"{brand} {model}", kategori, size, bin_lokasi,
-                harga_beli, harga_jual, stok_awal, terjual, sisa_stok, "" # Kolom status IF
+                harga_beli, harga_jual, stok_awal, terjual, sisa_stok, "", ""
             ])
 
         font_header = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
-        fill_header_navy = PatternFill(start_color="1A365D", end_color="1A365D", fill_type="solid")
-        fill_header_gold = PatternFill(start_color="C5A059", end_color="C5A059", fill_type="solid")
-        fill_header_green = PatternFill(start_color="276749", end_color="276749", fill_type="solid")
+        font_sub = Font(name="Calibri", size=11, bold=True, color="1A202C")
+        fill_navy = PatternFill(start_color="1A365D", end_color="1A365D", fill_type="solid")
+        fill_green = PatternFill(start_color="276749", end_color="276749", fill_type="solid")
+        fill_gold = PatternFill(start_color="C5A059", end_color="C5A059", fill_type="solid")
+        fill_yellow_blank = PatternFill(start_color="FEFCBF", end_color="FEFCBF", fill_type="solid") # Kolom Kosong Peserta
         border_thin = Border(left=Side(style='thin', color='CBD5E0'), right=Side(style='thin', color='CBD5E0'),
                              top=Side(style='thin', color='CBD5E0'), bottom=Side(style='thin', color='CBD5E0'))
 
-        # 1. SHEET DATA_STOK_SEPATU
-        headers_data = ["NO", "SKU", "BRAND", "NAMA SEPATU", "KATEGORI", "SIZE", "LOKASI BIN",
-                        "HARGA BELI", "HARGA JUAL", "STOK AWAL", "TERJUAL", "SISA STOK", "STATUS REFILL (TUGAS SOAL 7)"]
+        # ----------------------------------------------------------------------
+        # 1. RENDER SHEET DATA_STOK_SEPATU (Dengan 2 Kolom Kosong: XLOOKUP & IF)
+        # ----------------------------------------------------------------------
+        headers_data = [
+            "NO", "SKU", "BRAND", "NAMA SEPATU", "KATEGORI", "SIZE", "LOKASI BIN",
+            "HARGA BELI", "HARGA JUAL", "STOK AWAL", "TERJUAL", "SISA STOK",
+            "DISTRIBUTOR RESMI (KOSONG: ISI DGN XLOOKUP)",
+            "STATUS REFILL (KOSONG: ISI DGN IF)"
+        ]
         ws_data.append(headers_data)
         for col_idx in range(1, len(headers_data) + 1):
             cell = ws_data.cell(row=1, column=col_idx)
             cell.font = font_header
-            cell.fill = fill_header_navy
+            cell.fill = fill_navy if col_idx <= 12 else fill_gold
             cell.alignment = Alignment(horizontal="center", vertical="center")
 
         for r_idx, r in enumerate(rows_data, start=2):
@@ -4287,15 +4295,19 @@ class AppState:
                     cell.number_format = '"Rp "#,##0'
                 elif c_idx in [1, 6, 10, 11, 12]:
                     cell.alignment = Alignment(horizontal="center")
+                elif c_idx in [13, 14]:
+                    cell.fill = fill_yellow_blank # Beri warna kuning tanda kolom wajib diisi
 
-        # 2. SHEET REF_DISTRIBUTOR (Untuk XLOOKUP)
+        # ----------------------------------------------------------------------
+        # 2. RENDER SHEET REF_DISTRIBUTOR (Master Lookup)
+        # ----------------------------------------------------------------------
         headers_ref = ["SKU SEPATU", "DISTRIBUTOR RESMI", "LEAD TIME PENGIRIMAN"]
         ws_ref.append(headers_ref)
-        for col_idx in range(1, len(headers_ref) + 1):
-            cell = ws_ref.cell(row=1, column=col_idx)
-            cell.font = font_header
-            cell.fill = fill_header_gold
-            cell.alignment = Alignment(horizontal="center")
+        for col_idx in range(1, 4):
+            c = ws_ref.cell(row=1, column=col_idx)
+            c.font = font_header
+            c.fill = fill_navy
+            c.alignment = Alignment(horizontal="center")
 
         ref_list = list(sku_ref_map.items())
         random.shuffle(ref_list)
@@ -4304,336 +4316,367 @@ class AppState:
             for c_idx in range(1, 4):
                 cell = ws_ref.cell(row=r_idx, column=c_idx)
                 cell.border = border_thin
-                if c_idx == 1:
-                    cell.alignment = Alignment(horizontal="center")
+                if c_idx == 1: cell.alignment = Alignment(horizontal="center")
 
-        # 3. Parameter Soal Teracak
-        target_brand_sumif = random.choice(BRANDS)
-        target_bin_countif = random.choice(BINS)
-        target_brand_sumifs = random.choice([b for b in BRANDS if b != target_brand_sumif])
-        target_size_sumifs = random.choice([40, 41, 42])
-        target_kat_countifs = random.choice(KATEGORI_LIST)
-        sample_sku_xlookup = random.choice(list(sku_set))
-        expected_distributor = sku_ref_map[sample_sku_xlookup][0]
+        # ----------------------------------------------------------------------
+        # 3. RENDER SHEET LAPORAN_REKAPITULASI (Format Tabel Berkolom Kosong)
+        # ----------------------------------------------------------------------
+        ws_rekap.views.sheetView[0].showGridLines = True
+        
+        # Banner Judul
+        ws_rekap["A1"] = "LEMBAR UJIAN KEMAHIRAN EXCEL - LAPORAN MONITORING STOK RETAIL SEPATU"
+        ws_rekap["A1"].font = Font(name="Calibri", size=14, bold=True, color="1A365D")
+        ws_rekap["A2"] = "Petunjuk: Lengkapi seluruh tabel dan kolom berlatar KUNING menggunakan formula Excel yang diminta."
+        ws_rekap["A2"].font = Font(name="Calibri", size=10, italic=True, color="4A5568")
 
-        # 4. SHEET LEMBAR_SOAL (Tanpa Kolom Kunci Jawaban)
-        soal_items = [
-            ("1", "SUM", "Total Seluruh Sisa Stok Sepatu",
-             "Gunakan rumus =SUM(...) untuk menghitung total seluruh Sisa Stok sepatu yang ada (Kolom L di DATA_STOK_SEPATU)."),
+        # --- TABEL 1: TOTAL GLOBAL (SUM & COUNT) ---
+        ws_rekap["A4"] = "TABEL 1: REKAPITULASI TOTAL GLOBAL TOKO"
+        ws_rekap["A4"].font = font_sub
+        
+        tbl1_headers = ["INDIKATOR METRIK", "NILAI HASIL FORMULA (KOSONG: ISI RUMUS)", "RUMUS YANG DIMINTA"]
+        for c_idx, h in enumerate(tbl1_headers, start=1):
+            c = ws_rekap.cell(row=5, column=c_idx, value=h)
+            c.font = font_header
+            c.fill = fill_green
+            c.alignment = Alignment(horizontal="center")
+            c.border = border_thin
 
-            ("2", "COUNT", "Total Baris SKU yang Terdaftar",
-             "Gunakan rumus =COUNT(...) untuk menghitung berapa total SKU sepatu yang aktif terdaftar menggunakan Kolom A."),
+        ws_rekap["A6"] = "Total Seluruh Sisa Stok Sepatu di Gudang & Toko"
+        ws_rekap["B6"] = "" # KOSONG: =SUM(...)
+        ws_rekap["B6"].fill = fill_yellow_blank
+        ws_rekap["C6"] = "Wajib gunakan rumus =SUM(...)"
+        
+        ws_rekap["A7"] = "Total Jumlah SKU Sepatu Aktif Terdaftar"
+        ws_rekap["B7"] = "" # KOSONG: =COUNT(...)
+        ws_rekap["B7"].fill = fill_yellow_blank
+        ws_rekap["C7"] = "Wajib gunakan rumus =COUNT(...)"
 
-            ("3", "SUMIF", f"Total Pasang Terjual Khusus Brand '{target_brand_sumif}'",
-             f"Gunakan rumus =SUMIF(...) untuk menghitung total pasang terjual (Kolom K) hanya untuk Brand '{target_brand_sumif}'."),
+        for r in range(6, 8):
+            for c in range(1, 4):
+                ws_rekap.cell(row=r, column=c).border = border_thin
 
-            ("4", "COUNTIF", f"Jumlah SKU yang Berada di Lokasi '{target_bin_countif}'",
-             f"Gunakan rumus =COUNTIF(...) untuk menghitung berapa banyak SKU yang berada di lokasi BIN '{target_bin_countif}' (Kolom G)."),
+        # --- TABEL 2: REKAP PER BRAND (SUMIF & COUNTIF) ---
+        ws_rekap["A9"] = "TABEL 2: REKAPITULASI PENJUALAN & SKU PER BRAND"
+        ws_rekap["A9"].font = font_sub
 
-            ("5", "SUMIFS", f"Total Terjual Brand '{target_brand_sumifs}' Ukuran Size {target_size_sumifs}",
-             f"Gunakan rumus =SUMIFS(...) dengan 2 kriteria: Brand = '{target_brand_sumifs}' DAN Size = {target_size_sumifs}."),
-
-            ("6", "COUNTIFS", f"Jumlah SKU '{target_kat_countifs}' dengan Sisa Stok > 5",
-             f"Gunakan rumus =COUNTIFS(...) untuk menghitung SKU berkategori '{target_kat_countifs}' yang sisa stoknya > 5 pasang."),
-
-            ("7", "IF", "Status Refill di Kolom M Sheet DATA_STOK_SEPATU",
-             "Ketik rumus =IF(...) di sel E8 ini untuk baris ke-2: Jika Sisa Stok (L2) <= 3 maka 'REFILL', selain itu 'AMAN'."),
-
-            ("8", "XLOOKUP", f"Cari Distributor Resmi untuk SKU '{sample_sku_xlookup}'",
-             f"Gunakan rumus =XLOOKUP(...) untuk mencari nama distributor resmi dari SKU '{sample_sku_xlookup}' pada sheet REF_DISTRIBUTOR.")
+        tbl2_headers = [
+            "NO", "BRAND SEPATU", 
+            "TOTAL TERJUAL (KOSONG: ISI DGN SUMIF)", 
+            "JUMLAH MODEL SKU (KOSONG: ISI DGN COUNTIF)"
         ]
+        for c_idx, h in enumerate(tbl2_headers, start=1):
+            c = ws_rekap.cell(row=10, column=c_idx, value=h)
+            c.font = font_header
+            c.fill = fill_green
+            c.alignment = Alignment(horizontal="center")
+            c.border = border_thin
 
-        ws_soal.append(["NO", "RUMUS YANG DIUJI", "JUDUL TUGAS", "INSTRUKSI PENGERJAAN SOAL", "KETIK RUMUS LENGKAP ANDA DI SINI", "HASIL FORMULA EXCEL"])
-        for col_idx in range(1, 7):
-            cell = ws_soal.cell(row=1, column=col_idx)
-            cell.font = font_header
-            cell.fill = fill_header_green
-            cell.alignment = Alignment(horizontal="center", vertical="center")
+        for idx, br in enumerate(BRANDS, start=1):
+            curr_r = 10 + idx
+            ws_rekap.cell(row=curr_r, column=1, value=idx).alignment = Alignment(horizontal="center")
+            ws_rekap.cell(row=curr_r, column=2, value=br).font = Font(name="Calibri", bold=True)
+            
+            # Kolom C (SUMIF) & D (COUNTIF) Kosong Kuning
+            c_c = ws_rekap.cell(row=curr_r, column=3, value="")
+            c_c.fill = fill_yellow_blank
+            c_d = ws_rekap.cell(row=curr_r, column=4, value="")
+            c_d.fill = fill_yellow_blank
 
-        for r_idx, item in enumerate(soal_items, start=2):
-            no_soal, rumus, judul, instruksi = item
-            ws_soal.append([int(no_soal), rumus, judul, instruksi, "", ""])
-            for c_idx in range(1, 7):
-                c = ws_soal.cell(row=r_idx, column=c_idx)
-                c.border = border_thin
-                if c_idx in [1, 2]:
-                    c.alignment = Alignment(horizontal="center")
-                    c.font = Font(name="Calibri", bold=True)
-                elif c_idx == 5:
-                    c.fill = PatternFill(start_color="FEFCBF", end_color="FEFCBF", fill_type="solid") # Area Mengetik Kuning
+            for c in range(1, 5):
+                ws_rekap.cell(row=curr_r, column=c).border = border_thin
 
-        # 5. SHEET EVALUASI SISTEM (Disembunyikan secara Very Hidden)
-        meta_pairs = [
-            ("brand_sumif", target_brand_sumif),
-            ("bin_countif", target_bin_countif),
-            ("brand_sumifs", target_brand_sumifs),
-            ("size_sumifs", str(target_size_sumifs)),
-            ("kat_countifs", target_kat_countifs),
-            ("sku_xlookup", sample_sku_xlookup),
-            ("distrib_xlookup", expected_distributor)
+        # --- TABEL 3: REKAP MULTI-KRITERIA (SUMIFS & COUNTIFS) ---
+        start_t3 = 10 + len(BRANDS) + 2
+        ws_rekap.cell(row=start_t3, column=1, value="TABEL 3: REKAPITULASI MULTI-SYARAT BRAND & KATEGORI").font = font_sub
+
+        tbl3_headers = [
+            "NO", "BRAND", "KATEGORI SEPATU", 
+            "TOTAL TERJUAL (KOSONG: ISI DGN SUMIFS)", 
+            "JUMLAH SKU STOK > 5 (KOSONG: ISI DGN COUNTIFS)"
         ]
-        ws_meta.append(["KEY", "VALUE"])
-        for k, v in meta_pairs:
-            ws_meta.append([k, v])
+        for c_idx, h in enumerate(tbl3_headers, start=1):
+            c = ws_rekap.cell(row=start_t3 + 1, column=c_idx, value=h)
+            c.font = font_header
+            c.fill = fill_green
+            c.alignment = Alignment(horizontal="center")
+            c.border = border_thin
 
-        # Atur Lebar Kolom
-        for sheet in [ws_soal, ws_data, ws_ref]:
+        combo_samples = [
+            ("SPECS", "SEPATU BOLA"),
+            ("ORTUSEIGHT", "SEPATU FUTSAL"),
+            ("MILLS", "SEPATU RUNNING"),
+            ("ADIDAS", "SEPATU BOLA"),
+            ("PIERO", "SEPATU RUNNING")
+        ]
+        for idx, (br, kat) in enumerate(combo_samples, start=1):
+            curr_r = start_t3 + 1 + idx
+            ws_rekap.cell(row=curr_r, column=1, value=idx).alignment = Alignment(horizontal="center")
+            ws_rekap.cell(row=curr_r, column=2, value=br).font = Font(name="Calibri", bold=True)
+            ws_rekap.cell(row=curr_r, column=3, value=kat)
+            
+            # Kolom D (SUMIFS) & E (COUNTIFS) Kosong Kuning
+            c_d = ws_rekap.cell(row=curr_r, column=4, value="")
+            c_d.fill = fill_yellow_blank
+            c_e = ws_rekap.cell(row=curr_r, column=5, value="")
+            c_e.fill = fill_yellow_blank
+
+            for c in range(1, 6):
+                ws_rekap.cell(row=curr_r, column=c).border = border_thin
+
+        # Simpan Metadata Rahasia untuk Evaluasi Sistem
+        ws_meta.append(["total_brands", str(len(BRANDS))])
+        ws_meta.append(["start_row_t2", "11"])
+        ws_meta.append(["end_row_t2", str(10 + len(BRANDS))])
+        ws_meta.append(["start_row_t3", str(start_t3 + 2)])
+        ws_meta.append(["end_row_t3", str(start_t3 + 1 + len(combo_samples))])
+
+        for sheet in [ws_rekap, ws_data, ws_ref]:
             for col in sheet.columns:
                 max_len = max(len(str(cell.value or '')) for cell in col)
                 col_letter = get_column_letter(col[0].column)
-                sheet.column_dimensions[col_letter].width = max(max_len + 3, 12)
+                sheet.column_dimensions[col_letter].width = max(max_len + 3, 14)
 
         buf = io.BytesIO()
         wb.save(buf)
         buf.seek(0)
 
-        # Simpan preview ke state web
+        # Simpan Rincian Struktur Soal ke State Web
         self.excel_exam_questions.set([
-            {"NO": s[0], "RUMUS": s[1], "TUGAS": s[2], "INSTRUKSI": s[3]} for s in soal_items
+            {"BAGIAN": "TABEL 1 (Sel B6)", "RUMUS": "SUM", "TUGAS": "Total Sisa Stok", "INSTRUKSI": "Isi sel B6 dengan =SUM(...) dari kolom SISA STOK di DATA_STOK_SEPATU."},
+            {"BAGIAN": "TABEL 1 (Sel B7)", "RUMUS": "COUNT", "TUGAS": "Total Jumlah SKU", "INSTRUKSI": "Isi sel B7 dengan =COUNT(...) dari kolom NO di DATA_STOK_SEPATU."},
+            {"BAGIAN": "TABEL 2 (Kolom C)", "RUMUS": "SUMIF", "TUGAS": "Total Terjual per Brand", "INSTRUKSI": "Isi Kolom C dengan =SUMIF(...) untuk menghitung total penjualan masing-masing Brand."},
+            {"BAGIAN": "TABEL 2 (Kolom D)", "RUMUS": "COUNTIF", "TUGAS": "Jumlah SKU per Brand", "INSTRUKSI": "Isi Kolom D dengan =COUNTIF(...) untuk menghitung jumlah varian SKU per Brand."},
+            {"BAGIAN": "TABEL 3 (Kolom D)", "RUMUS": "SUMIFS", "TUGAS": "Total Terjual Multi-Syarat", "INSTRUKSI": "Isi Kolom D dengan =SUMIFS(...) berdasarkan 2 kriteria: Brand DAN Kategori."},
+            {"BAGIAN": "TABEL 3 (Kolom E)", "RUMUS": "COUNTIFS", "TUGAS": "Jumlah SKU Stok > 5", "INSTRUKSI": "Isi Kolom E dengan =COUNTIFS(...) dengan 2 syarat: Kategori DAN Stok > 5."},
+            {"BAGIAN": "DATA_STOK (Kolom M)", "RUMUS": "XLOOKUP", "TUGAS": "Distributor Resmi", "INSTRUKSI": "Isi seluruh Kolom M di DATA_STOK_SEPATU memakai =XLOOKUP(...) dari sheet REF_DISTRIBUTOR."},
+            {"BAGIAN": "DATA_STOK (Kolom N)", "RUMUS": "IF", "TUGAS": "Status Refill Toko", "INSTRUKSI": "Isi seluruh Kolom N di DATA_STOK_SEPATU: Jika Sisa Stok <= 3 maka 'REFILL', selain itu 'AMAN'."}
         ])
         return buf.getvalue()
 
     # ==========================================================================
-    # 2. ENGINE KOREKSI OTOMATIS JAWABAN PESERTA (AUTO-GRADER)
+    # 2. AUTO-GRADER TABEL & KOLOM KOSONG (KOREKSI OTOMATIS)
     # ==========================================================================
     def grade_excel_practice(self, f_exam):
         try:
             import openpyxl
-            import re
 
             if not f_exam:
                 return False, "File Excel jawaban peserta wajib diupload!"
 
             path = f_exam[0]["datapath"]
-
-            # Buka 2 mode: 1 untuk membaca rumus mentah (formulas), 1 untuk membaca hasil nilai kalkulasi (values)
             wb_form = openpyxl.load_workbook(path, data_only=False)
             wb_vals = openpyxl.load_workbook(path, data_only=True)
 
-            if "LEMBAR_SOAL" not in wb_form.sheetnames or "DATA_STOK_SEPATU" not in wb_form.sheetnames:
-                return False, "Format file tidak valid! Pastikan menggunakan file template soal yang digenerate sistem."
+            if "LAPORAN_REKAPITULASI" not in wb_form.sheetnames or "DATA_STOK_SEPATU" not in wb_form.sheetnames:
+                return False, "Format file tidak cocok! Pastikan mengunggah file template laporan resmi yang digenerate sistem."
 
-            # Baca Metadata Ujian
-            meta_dict = {}
-            if "_SYS_EVAL_META" in wb_vals.sheetnames:
-                ws_m = wb_vals["_SYS_EVAL_META"]
-                for row in ws_m.iter_rows(min_row=2, values_only=True):
-                    if row and row[0]:
-                        meta_dict[str(row[0]).strip()] = str(row[1]).strip()
+            ws_rk_f = wb_form["LAPORAN_REKAPITULASI"]
+            ws_rk_v = wb_vals["LAPORAN_REKAPITULASI"]
+            ws_dt_f = wb_form["DATA_STOK_SEPATU"]
+            ws_dt_v = wb_vals["DATA_STOK_SEPATU"]
 
-            # Baca Data Transaksi Sepatu ke Pandas untuk menghitung Nilai Pasti (Ground Truth)
-            ws_d = wb_vals["DATA_STOK_SEPATU"]
-            data_rows = list(ws_d.iter_rows(values_only=True))
-            if len(data_rows) < 2:
-                return False, "Data stok sepatu kosong!"
+            # Load Data Transaksi ke Pandas untuk Ground Truth
+            data_rows = list(ws_dt_v.iter_rows(values_only=True))
+            headers = [str(h).strip().upper() for h in data_rows[0]]
+            df_stk = pd.DataFrame(data_rows[1:], columns=headers)
 
-            headers_raw = [str(h).strip().upper() for h in data_rows[0]]
-            df_stk = pd.DataFrame(data_rows[1:], columns=headers_raw)
-
-            # Hitung Ground Truth dengan Pandas
             df_stk["TERJUAL"] = pd.to_numeric(df_stk["TERJUAL"], errors='coerce').fillna(0)
             df_stk["SISA STOK"] = pd.to_numeric(df_stk["SISA STOK"], errors='coerce').fillna(0)
-            df_stk["SIZE"] = pd.to_numeric(df_stk["SIZE"], errors='coerce').fillna(0)
             df_stk["BRAND"] = df_stk["BRAND"].astype(str).str.strip().str.upper()
-            df_stk["LOKASI BIN"] = df_stk["LOKASI BIN"].astype(str).str.strip().str.upper()
             df_stk["KATEGORI"] = df_stk["KATEGORI"].astype(str).str.strip().str.upper()
 
-            b_sumif = meta_dict.get("brand_sumif", "").upper()
-            bin_countif = meta_dict.get("bin_countif", "").upper()
-            b_sumifs = meta_dict.get("brand_sumifs", "").upper()
-            s_sumifs = float(meta_dict.get("size_sumifs", 0))
-            kat_countifs = meta_dict.get("kat_countifs", "").upper()
-            expected_distrib = meta_dict.get("distrib_xlookup", "")
+            def clean_f(val):
+                return str(val or "").strip().upper().replace(" ", "").replace(";", ",")
 
-            # Ground Truth Value Calculations
-            gt_1 = int(df_stk["SISA STOK"].sum())
-            gt_2 = len(df_stk)
-            gt_3 = int(df_stk[df_stk["BRAND"] == b_sumif]["TERJUAL"].sum())
-            gt_4 = int((df_stk["LOKASI BIN"] == bin_countif).sum())
-            gt_5 = int(df_stk[(df_stk["BRAND"] == b_sumifs) & (df_stk["SIZE"] == s_sumifs)]["TERJUAL"].sum())
-            gt_6 = int(((df_stk["KATEGORI"] == kat_countifs) & (df_stk["SISA STOK"] > 5)).sum())
-            gt_7 = "REFILL / AMAN"
-            gt_8 = expected_distrib
+            grading = []
+            score_total = 0.0
 
-            # Ambil Jawaban Peserta dari Sheet LEMBAR_SOAL
-            ws_s_form = wb_form["LEMBAR_SOAL"]
-            ws_s_vals = wb_vals["LEMBAR_SOAL"]
+            # 1. EVALUASI TABEL 1: SUM (Sel B6)
+            f_b6 = clean_f(ws_rk_f["B6"].value)
+            v_b6 = ws_rk_v["B6"].value
+            gt_sum = int(df_stk["SISA STOK"].sum())
+            has_sum = "SUM(" in f_b6 and "SUMIF" not in f_b6
+            val_sum_ok = (v_b6 == gt_sum) or (str(gt_sum) in f_b6)
+            ok_1 = has_sum and val_sum_ok
+            if ok_1: score_total += 12.5
+            grading.append({
+                "No": "1", "Bagian": "Tabel 1 (Sel B6)", "Rumus": "SUM",
+                "Rumus Peserta": str(ws_rk_f["B6"].value or "(Kosong)"),
+                "Hasil Peserta": str(v_b6 or "(Kosong)"),
+                "Kunci Jawaban": f"=SUM(...) ➔ {gt_sum:,}",
+                "Status": "✅ BENAR" if ok_1 else "❌ SALAH",
+                "Catatan": "Sempurna!" if ok_1 else f"Harusnya =SUM(...) dengan hasil {gt_sum:,}"
+            })
 
-            def clean_formula(val):
-                if not val: return ""
-                return str(val).strip().upper().replace(" ", "").replace(";", ",")
+            # 2. EVALUASI TABEL 1: COUNT (Sel B7)
+            f_b7 = clean_f(ws_rk_f["B7"].value)
+            v_b7 = ws_rk_v["B7"].value
+            gt_cnt = len(df_stk)
+            has_cnt = ("COUNT(" in f_b7 or "COUNTA(" in f_b7) and "COUNTIF" not in f_b7
+            val_cnt_ok = (v_b7 == gt_cnt) or (str(gt_cnt) in f_b7)
+            ok_2 = has_cnt and val_cnt_ok
+            if ok_2: score_total += 12.5
+            grading.append({
+                "No": "2", "Bagian": "Tabel 1 (Sel B7)", "Rumus": "COUNT",
+                "Rumus Peserta": str(ws_rk_f["B7"].value or "(Kosong)"),
+                "Hasil Peserta": str(v_b7 or "(Kosong)"),
+                "Kunci Jawaban": f"=COUNT(...) ➔ {gt_cnt}",
+                "Status": "✅ BENAR" if ok_2 else "❌ SALAH",
+                "Catatan": "Sempurna!" if ok_2 else f"Harusnya =COUNT(...) dengan hasil {gt_cnt}"
+            })
 
-            def get_cell_num(val):
-                try:
-                    if val is None: return None
-                    return float(val)
-                except: return None
+            # 3. EVALUASI TABEL 2: SUMIF (Kolom C Baris 11-18)
+            sumif_correct = 0
+            sample_f3 = ""
+            for r in range(11, 19):
+                br_name = str(ws_rk_v.cell(row=r, column=2).value or "").strip().upper()
+                f_c = clean_f(ws_rk_f.cell(row=r, column=3).value)
+                v_c = ws_rk_v.cell(row=r, column=3).value
+                gt_val = int(df_stk[df_stk["BRAND"] == br_name]["TERJUAL"].sum())
+                if r == 11: sample_f3 = str(ws_rk_f.cell(row=r, column=3).value or "")
+                if "SUMIF(" in f_c and "SUMIFS" not in f_c and (v_c == gt_val or str(gt_val) in f_c):
+                    sumif_correct += 1
 
-            grading_results = []
-            score_total = 0
+            ok_3 = (sumif_correct >= 6) # Toleransi minimal 6 dari 8 baris benar
+            if ok_3: score_total += 12.5
+            grading.append({
+                "No": "3", "Bagian": "Tabel 2 (Kolom C)", "Rumus": "SUMIF",
+                "Rumus Peserta": sample_f3 if sample_f3 else "(Kosong)",
+                "Hasil Peserta": f"{sumif_correct}/8 Baris Benar",
+                "Kunci Jawaban": '=SUMIF(DATA_STOK_SEPATU!$C$2:$C$61, B11, DATA_STOK_SEPATU!$K$2:$K$61)',
+                "Status": "✅ BENAR" if ok_3 else "❌ SALAH",
+                "Catatan": "Rumus SUMIF bekerja dengan baik di tabel!" if ok_3 else f"Hanya {sumif_correct} dari 8 baris yang benar."
+            })
 
-            # Evaluasi 8 Soal
-            for i in range(1, 9):
-                row_idx = i + 1
-                raw_f_e = ws_s_form.cell(row=row_idx, column=5).value
-                raw_f_f = ws_s_form.cell(row=row_idx, column=6).value
-                raw_v_e = ws_s_vals.cell(row=row_idx, column=5).value
-                raw_v_f = ws_s_vals.cell(row=row_idx, column=6).value
+            # 4. EVALUASI TABEL 2: COUNTIF (Kolom D Baris 11-18)
+            countif_correct = 0
+            sample_f4 = ""
+            for r in range(11, 19):
+                br_name = str(ws_rk_v.cell(row=r, column=2).value or "").strip().upper()
+                f_d = clean_f(ws_rk_f.cell(row=r, column=4).value)
+                v_d = ws_rk_v.cell(row=r, column=4).value
+                gt_val = int((df_stk["BRAND"] == br_name).sum())
+                if r == 11: sample_f4 = str(ws_rk_f.cell(row=r, column=4).value or "")
+                if "COUNTIF(" in f_d and "COUNTIFS" not in f_d and (v_d == gt_val or str(gt_val) in f_d):
+                    countif_correct += 1
 
-                # Peserta bisa mengetik rumus di Kolom E atau Kolom F
-                user_f = str(raw_f_e or raw_f_f or "").strip()
-                user_v = raw_v_f if raw_v_f is not None else raw_v_e
-                clean_f = clean_formula(user_f)
+            ok_4 = (countif_correct >= 6)
+            if ok_4: score_total += 12.5
+            grading.append({
+                "No": "4", "Bagian": "Tabel 2 (Kolom D)", "Rumus": "COUNTIF",
+                "Rumus Peserta": sample_f4 if sample_f4 else "(Kosong)",
+                "Hasil Peserta": f"{countif_correct}/8 Baris Benar",
+                "Kunci Jawaban": '=COUNTIF(DATA_STOK_SEPATU!$C$2:$C$61, B11)',
+                "Status": "✅ BENAR" if ok_4 else "❌ SALAH",
+                "Catatan": "Rumus COUNTIF bekerja dengan baik di tabel!" if ok_4 else f"Hanya {countif_correct} dari 8 baris yang benar."
+            })
 
-                status_ok = False
-                note = ""
+            # 5. EVALUASI TABEL 3: SUMIFS (Kolom D)
+            start_t3 = 21 # Baris data Tabel 3
+            sumifs_correct = 0
+            sample_f5 = ""
+            for r in range(start_t3, start_t3 + 5):
+                br_name = str(ws_rk_v.cell(row=r, column=2).value or "").strip().upper()
+                kt_name = str(ws_rk_v.cell(row=r, column=3).value or "").strip().upper()
+                f_d = clean_f(ws_rk_f.cell(row=r, column=4).value)
+                v_d = ws_rk_v.cell(row=r, column=4).value
+                gt_val = int(df_stk[(df_stk["BRAND"] == br_name) & (df_stk["KATEGORI"] == kt_name)]["TERJUAL"].sum())
+                if r == start_t3: sample_f5 = str(ws_rk_f.cell(row=r, column=4).value or "")
+                if "SUMIFS(" in f_d and (v_d == gt_val or str(gt_val) in f_d):
+                    sumifs_correct += 1
 
-                # --- SOAL 1: SUM ---
-                if i == 1:
-                    judul = "Total Seluruh Sisa Stok Sepatu"
-                    rumus_req = "SUM"
-                    val_num = get_cell_num(user_v)
-                    has_func = "SUM(" in clean_f and "SUMIF" not in clean_f
-                    if has_func and (val_num == gt_1 or str(gt_1) in clean_f):
-                        status_ok, note = True, "Sempurna! Rumus =SUM(...) dan hasil tepat."
-                    elif has_func:
-                        status_ok, note = False, f"Rumus SUM terdeteksi, namun hasil salah (Harusnya {gt_1:,})."
-                    else:
-                        status_ok, note = False, "Wajib menggunakan formula =SUM(...)."
-                    kunci_display = f"=SUM(...) ➔ Nilai: {gt_1:,}"
+            ok_5 = (sumifs_correct >= 4)
+            if ok_5: score_total += 12.5
+            grading.append({
+                "No": "5", "Bagian": "Tabel 3 (Kolom D)", "Rumus": "SUMIFS",
+                "Rumus Peserta": sample_f5 if sample_f5 else "(Kosong)",
+                "Hasil Peserta": f"{sumifs_correct}/5 Baris Benar",
+                "Kunci Jawaban": '=SUMIFS(DATA_STOK_SEPATU!$K$2:$K$61, DATA_STOK_SEPATU!$C$2:$C$61, B21, DATA_STOK_SEPATU!$E$2:$E$61, C21)',
+                "Status": "✅ BENAR" if ok_5 else "❌ SALAH",
+                "Catatan": "Rumus SUMIFS multi-kriteria tepat!" if ok_5 else f"Hanya {sumifs_correct} dari 5 baris yang benar."
+            })
 
-                # --- SOAL 2: COUNT ---
-                elif i == 2:
-                    judul = "Total Baris SKU Terdaftar"
-                    rumus_req = "COUNT"
-                    val_num = get_cell_num(user_v)
-                    has_func = ("COUNT(" in clean_f or "COUNTA(" in clean_f) and "COUNTIF" not in clean_f
-                    if has_func and (val_num == gt_2 or str(gt_2) in clean_f):
-                        status_ok, note = True, "Sempurna! Rumus =COUNT(...) dan hasil tepat."
-                    elif has_func:
-                        status_ok, note = False, f"Rumus COUNT terdeteksi, namun hasil salah (Harusnya {gt_2})."
-                    else:
-                        status_ok, note = False, "Wajib menggunakan formula =COUNT(...)."
-                    kunci_display = f"=COUNT(...) ➔ Nilai: {gt_2}"
+            # 6. EVALUASI TABEL 3: COUNTIFS (Kolom E)
+            countifs_correct = 0
+            sample_f6 = ""
+            for r in range(start_t3, start_t3 + 5):
+                kt_name = str(ws_rk_v.cell(row=r, column=3).value or "").strip().upper()
+                f_e = clean_f(ws_rk_f.cell(row=r, column=5).value)
+                v_e = ws_rk_v.cell(row=r, column=5).value
+                gt_val = int(((df_stk["KATEGORI"] == kt_name) & (df_stk["SISA STOK"] > 5)).sum())
+                if r == start_t3: sample_f6 = str(ws_rk_f.cell(row=r, column=5).value or "")
+                if "COUNTIFS(" in f_e and (v_e == gt_val or str(gt_val) in f_e):
+                    countifs_correct += 1
 
-                # --- SOAL 3: SUMIF ---
-                elif i == 3:
-                    judul = f"Total Terjual Brand '{b_sumif}'"
-                    rumus_req = "SUMIF"
-                    val_num = get_cell_num(user_v)
-                    has_func = "SUMIF(" in clean_f and "SUMIFS" not in clean_f and b_sumif in clean_f
-                    if has_func and (val_num == gt_3 or str(gt_3) in clean_f):
-                        status_ok, note = True, "Sempurna! Rumus =SUMIF(...) dan kriteria brand tepat."
-                    elif has_func:
-                        status_ok, note = False, f"Rumus SUMIF terdeteksi, namun hasil salah (Harusnya {gt_3:,})."
-                    else:
-                        status_ok, note = False, f"Wajib menggunakan formula =SUMIF(...) dengan kriteria '{b_sumif}'."
-                    kunci_display = f'=SUMIF(..., "{b_sumif}", ...) ➔ Nilai: {gt_3:,}'
+            ok_6 = (countifs_correct >= 4)
+            if ok_6: score_total += 12.5
+            grading.append({
+                "No": "6", "Bagian": "Tabel 3 (Kolom E)", "Rumus": "COUNTIFS",
+                "Rumus Peserta": sample_f6 if sample_f6 else "(Kosong)",
+                "Hasil Peserta": f"{countifs_correct}/5 Baris Benar",
+                "Kunci Jawaban": '=COUNTIFS(DATA_STOK_SEPATU!$E$2:$E$61, C21, DATA_STOK_SEPATU!$L$2:$L$61, ">5")',
+                "Status": "✅ BENAR" if ok_6 else "❌ SALAH",
+                "Catatan": "Rumus COUNTIFS multi-kriteria tepat!" if ok_6 else f"Hanya {countifs_correct} dari 5 baris yang benar."
+            })
 
-                # --- SOAL 4: COUNTIF ---
-                elif i == 4:
-                    judul = f"Jumlah SKU di Lokasi '{bin_countif}'"
-                    rumus_req = "COUNTIF"
-                    val_num = get_cell_num(user_v)
-                    has_func = "COUNTIF(" in clean_f and "COUNTIFS" not in clean_f and bin_countif in clean_f
-                    if has_func and (val_num == gt_4 or str(gt_4) in clean_f):
-                        status_ok, note = True, "Sempurna! Rumus =COUNTIF(...) dan kriteria lokasi tepat."
-                    elif has_func:
-                        status_ok, note = False, f"Rumus COUNTIF terdeteksi, namun hasil salah (Harusnya {gt_4})."
-                    else:
-                        status_ok, note = False, f"Wajib menggunakan formula =COUNTIF(...) dengan kriteria '{bin_countif}'."
-                    kunci_display = f'=COUNTIF(..., "{bin_countif}") ➔ Nilai: {gt_4}'
+            # 7. EVALUASI DATA_STOK_SEPATU: XLOOKUP (Kolom M Baris 2-15)
+            xlookup_correct = 0
+            sample_f7 = ""
+            for r in range(2, 16):
+                f_m = clean_f(ws_dt_f.cell(row=r, column=13).value)
+                v_m = str(ws_dt_v.cell(row=r, column=13).value or "").strip().upper()
+                if r == 2: sample_f7 = str(ws_dt_f.cell(row=r, column=13).value or "")
+                if ("XLOOKUP(" in f_m or "VLOOKUP(" in f_m or "INDEX(" in f_m) and len(v_m) > 4:
+                    xlookup_correct += 1
 
-                # --- SOAL 5: SUMIFS ---
-                elif i == 5:
-                    judul = f"Total Terjual '{b_sumifs}' Size {int(s_sumifs)}"
-                    rumus_req = "SUMIFS"
-                    val_num = get_cell_num(user_v)
-                    has_func = "SUMIFS(" in clean_f and b_sumifs in clean_f and str(int(s_sumifs)) in clean_f
-                    if has_func and (val_num == gt_5 or str(gt_5) in clean_f):
-                        status_ok, note = True, "Sempurna! Rumus multi-kriteria =SUMIFS(...) tepat."
-                    elif has_func:
-                        status_ok, note = False, f"Rumus SUMIFS terdeteksi, namun hasil salah (Harusnya {gt_5:,})."
-                    else:
-                        status_ok, note = False, "Wajib menggunakan formula =SUMIFS(...) dengan 2 syarat."
-                    kunci_display = f'=SUMIFS(..., "{b_sumifs}", ..., {int(s_sumifs)}) ➔ Nilai: {gt_5:,}'
+            ok_7 = (xlookup_correct >= 10)
+            if ok_7: score_total += 12.5
+            grading.append({
+                "No": "7", "Bagian": "DATA_STOK (Kolom M)", "Rumus": "XLOOKUP",
+                "Rumus Peserta": sample_f7 if sample_f7 else "(Kosong)",
+                "Hasil Peserta": f"{xlookup_correct}/14 Sampel Terisi",
+                "Kunci Jawaban": '=XLOOKUP(B2, REF_DISTRIBUTOR!$A$2:$A$61, REF_DISTRIBUTOR!$B$2:$B$61)',
+                "Status": "✅ BENAR" if ok_7 else "❌ SALAH",
+                "Catatan": "Kolom XLOOKUP berhasil menarik data distributor!" if ok_7 else "Kolom M kosong atau rumus XLOOKUP belum diterapkan."
+            })
 
-                # --- SOAL 6: COUNTIFS ---
-                elif i == 6:
-                    judul = f"Jumlah SKU '{kat_countifs}' Stok > 5"
-                    rumus_req = "COUNTIFS"
-                    val_num = get_cell_num(user_v)
-                    has_func = "COUNTIFS(" in clean_f and kat_countifs in clean_f and ">5" in clean_f
-                    if has_func and (val_num == gt_6 or str(gt_6) in clean_f):
-                        status_ok, note = True, "Sempurna! Rumus multi-kriteria =COUNTIFS(...) tepat."
-                    elif has_func:
-                        status_ok, note = False, f"Rumus COUNTIFS terdeteksi, namun hasil salah (Harusnya {gt_6})."
-                    else:
-                        status_ok, note = False, "Wajib menggunakan formula =COUNTIFS(...) dengan syarat kategori dan stok > 5."
-                    kunci_display = f'=COUNTIFS(..., "{kat_countifs}", ..., ">5") ➔ Nilai: {gt_6}'
+            # 8. EVALUASI DATA_STOK_SEPATU: IF (Kolom N Baris 2-15)
+            if_correct = 0
+            sample_f8 = ""
+            for r in range(2, 16):
+                f_n = clean_f(ws_dt_f.cell(row=r, column=14).value)
+                v_n = str(ws_dt_v.cell(row=r, column=14).value or "").strip().upper()
+                sisa_qty = float(ws_dt_v.cell(row=r, column=12).value or 0)
+                expected_status = "REFILL" if sisa_qty <= 3 else "AMAN"
+                if r == 2: sample_f8 = str(ws_dt_f.cell(row=r, column=14).value or "")
+                if "IF(" in f_n and (v_n == expected_status or expected_status in f_n):
+                    if_correct += 1
 
-                # --- SOAL 7: IF ---
-                elif i == 7:
-                    judul = "Status Refill di Kolom M"
-                    rumus_req = "IF"
-                    has_func = "IF(" in clean_f and ("REFILL" in clean_f or "AMAN" in clean_f)
-                    
-                    # Cek juga apakah peserta mengisi Kolom M pada DATA_STOK_SEPATU
-                    col_m_filled = False
-                    if "STATUS REFILL (TUGAS SOAL 7)" in df_stk.columns:
-                        sample_m = df_stk["STATUS REFILL (TUGAS SOAL 7)"].astype(str).str.upper().tolist()
-                        if any("REFILL" in s for s in sample_m) and any("AMAN" in s for s in sample_m):
-                            col_m_filled = True
+            ok_8 = (if_correct >= 10)
+            if ok_8: score_total += 12.5
+            grading.append({
+                "No": "8", "Bagian": "DATA_STOK (Kolom N)", "Rumus": "IF LOGIC",
+                "Rumus Peserta": sample_f8 if sample_f8 else "(Kosong)",
+                "Hasil Peserta": f"{if_correct}/14 Sampel Sesuai",
+                "Kunci Jawaban": '=IF(L2<=3, "REFILL", "AMAN")',
+                "Status": "✅ BENAR" if ok_8 else "❌ SALAH",
+                "Catatan": "Logika IF berhasil mengisi status REFILL / AMAN!" if ok_8 else "Kolom N kosong atau rumus IF belum sesuai."
+            })
 
-                    if has_func or col_m_filled:
-                        status_ok, note = True, "Sempurna! Logika kondisi =IF(...) berhasil diterapkan."
-                    else:
-                        status_ok, note = False, "Wajib menggunakan formula logika =IF(L2<=3, 'REFILL', 'AMAN')."
-                    kunci_display = '=IF(L2<=3, "REFILL", "AMAN")'
-
-                # --- SOAL 8: XLOOKUP ---
-                elif i == 8:
-                    judul = f"Distributor Resmi SKU '{meta_dict.get('sku_xlookup', '')}'"
-                    rumus_req = "XLOOKUP"
-                    has_func = ("XLOOKUP(" in clean_f or "VLOOKUP(" in clean_f or "INDEX(" in clean_f)
-                    val_str = str(user_v or "").strip().upper()
-                    if has_func and (expected_distrib.upper() in val_str or expected_distrib.upper() in clean_f):
-                        status_ok, note = True, "Sempurna! Rumus pencarian =XLOOKUP(...) berhasil menemukan distributor."
-                    elif has_func:
-                        status_ok, note = False, f"Rumus lookup terdeteksi, namun hasil salah (Harusnya '{expected_distrib}')."
-                    else:
-                        status_ok, note = False, "Wajib menggunakan formula =XLOOKUP(...)."
-                    kunci_display = f'=XLOOKUP(..., "REF_DISTRIBUTOR") ➔ {expected_distrib}'
-
-                if status_ok:
-                    score_total += 12.5  # 8 Soal x 12.5 = 100 Poin
-
-                grading_results.append({
-                    "No": str(i),
-                    "Rumus": rumus_req,
-                    "Judul": judul,
-                    "Rumus Peserta": user_f if user_f else "(Kosong)",
-                    "Hasil Peserta": str(user_v) if user_v is not None else "(Kosong)",
-                    "Kunci Jawaban": kunci_display,
-                    "Status": "✅ BENAR" if status_ok else "❌ SALAH",
-                    "Catatan Evaluasi": note
-                })
-
-            total_correct = sum(1 for g in grading_results if "BENAR" in g["Status"])
-            total_wrong = 8 - total_correct
             final_score = int(round(score_total))
+            correct_cnt = sum(1 for g in grading if "BENAR" in g["Status"])
+            wrong_cnt = 8 - correct_cnt
 
-            df_res = pd.DataFrame(grading_results)
-
+            df_eval = pd.DataFrame(grading)
             self.excel_exam_score.set(final_score)
-            self.excel_exam_correct.set(total_correct)
-            self.excel_exam_wrong.set(total_wrong)
-            self._raw_df_exam_result = df_res.copy()
+            self.excel_exam_correct.set(correct_cnt)
+            self.excel_exam_wrong.set(wrong_cnt)
+            self._raw_df_exam_result = df_eval.copy()
 
-            self.df_exam_result_headers.set(df_res.columns.tolist())
-            self.df_exam_result_rows.set(df_res.fillna("").astype(str).values.tolist())
+            self.df_exam_result_headers.set(df_eval.columns.tolist())
+            self.df_exam_result_rows.set(df_eval.fillna("").astype(str).values.tolist())
 
             self.excel_exam_graded.set(True)
-            return True, f"Koreksi Otomatis Selesai! Nilai Peserta: {final_score} / 100 ({total_correct} Benar, {total_wrong} Salah)"
+            return True, f"Koreksi Selesai! Nilai: {final_score}/100 ({correct_cnt} Benar, {wrong_cnt} Salah)"
         except Exception as e:
             return False, f"Gagal mengoreksi file jawaban: {e}"

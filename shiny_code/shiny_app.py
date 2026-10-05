@@ -3313,10 +3313,8 @@ def server(input: Inputs, output: Outputs, session: Session):
         yield buf.getvalue()
 
 # ==========================================================================
-    # CONTROLLER: LATIHAN EXCEL & AUTO-GRADING SYSTEM
+    # CONTROLLER: LATIHAN FORMULA EXCEL & AUTO-GRADING
     # ==========================================================================
-
-    # 1. Tombol Aksi Upload & Koreksi
     @render.ui
     def excel_practice_action_btn_ui():
         f = input.upload_exam_answer_file() if "upload_exam_answer_file" in input else None
@@ -3332,14 +3330,13 @@ def server(input: Inputs, output: Outputs, session: Session):
         return ui.div(
             ui.tags.button(
                 ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"),
-                "UPLOAD FILE JAWABAN UNTUK KOREKSI OTOMATIS",
+                "UPLOAD FILE JAWABAN UNTUK MEMULAI KOREKSI",
                 disabled=True,
                 class_="btn-locked"
             ),
             style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.75rem;"
         )
 
-    # 2. Eksekusi Koreksi Otomatis
     @reactive.Effect
     @reactive.event(input.btn_process_exam_grading)
     def _proc_exam_grading():
@@ -3356,7 +3353,6 @@ def server(input: Inputs, output: Outputs, session: Session):
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
 
-    # 3. Tampilan Hasil Scorecard & Evaluasi Detail
     @render.ui
     def excel_practice_results_container():
         if not state.excel_exam_graded():
@@ -3369,21 +3365,20 @@ def server(input: Inputs, output: Outputs, session: Session):
             ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
             ui.h4("🏆 HASIL KOREKSI OTOMATIS & EVALUASI FORMULA EXCEL", style="font-size: 16px; font-weight: 800; color: #1A202C; margin-bottom: 1rem;"),
             
-            # Kartu Metrik Skor & Ringkasan Benar/Salah
             ui.div(
                 dark_metric_box("🎯 NILAI / SKOR AKHIR", f"{score} / 100", score_color),
-                dark_metric_box("✅ TOTAL JAWABAN BENAR", f"{state.excel_exam_correct()} SOAL", "#10B981"),
-                dark_metric_box("❌ TOTAL JAWABAN SALAH", f"{state.excel_exam_wrong()} SOAL", "#E53E3E"),
+                dark_metric_box("✅ TOTAL BAGIAN BENAR", f"{state.excel_exam_correct()} BAGIAN", "#10B981"),
+                dark_metric_box("❌ TOTAL BAGIAN SALAH", f"{state.excel_exam_wrong()} BAGIAN", "#E53E3E"),
                 style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
             ),
 
-            # Tabel Detail Scorecard Per Soal
             ui.div(
                 ui.div(
-                    ui.h4("📋 Detail Evaluasi Per Rumus (Auto-Grading Scorecard)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0;"),
+                    ui.h4("📋 Detail Evaluasi Per Tabel & Formula (Scorecard)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0;"),
                     ui.download_button(
                         "btn_dl_exam_report",
                         ui.tags.span(ui.tags.i(class_="fa-solid fa-file-excel", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD HASIL EVALUASI (.xlsx)"),
+                        onclick="setTimeout(function() { document.body.classList.remove('process-running'); }, 1500);",
                         style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
                     ),
                     style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem;"
@@ -3394,7 +3389,6 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
         )
 
-    # 4. Handler Download Laporan Evaluasi Ujian
     @render.download(filename="LAPORAN_EVALUASI_EXCEL_PESERTA.xlsx")
     def btn_dl_exam_report():
         buf = io.BytesIO()
@@ -3403,8 +3397,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         yield buf.getvalue()
 
-    # 5. Handler Download Soal (Dinamis & Tanpa Kunci Jawaban)
-    @render.download(filename="SOAL_LATIHAN_EXCEL_RETAIL_SEPATU.xlsx")
+    @render.download(filename="LATIHAN_EXCEL_RETAIL_SEPATU.xlsx")
     def btn_dl_excel_practice():
         content = state.generate_excel_practice_package()
         yield content
