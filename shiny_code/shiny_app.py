@@ -3503,7 +3503,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         meta_dict = {
             "company": input.aud_company() if "aud_company" in input else "PT ZONA KARYA NUSANTARA",
             "branch": input.aud_branch() if "aud_branch" in input else "SZ SURABAYA",
-            "date": input.aud_date() if "aud_date" in input else datetime.now().strftime("%d %B %Y"),
+            "date": input.aud_date() if "aud_date" in input else "12 JANUARI 2027",
             "start_time": input.aud_start_time() if "aud_start_time" in input else "08:00",
             "end_time": input.aud_end_time() if "aud_end_time" in input else "17:00",
             "method": input.aud_method() if "aud_method" in input else "Full count (wall-to-wall)",
@@ -3511,8 +3511,12 @@ def server(input: Inputs, output: Outputs, session: Session):
             "manager": input.aud_manager() if "aud_manager" in input else "",
             "supervisor": input.aud_supervisor() if "aud_supervisor" in input else "",
             "currency": input.aud_currency() if "aud_currency" in input else "IDR",
+            "counter_name": input.sign_counter() if "sign_counter" in input else "",
+            "checker_name": input.sign_checker() if "sign_checker" in input else "",
+            "finance_manager": input.sign_finance() if "sign_finance" in input else "",
+            "audit_firm": input.sign_kap() if "sign_kap" in input else "KAP Independent & Partners",
+            "audit_partner": input.sign_partner() if "sign_partner" in input else ""
         }
         content = state.generate_auditor_excel_pack(meta_dict)
         yield content
-
 app = App(app_ui, server)

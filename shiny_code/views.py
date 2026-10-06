@@ -1227,36 +1227,46 @@ def excel_practice_view(state: AppState):
 
 
 # ==============================================================================
-# VIEW: FORM AUDITOR (EXTERNAL AUDIT PACK & STOCK OPNAME)
+# VIEW: FORM AUDITOR (4 TAB EXTERNAL AUDIT PACK)
 # ==============================================================================
 def auditor_view(state: AppState):
-    upload_box = ui.div(
-        ui.h4("1️⃣ Upload All Data Stock (Multiple Adjustment)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
-        ui.p("Upload master stock Jezpro. Sistem otomatis mengecualikan seluruh lokasi rak bertuliskan 'KARANTINA'.", style="color: #718096; font-size: 13px; margin-bottom: 0.75rem;"),
-        custom_uploader_box("upload_auditor_file", "Pilih File Stock (Excel / CSV)"),
+    # KARTU ATAS: UPLOADER & FILTER DROPDOWN AUDITOR
+    top_control = ui.div(
         ui.div(
-            ui.tags.button(
-                ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "BACA FILE & AKTIFKAN FILTER"),
-                onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_load_auditor_file', Math.random(), {priority: 'event'});",
-                class_="btn-red-gradient"
+            ui.h4("📥 1. Upload All Data Stock (Multiple Adjustment)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
+            custom_uploader_box("upload_auditor_file", "Upload File Stock (Otomatis Mengecualikan BIN Karantina)"),
+            ui.div(
+                ui.tags.button(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "BACA FILE STOCK"),
+                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_load_auditor_file', Math.random(), {priority: 'event'});",
+                    class_="btn-red-gradient"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
             ),
-            style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+            style="flex: 1; min-width: 320px;"
         ),
-        style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+        ui.div(
+            ui.h4("🎯 2. Filter Dropdown Target Audit", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
+            ui.div(ui.input_selectize("aud_filter_brand", "🏷️ Brand (Kolom D):", choices=state.auditor_list_brand(), multiple=True, width="100%"), style="margin-bottom: 0.5rem;"),
+            ui.div(ui.input_selectize("aud_filter_sub", "🗂️ Sub Kategori (Kolom G):", choices=state.auditor_list_sub(), multiple=True, width="100%"), style="margin-bottom: 0.5rem;"),
+            ui.div(ui.input_selectize("aud_filter_bin", "🏭 BIN / Rak (Kolom B):", choices=state.auditor_list_bin(), multiple=True, width="100%")),
+            style="flex: 1; min-width: 320px;"
+        ),
+        style="display: flex; gap: 1.5rem; flex-wrap: wrap; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
     )
 
-    engagement_form = ui.div(
-        ui.h4("2️⃣ Detail Engagement Stock Opname (Sesuai Form Auditor)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
-        ui.p("Lengkapi data formulir resmi audit di bawah ini agar langsung tercetak otomatis di Sheet 1 Excel.", style="color: #718096; font-size: 13px; margin-bottom: 1rem;"),
+    # TAB 1: ENGAGEMENT DETAILS (GAMBAR 1)
+    tab1_eng = ui.div(
+        ui.h4("📋 Engagement Details (ISA 501 / PSAK 14)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 1rem;"),
         ui.div(
             ui.div(ui.span("🏢 Company Name:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="aud_company", type="text", value="PT ZONA KARYA NUSANTARA", class_="form-control"), style="flex: 1; min-width: 220px;"),
             ui.div(ui.span("🏬 Warehouse Branch:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="aud_branch", type="text", value="SZ SURABAYA", class_="form-control"), style="flex: 1; min-width: 180px;"),
-            ui.div(ui.span("📅 Stock Count Date:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="aud_date", type="date", value=datetime.now().strftime("%Y-%m-%d"), class_="form-control"), style="flex: 1; min-width: 160px;"),
+            ui.div(ui.span("📅 Stock Count Date:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="aud_date", type="text", value="12 JANUARI 2027", class_="form-control"), style="flex: 1; min-width: 160px;"),
             style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;"
         ),
         ui.div(
-            ui.div(ui.span("⏰ Count Start Time:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="aud_start_time", type="text", value="08:00", placeholder="Misal 08:00", class_="form-control"), style="flex: 1; min-width: 160px;"),
-            ui.div(ui.span("⏰ Count End Time:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="aud_end_time", type="text", value="17:00", placeholder="Misal 17:00", class_="form-control"), style="flex: 1; min-width: 160px;"),
+            ui.div(ui.span("⏰ Count Start Time:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="aud_start_time", type="text", value="08:00", class_="form-control"), style="flex: 1; min-width: 160px;"),
+            ui.div(ui.span("⏰ Count End Time:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="aud_end_time", type="text", value="17:00", class_="form-control"), style="flex: 1; min-width: 160px;"),
             ui.div(
                 ui.span("📋 Count Method:", style="font-size: 12px; font-weight: 800;"),
                 ui.tags.select(
@@ -1269,35 +1279,75 @@ def auditor_view(state: AppState):
             style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;"
         ),
         ui.div(
-            ui.div(ui.span("👤 Lead Auditor:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="aud_lead", type="text", placeholder="Nama Auditor Eksternal...", class_="form-control"), style="flex: 1; min-width: 200px;"),
-            ui.div(ui.span("👤 Warehouse/Ops. Manager:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="aud_manager", type="text", placeholder="Nama Manager...", class_="form-control"), style="flex: 1; min-width: 200px;"),
-            ui.div(ui.span("👤 Supervisor Tim:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="aud_supervisor", type="text", placeholder="Nama Supervisor...", class_="form-control"), style="flex: 1; min-width: 200px;"),
+            ui.div(ui.span("👤 Lead Auditor:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="aud_lead", type="text", placeholder="Nama Lead Auditor...", class_="form-control"), style="flex: 1; min-width: 200px;"),
+            ui.div(ui.span("👤 Warehouse/Ops. Manager:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="aud_manager", type="text", placeholder="Nama Manager Ops...", class_="form-control"), style="flex: 1; min-width: 200px;"),
+            ui.div(ui.span("👤 Count Team Supervisor:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="aud_supervisor", type="text", placeholder="Nama Supervisor...", class_="form-control"), style="flex: 1; min-width: 200px;"),
             ui.div(ui.span("💵 Currency:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="aud_currency", type="text", value="IDR", class_="form-control"), style="width: 120px;"),
             style="display: flex; gap: 1rem; flex-wrap: wrap;"
         ),
-        style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+        style="padding: 1rem 0;"
     )
 
-    filter_box = ui.div(
-        ui.h4("3️⃣ Filter Sasaran Audit (Brand, Sub Kategori, & BIN)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+    # TAB 2: STOCK COUNT SHEET (GAMBAR 2)
+    tab2_count = ui.div(
+        ui.output_ui("auditor_results_container"),
+        style="padding: 1rem 0;"
+    )
+
+    # TAB 3: OBSERVATIONS & FINDINGS (GAMBAR 3)
+    tab3_obs = ui.div(
+        ui.h4("🔍 Auditor Observations & Findings", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
+        ui.p("Catatan temuan penyimpangan fisik di lapangan beserta tingkat risiko (*High / Medium / Low*).", style="color: #718096; font-size: 13px; margin-bottom: 1rem;"),
         ui.div(
-            ui.div(ui.input_selectize("aud_filter_brand", "🏷️ Brand (Kolom D):", choices=state.auditor_list_brand(), multiple=True, width="100%"), style="flex: 1; min-width: 220px;"),
-            ui.div(ui.input_selectize("aud_filter_sub", "🗂️ Sub Kategori (Kolom G):", choices=state.auditor_list_sub(), multiple=True, width="100%"), style="flex: 1; min-width: 220px;"),
-            ui.div(ui.input_selectize("aud_filter_bin", "🏭 BIN / Rak (Kolom B - Bebas Karantina):", choices=state.auditor_list_bin(), multiple=True, width="100%"), style="flex: 1; min-width: 220px;"),
-            style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%;"
+            ui.div(ui.span("Area:", style="font-weight: 700; font-size: 12px;"), ui.tags.input(id="obs_area", type="text", value="Condition of stock", class_="form-control"), style="flex: 1; min-width: 180px;"),
+            ui.div(ui.span("Case / Temuan:", style="font-weight: 700; font-size: 12px;"), ui.tags.input(id="obs_case", type="text", placeholder="Deskripsi kasus...", class_="form-control"), style="flex: 2; min-width: 250px;"),
+            ui.div(
+                ui.span("Risk Rating:", style="font-weight: 700; font-size: 12px;"),
+                ui.tags.select(ui.tags.option("Medium", value="Medium"), ui.tags.option("High", value="High"), ui.tags.option("Low", value="Low"), id="obs_risk", class_="form-control"),
+                style="width: 140px;"
+            ),
+            style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;"
         ),
-        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+        ui.div(
+            ui.div(ui.span("Recommendation:", style="font-weight: 700; font-size: 12px;"), ui.tags.input(id="obs_recom", type="text", placeholder="Rekomendasi auditor...", class_="form-control"), style="flex: 2; min-width: 250px;"),
+            ui.div(ui.span("Status:", style="font-weight: 700; font-size: 12px;"), ui.tags.select(ui.tags.option("Open", value="Open"), ui.tags.option("Closed", value="Closed"), id="obs_status", class_="form-control"), style="width: 140px;"),
+            style="display: flex; gap: 1rem; flex-wrap: wrap;"
+        ),
+        style="padding: 1rem 0;"
     )
 
-    results_box = ui.div(
-        ui.output_ui("auditor_results_container")
+    # TAB 4: SIGN-OFF (GAMBAR 4)
+    tab4_sign = ui.div(
+        ui.h4("✍️ Stock Count Sign-Off (Daftar Penandatangan)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
+        ui.p("Masukkan nama penandatangan agar tercetak rapi di Sheet 4 Excel.", style="color: #718096; font-size: 13px; margin-bottom: 1rem;"),
+        ui.div(
+            ui.div(ui.span("Counter(s) Name:", style="font-weight: 700; font-size: 12px;"), ui.tags.input(id="sign_counter", type="text", placeholder="Nama Penghitung Fisik...", class_="form-control"), style="flex: 1; min-width: 200px;"),
+            ui.div(ui.span("Checker(s) Name:", style="font-weight: 700; font-size: 12px;"), ui.tags.input(id="sign_checker", type="text", placeholder="Nama Checker...", class_="form-control"), style="flex: 1; min-width: 200px;"),
+            ui.div(ui.span("Finance Manager:", style="font-weight: 700; font-size: 12px;"), ui.tags.input(id="sign_finance", type="text", placeholder="Nama Finance Manager...", class_="form-control"), style="flex: 1; min-width: 200px;"),
+            style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;"
+        ),
+        ui.div(
+            ui.div(ui.span("Nama Kantor Akuntan Publik (KAP):", style="font-weight: 700; font-size: 12px;"), ui.tags.input(id="sign_kap", type="text", value="KAP Independent & Partners", class_="form-control"), style="flex: 1; min-width: 200px;"),
+            ui.div(ui.span("Audit Partner / Manager:", style="font-weight: 700; font-size: 12px;"), ui.tags.input(id="sign_partner", type="text", placeholder="Nama Partner KAP...", class_="form-control"), style="flex: 1; min-width: 200px;"),
+            style="display: flex; gap: 1rem; flex-wrap: wrap;"
+        ),
+        style="padding: 1rem 0;"
+    )
+
+    # 4 TAB CARD UTAMA
+    main_tabs = ui.div(
+        ui.navset_card_tab(
+            ui.nav_panel("📋 1. ENGAGEMENT DETAILS", tab1_eng),
+            ui.nav_panel("📦 2. STOCK COUNT SHEET", tab2_count),
+            ui.nav_panel("🔍 3. OBSERVATIONS & FINDINGS", tab3_obs),
+            ui.nav_panel("✍️ 4. SIGN-OFF", tab4_sign)
+        ),
+        style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
     )
 
     return ui.div(
-        upload_box,
-        engagement_form,
-        filter_box,
-        results_box,
+        top_control,
+        main_tabs,
         style="width: 100%; padding: 1rem;"
     )
     

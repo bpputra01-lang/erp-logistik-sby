@@ -5027,15 +5027,15 @@ class AppState:
 
 
 # ==========================================================================
-    # METODE: FORM AUDITOR (UPLOAD, FILTER, & GENERATE AUDIT PACK EXCEL)
+    # METODE: FORM AUDITOR (4 SHEET RESMI SESUAI STANDAR EXTERNAL AUDIT PACK)
     # ==========================================================================
     def process_auditor_upload(self, f_info):
         try:
             df_raw = load_data_from_info(f_info)
             if df_raw.empty or df_raw.shape[1] < 10:
-                return False, "File All Data Stock minimal harus 10 kolom (Format Multiple Adjustment)!"
+                return False, "File All Data Stock minimal harus 10 kolom (Format Multiple Adjustment Jezpro)!"
 
-            # Mapping Kolom Sesuai Ketentuan:
+            # Mapping Kolom Jezpro:
             # Col 1 (B) = BIN | Col 2 (C) = SKU | Col 3 (D) = BRAND
             # Col 4 (E) = ITEM NAME | Col 6 (G) = SUB KATEGORI | Col 9 (J) = QTY SYSTEM
             df_clean = df_raw.copy()
@@ -5049,16 +5049,21 @@ class AppState:
             df_clean['BIN_CLEAN'] = df_clean[col_b].fillna('').astype(str).str.strip().str.upper()
             df_clean['SKU_CLEAN'] = df_clean[col_s].fillna('').astype(str).str.split('.').str[0].str.strip().str.upper()
             df_clean['BRAND_CLEAN'] = df_clean[col_d].fillna('UNKNOWN').astype(str).str.strip().str.upper()
-            df_clean['NAME_CLEAN'] = df_clean[col_e].fillna('-').astype(str).str.strip()
-            df_clean['SUB_CLEAN'] = df_clean[col_g].fillna('UNKNOWN').astype(str).str.strip().str.upper()
+            df_clean['DESC_CLEAN'] = df_clean[col_e].fillna('-').astype(str).str.strip()
+            df_clean['CAT_CLEAN'] = df_clean[col_g].fillna('UNKNOWN').astype(str).str.strip().str.upper()
             df_clean['QTY_SYS'] = pd.to_numeric(df_clean[col_j], errors='coerce').fillna(0).astype(int)
 
-            # 🛑 FILTER WAJIB: KECUALIKAN BIN YANG MENGANDUNG KATA "KARANTINA"
+            # Otomatis tentukan UoM: Kategori sepatu/footwear = PAIR, lainnya = PCS
+            df_clean['UOM'] = df_clean['CAT_CLEAN'].apply(
+                lambda x: "PAIR" if any(k in str(x).upper() for k in ["FOOTWEAR", "SHOES", "SEPATU", "SANDAL"]) else "PCS"
+            )
+
+            # 🛑 KECUALIKAN LOKASI BIN YANG MENGANDUNG "KARANTINA"
             df_clean = df_clean[~df_clean['BIN_CLEAN'].str.contains('KARANTINA', case=False, na=False)].copy()
 
             # Opsi dropdown filter
             brands = sorted([b for b in df_clean['BRAND_CLEAN'].unique() if b not in ['', 'NAN', 'UNKNOWN']])
-            subs = sorted([s for s in df_clean['SUB_CLEAN'].unique() if s not in ['', 'NAN', 'UNKNOWN']])
+            subs = sorted([s for s in df_clean['CAT_CLEAN'].unique() if s not in ['', 'NAN', 'UNKNOWN']])
             bins = sorted([bn for bn in df_clean['BIN_CLEAN'].unique() if bn not in ['', 'NAN']])
 
             self.auditor_list_brand.set(brands)
@@ -5078,10 +5083,11 @@ class AppState:
 
         df = self._raw_df_auditor_base.copy()
 
+        # Filter berdasarkan pilihan dropdown auditor di UI
         if sel_brand and len(sel_brand) > 0:
             df = df[df['BRAND_CLEAN'].isin([x.upper() for x in sel_brand])]
         if sel_sub and len(sel_sub) > 0:
-            df = df[df['SUB_CLEAN'].isin([x.upper() for x in sel_sub])]
+            df = df[df['CAT_CLEAN'].isin([x.upper() for x in sel_sub])]
         if sel_bin and len(sel_bin) > 0:
             df = df[df['BIN_CLEAN'].isin([x.upper() for x in sel_bin])]
 
@@ -5089,19 +5095,25 @@ class AppState:
         self.auditor_total_sku.set(df['SKU_CLEAN'].nunique() if not df.empty else 0)
         self.auditor_total_qty.set(int(df['QTY_SYS'].sum()) if not df.empty else 0)
 
-        # Tabel Preview
-        preview_df = pd.DataFrame({
-            "BIN": df['BIN_CLEAN'],
+        # Susun tabel Stock Count persis seperti Gambar 2
+        count_sheet_df = pd.DataFrame({
+            "No.": range(1, len(df) + 1),
+            "Bin Location": df['BIN_CLEAN'],
             "SKU": df['SKU_CLEAN'],
-            "BRAND": df['BRAND_CLEAN'],
-            "NAMA BARANG": df['NAME_CLEAN'],
-            "SUB KATEGORI": df['SUB_CLEAN'],
-            "QTY SYSTEM": df['QTY_SYS']
+            "Description": df['DESC_CLEAN'],
+            "Category": df['CAT_CLEAN'],
+            "UoM (PAIR / PCS)": df['UOM'],
+            "Qty System": df['QTY_SYS'],
+            "Physical Count": "",
+            "Variance Value": "",
+            "Counter": "Counter A",
+            "Auditor Verified": "No",
+            "Remarks": ""
         })
 
-        self._raw_df_auditor_filtered = preview_df.copy()
-        self.df_auditor_headers.set(preview_df.columns.tolist() if not preview_df.empty else [])
-        self.df_auditor_rows.set(preview_df.fillna("").astype(str).values.tolist() if not preview_df.empty else [])
+        self._raw_df_auditor_filtered = count_sheet_df.copy()
+        self.df_auditor_headers.set(count_sheet_df.columns.tolist() if not count_sheet_df.empty else [])
+        self.df_auditor_rows.set(count_sheet_df.fillna("").astype(str).values.tolist() if not count_sheet_df.empty else [])
         self.auditor_processed.set(True)
 
     def generate_auditor_excel_pack(self, form_meta: dict):
@@ -5110,47 +5122,43 @@ class AppState:
         from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
         wb = Workbook()
-        ws_eng = wb.active
-        ws_eng.title = "ENGAGEMENT DETAILS"
-        ws_eng.sheet_view.showGridLines = True
 
-        ws_data = wb.create_sheet(title="AUDIT COUNT SHEET")
-        ws_data.sheet_view.showGridLines = True
-
-        # Styles
+        # Styles Universal
         navy_fill = PatternFill(start_color="1A365D", end_color="1A365D", fill_type="solid")
         yellow_fill = PatternFill(start_color="FEFCBF", end_color="FEFCBF", fill_type="solid")
-        gray_header = PatternFill(start_color="EDF2F7", end_color="EDF2F7", fill_type="solid")
-        
-        font_title = Font(name="Calibri", size=14, bold=True, color="1A365D")
-        font_sub = Font(name="Calibri", size=10, italic=True, color="4A5568")
         font_th = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
+        font_title = Font(name="Calibri", size=14, bold=True, color="1A365D")
+        font_sub = Font(name="Calibri", size=9, italic=True, color="4A5568")
         font_bold = Font(name="Calibri", size=10, bold=True, color="1A202C")
-        
+        font_blue = Font(name="Calibri", size=10, color="0000FF")
+
         thin_border = Border(
             left=Side(style='thin', color='CBD5E0'), right=Side(style='thin', color='CBD5E0'),
             top=Side(style='thin', color='CBD5E0'), bottom=Side(style='thin', color='CBD5E0')
         )
 
-        # ----------------------------------------------------------------------
-        # SHEET 1: ENGAGEMENT DETAILS (IDENTIK PERSIS DENGAN FORMAT PDF)
-        # ----------------------------------------------------------------------
+        # ======================================================================
+        # SHEET 1: ENGAGEMENT DETAILS (GAMBAR 1)
+        # ======================================================================
+        ws_eng = wb.active
+        ws_eng.title = "ENGAGEMENT DETAILS"
+        ws_eng.sheet_view.showGridLines = True
+
         ws_eng["B2"] = "STOCK OPNAME (PHYSICAL INVENTORY COUNT) – EXTERNAL AUDIT PACK"
         ws_eng["B2"].font = font_title
         ws_eng["B3"] = "Retail sport warehouse - aligned with ISA 501 / SA 501, IAS 2 / PSAK 14 (Inventories) and good warehouse counting practice"
         ws_eng["B3"].font = font_sub
 
-        headers_meta = ["ENGAGEMENT DETAILS", "Entry (fill yellow cells)", "Note"]
-        for col_idx, h_text in enumerate(headers_meta, start=2):
+        for col_idx, h_text in enumerate(["ENGAGEMENT DETAILS", "Entry (fill yellow cells)", "Note"], start=2):
             cell = ws_eng.cell(row=5, column=col_idx, value=h_text)
             cell.fill = navy_fill
             cell.font = font_th
             cell.alignment = Alignment(horizontal="center" if col_idx != 2 else "left", vertical="center")
 
-        details_rows = [
+        eng_rows = [
             ("Company name", form_meta.get("company", "PT ZONA KARYA NUSANTARA"), ""),
             ("Warehouse branch", form_meta.get("branch", "SZ SURABAYA"), ""),
-            ("Stock count date", form_meta.get("date", datetime.now().strftime("%d %B %Y")), "Date of physical count"),
+            ("Stock count date", form_meta.get("date", "12 JANUARI 2027"), "Date of physical count"),
             ("Count start time", form_meta.get("start_time", "08:00"), ""),
             ("Count end time", form_meta.get("end_time", "17:00"), ""),
             ("Count method", form_meta.get("method", "Full count (wall-to-wall)"), "Dropdown: full / cycle / sample"),
@@ -5160,70 +5168,164 @@ class AppState:
             ("Currency", form_meta.get("currency", "IDR"), "Used for all values in this workbook")
         ]
 
-        for r_i, (lbl, val, note) in enumerate(details_rows, start=6):
+        for r_i, (lbl, val, note) in enumerate(eng_rows, start=6):
             c_lbl = ws_eng.cell(row=r_i, column=2, value=lbl)
             c_val = ws_eng.cell(row=r_i, column=3, value=val)
             c_not = ws_eng.cell(row=r_i, column=4, value=note)
 
-            c_lbl.font = font_bold
-            c_lbl.border = thin_border
-            
-            c_val.fill = yellow_fill
-            c_val.border = thin_border
-            c_val.font = Font(name="Calibri", size=10, bold=True, color="1A365D")
-
-            c_not.font = Font(name="Calibri", size=9, italic=True, color="718096")
-            c_not.border = thin_border
+            c_lbl.font = font_bold; c_lbl.border = thin_border
+            c_val.fill = yellow_fill; c_val.border = thin_border; c_val.font = font_blue
+            c_not.font = font_sub; c_not.border = thin_border
 
         ws_eng.column_dimensions['A'].width = 3
         ws_eng.column_dimensions['B'].width = 30
         ws_eng.column_dimensions['C'].width = 36
         ws_eng.column_dimensions['D'].width = 35
 
-        # ----------------------------------------------------------------------
-        # SHEET 2: AUDIT COUNT SHEET (HASIL FILTER & KOLOM FISIK AUDIT)
-        # ----------------------------------------------------------------------
-        ws_data["A1"] = f"LEMBAR PENGUJIAN FISIK AUDITOR - {form_meta.get('company', '')}"
-        ws_data["A1"].font = font_title
-        ws_data["A2"] = f"Cabang: {form_meta.get('branch', '')} | Tanggal: {form_meta.get('date', '')} | Auditor: {form_meta.get('lead', '-')}"
-        ws_data["A2"].font = font_sub
+        # ======================================================================
+        # SHEET 2: STOCK COUNT SHEET (GAMBAR 2 - HASIL FILTER DROPDOWN)
+        # ======================================================================
+        ws_cnt = wb.create_sheet(title="STOCK COUNT SHEET")
+        ws_cnt.sheet_view.showGridLines = True
 
-        headers_data = [
-            "NO", "BIN", "SKU", "BRAND", "NAMA BARANG", "SUB KATEGORI", 
-            "QTY SYSTEM", "PHYSICAL COUNT (ACTUAL)", "DIFF", "AUDITOR SIGN / NOTES"
+        ws_cnt["A1"] = "STOCK COUNT SHEET"
+        ws_cnt["A1"].font = font_title
+
+        ws_cnt["A2"] = "Company:"; ws_cnt["B2"] = form_meta.get("company", "PT ZONA KARYA NUSANTARA"); ws_cnt["B2"].font = Font(color="008000", bold=True)
+        ws_cnt["A3"] = "Warehouse:"; ws_cnt["B3"] = form_meta.get("branch", "SZ SURABAYA"); ws_cnt["B3"].font = Font(color="008000", bold=True)
+        ws_cnt["A4"] = "Count date:"; ws_cnt["B4"] = form_meta.get("date", "12 JANUARI 2027"); ws_cnt["B4"].font = Font(color="008000", bold=True)
+        for r_info in range(2, 5): ws_cnt.cell(row=r_info, column=1).font = font_bold
+
+        headers_cnt = [
+            "No.", "Bin Location", "SKU", "Description", "Category", 
+            "UoM (PAIR / PCS)", "Qty System", "Physical Count", "Variance Value", 
+            "Counter", "Auditor Verified", "Remarks"
         ]
-        for col_idx, h_text in enumerate(headers_data, start=1):
-            cell = ws_data.cell(row=4, column=col_idx, value=h_text)
+
+        for col_idx, h_text in enumerate(headers_cnt, start=1):
+            cell = ws_cnt.cell(row=6, column=col_idx, value=h_text)
+            cell.fill = navy_fill
+            cell.font = font_th
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+        df_out = self._raw_df_auditor_filtered
+        for r_idx, row in enumerate(df_out.itertuples(index=False), start=7):
+            ws_cnt.cell(row=r_idx, column=1, value=r_idx - 6).alignment = Alignment(horizontal="center")
+            c_bin = ws_cnt.cell(row=r_idx, column=2, value=str(row._1)); c_bin.font = font_blue
+            c_sku = ws_cnt.cell(row=r_idx, column=3, value=str(row._2)); c_sku.font = font_blue
+            c_desc = ws_cnt.cell(row=r_idx, column=4, value=str(row.Description)); c_desc.font = font_blue
+            c_cat = ws_cnt.cell(row=r_idx, column=5, value=str(row.Category)); c_cat.font = font_blue
+            c_uom = ws_cnt.cell(row=r_idx, column=6, value=str(getattr(row, "_5", "PCS"))); c_uom.font = font_blue; c_uom.alignment = Alignment(horizontal="center")
+            
+            # Qty System
+            ws_cnt.cell(row=r_idx, column=7, value=int(getattr(row, "_6", 0))).alignment = Alignment(horizontal="right")
+            
+            # Physical Count (Kuning Kosong untuk diisi Auditor)
+            c_phys = ws_cnt.cell(row=r_idx, column=8, value="")
+            c_phys.fill = yellow_fill
+            c_phys.alignment = Alignment(horizontal="right")
+            
+            # Rumus Variance (Actual - System)
+            ws_cnt.cell(row=r_idx, column=9, value=f'=IF(H{r_idx}="","",H{r_idx}-G{r_idx})').alignment = Alignment(horizontal="right")
+            
+            # Counter, Verified, Remarks
+            c_ctr = ws_cnt.cell(row=r_idx, column=10, value="Counter A"); c_ctr.font = font_blue; c_ctr.alignment = Alignment(horizontal="center")
+            c_ver = ws_cnt.cell(row=r_idx, column=11, value="No"); c_ver.font = font_blue; c_ver.alignment = Alignment(horizontal="center")
+            ws_cnt.cell(row=r_idx, column=12, value="")
+
+            for c in range(1, 13):
+                ws_cnt.cell(row=r_idx, column=c).border = thin_border
+
+        col_widths_cnt = {'A': 6, 'B': 18, 'C': 22, 'D': 35, 'E': 20, 'F': 18, 'G': 14, 'H': 16, 'I': 16, 'J': 15, 'K': 18, 'L': 25}
+        for col_letter, width in col_widths_cnt.items():
+            ws_cnt.column_dimensions[col_letter].width = width
+
+        # ======================================================================
+        # SHEET 3: AUDITOR OBSERVATIONS & FINDINGS (GAMBAR 3)
+        # ======================================================================
+        ws_obs = wb.create_sheet(title="OBSERVATIONS & FINDINGS")
+        ws_obs.sheet_view.showGridLines = True
+
+        ws_obs["A1"] = "AUDITOR OBSERVATIONS & FINDINGS"
+        ws_obs["A1"].font = font_title
+        ws_obs["A2"] = "Record exceptions noted during the count, with risk rating, recommendation and management response."
+        ws_obs["A2"].font = font_sub
+
+        headers_obs = ["Area", "Case", "Risk", "Recommendation", "Management Response", "Due Date", "Status"]
+        for col_idx, h_text in enumerate(headers_obs, start=1):
+            cell = ws_obs.cell(row=4, column=col_idx, value=h_text)
             cell.fill = navy_fill
             cell.font = font_th
             cell.alignment = Alignment(horizontal="center", vertical="center")
 
-        df_out = self._raw_df_auditor_filtered
-        for r_idx, row in enumerate(df_out.itertuples(index=False), start=5):
-            ws_data.cell(row=r_idx, column=1, value=r_idx - 4).alignment = Alignment(horizontal="center")
-            ws_data.cell(row=r_idx, column=2, value=str(row.BIN))
-            ws_data.cell(row=r_idx, column=3, value=str(row.SKU))
-            ws_data.cell(row=r_idx, column=4, value=str(row.BRAND))
-            ws_data.cell(row=r_idx, column=5, value=str(row._3)) # NAMA BARANG
-            ws_data.cell(row=r_idx, column=6, value=str(row._4)) # SUB KATEGORI
-            ws_data.cell(row=r_idx, column=7, value=int(row._5)).alignment = Alignment(horizontal="right") # QTY SYSTEM
-            
-            # Kolom Kosong untuk Cek Fisik Auditor
-            c_phys = ws_data.cell(row=r_idx, column=8, value="")
-            c_phys.fill = yellow_fill
-            
-            # Rumus DIFF Otomatis: QTY ACTUAL - QTY SYSTEM
-            ws_data.cell(row=r_idx, column=9, value=f"=IF(H{r_idx}=\"\",\"\",H{r_idx}-G{r_idx})").alignment = Alignment(horizontal="right")
-            ws_data.cell(row=r_idx, column=10, value="")
+        # Baris Contoh Sesuai Gambar 3
+        c_a = ws_obs.cell(row=5, column=1, value="Condition of stock"); c_a.font = font_blue
+        c_b = ws_obs.cell(row=5, column=2, value="EXAMPLE: Several footwear cartons in Zone C show water damage, not segregated."); c_b.font = font_blue
+        c_c = ws_obs.cell(row=5, column=3, value="Medium"); c_c.fill = yellow_fill; c_c.font = font_blue; c_c.alignment = Alignment(horizontal="center")
+        c_d = ws_obs.cell(row=5, column=4, value="Segregate and assess for markdown / write-down to NRV."); c_d.font = font_blue
+        ws_obs.cell(row=5, column=5, value="")
+        ws_obs.cell(row=5, column=6, value="")
+        c_g = ws_obs.cell(row=5, column=7, value="Open"); c_g.font = font_blue; c_g.alignment = Alignment(horizontal="center")
 
-            for c in range(1, 11):
-                ws_data.cell(row=r_idx, column=c).border = thin_border
+        for c in range(1, 8): ws_obs.cell(row=5, column=c).border = thin_border
 
-        # Atur lebar kolom sheet data
-        col_widths = {'A': 6, 'B': 18, 'C': 22, 'D': 16, 'E': 35, 'F': 20, 'G': 14, 'H': 24, 'I': 10, 'J': 25}
-        for col_letter, width in col_widths.items():
-            ws_data.column_dimensions[col_letter].width = width
+        # 10 Baris Kosong Berbingkai untuk Auditor
+        for r_empty in range(6, 16):
+            c_risk = ws_obs.cell(row=r_empty, column=3, value="")
+            c_risk.fill = yellow_fill
+            for c in range(1, 8):
+                ws_obs.cell(row=r_empty, column=c).border = thin_border
 
+        col_widths_obs = {'A': 22, 'B': 45, 'C': 15, 'D': 45, 'E': 30, 'F': 15, 'G': 15}
+        for col_letter, width in col_widths_obs.items():
+            ws_obs.column_dimensions[col_letter].width = width
+
+        # ======================================================================
+        # SHEET 4: STOCK COUNT SIGN-OFF (GAMBAR 4)
+        # ======================================================================
+        ws_sign = wb.create_sheet(title="STOCK COUNT SIGN-OFF")
+        ws_sign.sheet_view.showGridLines = True
+
+        ws_sign["A1"] = "STOCK COUNT SIGN-OFF"
+        ws_sign["A1"].font = font_title
+        ws_sign["A2"] = "By signing, each party confirms the count was performed as per the Count Procedure and the results are as recorded."
+        ws_sign["A2"].font = font_sub
+
+        headers_sign = ["Role", "Name", "Signature", "Date", "Company / Firm"]
+        for col_idx, h_text in enumerate(headers_sign, start=1):
+            cell = ws_sign.cell(row=4, column=col_idx, value=h_text)
+            cell.fill = navy_fill
+            cell.font = font_th
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+
+        sign_roles = [
+            ("Counter(s)", form_meta.get("counter_name", ""), form_meta.get("company", "")),
+            ("Checker(s)", form_meta.get("checker_name", ""), form_meta.get("company", "")),
+            ("Count Team Leader", form_meta.get("supervisor", ""), form_meta.get("company", "")),
+            ("Warehouse Manager", form_meta.get("manager", ""), form_meta.get("company", "")),
+            ("Finance Manager", form_meta.get("finance_manager", ""), form_meta.get("company", "")),
+            ("External Auditor (observer)", form_meta.get("lead", ""), form_meta.get("audit_firm", "KAP Independent")),
+            ("External Audit Manager / Partner", form_meta.get("audit_partner", ""), form_meta.get("audit_firm", "KAP Independent"))
+        ]
+
+        for r_s, (role_txt, name_val, comp_val) in enumerate(sign_roles, start=5):
+            ws_sign.row_dimensions[r_s].height = 28
+            c_r = ws_sign.cell(row=r_s, column=1, value=role_txt); c_r.font = font_bold
+            c_n = ws_sign.cell(row=r_s, column=2, value=name_val)
+            ws_sign.cell(row=r_s, column=3, value="")  # Area tanda tangan
+            ws_sign.cell(row=r_s, column=4, value=form_meta.get("date", ""))
+            ws_sign.cell(row=r_s, column=5, value=comp_val)
+
+            for c in range(1, 6):
+                cell_box = ws_sign.cell(row=r_s, column=c)
+                cell_box.border = thin_border
+                cell_box.alignment = Alignment(vertical="center")
+
+        col_widths_sign = {'A': 32, 'B': 28, 'C': 22, 'D': 18, 'E': 30}
+        for col_letter, width in col_widths_sign.items():
+            ws_sign.column_dimensions[col_letter].width = width
+
+        # Simpan Workbook
         buf = io.BytesIO()
         wb.save(buf)
         buf.seek(0)
