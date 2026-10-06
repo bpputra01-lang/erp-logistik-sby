@@ -1183,7 +1183,7 @@ def excel_practice_view(state: AppState):
                     style="width: 44px; height: 44px; background: linear-gradient(135deg, #10B981 0%, #059669 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-right: 12px;"
                 ),
                 ui.div(
-                    ui.h3("Uji Kemahiran Formula Excel Retail Sepatu (Auto-Grading)", style="font-size: 18px; font-weight: 800; color: #1A202C; margin: 0;"),
+                    ui.h3("E-Learning Excel Formula Logistic Retail (Auto-Grading)", style="font-size: 18px; font-weight: 800; color: #1A202C; margin: 0;"),
                     ui.p("Soal dibuat dinamis dengan berbagai variasi model tabel kerja (SUM, COUNT/COUNTA, SUMIF, COUNTIF, SUMIFS, COUNTIFS, IF, XLOOKUP).", style="font-size: 13px; color: #718096; margin: 0;")
                 ),
                 style="display: flex; align-items: center;"
