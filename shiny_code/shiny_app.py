@@ -1,5 +1,6 @@
 import io
 import time
+from datetime import datetime
 import pandas as pd
 from shiny import App, Inputs, Outputs, Session, reactive, render, ui
 from state import AppState
@@ -3386,7 +3387,7 @@ def server(input: Inputs, output: Outputs, session: Session):
 
     # 👇 Perhatikan penambahan blok try-except dan time.time() yang sudah benar:
     @render.download(
-        filename=lambda: f"SOAL_EXCEL_SEPATU_{int(time.time())}.xlsx"
+        filename=lambda: f"SOAL_LATIHAN_EXCEL_{datetime.now().strftime('%d_%m_%Y_%H%M')}.xlsx"
     )
     def btn_dl_excel_practice():
         try:

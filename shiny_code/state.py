@@ -4322,16 +4322,16 @@ class AppState:
             ws_rekap["A2"].font = Font(name="Calibri", size=10, italic=True, color="718096")
 
             # Kartu Atas
-            ws_rekap["A4"] = "Ringkasan Cepat"
+            ws_rekap["A4"] = "Isi Total Stock dan Hitung Jumlah SKU"
             ws_rekap["A4"].font = font_sub
             ws_rekap["A5"] = "Total Sisa Stok (SUM)"; ws_rekap["A5"].fill = theme_fill; ws_rekap["A5"].font = font_header
             ws_rekap["B5"] = ""; ws_rekap["B5"].fill = fill_yellow
-            ws_rekap["D5"] = "Total Barcode (COUNT)"; ws_rekap["D5"].fill = theme_fill; ws_rekap["D5"].font = font_header
+            ws_rekap["D5"] = "Jumlah SKU (COUNT)"; ws_rekap["D5"].fill = theme_fill; ws_rekap["D5"].font = font_header
             ws_rekap["E5"] = ""; ws_rekap["E5"].fill = fill_yellow
             for col in ["A", "B", "D", "E"]: ws_rekap[f"{col}5"].border = border_thin
 
             # Matriks Silang
-            ws_rekap["A7"] = "Tabel Silang Penjualan (Isi sel pertemuan pakai SUMIFS)"
+            ws_rekap["A7"] = "Isi Menggunakan SUMIFS untuk Sesuai Kategori & Brand"
             ws_rekap["A7"].font = font_sub
             headers_matrix = ["Brand", "Sepatu Bola (SUMIFS)", "Sepatu Futsal (SUMIFS)", "Sepatu Running (SUMIFS)",
                               "Total Brand (SUMIF)", "Banyak SKU (COUNTIF)"]
@@ -4350,9 +4350,9 @@ class AppState:
                 for col in range(1, 7): ws_rekap.cell(row=r, column=col).border = border_thin
 
             # Rekap Bawah
-            ws_rekap["A15"] = "Cek Stok per Kategori"
+            ws_rekap["A15"] = "Cek SKU per Kategori"
             ws_rekap["A15"].font = font_sub
-            for c_idx, h in enumerate(["Kategori", "SKU Stok > 5 (COUNTIFS)"], start=1):
+            for c_idx, h in enumerate(["Kategori", "SKU dengan Stok > 5 (COUNTIFS)"], start=1):
                 c = ws_rekap.cell(row=16, column=c_idx, value=h)
                 c.fill = theme_fill; c.font = font_header; c.alignment = Alignment(horizontal="center")
             for idx, kt in enumerate(KATEGORI, start=1):
@@ -4432,7 +4432,7 @@ class AppState:
         # SHEET DATA STOK & DISTRIBUTOR
         # ----------------------------------------------------------------------
         ws_data = wb.create_sheet(title="DATA_STOK_SEPATU")
-        ws_ref = wb.create_sheet(title="REF_DISTRIBUTOR")
+        ws_ref = wb.create_sheet(title="REFERENSI SUPPLIER")
 
         headers_data = [
             "NO", "BARCODE", "SKU", "BRAND", "NAMA BARANG", "KATEGORI", "SIZE", "RAK",
@@ -4688,11 +4688,11 @@ class AppState:
             ok_7 = (x_ok >= 10)
             if ok_7: score_total += 12.5
             grading.append({
-                "No": "7", "Bagian": "Distributor (Sheet Data)", "Rumus": "XLOOKUP",
+                "No": "7", "Bagian": "Supplier (Sheet Data)", "Rumus": "XLOOKUP",
                 "Jawaban Kamu": f"{x_ok}/14 Sampel Terisi",
-                "Kunci": "Nama Distributor",
+                "Kunci": "Nama Supplier",
                 "Status": "✅ Benar" if ok_7 else "❌ Cek Lagi",
-                "Catatan": "Mantap, XLOOKUP narik data bener!" if ok_7 else "Kolom distributor masih kosong atau rumusnya belum pas."
+                "Catatan": "Great, XLOOKUP Sesuai!" if ok_7 else "Kolom distributor masih kosong atau rumusnya belum pas."
             })
 
             # 8. IF
