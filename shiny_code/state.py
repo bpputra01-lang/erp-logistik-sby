@@ -4198,12 +4198,19 @@ class AppState:
 # ==========================================================================
     # 1. GENERATOR PAKET SOAL EXCEL RETAIL SEPATU (MULTI-MODEL & ON-DEMAND)
     # ==========================================================================
-    def generate_excel_practice_package(self):
+  def generate_excel_practice_package(self):
         import io
+        import time
         import random
         from openpyxl import Workbook
         from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
         from openpyxl.utils import get_column_letter
+
+        # Seed berbasis mikrodetik untuk menjamin 100% acak di setiap klik
+        random.seed(time.time_ns())
+
+        # PILIH 1 DARI 3 MODEL YANG SANGAT BERBEDA BENTUKNYA
+        pilihan_model = random.choice(["MODEL_GUDANG_LOGISTIK", "MODEL_SALES_RETAIL", "MODEL_AUDIT_KONSINYASI"])
 
         wb = Workbook()
         ws_rekap = wb.active
@@ -4211,118 +4218,116 @@ class AppState:
         ws_data = wb.create_sheet(title="DATA_STOK_SEPATU")
         ws_ref = wb.create_sheet(title="REF_DISTRIBUTOR")
         
-        # Sheet Metadata Evaluasi (veryHidden agar peserta tidak bisa intip kunci)
         ws_meta = wb.create_sheet(title="_SYS_EVAL_META")
         ws_meta.sheet_state = 'veryHidden'
 
-        # ----------------------------------------------------------------------
-        # PILIH DARI 3 MODEL SKENARIO & TATA LETAK TABEL YANG BERBEDA
-        # ----------------------------------------------------------------------
-        MODELS = [
-            {
-                "id": "MODEL_A_SPORT",
-                "nama_ujian": "LAPORAN MONITORING STOK - DIVISI PERFORMANCE SPORT",
-                "brands": ["SPECS", "ORTUSEIGHT", "MILLS", "MIZUNO", "PUMA", "ADIDAS", "LOTTO", "DIADORA"],
-                "kategori": ["SEPATU BOLA", "SEPATU FUTSAL", "SEPATU RUNNING"],
-                "sizes": [39, 40, 41, 42, 43, 44],
-                "barcode_base": 89910000,   # Model angka barcode 8-digit
-                "harga_range": (30, 85),
-                "combos": [("SPECS", "SEPATU BOLA"), ("ORTUSEIGHT", "SEPATU FUTSAL"), ("MILLS", "SEPATU RUNNING"), ("ADIDAS", "SEPATU BOLA"), ("MIZUNO", "SEPATU BOLA")],
-                "countifs_stok": 5,
-                "if_threshold": 3,
-                "if_true": "REFILL",
-                "if_false": "AMAN",
-                "header_color": "1A365D"    # Tema Navy
-            },
-            {
-                "id": "MODEL_B_SNEAKERS",
-                "nama_ujian": "LAPORAN AUDIT PERPUTARAN STOK - DIVISI SNEAKERS & CASUAL",
-                "brands": ["PIERO", "NINETEN", "VENTELA", "COMPASS", "PATROBAS", "GEOFF MAX"],
-                "kategori": ["LOW TOP SNEAKERS", "HIGH TOP SNEAKERS", "SLIP ON CASUAL"],
-                "sizes": [37, 38, 39, 40, 41, 42, 43],
-                "barcode_base": 2026100000, # Model angka barcode 10-digit
-                "harga_range": (18, 55),
-                "combos": [("PIERO", "LOW TOP SNEAKERS"), ("NINETEN", "LOW TOP SNEAKERS"), ("VENTELA", "HIGH TOP SNEAKERS"), ("COMPASS", "LOW TOP SNEAKERS")],
-                "countifs_stok": 6,
-                "if_threshold": 5,
-                "if_true": "RESTOCK",
-                "if_false": "CUKUP",
-                "header_color": "22543D"    # Tema Forest Green
-            },
-            {
-                "id": "MODEL_C_FLAGSHIP",
-                "nama_ujian": "LAPORAN REKAPITULASI INVENTORY - FLAGSHIP STORE MULTI-BRAND",
-                "brands": ["NIKE", "ADIDAS", "ASICS", "PUMA", "NEW BALANCE"],
-                "kategori": ["ROAD RUNNING", "TRAIL RUNNING", "TRAINING & GYM"],
-                "sizes": [40, 41, 42, 43, 44, 45, 46],
-                "barcode_base": 7100000,    # Model angka barcode 7-digit
-                "harga_range": (45, 140),
-                "combos": [("NIKE", "ROAD RUNNING"), ("ASICS", "ROAD RUNNING"), ("ADIDAS", "TRAINING & GYM"), ("PUMA", "ROAD RUNNING")],
-                "countifs_stok": 4,
-                "if_threshold": 4,
-                "if_true": "ORDER ULANG",
-                "if_false": "READY",
-                "header_color": "2D3748"    # Tema Slate Grey
-            }
-        ]
-
-        active_model = random.choice(MODELS)
-        BRANDS = active_model["brands"]
-        KATEGORI_LIST = active_model["kategori"]
-        BINS = ["TOKO", "GUDANG LT.2", "DISPLAY UTAMA", "DISPLAY RAK 2"]
-        DISTRIBUTORS = ["PT MITRA OLAHRAGA SEJATI", "PT ZONA ATLET PRIMA", "PT DISTRINDO SPORT INDONESIA", "GLOBAL RETAIL LOGISTIC"]
-
-        rows_data = []
-        sku_set = set()
-        sku_ref_map = {}
-
-        total_items = 60
-        for i in range(1, total_items + 1):
-            brand = random.choice(BRANDS)
-            size = random.choice(active_model["sizes"])
-            kategori = random.choice(KATEGORI_LIST)
-            bin_lokasi = random.choice(BINS)
-            
-            # Barcode MURNI INTEGER sesuai model angka
-            barcode_num = int(active_model["barcode_base"] + i)
-            sku_code = f"SH-{brand[:3]}-{size}-{random.randint(100, 999)}"
-            while sku_code in sku_set:
-                sku_code = f"SH-{brand[:3]}-{size}-{random.randint(100, 999)}"
-            sku_set.add(sku_code)
-
-            min_h, max_h = active_model["harga_range"]
-            harga_beli = random.randint(min_h, max_h) * 10000
-            harga_jual = int(harga_beli * random.choice([1.25, 1.30, 1.35, 1.40]))
-            stok_awal = random.randint(5, 30)
-            terjual = random.randint(0, stok_awal)
-            sisa_stok = stok_awal - terjual
-
-            distrib = random.choice(DISTRIBUTORS)
-            lead_time = random.choice(["2 HARI", "3 HARI", "5 HARI", "7 HARI"])
-            sku_ref_map[sku_code] = (distrib, lead_time)
-
-            rows_data.append([
-                i, barcode_num, sku_code, brand, f"{brand} {kategori} SERI-{random.randint(1,9)}", 
-                kategori, size, bin_lokasi, harga_beli, harga_jual, stok_awal, terjual, sisa_stok, "", ""
-            ])
-
+        # Definisikan style dasar
         font_header = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
         font_sub = Font(name="Calibri", size=11, bold=True, color="1A365D")
-        fill_theme = PatternFill(start_color=active_model["header_color"], end_color=active_model["header_color"], fill_type="solid")
         fill_gold = PatternFill(start_color="C5A059", end_color="C5A059", fill_type="solid")
-        fill_yellow_blank = PatternFill(start_color="FEFCBF", end_color="FEFCBF", fill_type="solid")
+        fill_yellow = PatternFill(start_color="FEFCBF", end_color="FEFCBF", fill_type="solid")
         border_thin = Border(left=Side(style='thin', color='CBD5E0'), right=Side(style='thin', color='CBD5E0'),
                              top=Side(style='thin', color='CBD5E0'), bottom=Side(style='thin', color='CBD5E0'))
 
-        # ----------------------------------------------------------------------
-        # 1. SHEET DATA_STOK_SEPATU
-        # ----------------------------------------------------------------------
-        headers_data = [
-            "NO", "KODE BARCODE (ANGKA)", "SKU", "BRAND", "DESKRIPSI ARTIKEL", "KATEGORI", "SIZE", "LOKASI BIN",
-            "HARGA BELI", "HARGA JUAL", "STOK AWAL", "TERJUAL", "SISA STOK",
-            "DISTRIBUTOR RESMI (KOSONG: WAJIB XLOOKUP)",
-            "STATUS REFILL (KOSONG: WAJIB IF)"
-        ]
+        sku_ref_map = {}
+        rows_data = []
+
+        # ======================================================================
+        # VARIASI 1: MODEL GUDANG LOGISTIK (TEMA NAVY)
+        # ======================================================================
+        if pilihan_model == "MODEL_GUDANG_LOGISTIK":
+            theme_color = "1A365D"
+            brands = ["SPECS", "ORTUSEIGHT", "MILLS", "MIZUNO", "PUMA"]
+            kategori = ["SEPATU BOLA", "SEPATU FUTSAL", "SEPATU RUNNING"]
+            barcode_base = 89910000  # 8 Digit
+            combos = [("SPECS", "SEPATU BOLA"), ("ORTUSEIGHT", "SEPATU FUTSAL"), ("MILLS", "SEPATU RUNNING")]
+            if_thresh = 3
+            if_true, if_false = "REFILL", "AMAN"
+            c_thresh = 5
+
+            headers_data = [
+                "NO", "KODE BARCODE (ANGKA)", "SKU", "BRAND", "NAMA PRODUK", "KATEGORI", "SIZE", "LOKASI RAK",
+                "HARGA BELI", "HARGA JUAL", "STOK AWAL", "TERJUAL", "SISA STOK",
+                "DISTRIBUTOR RESMI (KOSONG: XLOOKUP)", "STATUS REFILL (KOSONG: IF)"
+            ]
+            for i in range(1, 61):
+                br = random.choice(brands)
+                sz = random.choice([39, 40, 41, 42, 43, 44])
+                kt = random.choice(kategori)
+                code = f"LOG-{br[:3]}-{sz}-{random.randint(100, 999)}"
+                hb = random.randint(25, 75) * 10000
+                hj = int(hb * 1.3)
+                awal = random.randint(5, 30)
+                terjual = random.randint(0, awal)
+                sisa = awal - terjual
+                sku_ref_map[code] = ("PT MITRA LOGISTIK UTAMA", "3 HARI")
+                rows_data.append([i, barcode_base + i, code, br, f"{br} SPORT PRO", kt, sz, f"RAK-{random.choice(['A','B','C'])}{random.randint(1,5)}", hb, hj, awal, terjual, sisa, "", ""])
+
+        # ======================================================================
+        # VARIASI 2: MODEL SALES RETAIL (TEMA HIJAU FOREST - BEDA SUSUNAN KOLOM)
+        # ======================================================================
+        elif pilihan_model == "MODEL_SALES_RETAIL":
+            theme_color = "22543D"
+            brands = ["PIERO", "NINETEN", "VENTELA", "COMPASS", "PATROBAS", "AEROSTREET"]
+            kategori = ["LOW SNEAKERS", "HIGH SNEAKERS", "SLIP ON CASUAL"]
+            barcode_base = 2026100000 # 10 Digit
+            combos = [("PIERO", "LOW SNEAKERS"), ("NINETEN", "LOW SNEAKERS"), ("VENTELA", "HIGH SNEAKERS"), ("COMPASS", "LOW SNEAKERS")]
+            if_thresh = 5
+            if_true, if_false = "RESTOCK", "CUKUP"
+            c_thresh = 7
+
+            headers_data = [
+                "NO", "KODE BARCODE (ANGKA)", "SKU", "BRAND", "SERI SEPATU", "KATEGORI", "SIZE", "AREA DISPLAY",
+                "HARGA BELI", "HARGA JUAL", "STOK AWAL", "TERJUAL", "SISA STOK",
+                "SUPPLIER MITRA (KOSONG: XLOOKUP)", "STATUS ORDER (KOSONG: IF)"
+            ]
+            for i in range(1, 61):
+                br = random.choice(brands)
+                sz = random.choice([37, 38, 39, 40, 41, 42])
+                kt = random.choice(kategori)
+                code = f"RET-{br[:3]}-{random.randint(100, 999)}"
+                hb = random.randint(15, 50) * 10000
+                hj = int(hb * 1.35)
+                awal = random.randint(10, 40)
+                terjual = random.randint(0, awal)
+                sisa = awal - terjual
+                sku_ref_map[code] = ("PT DISTRINDO RETAIL INDONESIA", "5 HARI")
+                rows_data.append([i, barcode_base + i, code, br, f"{br} URBAN STREET", kt, sz, f"DISPLAY-{random.choice(['DEPAN','TENGAH','KASIR'])}", hb, hj, awal, terjual, sisa, "", ""])
+
+        # ======================================================================
+        # VARIASI 3: MODEL KONSINYASI PREMIUM (TEMA DARK SLATE - RENTANG HARGA TINGGI)
+        # ======================================================================
+        else:
+            theme_color = "2D3748"
+            brands = ["ADIDAS", "NIKE", "PUMA", "ASICS"]
+            kategori = ["TRAIL RUNNING", "ROAD RUNNING", "GYM & FITNESS"]
+            barcode_base = 7200000 # 7 Digit
+            combos = [("ADIDAS", "ROAD RUNNING"), ("NIKE", "TRAIL RUNNING"), ("ASICS", "ROAD RUNNING")]
+            if_thresh = 4
+            if_true, if_false = "ORDER ULANG", "READY"
+            c_thresh = 4
+
+            headers_data = [
+                "NO", "KODE BARCODE (ANGKA)", "SKU", "BRAND", "DESKRIPSI ARTIKEL", "KATEGORI", "SIZE", "TIER RAK",
+                "HARGA BELI", "HARGA JUAL", "STOK AWAL", "TERJUAL", "SISA STOK",
+                "DISTRIBUTOR UTAMA (KOSONG: XLOOKUP)", "STATUS INVENTORY (KOSONG: IF)"
+            ]
+            for i in range(1, 61):
+                br = random.choice(brands)
+                sz = random.choice([40, 41, 42, 43, 44, 45])
+                kt = random.choice(kategori)
+                code = f"KNS-{br[:3]}-{sz}-{random.randint(1000, 9999)}"
+                hb = random.randint(50, 160) * 10000
+                hj = int(hb * 1.25)
+                awal = random.randint(5, 25)
+                terjual = random.randint(0, awal)
+                sisa = awal - terjual
+                sku_ref_map[code] = ("GLOBAL PREMIUM ATHLETICS", "2 HARI")
+                rows_data.append([i, barcode_base + i, code, br, f"{br} PREMIUM SERIES", kt, sz, f"TIER-{random.randint(1, 4)}", hb, hj, awal, terjual, sisa, "", ""])
+
+        fill_theme = PatternFill(start_color=theme_color, end_color=theme_color, fill_type="solid")
+
+        # 1. RENDER SHEET DATA_STOK_SEPATU
         ws_data.append(headers_data)
         for col_idx in range(1, len(headers_data) + 1):
             cell = ws_data.cell(row=1, column=col_idx)
@@ -4335,16 +4340,11 @@ class AppState:
             for c_idx in range(1, len(r) + 1):
                 cell = ws_data.cell(row=r_idx, column=c_idx)
                 cell.border = border_thin
-                if c_idx in [9, 10]:
-                    cell.number_format = '"Rp "#,##0'
-                elif c_idx in [1, 2, 7, 11, 12, 13]:
-                    cell.alignment = Alignment(horizontal="center")
-                elif c_idx in [14, 15]:
-                    cell.fill = fill_yellow_blank
+                if c_idx in [9, 10]: cell.number_format = '"Rp "#,##0'
+                elif c_idx in [1, 2, 7, 11, 12, 13]: cell.alignment = Alignment(horizontal="center")
+                elif c_idx in [14, 15]: cell.fill = fill_yellow
 
-        # ----------------------------------------------------------------------
-        # 2. SHEET REF_DISTRIBUTOR (Master Lookup)
-        # ----------------------------------------------------------------------
+        # 2. RENDER SHEET REF_DISTRIBUTOR
         ws_ref.append(["SKU SEPATU", "DISTRIBUTOR RESMI", "LEAD TIME PENGIRIMAN"])
         for col_idx in range(1, 4):
             c = ws_ref.cell(row=1, column=col_idx)
@@ -4361,22 +4361,17 @@ class AppState:
                 cell.border = border_thin
                 if c_idx == 1: cell.alignment = Alignment(horizontal="center")
 
-        # ----------------------------------------------------------------------
-        # 3. SHEET LAPORAN_REKAPITULASI (Format Tabel Sesuai Model)
-        # ----------------------------------------------------------------------
+        # 3. RENDER SHEET LAPORAN_REKAPITULASI (Format & Baris Bergeser Mengikuti Model)
         ws_rekap.views.sheetView[0].showGridLines = True
-        
-        ws_rekap["A1"] = active_model["nama_ujian"]
-        ws_rekap["A1"].font = Font(name="Calibri", size=13, bold=True, color=active_model["header_color"])
-        ws_rekap["A2"] = f"Model Skenario: {active_model['id']} | Lengkapi seluruh sel berlatar belakang KUNING dengan formula Excel."
+        ws_rekap["A1"] = f"LEMBAR UJIAN EXCEL - {pilihan_model.replace('_', ' ')}"
+        ws_rekap["A1"].font = Font(name="Calibri", size=13, bold=True, color=theme_color)
+        ws_rekap["A2"] = "Lengkapi seluruh sel/kolom berlatar belakang KUNING dengan formula Excel yang diminta."
         ws_rekap["A2"].font = Font(name="Calibri", size=10, italic=True, color="4A5568")
 
-        # TABEL 1: TOTAL GLOBAL (SUM & COUNT)
+        # Tabel 1
         ws_rekap["A4"] = "TABEL 1: REKAPITULASI TOTAL GLOBAL"
         ws_rekap["A4"].font = font_sub
-        
-        tbl1_headers = ["INDIKATOR LAPORAN", "NILAI HASIL FORMULA (KOSONG: ISI RUMUS)", "RUMUS YANG WAJIB DIGUNAKAN"]
-        for c_idx, h in enumerate(tbl1_headers, start=1):
+        for c_idx, h in enumerate(["INDIKATOR LAPORAN", "NILAI FORMULA (KOSONG: ISI RUMUS)", "PETUNJUK FORMULA"], start=1):
             c = ws_rekap.cell(row=5, column=c_idx, value=h)
             c.font = font_header
             c.fill = fill_theme
@@ -4384,25 +4379,20 @@ class AppState:
             c.border = border_thin
 
         ws_rekap["A6"] = "Total Seluruh Sisa Stok Sepatu di Gudang & Toko"
-        ws_rekap["B6"] = ""
-        ws_rekap["B6"].fill = fill_yellow_blank
+        ws_rekap["B6"] = ""; ws_rekap["B6"].fill = fill_yellow
         ws_rekap["C6"] = "Wajib gunakan rumus =SUM(...) pada kolom SISA STOK"
-        
+
         ws_rekap["A7"] = "Total Jumlah Baris Item / Barcode Terdaftar"
-        ws_rekap["B7"] = ""
-        ws_rekap["B7"].fill = fill_yellow_blank
+        ws_rekap["B7"] = ""; ws_rekap["B7"].fill = fill_yellow
         ws_rekap["C7"] = "Wajib gunakan rumus =COUNT(...) pada Kolom A (NO) atau Kolom B (BARCODE)"
 
         for r in range(6, 8):
-            for c in range(1, 4):
-                ws_rekap.cell(row=r, column=c).border = border_thin
+            for c in range(1, 4): ws_rekap.cell(row=r, column=c).border = border_thin
 
-        # TABEL 2: REKAP PER BRAND (SUMIF & COUNTIF)
+        # Tabel 2
         ws_rekap["A9"] = "TABEL 2: REKAPITULASI PENJUALAN & MODEL PER BRAND"
         ws_rekap["A9"].font = font_sub
-
-        tbl2_headers = ["NO", "BRAND SEPATU", "TOTAL TERJUAL (KOSONG: ISI SUMIF)", "JUMLAH MODEL SKU (KOSONG: ISI COUNTIF)"]
-        for c_idx, h in enumerate(tbl2_headers, start=1):
+        for c_idx, h in enumerate(["NO", "BRAND SEPATU", "TOTAL TERJUAL (KOSONG: ISI SUMIF)", "JUMLAH MODEL SKU (KOSONG: ISI COUNTIF)"], start=1):
             c = ws_rekap.cell(row=10, column=c_idx, value=h)
             c.font = font_header
             c.fill = fill_theme
@@ -4410,58 +4400,46 @@ class AppState:
             c.border = border_thin
 
         start_row_t2 = 11
-        for idx, br in enumerate(BRANDS, start=1):
+        for idx, br in enumerate(brands, start=1):
             curr_r = 10 + idx
             ws_rekap.cell(row=curr_r, column=1, value=idx).alignment = Alignment(horizontal="center")
             ws_rekap.cell(row=curr_r, column=2, value=br).font = Font(name="Calibri", bold=True)
-            ws_rekap.cell(row=curr_r, column=3, value="").fill = fill_yellow_blank
-            ws_rekap.cell(row=curr_r, column=4, value="").fill = fill_yellow_blank
-            for c in range(1, 5):
-                ws_rekap.cell(row=curr_r, column=c).border = border_thin
-        end_row_t2 = 10 + len(BRANDS)
+            ws_rekap.cell(row=curr_r, column=3, value="").fill = fill_yellow
+            ws_rekap.cell(row=curr_r, column=4, value="").fill = fill_yellow
+            for c in range(1, 5): ws_rekap.cell(row=curr_r, column=c).border = border_thin
+        end_row_t2 = 10 + len(brands)
 
-        # TABEL 3: REKAP MULTI-KRITERIA (SUMIFS & COUNTIFS)
+        # Tabel 3
         start_t3 = end_row_t2 + 2
         ws_rekap.cell(row=start_t3, column=1, value="TABEL 3: REKAPITULASI MULTI-SYARAT BRAND & KATEGORI").font = font_sub
-
-        tbl3_headers = [
-            "NO", "BRAND", "KATEGORI SEPATU", 
-            "TOTAL TERJUAL (KOSONG: ISI SUMIFS)", 
-            f"JUMLAH SKU STOK > {active_model['countifs_stok']} (KOSONG: ISI COUNTIFS)"
-        ]
-        for c_idx, h in enumerate(tbl3_headers, start=1):
+        for c_idx, h in enumerate(["NO", "BRAND", "KATEGORI SEPATU", "TOTAL TERJUAL (KOSONG: ISI SUMIFS)", f"JUMLAH SKU STOK > {c_thresh} (KOSONG: ISI COUNTIFS)"], start=1):
             c = ws_rekap.cell(row=start_t3 + 1, column=c_idx, value=h)
             c.font = font_header
             c.fill = fill_theme
             c.alignment = Alignment(horizontal="center")
             c.border = border_thin
 
-        combos = active_model["combos"]
         start_row_t3 = start_t3 + 2
         for idx, (br, kat) in enumerate(combos, start=1):
             curr_r = start_t3 + 1 + idx
             ws_rekap.cell(row=curr_r, column=1, value=idx).alignment = Alignment(horizontal="center")
             ws_rekap.cell(row=curr_r, column=2, value=br).font = Font(name="Calibri", bold=True)
             ws_rekap.cell(row=curr_r, column=3, value=kat)
-            ws_rekap.cell(row=curr_r, column=4, value="").fill = fill_yellow_blank
-            ws_rekap.cell(row=curr_r, column=5, value="").fill = fill_yellow_blank
-            for c in range(1, 6):
-                ws_rekap.cell(row=curr_r, column=c).border = border_thin
+            ws_rekap.cell(row=curr_r, column=4, value="").fill = fill_yellow
+            ws_rekap.cell(row=curr_r, column=5, value="").fill = fill_yellow
+            for c in range(1, 6): ws_rekap.cell(row=curr_r, column=c).border = border_thin
         end_row_t3 = start_t3 + 1 + len(combos)
 
-        # ----------------------------------------------------------------------
-        # SIMPAN METADATA UNTUK AUTO-GRADING AGAR BISA MEMBACA MODEL APA PUN
-        # ----------------------------------------------------------------------
-        ws_meta.append(["model_id", active_model["id"]])
-        ws_meta.append(["total_rows", str(total_items)])
+        # METADATA AUTO-GRADING
+        ws_meta.append(["model_id", pilihan_model])
         ws_meta.append(["start_row_t2", str(start_row_t2)])
         ws_meta.append(["end_row_t2", str(end_row_t2)])
         ws_meta.append(["start_row_t3", str(start_row_t3)])
         ws_meta.append(["end_row_t3", str(end_row_t3)])
-        ws_meta.append(["countifs_stok", str(active_model["countifs_stok"])])
-        ws_meta.append(["if_threshold", str(active_model["if_threshold"])])
-        ws_meta.append(["if_true", active_model["if_true"]])
-        ws_meta.append(["if_false", active_model["if_false"]])
+        ws_meta.append(["countifs_stok", str(c_thresh)])
+        ws_meta.append(["if_threshold", str(if_thresh)])
+        ws_meta.append(["if_true", if_true])
+        ws_meta.append(["if_false", if_false])
 
         for sheet in [ws_rekap, ws_data, ws_ref]:
             for col in sheet.columns:
@@ -4472,9 +4450,6 @@ class AppState:
         buf = io.BytesIO()
         wb.save(buf)
         buf.seek(0)
-
-        # ⚠️ PENTING: JANGAN PANGGIL self.excel_exam_questions.set(...) DI SINI!
-        # Dibiarkan murni mengembalikan file bytes agar Shiny TIDAK re-render / layar hitam.
         return buf.getvalue()
 
     # ==========================================================================

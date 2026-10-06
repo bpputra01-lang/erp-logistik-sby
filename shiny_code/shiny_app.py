@@ -1,4 +1,5 @@
 import io
+import time
 import pandas as pd
 from shiny import App, Inputs, Outputs, Session, reactive, render, ui
 from state import AppState
@@ -3408,18 +3409,16 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         yield buf.getvalue()
 
-    @render.download(filename="LATIHAN_EXCEL_RETAIL_SEPATU.xlsx")
+    @render.download(
+        filename=lambda: f"SOAL_EXCEL_SEPATU_{int(time.time())}.xlsx"
+    )
     def btn_dl_excel_practice():
-        try:
-            content = state.generate_excel_practice_package()
-            # Jika mengembalikan BytesIO, ambil value bytes-nya
-            if hasattr(content, "getvalue"):
-                yield content.getvalue()
-            elif hasattr(content, "read"):
-                content.seek(0)
-                yield content.read()
-            else:
-                yield content
+        # Selalu paksa eksekusi generator baru
+        content = state.generate_excel_practice_package()
+        if hasattr(content, "getvalue"):
+            yield content.getvalue()
+        else:
+            yield content
         except Exception as e:
             print(f"Error generate excel practice: {e}")
             yield b""
