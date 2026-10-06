@@ -3550,7 +3550,13 @@ def server(input: Inputs, output: Outputs, session: Session):
             "checker_name": input.sign_checker() if "sign_checker" in input else "",
             "finance_manager": input.sign_finance() if "sign_finance" in input else "",
             "audit_firm": input.sign_kap() if "sign_kap" in input else "KAP Independent & Partners",
-            "audit_partner": input.sign_partner() if "sign_partner" in input else ""
+            "audit_partner": input.sign_partner() if "sign_partner" in input else "",
+            # Ambil data dari Tab 3:
+            "obs_area": input.obs_area() if "obs_area" in input else "Condition of stock",
+            "obs_case": input.obs_case() if "obs_case" in input else "",
+            "obs_risk": input.obs_risk() if "obs_risk" in input else "Medium",
+            "obs_recom": input.obs_recom() if "obs_recom" in input else "",
+            "obs_status": input.obs_status() if "obs_status" in input else "Open",
         }
         content = state.generate_auditor_excel_pack(meta_dict)
         yield content
