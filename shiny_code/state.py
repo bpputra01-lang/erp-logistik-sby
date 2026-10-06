@@ -4850,25 +4850,36 @@ class AppState:
                 "Catatan": "Keren, rumus 2 syaratnya bener!" if ok_5 else "Cek urutan kolom di rumus SUMIFS-nya."
             })
 
-            # 6. EVALUASI COUNTIFS
+            # 6. EVALUASI COUNTIFS (MENDUKUNG 3 KRITERIA: BRAND + KATEGORI + STOK > LIMIT)
             countifs_ok = 0
             for r in range(t3_start, t3_end + 1):
+                br = str(ws_rk_v.cell(row=r, column=2).value or "").strip().upper()
                 kt = str(ws_rk_v.cell(row=r, column=3).value or "").strip().upper()
                 f_v = clean_f(ws_rk_f.cell(row=r, column=5).value)
                 v_v = safe_float(ws_rk_v.cell(row=r, column=5).value)
-                gt_v = int(((df_stk[col_kat] == kt) & (df_stk[col_sisa] > countifs_limit)).sum()) if col_kat and col_sisa else 0
-                if "COUNTIFS(" in f_v and (int(v_v) == gt_v or str(gt_v) in f_v):
+
+                # Kunci 1: 3 Kriteria Lengkap (Brand + Kategori + Stok > limit) -> RUMUS ANDA
+                gt_3 = int(((df_stk[col_brand] == br) & (df_stk[col_kat] == kt) & (df_stk[col_sisa] > countifs_limit)).sum()) if col_brand and col_kat and col_sisa else 0
+                
+                # Kunci 2: Fallback 2 Kriteria (Kategori + Stok > limit)
+                gt_2 = int(((df_stk[col_kat] == kt) & (df_stk[col_sisa] > countifs_limit)).sum()) if col_kat and col_sisa else 0
+
+                val_num = int(round(v_v))
+                if "COUNTIFS(" in f_v and (val_num in [gt_3, gt_2] or str(gt_3) in f_v or str(gt_2) in f_v):
                     countifs_ok += 1
+
             ok_6 = (countifs_ok >= max(1, total_t3 - 1))
             if ok_6: score_total += 12.5
-            grading.append({
-                "No": "6", "Bagian": "Hitung Syarat (COUNTIFS)", "Rumus": "COUNTIFS",
-                "Jawaban Kamu": f"{countifs_ok}/{total_t3} Baris Pas",
-                "Kunci": f"Sesuai Syarat >{int(countifs_limit)}",
-                "Status": "✅ Benar" if ok_6 else "❌ Cek Lagi",
-                "Catatan": "Sip, syarat kriteria stok terbaca bener!" if ok_6 else f'Pastikan tanda petiknya bener (">{int(countifs_limit)}").'
-            })
 
+            grading.append({
+                "No": "6", 
+                "Bagian": "Hitung Syarat (COUNTIFS)", 
+                "Rumus": "COUNTIFS",
+                "Jawaban Kamu": f"{countifs_ok}/{total_t3} Baris Pas",
+                "Kunci": f"Brand + Kat + Stok >{int(countifs_limit)}",
+                "Status": "✅ Benar" if ok_6 else "❌ Cek Lagi",
+                "Catatan": "Sip, rumus COUNTIFS multi-kriteria bener!" if ok_6 else f'Pastikan tanda petiknya bener (">{int(countifs_limit)}").'
+            })
             # 7. EVALUASI XLOOKUP (Cari kolom yang berlabel DISTRIBUTOR)
             col_x_idx = next((i for i, c in enumerate(headers, start=1) if "DISTRIBUTOR" in c or "XLOOKUP" in c), 14)
             x_ok = 0
