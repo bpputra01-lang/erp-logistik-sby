@@ -3317,8 +3317,8 @@ def server(input: Inputs, output: Outputs, session: Session):
         yield buf.getvalue()
 
 # ==========================================================================
-# CONTROLLER: LATIHAN FORMULA EXCEL & AUTO-GRADING
-# ==========================================================================
+    # CONTROLLER: LATIHAN FORMULA EXCEL & AUTO-GRADING
+    # ==========================================================================
     @render.ui
     def excel_practice_action_btn_ui():
         f = input.upload_exam_answer_file() if "upload_exam_answer_file" in input else None
@@ -3381,7 +3381,13 @@ def server(input: Inputs, output: Outputs, session: Session):
     def btn_dl_exam_report():
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-            state._raw_df_exam_result.to_excel(writer, sheet_name='SCORECARD_EVALUASI', index=False)
+            df = getattr(state, "_raw_df_exam_result", None)
+            if df is not None and not df.empty:
+                df.to_excel(writer, sheet_name='SCORECARD_EVALUASI', index=False)
+            else:
+                pd.DataFrame(columns=["NO", "SOAL / MATERI", "STATUS", "KETERANGAN"]).to_excel(
+                    writer, sheet_name='SCORECARD_EVALUASI', index=False
+                )
         buf.seek(0)
         yield buf.getvalue()
 
@@ -3391,17 +3397,22 @@ def server(input: Inputs, output: Outputs, session: Session):
     def btn_dl_excel_practice():
         try:
             content = state.generate_excel_practice_package()
-            if content and len(content) > 0:
+            if content is not None:
                 if hasattr(content, "getvalue"):
                     yield content.getvalue()
-                else:
+                elif isinstance(content, (bytes, bytearray)):
                     yield content
+                else:
+                    yield bytes(content)
+            else:
+                yield b""
         except Exception as e:
             import traceback
             print(f"Error generate excel: {e}")
             traceback.print_exc()
+            yield b""
 
-@reactive.Effect
+    @reactive.Effect
     @reactive.event(input.btn_process_exam_grading)
     def _proc_exam_grading():
         f = input.upload_exam_answer_file()
@@ -3412,13 +3423,13 @@ def server(input: Inputs, output: Outputs, session: Session):
 
         try:
             succ, msg = state.grade_excel_practice(f)
-            ui.insert_ui(ui.tags.script("window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
             if succ:
                 ui.notification_show(msg, type="message", duration=5)
             else:
                 ui.notification_show(msg, type="error", duration=6)
         except Exception as e:
+            ui.notification_show(f"Terjadi kesalahan saat memeriksa file: {str(e)}", type="error", duration=6)
+        finally:
             ui.insert_ui(ui.tags.script("window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
-            ui.notification_show(f"Terjadi kesalahan: {str(e)}", type="error", duration=6)
 
 app = App(app_ui, server)
