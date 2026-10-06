@@ -4738,32 +4738,50 @@ class AppState:
             grading = []
             score_total = 0.0
 
-            # 1. EVALUASI SUM
-            f_sum = clean_f(ws_rk_f[cell_sum].value if cell_sum in ws_rk_f else "")
-            v_sum = safe_float(ws_rk_v[cell_sum].value if cell_sum in ws_rk_v else 0)
+            # 1. EVALUASI SUM (DIPERBAIKI: Akses langsung koordinat sel tanpa 'in ws')
+            try:
+                f_sum = clean_f(ws_rk_f[cell_sum].value)
+                v_sum = safe_float(ws_rk_v[cell_sum].value)
+            except Exception:
+                f_sum = ""
+                v_sum = 0.0
+
             gt_sum = int(df_stk[col_sisa].sum()) if col_sisa else 0
             has_sum = "SUM(" in f_sum and "SUMIF" not in f_sum
-            ok_1 = has_sum and ((int(v_sum) == gt_sum) or (str(gt_sum) in f_sum))
+            ok_1 = has_sum and ((int(round(v_sum)) == gt_sum) or (str(gt_sum) in f_sum))
             if ok_1: score_total += 12.5
+
             grading.append({
-                "No": "1", "Bagian": f"Total Sisa Stok ({cell_sum})", "Rumus": "SUM",
-                "Jawaban Kamu": f"{int(v_sum):,}" if v_sum > 0 else (str(ws_rk_f[cell_sum].value or "(Kosong)")),
+                "No": "1", 
+                "Bagian": f"Total Sisa Stok ({cell_sum})", 
+                "Rumus": "SUM",
+                "Jawaban Kamu": f"{int(round(v_sum)):,}" if v_sum > 0 else (str(ws_rk_f[cell_sum].value or "(Kosong)")),
                 "Kunci": f"{gt_sum:,}",
                 "Status": "✅ Benar" if ok_1 else "❌ Cek Lagi",
                 "Catatan": "Mantap, rumusnya bener!" if ok_1 else "Coba periksa kolom sisa stok yang dijumlahkan."
             })
 
-            # 2. EVALUASI COUNT
-            f_cnt = clean_f(ws_rk_f[cell_cnt].value if cell_cnt in ws_rk_f else "")
-            v_cnt = safe_float(ws_rk_v[cell_cnt].value if cell_cnt in ws_rk_v else 0)
+            # 2. EVALUASI COUNT (DIPERBAIKI: Akses langsung koordinat sel tanpa 'in ws')
+            try:
+                f_cnt = clean_f(ws_rk_f[cell_cnt].value)
+                v_cnt = safe_float(ws_rk_v[cell_cnt].value)
+            except Exception:
+                f_cnt = ""
+                v_cnt = 0.0
+
             gt_cnt = len(df_stk)
             has_cnt = ("COUNT(" in f_cnt) and ("COUNTA(" not in f_cnt) and ("COUNTIF" not in f_cnt)
-            ok_2 = has_cnt and ((int(v_cnt) == gt_cnt) or (str(gt_cnt) in f_cnt))
+            ok_2 = has_cnt and ((int(round(v_cnt)) == gt_cnt) or (str(gt_cnt) in f_cnt))
             if ok_2: score_total += 12.5
-            note_2 = "Keren, rumus COUNT bener!" if ok_2 else ("Masih pakai COUNTA nih, soal minta pakai COUNT ya." if "COUNTA(" in f_cnt else "Coba sorot kolom angka (No/Barcode) ya.")
+
+            note_2 = "Keren, rumus COUNT bener!" if ok_2 else (
+                "Masih pakai COUNTA nih, soal minta pakai COUNT ya." if "COUNTA(" in f_cnt else "Coba sorot kolom angka (No/Barcode) ya."
+            )
             grading.append({
-                "No": "2", "Bagian": f"Total Barcode ({cell_cnt})", "Rumus": "COUNT",
-                "Jawaban Kamu": f"{int(v_cnt)}" if v_cnt > 0 else (str(ws_rk_f[cell_cnt].value or "(Kosong)")),
+                "No": "2", 
+                "Bagian": f"Total Barcode ({cell_cnt})", 
+                "Rumus": "COUNT",
+                "Jawaban Kamu": f"{int(round(v_cnt))}" if v_cnt > 0 else (str(ws_rk_f[cell_cnt].value or "(Kosong)")),
                 "Kunci": f"{gt_cnt}",
                 "Status": "✅ Benar" if ok_2 else "❌ Cek Lagi",
                 "Catatan": note_2
