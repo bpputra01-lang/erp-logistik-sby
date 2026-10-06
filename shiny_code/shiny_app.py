@@ -3324,7 +3324,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         if f and len(f) > 0:
             return ui.div(
                 ui.tags.button(
-                    ui.tags.span(ui.tags.i(class_="fa-solid fa-wand-magic-sparkles", style="margin-right: 6px; font-size: 14px;"), "RUN KOREKSI JAWABAN OTOMATIS"),
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-wand-magic-sparkles", style="margin-right: 6px; font-size: 14px;"), "Cek Nilai Saya"),
                     onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_process_exam_grading', Math.random(), {priority: 'event'});",
                     class_="btn-red-gradient"
                 ),
@@ -3333,35 +3333,12 @@ def server(input: Inputs, output: Outputs, session: Session):
         return ui.div(
             ui.tags.button(
                 ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"),
-                "UPLOAD FILE JAWABAN UNTUK MEMULAI KOREKSI",
+                "Upload File Dulu Untuk Cek Nilai",
                 disabled=True,
                 class_="btn-locked"
             ),
             style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.75rem;"
         )
-
-    @reactive.Effect
-    @reactive.event(input.btn_process_exam_grading)
-    def _proc_exam_grading():
-        f = input.upload_exam_answer_file()
-        if not f:
-            ui.insert_ui(ui.tags.script("window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
-            state.error_modal_message.set("Upload file jawaban terlebih dahulu!")
-            state.show_error_modal.set(True)
-            return
-
-        try:
-            succ, msg = state.grade_excel_practice(f)
-            ui.insert_ui(ui.tags.script("window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
-            if succ:
-                state.show_success_modal.set(True)
-            else:
-                state.error_modal_message.set(msg)
-                state.show_error_modal.set(True)
-        except Exception as e:
-            ui.insert_ui(ui.tags.script("window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
-            state.error_modal_message.set(f"Terjadi kesalahan: {str(e)}")
-            state.show_error_modal.set(True)
 
     @render.ui
     def excel_practice_results_container():
@@ -3373,21 +3350,21 @@ def server(input: Inputs, output: Outputs, session: Session):
 
         return ui.div(
             ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
-            ui.h4("🏆 HASIL KOREKSI OTOMATIS & EVALUASI FORMULA EXCEL", style="font-size: 16px; font-weight: 800; color: #1A202C; margin-bottom: 1rem;"),
+            ui.h4("Hasil Latihan Kamu", style="font-size: 16px; font-weight: 800; color: #1A202C; margin-bottom: 1rem;"),
             
             ui.div(
-                dark_metric_box("🎯 NILAI / SKOR AKHIR", f"{score} / 100", score_color),
-                dark_metric_box("✅ TOTAL BAGIAN BENAR", f"{state.excel_exam_correct()} BAGIAN", "#10B981"),
-                dark_metric_box("❌ TOTAL BAGIAN SALAH", f"{state.excel_exam_wrong()} BAGIAN", "#E53E3E"),
+                dark_metric_box("🎯 Nilai Kamu", f"{score} / 100", score_color),
+                dark_metric_box("✅ Rumus Bener", f"{state.excel_exam_correct()} Bagian", "#10B981"),
+                dark_metric_box("❌ Perlu Dicek Lagi", f"{state.excel_exam_wrong()} Bagian", "#E53E3E"),
                 style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
             ),
 
             ui.div(
                 ui.div(
-                    ui.h4("📋 Detail Evaluasi Per Tabel & Formula (Scorecard)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0;"),
+                    ui.h4("Rincian Jawaban", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0;"),
                     ui.download_button(
                         "btn_dl_exam_report",
-                        ui.tags.span(ui.tags.i(class_="fa-solid fa-file-excel", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD HASIL EVALUASI (.xlsx)"),
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-file-excel", style="margin-right: 6px; font-size: 14px;"), "Download Rekap Nilai (.xlsx)"),
                         onclick="setTimeout(function() { document.body.classList.remove('process-running'); }, 1500);",
                         style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
                     ),
