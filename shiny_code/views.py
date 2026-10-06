@@ -1171,23 +1171,9 @@ def percentage_display_view(state: AppState):
     )
 
 # ==============================================================================
-# VIEW: LATIHAN FORMULA EXCEL & SISTEM KOREKSI OTOMATIS BERBENTUK TABEL
+# VIEW: LATIHAN FORMULA EXCEL (CLEAN & ON-DEMAND GENERATE)
 # ==============================================================================
 def excel_practice_view(state: AppState):
-    preview_data = state.excel_exam_questions()
-    
-    # Render tabel preview langsung
-    if preview_data and len(preview_data) > 0:
-        headers = ["BAGIAN / TABEL", "RUMUS", "TUGAS", "INSTRUKSI PENGERJAAN DI EXCEL"]
-        rows = [[d["BAGIAN"], d["RUMUS"], d["TUGAS"], d["INSTRUKSI"]] for d in preview_data]
-        table_preview = render_clean_table(headers, rows, "tbl_soal_preview")
-    else:
-        table_preview = ui.div(
-            ui.tags.i(class_="fa-solid fa-table-list", style="font-size: 38px; color: #CBD5E0; margin-bottom: 8px;"),
-            ui.p("Daftar tabel soal sedang disiapkan...", style="color: #718096; font-style: italic; margin: 0;"),
-            style="text-align: center; padding: 2rem; background: #F8FAFC; border-radius: 8px; border: 1.5px dashed #CBD5E0;"
-        )
-
     return ui.div(
         # Header Banner
         ui.div(
@@ -1198,19 +1184,19 @@ def excel_practice_view(state: AppState):
                 ),
                 ui.div(
                     ui.h3("Uji Kemahiran Formula Excel Retail Sepatu (Auto-Grading)", style="font-size: 18px; font-weight: 800; color: #1A202C; margin: 0;"),
-                    ui.p("Format soal berbentuk tabel laporan kerja nyata dengan kolom kuning kosong (SUM, COUNT/COUNTA, SUMIF, COUNTIF, SUMIFS, COUNTIFS, IF, XLOOKUP).", style="font-size: 13px; color: #718096; margin: 0;")
+                    ui.p("Soal dibuat dinamis dengan berbagai variasi model tabel kerja (SUM, COUNT/COUNTA, SUMIF, COUNTIF, SUMIFS, COUNTIFS, IF, XLOOKUP).", style="font-size: 13px; color: #718096; margin: 0;")
                 ),
                 style="display: flex; align-items: center;"
             ),
             style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
         ),
 
-        # TAHAP 1: DOWNLOAD SOAL TABEL DENGAN TIMER ANTI-STUCK
+        # TAHAP 1: DOWNLOAD SOAL (BERSIH - GENERATE ON-DEMAND SAAT KLIK)
         ui.div(
             ui.div(
                 ui.div(
-                    ui.h4("1️⃣ TAHAP 1: Download Lembar Kerja Laporan (Ada Kolom & Sel Kosong)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
-                    ui.p("Lengkapi seluruh sel berlatar belakang KUNING di sheet 'LAPORAN_REKAPITULASI' dan 'DATA_STOK_SEPATU' menggunakan rumus Excel.", style="color: #718096; font-size: 13px; margin: 0;"),
+                    ui.h4("1️⃣ TAHAP 1: Download Lembar Kerja Excel", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
+                    ui.p("Klik tombol di sebelah kanan untuk men-generate paket soal acak. Lengkapi seluruh sel/kolom berlatar belakang KUNING dengan formula Excel.", style="color: #718096; font-size: 13px; margin: 0;"),
                 ),
                 ui.download_button(
                     "btn_dl_excel_practice",
@@ -1218,13 +1204,11 @@ def excel_practice_view(state: AppState):
                         ui.tags.i(class_="fa-solid fa-cloud-arrow-down", style="margin-right: 8px; font-size: 14px;"),
                         "GENERATE & DOWNLOAD PAKET SOAL (.XLSX)"
                     ),
-                    # 👇 Bersihkan spinner & class running secara langsung
-                    onclick="window.hideGlobalSpinner(); document.body.classList.remove('process-running'); setTimeout(function() { window.hideGlobalSpinner(); }, 500);",
-                    style="background: linear-gradient(135deg, #3182CE 0%, #2B6CB0 100%); color: white; font-weight: 800; border-radius: 8px; border: none; padding: 10px 20px; cursor: pointer; font-size: 13px; box-shadow: 0 4px 12px rgba(49, 130, 206, 0.3);"
+                    onclick="window.hideGlobalSpinner(); document.body.classList.remove('process-running'); setTimeout(function() { window.hideGlobalSpinner(); }, 400);",
+                    style="background: linear-gradient(135deg, #3182CE 0%, #2B6CB0 100%); color: white; font-weight: 800; border-radius: 8px; border: none; padding: 10px 22px; cursor: pointer; font-size: 13px; box-shadow: 0 4px 12px rgba(49, 130, 206, 0.3); white-space: nowrap;"
                 ),
-                style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 10px; margin-bottom: 1rem;"
+                style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 12px;"
             ),
-            table_preview,
             style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
         ),
 
