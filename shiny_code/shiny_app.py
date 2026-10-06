@@ -27,7 +27,7 @@ app_ui = ui.page_fluid(
 
 def server(input: Inputs, output: Outputs, session: Session):
     state = AppState()
-
+    _last_filter_state = {"c_brands": [], "c_subs": [], "c_bins": []}
     # Modal Dismiss Listeners
     @reactive.Effect
     @reactive.event(input.close_success_modal_event)
@@ -3439,6 +3439,7 @@ def server(input: Inputs, output: Outputs, session: Session):
 # ==========================================================================
     # CONTROLLER: MENU FORM AUDITOR (EXTERNAL AUDIT PACK)
     # ==========================================================================
+    # 1. Saat file berhasil dimuat -> isi seluruh opsi awal
     @reactive.Effect
     @reactive.event(input.btn_load_auditor_file)
     def _proc_load_auditor():
@@ -3451,20 +3452,54 @@ def server(input: Inputs, output: Outputs, session: Session):
         succ, msg = state.process_auditor_upload(f)
         ui.insert_ui(ui.tags.script("window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
         if succ:
+            # Set cache opsi awal
+            _last_filter_state["c_brands"] = state.auditor_list_brand()
+            _last_filter_state["c_subs"] = state.auditor_list_sub()
+            _last_filter_state["c_bins"] = state.auditor_list_bin()
+
+            # Update ketiga dropdown di browser
+            ui.update_selectize("aud_filter_brand", choices=state.auditor_list_brand(), selected=[])
+            ui.update_selectize("aud_filter_sub", choices=state.auditor_list_sub(), selected=[])
+            ui.update_selectize("aud_filter_bin", choices=state.auditor_list_bin(), selected=[])
+
             state.show_success_modal.set(True)
         else:
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
 
-    # Filter Interaktif Real-time
+    # 2. Logika Saling Mengerucut Real-time (Anti-Flicker & Presisi)
     @reactive.Effect
     def _on_auditor_filter_change():
-        if state.auditor_uploaded():
-            brands = list(input.aud_filter_brand()) if "aud_filter_brand" in input and input.aud_filter_brand() is not None else []
-            subs = list(input.aud_filter_sub()) if "aud_filter_sub" in input and input.aud_filter_sub() is not None else []
-            bins = list(input.aud_filter_bin()) if "aud_filter_bin" in input and input.aud_filter_bin() is not None else []
-            state.apply_auditor_filters(brands, subs, bins)
+        if not state.auditor_uploaded():
+            return
 
+        brands = list(input.aud_filter_brand()) if "aud_filter_brand" in input and input.aud_filter_brand() is not None else []
+        subs = list(input.aud_filter_sub()) if "aud_filter_sub" in input and input.aud_filter_sub() is not None else []
+        bins = list(input.aud_filter_bin()) if "aud_filter_bin" in input and input.aud_filter_bin() is not None else []
+
+        # Hitung opsi yang mengerucut (masing-masing dropdown dibatasi 2 dropdown lainnya)
+        avail_brands, avail_subs, avail_bins = state.get_cascading_auditor_choices(brands, subs, bins)
+
+        # Pertahankan pilihan user yang masih valid
+        valid_brands = [b for b in brands if b in avail_brands]
+        valid_subs = [s for s in subs if s in avail_subs]
+        valid_bins = [bn for bn in bins if bn in avail_bins]
+
+        # Update opsi di browser HANYA jika list opsinya berubah (mencegah dropdown menutup sendiri saat diklik)
+        if avail_brands != _last_filter_state["c_brands"] or len(valid_brands) != len(brands):
+            ui.update_selectize("aud_filter_brand", choices=avail_brands, selected=valid_brands)
+            _last_filter_state["c_brands"] = avail_brands
+
+        if avail_subs != _last_filter_state["c_subs"] or len(valid_subs) != len(subs):
+            ui.update_selectize("aud_filter_sub", choices=avail_subs, selected=valid_subs)
+            _last_filter_state["c_subs"] = avail_subs
+
+        if avail_bins != _last_filter_state["c_bins"] or len(valid_bins) != len(bins):
+            ui.update_selectize("aud_filter_bin", choices=avail_bins, selected=valid_bins)
+            _last_filter_state["c_bins"] = avail_bins
+
+        # Terapkan filter ke tabel data dan metrik
+        state.apply_auditor_filters(valid_brands, valid_subs, valid_bins)
     @render.ui
     def auditor_results_container():
         if not state.auditor_processed():
