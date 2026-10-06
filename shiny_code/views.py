@@ -1224,6 +1224,82 @@ def excel_practice_view(state: AppState):
         ui.output_ui("excel_practice_results_container"),
         style="width: 100%; padding: 1rem;"
     )
+
+
+# ==============================================================================
+# VIEW: FORM AUDITOR (EXTERNAL AUDIT PACK & STOCK OPNAME)
+# ==============================================================================
+def auditor_view(state: AppState):
+    upload_box = ui.div(
+        ui.h4("1️⃣ Upload All Data Stock (Multiple Adjustment)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+        ui.p("Upload master stock Jezpro. Sistem otomatis mengecualikan seluruh lokasi rak bertuliskan 'KARANTINA'.", style="color: #718096; font-size: 13px; margin-bottom: 0.75rem;"),
+        custom_uploader_box("upload_auditor_file", "Pilih File Stock (Excel / CSV)"),
+        ui.div(
+            ui.tags.button(
+                ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "BACA FILE & AKTIFKAN FILTER"),
+                onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_load_auditor_file', Math.random(), {priority: 'event'});",
+                class_="btn-red-gradient"
+            ),
+            style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+        ),
+        style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+    )
+
+    engagement_form = ui.div(
+        ui.h4("2️⃣ Detail Engagement Stock Opname (Sesuai Form Auditor)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+        ui.p("Lengkapi data formulir resmi audit di bawah ini agar langsung tercetak otomatis di Sheet 1 Excel.", style="color: #718096; font-size: 13px; margin-bottom: 1rem;"),
+        ui.div(
+            ui.div(ui.span("🏢 Company Name:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="aud_company", type="text", value="PT ZONA KARYA NUSANTARA", class_="form-control"), style="flex: 1; min-width: 220px;"),
+            ui.div(ui.span("🏬 Warehouse Branch:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="aud_branch", type="text", value="SZ SURABAYA", class_="form-control"), style="flex: 1; min-width: 180px;"),
+            ui.div(ui.span("📅 Stock Count Date:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="aud_date", type="date", value=datetime.now().strftime("%Y-%m-%d"), class_="form-control"), style="flex: 1; min-width: 160px;"),
+            style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;"
+        ),
+        ui.div(
+            ui.div(ui.span("⏰ Count Start Time:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="aud_start_time", type="text", value="08:00", placeholder="Misal 08:00", class_="form-control"), style="flex: 1; min-width: 160px;"),
+            ui.div(ui.span("⏰ Count End Time:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="aud_end_time", type="text", value="17:00", placeholder="Misal 17:00", class_="form-control"), style="flex: 1; min-width: 160px;"),
+            ui.div(
+                ui.span("📋 Count Method:", style="font-size: 12px; font-weight: 800;"),
+                ui.tags.select(
+                    ui.tags.option("Full count (wall-to-wall)", value="Full count (wall-to-wall)"),
+                    ui.tags.option("Cycle count", value="Cycle count"),
+                    ui.tags.option("Sample count", value="Sample count"),
+                    id="aud_method", class_="form-control"
+                ), style="flex: 1; min-width: 200px;"
+            ),
+            style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;"
+        ),
+        ui.div(
+            ui.div(ui.span("👤 Lead Auditor:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="aud_lead", type="text", placeholder="Nama Auditor Eksternal...", class_="form-control"), style="flex: 1; min-width: 200px;"),
+            ui.div(ui.span("👤 Warehouse/Ops. Manager:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="aud_manager", type="text", placeholder="Nama Manager...", class_="form-control"), style="flex: 1; min-width: 200px;"),
+            ui.div(ui.span("👤 Supervisor Tim:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="aud_supervisor", type="text", placeholder="Nama Supervisor...", class_="form-control"), style="flex: 1; min-width: 200px;"),
+            ui.div(ui.span("💵 Currency:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="aud_currency", type="text", value="IDR", class_="form-control"), style="width: 120px;"),
+            style="display: flex; gap: 1rem; flex-wrap: wrap;"
+        ),
+        style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+    )
+
+    filter_box = ui.div(
+        ui.h4("3️⃣ Filter Sasaran Audit (Brand, Sub Kategori, & BIN)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+        ui.div(
+            ui.div(ui.input_selectize("aud_filter_brand", "🏷️ Brand (Kolom D):", choices=state.auditor_list_brand(), multiple=True, width="100%"), style="flex: 1; min-width: 220px;"),
+            ui.div(ui.input_selectize("aud_filter_sub", "🗂️ Sub Kategori (Kolom G):", choices=state.auditor_list_sub(), multiple=True, width="100%"), style="flex: 1; min-width: 220px;"),
+            ui.div(ui.input_selectize("aud_filter_bin", "🏭 BIN / Rak (Kolom B - Bebas Karantina):", choices=state.auditor_list_bin(), multiple=True, width="100%"), style="flex: 1; min-width: 220px;"),
+            style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%;"
+        ),
+        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+    )
+
+    results_box = ui.div(
+        ui.output_ui("auditor_results_container")
+    )
+
+    return ui.div(
+        upload_box,
+        engagement_form,
+        filter_box,
+        results_box,
+        style="width: 100%; padding: 1rem;"
+    )
     
 def menu_item(label: str, target_menu: str, current_menu: str):
     import re

@@ -11,7 +11,8 @@ from views import (
     putaway_view, main_dashboard_view, sidebar, ongkir_tab2_view, compare_rto_view, 
     justification_so_view, cycle_count_view, login_page, ppa_audit_view, 
     cycle_count_analyzer_view, global_header, cross_check_real_system_view,
-    balancing_stock_view, physical_inventory_list_view, validation_barcode_sku_view, percentage_display_view,excel_practice_view
+    balancing_stock_view, physical_inventory_list_view, validation_barcode_sku_view, percentage_display_view,excel_practice_view,
+    auditor_view
 )
 
 app_ui = ui.page_fluid(
@@ -103,7 +104,9 @@ def server(input: Inputs, output: Outputs, session: Session):
         "precentage-display": "Precentage Display",
         "percentage-display": "Percentage Display",
         "latihan-excel": "Latihan Excel",
-        "excel-practice": "Latihan Excel"
+        "excel-practice": "Latihan Excel",
+        "form-auditor": "Form Auditor",
+        "auditor-pack": "Form Auditor"
     }
 
     # 1. Saat menu diklik di sidebar -> URL di browser otomatis berubah
@@ -993,6 +996,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         elif content_type == "validation_barcode_sku": page_content = validation_barcode_sku_view(state)
         elif content_type in ["percentage_display", "percentage-display"]: page_content = percentage_display_view(state)
         elif content_type in ["excel_practice", "latihan_excel"]: page_content = excel_practice_view(state)
+        elif content_type == "form_auditor": page_content = auditor_view(state)
         elif content_type == "access_denied":
             page_content = ui.div(ui.h2("⛔ Akses Ditolak", style="font-size: 28px; color: #E53E3E; font-weight: bold;"), ui.p("Maaf, halaman ini dibatasi hak aksesnya.", style="color: #718096; font-size: 15px;"), style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;")
         else:
@@ -3431,5 +3435,84 @@ def server(input: Inputs, output: Outputs, session: Session):
             ui.notification_show(f"Terjadi kesalahan saat memeriksa file: {str(e)}", type="error", duration=6)
         finally:
             ui.insert_ui(ui.tags.script("window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+
+# ==========================================================================
+    # CONTROLLER: MENU FORM AUDITOR (EXTERNAL AUDIT PACK)
+    # ==========================================================================
+    @reactive.Effect
+    @reactive.event(input.btn_load_auditor_file)
+    def _proc_load_auditor():
+        f = input.upload_auditor_file()
+        if not f:
+            ui.insert_ui(ui.tags.script("window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+            ui.notification_show("Pilih file All Data Stock terlebih dahulu!", type="warning", duration=4)
+            return
+
+        succ, msg = state.process_auditor_upload(f)
+        ui.insert_ui(ui.tags.script("window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+        if succ:
+            state.show_success_modal.set(True)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+
+    # Filter Interaktif Real-time
+    @reactive.Effect
+    def _on_auditor_filter_change():
+        if state.auditor_uploaded():
+            brands = list(input.aud_filter_brand()) if "aud_filter_brand" in input and input.aud_filter_brand() is not None else []
+            subs = list(input.aud_filter_sub()) if "aud_filter_sub" in input and input.aud_filter_sub() is not None else []
+            bins = list(input.aud_filter_bin()) if "aud_filter_bin" in input and input.aud_filter_bin() is not None else []
+            state.apply_auditor_filters(brands, subs, bins)
+
+    @render.ui
+    def auditor_results_container():
+        if not state.auditor_processed():
+            return ui.div()
+
+        return ui.div(
+            ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
+            ui.h4("📋 RINGKASAN DATA SASARAN AUDIT", style="font-size: 16px; font-weight: 800; color: #1A202C; margin-bottom: 1rem;"),
+            ui.div(
+                dark_metric_box("🏭 TOTAL LOKASI BIN", f"{state.auditor_total_bin():,} BIN", "#3182CE"),
+                dark_metric_box("📦 TOTAL SKU HARUS DICEK", f"{state.auditor_total_sku():,} SKU", "#C5A059"),
+                dark_metric_box("🔢 TOTAL QTY SYSTEM", f"{state.auditor_total_qty():,} PCS", "#10B981"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+            ),
+            ui.div(
+                ui.div(
+                    ui.h4("Preview Tabel Data Stock Auditor", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0;"),
+                    ui.download_button(
+                        "btn_dl_auditor_pack",
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-file-excel", style="margin-right: 8px; font-size: 14px;"), "DOWNLOAD FORM AUDITOR LENGKAP (.XLSX)"),
+                        onclick="setTimeout(function() { document.body.classList.remove('process-running'); }, 1500);",
+                        style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; font-weight: 800; border-radius: 8px; border: none; padding: 10px 20px; cursor: pointer; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);"
+                    ),
+                    style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem;"
+                ),
+                render_clean_table(state.df_auditor_headers(), state.df_auditor_rows(), "tbl_auditor_preview"),
+                style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
+            ),
+            style="width: 100%;"
+        )
+
+    @render.download(
+        filename=lambda: f"EXTERNAL_AUDIT_PACK_{datetime.now().strftime('%d_%m_%Y_%H%M')}.xlsx"
+    )
+    def btn_dl_auditor_pack():
+        meta_dict = {
+            "company": input.aud_company() if "aud_company" in input else "PT ZONA KARYA NUSANTARA",
+            "branch": input.aud_branch() if "aud_branch" in input else "SZ SURABAYA",
+            "date": input.aud_date() if "aud_date" in input else datetime.now().strftime("%d %B %Y"),
+            "start_time": input.aud_start_time() if "aud_start_time" in input else "08:00",
+            "end_time": input.aud_end_time() if "aud_end_time" in input else "17:00",
+            "method": input.aud_method() if "aud_method" in input else "Full count (wall-to-wall)",
+            "lead": input.aud_lead() if "aud_lead" in input else "",
+            "manager": input.aud_manager() if "aud_manager" in input else "",
+            "supervisor": input.aud_supervisor() if "aud_supervisor" in input else "",
+            "currency": input.aud_currency() if "aud_currency" in input else "IDR",
+        }
+        content = state.generate_auditor_excel_pack(meta_dict)
+        yield content
 
 app = App(app_ui, server)
