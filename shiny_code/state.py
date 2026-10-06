@@ -4633,7 +4633,7 @@ class AppState:
         return buf.getvalue()
 
     # ==========================================================================
-    # AUTO-GRADER FLEKSIBEL (KOREKSI OTOMATIS BISA MEMBACA SEMUA VARIASI MODEL)
+    # AUTO-GRADER FLEKSIBEL & ANTI-CRASH (HASIL PASTI MUNCUL)
     # ==========================================================================
     def grade_excel_practice(self, f_exam):
         try:
@@ -4641,66 +4641,96 @@ class AppState:
             import pandas as pd
 
             if not f_exam:
-                return False, "Pilih dulu file Excel jawabanmu ya!"
+                return False, "Silakan pilih dan upload file Excel jawabanmu terlebih dahulu!"
 
             path = f_exam[0]["datapath"]
             wb_form = openpyxl.load_workbook(path, data_only=False)
             wb_vals = openpyxl.load_workbook(path, data_only=True)
 
+            # 1. BACA METADATA DARI FILE (JIKA ADA)
             meta = {}
             if "_SYS_EVAL_META" in wb_vals.sheetnames:
-                ws_m = wb_vals["_SYS_EVAL_META"]
-                for r in ws_m.iter_rows(values_only=True):
-                    if r and len(r) >= 2:
-                        meta[str(r[0])] = str(r[1])
+                try:
+                    ws_m = wb_vals["_SYS_EVAL_META"]
+                    for r in ws_m.iter_rows(values_only=True):
+                        if r and len(r) >= 2 and r[0] is not None:
+                            meta[str(r[0]).strip()] = str(r[1]).strip()
+                except Exception:
+                    pass
 
-            rekap_sheet_name = meta.get("rekap_sheet", wb_form.sheetnames[0])
-            data_sheet_name = meta.get("data_sheet", wb_form.sheetnames[0])
+            # 2. DETEKSI SHEET OTOMATIS (TOLERAN TERHADAP SEMUA NAMA SHEET)
+            sheetnames = wb_form.sheetnames
+            rekap_sheet_name = meta.get("rekap_sheet")
+            if not rekap_sheet_name or rekap_sheet_name not in sheetnames:
+                # Cari sheet yang mengandung kata REKAP / LAPORAN / DASHBOARD, atau gunakan sheet pertama
+                rekap_sheet_name = next((s for s in sheetnames if any(k in s.upper() for k in ["REKAP", "LAPORAN", "DASHBOARD"])), sheetnames[0])
 
-            if rekap_sheet_name not in wb_form.sheetnames or data_sheet_name not in wb_form.sheetnames:
-                return False, "File yang diupload bukan template latihan resmi nih. Coba cek lagi ya."
+            data_sheet_name = meta.get("data_sheet")
+            if not data_sheet_name or data_sheet_name not in sheetnames:
+                # Cari sheet data transaksi (selain sheet rekap & meta)
+                data_sheet_name = next((s for s in sheetnames if s != rekap_sheet_name and not s.startswith("_SYS")), rekap_sheet_name)
 
             ws_rk_f = wb_form[rekap_sheet_name]
             ws_rk_v = wb_vals[rekap_sheet_name]
             ws_dt_f = wb_form[data_sheet_name]
             ws_dt_v = wb_vals[data_sheet_name]
 
-            paradigm = meta.get("paradigm", "MULTI_SHEET")
             cell_sum = meta.get("cell_sum", "B6")
             cell_cnt = meta.get("cell_count", "B7")
             t2_start = int(meta.get("t2_start", 11))
             t2_end = int(meta.get("t2_end", 15))
             t3_start = int(meta.get("t3_start", 19))
             t3_end = int(meta.get("t3_end", 21))
-            data_start_row = int(meta.get("data_start_row", 2))
 
-            if_limit = float(meta.get("if_limit", 3))
-            if_true_text = meta.get("if_true", "REFILL").upper()
-            if_false_text = meta.get("if_false", "AMAN").upper()
-            countifs_limit = float(meta.get("countifs_limit", 5))
+            def safe_float(val, default=0.0):
+                try:
+                    if val is None or val == "": return default
+                    # Bersihkan karakter non-angka jika ada
+                    s = str(val).strip().replace("Rp", "").replace(".", "").replace(",", ".")
+                    return float(s)
+                except Exception:
+                    return default
 
-            # Tentukan Posisi Kolom di Sheet Data
-            if paradigm == "MID_COLUMNS_RANDOM":
-                col_xlookup_idx, col_if_idx = 4, 5
-                header_row_data = 1
-            elif paradigm == "SINGLE_SHEET":
-                col_xlookup_idx, col_if_idx = 14, 15
-                header_row_data = 10
-            elif paradigm == "FOOTER_REKAP":
-                col_xlookup_idx, col_if_idx = 14, 15
-                header_row_data = 4
-            else: # MULTI_SHEET
-                col_xlookup_idx, col_if_idx = 14, 15
-                header_row_data = 1
+            if_limit = safe_float(meta.get("if_limit", 3), 3.0)
+            if_true_text = str(meta.get("if_true", "REFILL")).strip().upper()
+            if_false_text = str(meta.get("if_false", "AMAN")).strip().upper()
+            countifs_limit = safe_float(meta.get("countifs_limit", 5), 5.0)
 
-            # Load Data Transaksi ke Pandas
-            data_rows = list(ws_dt_v.iter_rows(values_only=True))
-            headers = [str(h).strip().upper() for h in data_rows[header_row_data - 1]]
-            df_stk = pd.DataFrame(data_rows[header_row_data:header_row_data + 60], columns=headers)
-            df_stk["TERJUAL"] = pd.to_numeric(df_stk["TERJUAL"], errors='coerce').fillna(0)
-            df_stk["SISA STOK"] = pd.to_numeric(df_stk["SISA STOK"], errors='coerce').fillna(0)
-            df_stk["BRAND"] = df_stk["BRAND"].astype(str).str.strip().str.upper()
-            df_stk["KATEGORI"] = df_stk["KATEGORI"].astype(str).str.strip().str.upper()
+            # 3. DETEKSI BARIS HEADER TABEL DATA SECARA DINAMIS
+            all_data_rows = list(ws_dt_v.iter_rows(values_only=True))
+            header_row_idx = 1
+            headers = []
+
+            for idx_r, r_vals in enumerate(all_data_rows[:20], start=1):
+                r_str = [str(x or "").strip().upper() for x in r_vals]
+                if any("SKU" in x for x in r_str) and any("TERJUAL" in x for x in r_str):
+                    header_row_idx = idx_r
+                    headers = r_str
+                    break
+
+            if not headers and all_data_rows:
+                headers = [str(x or "").strip().upper() for x in all_data_rows[0]]
+                header_row_idx = 1
+
+            # Muat Data Transaksi ke DataFrame
+            data_body = all_data_rows[header_row_idx:header_row_idx + 60]
+            df_stk = pd.DataFrame(data_body)
+            if df_stk.shape[1] >= len(headers):
+                df_stk = df_stk.iloc[:, :len(headers)]
+                df_stk.columns = headers
+            else:
+                df_stk.columns = headers[:df_stk.shape[1]]
+
+            # Standarisasi Kolom Kritis
+            col_terjual = next((c for c in df_stk.columns if "TERJUAL" in c), None)
+            col_sisa = next((c for c in df_stk.columns if "SISA" in c), None)
+            col_brand = next((c for c in df_stk.columns if "BRAND" in c), None)
+            col_kat = next((c for c in df_stk.columns if "KATEGORI" in c), None)
+
+            if col_terjual: df_stk[col_terjual] = pd.to_numeric(df_stk[col_terjual], errors='coerce').fillna(0)
+            if col_sisa: df_stk[col_sisa] = pd.to_numeric(df_stk[col_sisa], errors='coerce').fillna(0)
+            if col_brand: df_stk[col_brand] = df_stk[col_brand].fillna("").astype(str).str.strip().str.upper()
+            if col_kat: df_stk[col_kat] = df_stk[col_kat].fillna("").astype(str).str.strip().str.upper()
 
             def clean_f(val):
                 return str(val or "").strip().upper().replace(" ", "").replace(";", ",")
@@ -4708,118 +4738,109 @@ class AppState:
             grading = []
             score_total = 0.0
 
-            # 1. SUM
-            f_sum = clean_f(ws_rk_f[cell_sum].value)
-            v_sum = ws_rk_v[cell_sum].value
-            gt_sum = int(df_stk["SISA STOK"].sum())
+            # 1. EVALUASI SUM
+            f_sum = clean_f(ws_rk_f[cell_sum].value if cell_sum in ws_rk_f else "")
+            v_sum = safe_float(ws_rk_v[cell_sum].value if cell_sum in ws_rk_v else 0)
+            gt_sum = int(df_stk[col_sisa].sum()) if col_sisa else 0
             has_sum = "SUM(" in f_sum and "SUMIF" not in f_sum
-            ok_1 = has_sum and ((v_sum == gt_sum) or (str(gt_sum) in f_sum))
+            ok_1 = has_sum and ((int(v_sum) == gt_sum) or (str(gt_sum) in f_sum))
             if ok_1: score_total += 12.5
             grading.append({
-                "No": "1", "Bagian": f"Total Stok ({cell_sum})", "Rumus": "SUM",
-                "Jawaban Kamu": str(v_sum or "(Kosong)"),
+                "No": "1", "Bagian": f"Total Sisa Stok ({cell_sum})", "Rumus": "SUM",
+                "Jawaban Kamu": f"{int(v_sum):,}" if v_sum > 0 else (str(ws_rk_f[cell_sum].value or "(Kosong)")),
                 "Kunci": f"{gt_sum:,}",
                 "Status": "✅ Benar" if ok_1 else "❌ Cek Lagi",
-                "Catatan": "Mantap, rumusnya bener!" if ok_1 else "Hasil belum pas, cek kolom sisa stok ya."
+                "Catatan": "Mantap, rumusnya bener!" if ok_1 else "Coba periksa kolom sisa stok yang dijumlahkan."
             })
 
-            # 2. COUNT
-            f_cnt = clean_f(ws_rk_f[cell_cnt].value)
-            v_cnt = ws_rk_v[cell_cnt].value
+            # 2. EVALUASI COUNT
+            f_cnt = clean_f(ws_rk_f[cell_cnt].value if cell_cnt in ws_rk_f else "")
+            v_cnt = safe_float(ws_rk_v[cell_cnt].value if cell_cnt in ws_rk_v else 0)
             gt_cnt = len(df_stk)
             has_cnt = ("COUNT(" in f_cnt) and ("COUNTA(" not in f_cnt) and ("COUNTIF" not in f_cnt)
-            ok_2 = has_cnt and ((v_cnt == gt_cnt) or (str(gt_cnt) in f_cnt))
+            ok_2 = has_cnt and ((int(v_cnt) == gt_cnt) or (str(gt_cnt) in f_cnt))
             if ok_2: score_total += 12.5
             note_2 = "Keren, rumus COUNT bener!" if ok_2 else ("Masih pakai COUNTA nih, soal minta pakai COUNT ya." if "COUNTA(" in f_cnt else "Coba sorot kolom angka (No/Barcode) ya.")
             grading.append({
                 "No": "2", "Bagian": f"Total Barcode ({cell_cnt})", "Rumus": "COUNT",
-                "Jawaban Kamu": str(v_cnt or "(Kosong)"),
+                "Jawaban Kamu": f"{int(v_cnt)}" if v_cnt > 0 else (str(ws_rk_f[cell_cnt].value or "(Kosong)")),
                 "Kunci": f"{gt_cnt}",
                 "Status": "✅ Benar" if ok_2 else "❌ Cek Lagi",
                 "Catatan": note_2
             })
 
-            # 3. SUMIF
-            col_b_t2 = 5 if paradigm == "FOOTER_REKAP" else (6 if paradigm == "SINGLE_SHEET" else 2)
-            col_sumif_t2 = 6 if paradigm == "FOOTER_REKAP" else (7 if paradigm == "SINGLE_SHEET" else 3)
-            sumif_ok_count = 0
-            total_t2 = t2_end - t2_start + 1
+            # 3. EVALUASI SUMIF
+            col_b_idx = 2
+            col_sumif_idx = 3
+            sumif_ok = 0
+            total_t2 = max(1, t2_end - t2_start + 1)
             for r in range(t2_start, t2_end + 1):
-                br_name = str(ws_rk_v.cell(row=r, column=col_b_t2).value or "").strip().upper()
-                f_val = clean_f(ws_rk_f.cell(row=r, column=col_sumif_t2).value)
-                v_val = ws_rk_v.cell(row=r, column=col_sumif_t2).value
-                gt_val = int(df_stk[df_stk["BRAND"] == br_name]["TERJUAL"].sum())
-                if "SUMIF(" in f_val and "SUMIFS" not in f_val and (v_val == gt_val or str(gt_val) in f_val):
-                    sumif_ok_count += 1
-            ok_3 = (sumif_ok_count >= max(1, total_t2 - 1))
+                br_name = str(ws_rk_v.cell(row=r, column=col_b_idx).value or "").strip().upper()
+                f_val = clean_f(ws_rk_f.cell(row=r, column=col_sumif_idx).value)
+                v_val = safe_float(ws_rk_v.cell(row=r, column=col_sumif_idx).value)
+                gt_val = int(df_stk[df_stk[col_brand] == br_name][col_terjual].sum()) if col_brand and col_terjual else 0
+                if "SUMIF(" in f_val and "SUMIFS" not in f_val and (int(v_val) == gt_val or str(gt_val) in f_val):
+                    sumif_ok += 1
+            ok_3 = (sumif_ok >= max(1, total_t2 - 1))
             if ok_3: score_total += 12.5
             grading.append({
                 "No": "3", "Bagian": "Rekap Brand (SUMIF)", "Rumus": "SUMIF",
-                "Jawaban Kamu": f"{sumif_ok_count}/{total_t2} Baris Pas",
+                "Jawaban Kamu": f"{sumif_ok}/{total_t2} Baris Pas",
                 "Kunci": "Sesuai Total Terjual",
                 "Status": "✅ Benar" if ok_3 else "❌ Cek Lagi",
                 "Catatan": "Bagus, SUMIF sudah bener!" if ok_3 else "Ada baris yang belum pas kuncian sel ($)-nya."
             })
 
-            # 4. COUNTIF
-            col_countif_t2 = col_sumif_t2 + 1
-            countif_ok_count = 0
+            # 4. EVALUASI COUNTIF
+            col_countif_idx = col_sumif_idx + 1
+            countif_ok = 0
             for r in range(t2_start, t2_end + 1):
-                br_name = str(ws_rk_v.cell(row=r, column=col_b_t2).value or "").strip().upper()
-                f_val = clean_f(ws_rk_f.cell(row=r, column=col_countif_t2).value)
-                v_val = ws_rk_v.cell(row=r, column=col_countif_t2).value
-                gt_val = int((df_stk["BRAND"] == br_name).sum())
-                if "COUNTIF(" in f_val and "COUNTIFS" not in f_val and (v_val == gt_val or str(gt_val) in f_val):
-                    countif_ok_count += 1
-            ok_4 = (countif_ok_count >= max(1, total_t2 - 1))
+                br_name = str(ws_rk_v.cell(row=r, column=col_b_idx).value or "").strip().upper()
+                f_val = clean_f(ws_rk_f.cell(row=r, column=col_countif_idx).value)
+                v_val = safe_float(ws_rk_v.cell(row=r, column=col_countif_idx).value)
+                gt_val = int((df_stk[col_brand] == br_name).sum()) if col_brand else 0
+                if "COUNTIF(" in f_val and "COUNTIFS" not in f_val and (int(v_val) == gt_val or str(gt_val) in f_val):
+                    countif_ok += 1
+            ok_4 = (countif_ok >= max(1, total_t2 - 1))
             if ok_4: score_total += 12.5
             grading.append({
                 "No": "4", "Bagian": "Rekap Brand (COUNTIF)", "Rumus": "COUNTIF",
-                "Jawaban Kamu": f"{countif_ok_count}/{total_t2} Baris Pas",
+                "Jawaban Kamu": f"{countif_ok}/{total_t2} Baris Pas",
                 "Kunci": "Sesuai Jumlah SKU",
                 "Status": "✅ Benar" if ok_4 else "❌ Cek Lagi",
                 "Catatan": "Mantap, COUNTIF bener!" if ok_4 else "Cek lagi kriteria brand yang dihitung."
             })
 
-            # 5. SUMIFS
-            if paradigm == "FOOTER_REKAP":
-                c_br, c_kt, c_out = 9, 10, 11
-            elif paradigm == "SINGLE_SHEET":
-                c_br, c_kt, c_out = 11, 12, 13
-            elif paradigm == "MID_COLUMNS_RANDOM":
-                c_br, c_kt, c_out = 7, 8, 9
-            else: # MULTI_SHEET
-                c_br, c_kt, c_out = 2, 3, 4
-
-            sumifs_ok_count = 0
-            total_t3 = t3_end - t3_start + 1
+            # 5. EVALUASI SUMIFS
+            sumifs_ok = 0
+            total_t3 = max(1, t3_end - t3_start + 1)
             for r in range(t3_start, t3_end + 1):
-                br = str(ws_rk_v.cell(row=r, column=c_br).value or "").strip().upper()
-                kt = str(ws_rk_v.cell(row=r, column=c_kt).value or "").strip().upper()
-                f_v = clean_f(ws_rk_f.cell(row=r, column=c_out).value)
-                v_v = ws_rk_v.cell(row=r, column=c_out).value
-                gt_v = int(df_stk[(df_stk["BRAND"] == br) & (df_stk["KATEGORI"] == kt)]["TERJUAL"].sum())
-                if "SUMIFS(" in f_v and (v_v == gt_v or str(gt_v) in f_v):
-                    sumifs_ok_count += 1
-            ok_5 = (sumifs_ok_count >= max(1, total_t3 - 1))
+                br = str(ws_rk_v.cell(row=r, column=2).value or "").strip().upper()
+                kt = str(ws_rk_v.cell(row=r, column=3).value or "").strip().upper()
+                f_v = clean_f(ws_rk_f.cell(row=r, column=4).value)
+                v_v = safe_float(ws_rk_v.cell(row=r, column=4).value)
+                gt_v = int(df_stk[(df_stk[col_brand] == br) & (df_stk[col_kat] == kt)][col_terjual].sum()) if col_brand and col_kat and col_terjual else 0
+                if "SUMIFS(" in f_v and (int(v_v) == gt_v or str(gt_v) in f_v):
+                    sumifs_ok += 1
+            ok_5 = (sumifs_ok >= max(1, total_t3 - 1))
             if ok_5: score_total += 12.5
             grading.append({
                 "No": "5", "Bagian": "Multi-Syarat (SUMIFS)", "Rumus": "SUMIFS",
-                "Jawaban Kamu": f"{sumifs_ok_count}/{total_t3} Baris Pas",
+                "Jawaban Kamu": f"{sumifs_ok}/{total_t3} Baris Pas",
                 "Kunci": "Sesuai 2 Kriteria",
                 "Status": "✅ Benar" if ok_5 else "❌ Cek Lagi",
                 "Catatan": "Keren, rumus 2 syaratnya bener!" if ok_5 else "Cek urutan kolom di rumus SUMIFS-nya."
             })
 
-            # 6. COUNTIFS
-            c_out_cnt = c_out + 1
+            # 6. EVALUASI COUNTIFS
             countifs_ok = 0
             for r in range(t3_start, t3_end + 1):
-                kt = str(ws_rk_v.cell(row=r, column=c_kt).value or "").strip().upper()
-                f_v = clean_f(ws_rk_f.cell(row=r, column=c_out_cnt).value)
-                v_v = ws_rk_v.cell(row=r, column=c_out_cnt).value
-                gt_v = int(((df_stk["KATEGORI"] == kt) & (df_stk["SISA STOK"] > countifs_limit)).sum())
-                if "COUNTIFS(" in f_v and (v_v == gt_v or str(gt_v) in f_v): countifs_ok += 1
+                kt = str(ws_rk_v.cell(row=r, column=3).value or "").strip().upper()
+                f_v = clean_f(ws_rk_f.cell(row=r, column=5).value)
+                v_v = safe_float(ws_rk_v.cell(row=r, column=5).value)
+                gt_v = int(((df_stk[col_kat] == kt) & (df_stk[col_sisa] > countifs_limit)).sum()) if col_kat and col_sisa else 0
+                if "COUNTIFS(" in f_v and (int(v_v) == gt_v or str(gt_v) in f_v):
+                    countifs_ok += 1
             ok_6 = (countifs_ok >= max(1, total_t3 - 1))
             if ok_6: score_total += 12.5
             grading.append({
@@ -4830,42 +4851,47 @@ class AppState:
                 "Catatan": "Sip, syarat kriteria stok terbaca bener!" if ok_6 else f'Pastikan tanda petiknya bener (">{int(countifs_limit)}").'
             })
 
-            # 7. XLOOKUP
+            # 7. EVALUASI XLOOKUP (Cari kolom yang berlabel DISTRIBUTOR)
+            col_x_idx = next((i for i, c in enumerate(headers, start=1) if "DISTRIBUTOR" in c or "XLOOKUP" in c), 14)
             x_ok = 0
-            for r in range(data_start_row, data_start_row + 14):
-                f_n = clean_f(ws_dt_f.cell(row=r, column=col_xlookup_idx).value)
-                v_n = str(ws_dt_v.cell(row=r, column=col_xlookup_idx).value or "").strip().upper()
-                if ("XLOOKUP(" in f_n or "VLOOKUP(" in f_n or "INDEX(" in f_n) and len(v_n) > 4:
+            data_start = header_row_idx + 1
+            for r in range(data_start, data_start + 14):
+                f_n = clean_f(ws_dt_f.cell(row=r, column=col_x_idx).value)
+                v_n = str(ws_dt_v.cell(row=r, column=col_x_idx).value or "").strip().upper()
+                if ("XLOOKUP(" in f_n or "VLOOKUP(" in f_n or "INDEX(" in f_n) and len(v_n) > 3:
                     x_ok += 1
             ok_7 = (x_ok >= 10)
             if ok_7: score_total += 12.5
             grading.append({
-                "No": "7", "Bagian": f"Distributor (Kolom {get_column_letter(col_xlookup_idx)})", "Rumus": "XLOOKUP",
+                "No": "7", "Bagian": "Distributor (Sheet Data)", "Rumus": "XLOOKUP",
                 "Jawaban Kamu": f"{x_ok}/14 Sampel Terisi",
                 "Kunci": "Nama Distributor",
                 "Status": "✅ Benar" if ok_7 else "❌ Cek Lagi",
                 "Catatan": "Mantap, XLOOKUP narik data bener!" if ok_7 else "Kolom distributor masih kosong atau rumusnya belum pas."
             })
 
-            # 8. IF
+            # 8. EVALUASI IF LOGIC (Cari kolom yang berlabel STATUS)
+            col_if_idx = next((i for i, c in enumerate(headers, start=1) if "STATUS" in c or "IF" in c), 15)
+            col_sisa_idx = next((i for i, c in enumerate(headers, start=1) if "SISA" in c), 13)
             if_ok = 0
-            for r in range(data_start_row, data_start_row + 14):
+            for r in range(data_start, data_start + 14):
                 f_o = clean_f(ws_dt_f.cell(row=r, column=col_if_idx).value)
                 v_o = str(ws_dt_v.cell(row=r, column=col_if_idx).value or "").strip().upper()
-                sisa_qty = float(df_stk.iloc[r - data_start_row]["SISA STOK"] or 0)
+                sisa_qty = safe_float(ws_dt_v.cell(row=r, column=col_sisa_idx).value)
                 expected = if_true_text if sisa_qty <= if_limit else if_false_text
                 if "IF(" in f_o and (v_o == expected or expected in f_o):
                     if_ok += 1
             ok_8 = (if_ok >= 10)
             if ok_8: score_total += 12.5
             grading.append({
-                "No": "8", "Bagian": f"Status Refill (Kolom {get_column_letter(col_if_idx)})", "Rumus": "IF",
+                "No": "8", "Bagian": "Status Refill (Sheet Data)", "Rumus": "IF",
                 "Jawaban Kamu": f"{if_ok}/14 Sampel Sesuai",
                 "Kunci": f"{if_true_text} / {if_false_text}",
                 "Status": "✅ Benar" if ok_8 else "❌ Cek Lagi",
-                "Catatan": f"Logika IF {if_true_text}/{if_false_text} pas!" if ok_8 else f"Cek logika perbandingan (<= {int(if_limit)})-nya ya."
+                "Catatan": f"Logika IF {if_true_text}/{if_false_text} pas!" if ok_8 else f"Cek perbandingannya ya (<= {int(if_limit)})."
             })
 
+            # SIMPAN HASIL DAN AKTIFKAN SCORECARD DI LAYAR
             final_score = int(round(score_total))
             correct_cnt = sum(1 for g in grading if "Benar" in g["Status"])
             wrong_cnt = 8 - correct_cnt
@@ -4878,9 +4904,13 @@ class AppState:
 
             self.df_exam_result_headers.set(df_eval.columns.tolist())
             self.df_exam_result_rows.set(df_eval.fillna("").astype(str).values.tolist())
+
+            # 👇 Ini saklar penentu agar hasil di web PASTI MUNCUL!
             self.excel_exam_graded.set(True)
 
             msg = f"Keren! Nilai kamu: {final_score}/100" if final_score >= 75 else f"Selesai diperiksa! Nilai kamu: {final_score}/100"
             return True, msg
         except Exception as e:
-            return False, f"Gagal Memproses File: {e}"
+            import traceback
+            traceback.print_exc()
+            return False, f"Ada kendala saat memeriksa file: {str(e)}"

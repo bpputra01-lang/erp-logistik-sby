@@ -3401,4 +3401,24 @@ def server(input: Inputs, output: Outputs, session: Session):
             print(f"Error generate excel: {e}")
             traceback.print_exc()
 
+@reactive.Effect
+    @reactive.event(input.btn_process_exam_grading)
+    def _proc_exam_grading():
+        f = input.upload_exam_answer_file()
+        if not f:
+            ui.insert_ui(ui.tags.script("window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+            ui.notification_show("Upload file jawaban Excel kamu terlebih dahulu ya!", type="warning", duration=4)
+            return
+
+        try:
+            succ, msg = state.grade_excel_practice(f)
+            ui.insert_ui(ui.tags.script("window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+            if succ:
+                ui.notification_show(msg, type="message", duration=5)
+            else:
+                ui.notification_show(msg, type="error", duration=6)
+        except Exception as e:
+            ui.insert_ui(ui.tags.script("window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+            ui.notification_show(f"Terjadi kesalahan: {str(e)}", type="error", duration=6)
+
 app = App(app_ui, server)
