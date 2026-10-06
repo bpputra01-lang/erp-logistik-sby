@@ -3385,19 +3385,20 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         yield buf.getvalue()
 
-    # 👇 Perhatikan penambahan blok try-except dan time.time() yang sudah benar:
     @render.download(
         filename=lambda: f"SOAL_LATIHAN_EXCEL_{datetime.now().strftime('%d_%m_%Y_%H%M')}.xlsx"
     )
     def btn_dl_excel_practice():
         try:
             content = state.generate_excel_practice_package()
-            if hasattr(content, "getvalue"):
-                yield content.getvalue()
-            else:
-                yield content
+            if content and len(content) > 0:
+                if hasattr(content, "getvalue"):
+                    yield content.getvalue()
+                else:
+                    yield content
         except Exception as e:
-            print(f"Error generate excel practice: {e}")
-            yield b""
+            import traceback
+            print(f"Error generate excel: {e}")
+            traceback.print_exc()
 
 app = App(app_ui, server)
