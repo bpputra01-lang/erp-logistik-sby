@@ -1453,76 +1453,40 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
         )
 
+    # Tombol Step 4 Cycle Count (Otomatis Aktif jika Memang Tidak Ada Real+ Recon)
     @render.ui
     def cca_step4_btn_ui():
         f = input.cca_up_recon_real() if "cca_up_recon_real" in input else None
-        if f:
+        if state._raw_df_cca_rec_real.empty or (f and len(f) > 0):
+            lbl = "RUN RECON ANALYSIS" if not state._raw_df_cca_rec_real.empty else "LANJUT (TIDAK ADA REAL + RECON)"
             return ui.div(
                 ui.tags.button(
-                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "RUN RECON ANALYSIS"),
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), lbl),
                     onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_cca_step4', Math.random(), {priority: 'event'});",
                     class_="btn-red-gradient"
                 ), style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
             )
         return ui.div(ui.tags.button("UPLOAD HASIL RECON REAL + UNTUK ANALISIS", disabled=True, class_="btn-locked"), style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;")
-
+# LISTENER STEP 4 CYCLE COUNT (SEBELUMNYA HILANG)
     @reactive.Effect
     @reactive.event(input.btn_run_cca_step4)
     def _proc_cca_step4():
-        f = input.cca_up_recon_real()
+        f = input.cca_up_recon_real() if "cca_up_recon_real" in input else None
         succ, msg = state.run_cca_step4(f)
-        if succ: state.show_success_modal.set(True)
+        if succ:
+            state.show_success_modal.set(True)
         else:
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
-
-    @render.download(filename="Hasil_Recon_Real_Plus_Need_Adj.xlsx")
-    def btn_dl_cca_step4():
-        buf = io.BytesIO()
-        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-            state._raw_df_cca_adj4.to_excel(writer, sheet_name='RECON_REAL_PLUS_ADJ', index=False)
-        buf.seek(0)
-        yield buf.getvalue()
-
-    # --- KARTU MANDIRI STEP 5 ---
-    @render.ui
-    def cca_step5_card_ui():
-        if not state.cca_step4_done(): return ui.div()
-        step5_results = ui.div()
-        if state.cca_step5_done():
-            step5_results = ui.div(
-                ui.hr(style="margin: 1rem 0; border-color: #E2E8F0;"),
-                ui.div(
-                    dark_metric_box("☣️ QTY TO KARANTINA", f"{state.cca_qty_karantina():,} QTY", "#ECC94B"),
-                    dark_metric_box("🏷️ SKU TO KARANTINA", f"{state.cca_sku_karantina():,} SKU", "#ECC94B"),
-                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
-                ),
-                ui.div(
-                    ui.download_button("btn_dl_cca_karantina", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD HASIL KARANTINA (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"),
-                    style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
-                ),
-                ui.navset_card_tab(
-                    ui.nav_panel("📦 HASIL KARANTINA", ui.div(render_clean_table(state.df_cca_karantina_headers(), state.df_cca_karantina_rows(), "tbl_cca_karantina"), style="padding: 0.75rem 0;")),
-                    ui.nav_panel("🔍 DATA PENGECEKAN (AUDIT)", ui.div(render_clean_table(state.df_cca_check5_headers(), state.df_cca_check5_rows(), "tbl_cca_check5"), style="padding: 0.75rem 0;"))
-                )
-            )
-
-        return ui.div(
-            ui.h4("4️⃣ RECON SYSTEM + PROCESS (SET UP KARANTINA)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
-            custom_uploader_box("cca_up_recon_sys", "📥 Upload SYSTEM + RECON (File Master Hasil Audit)"),
-            ui.output_ui("cca_step5_btn_ui"),
-            step5_results,
-            class_="step-card-box",
-            style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
-        )
-
+    # Tombol Step 5 Cycle Count (Otomatis Aktif jika Memang Tidak Ada System+ Outstanding)
     @render.ui
     def cca_step5_btn_ui():
         f = input.cca_up_recon_sys() if "cca_up_recon_sys" in input else None
-        if f:
+        if state._raw_df_cca_rec_sys.empty or (f and len(f) > 0):
+            lbl = "GENERATE KARANTINA" if not state._raw_df_cca_rec_sys.empty else "LANJUT (TIDAK ADA SYSTEM + RECON)"
             return ui.div(
                 ui.tags.button(
-                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "GENERATE KARANTINA"),
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), lbl),
                     onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_cca_step5', Math.random(), {priority: 'event'});",
                     class_="btn-red-gradient"
                 ), style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
@@ -2135,13 +2099,24 @@ def server(input: Inputs, output: Outputs, session: Session):
     @reactive.Effect
     @reactive.event(input.btn_run_so_step4)
     def _proc_so_step4():
-        f1, f2, f3 = input.so_up_r4(), input.so_up_s4(), input.so_up_m5()
-        if not f1 or not f2 or not f3:
-            state.error_modal_message.set("Pilih ketiga file (Real+ Recon, Cek Stock Adj+, Staging Inbound) terlebih dahulu!")
+        f1 = input.so_up_r4() if "so_up_r4" in input else None
+        f2, f3 = input.so_up_s4(), input.so_up_m5()
+
+        # Jika memang ada item Real+ Recon yang harus dicek, maka f1 wajib ada
+        if not state._raw_df_so_rec_real.empty and not f1:
+            state.error_modal_message.set("Upload sheet REAL + RECON terlebih dahulu!")
             state.show_error_modal.set(True)
             return
+
+        # File Cek Stock Adj+ dan Staging Inbound tetap wajib ada
+        if not f2 or not f3:
+            state.error_modal_message.set("File Cek Stock Adj (+) dan Staging Inbound wajib diupload!")
+            state.show_error_modal.set(True)
+            return
+
         succ, msg = state.run_so_step4(f1, f2, f3)
-        if succ: state.show_success_modal.set(True)
+        if succ:
+            state.show_success_modal.set(True)
         else:
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
@@ -2240,17 +2215,25 @@ def server(input: Inputs, output: Outputs, session: Session):
     @reactive.Effect
     @reactive.event(input.btn_run_so_step5)
     def _proc_so_step5():
-        f1, f2 = input.so_up_k6(), input.so_up_adj6()
-        if not f1 or not f2:
-            state.error_modal_message.set("Pilih kedua file (System+ Recon & Stock Cek Adj-) terlebih dahulu!")
-            state.show_error_modal.set(True)
-            return
-        succ, msg = state.run_so_step5(f1, f2)
-        if succ: state.show_success_modal.set(True)
+        f1 = input.so_up_k6() if "so_up_k6" in input else None
+        f2 = input.so_up_adj6() if "so_up_adj6" in input else None
+
+        # Jika memang tidak ada item System+ Recon dari Step 3, langsung jalankan tanpa blokir file
+        if state._raw_df_so_rec_sys.empty:
+            succ, msg = state.run_so_step5(None, None)
+        else:
+            if not f1 or not f2:
+                state.error_modal_message.set("Upload kedua file (System+ Recon & Stock Cek Adj -) terlebih dahulu!")
+                state.show_error_modal.set(True)
+                return
+            succ, msg = state.run_so_step5(f1, f2)
+
+        if succ:
+            state.show_success_modal.set(True)
         else:
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
-
+            
     @render.download(filename="Karantina_SO.xlsx")
     def btn_dl_so_karantina():
         buf = io.BytesIO()
