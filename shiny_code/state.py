@@ -4703,7 +4703,7 @@ class AppState:
             wb_form = openpyxl.load_workbook(path, data_only=False)
             wb_vals = openpyxl.load_workbook(path, data_only=True)
 
-            # 1. BACA METADATA YANG DITANAM SISTEM
+            # 1. BACA METADATA DARI FILE (JIKA ADA)
             meta = {}
             if "_SYS_EVAL_META" in wb_vals.sheetnames:
                 try:
@@ -4729,7 +4729,7 @@ class AppState:
             if_false_text = str(meta.get("if_false", "AMAN")).strip().upper()
             countifs_limit = safe_float(meta.get("countifs_limit", 5), 5.0)
 
-            # 2. TENTUKAN SHEET KERJA
+            # 2. IDENTIFIKASI SHEET REKAP DAN SHEET DATA TRANSAKSI
             rekap_sheet_name = meta.get("rekap_sheet")
             if not rekap_sheet_name or rekap_sheet_name not in wb_form.sheetnames:
                 rekap_sheet_name = next(
@@ -4749,34 +4749,35 @@ class AppState:
             ws_dt_f = wb_form[data_sheet_name]
             ws_dt_v = wb_vals[data_sheet_name]
 
-            # 3. IDENTIFIKASI RANGE DATA TABEL UTAMA SECARA PRESISI
+            # 3. DETEKSI TABEL TRANSAKSI SECARA AKURAT (CARI HEADER HARGA BELI & STOK AWAL)
             dt_rows = list(ws_dt_v.iter_rows(values_only=True))
-            hdr_dt_row = int(meta.get("data_hdr_row", 0))
+            hdr_dt_row = None
+            headers_dt = []
 
-            if hdr_dt_row <= 0:
-                # Fallback cerdas: cari baris yang punya BARCODE dan SKU dan TERJUAL (bukan SUMIF)
-                for r_idx, r_vals in enumerate(dt_rows[:40], start=1):
-                    r_upper = [str(x or "").strip().upper() for x in r_vals]
-                    has_bc = any("BARCODE" in x and "TOTAL" not in x for x in r_upper)
-                    has_sku = any(x == "SKU" for x in r_upper)
-                    has_tj = any("TERJUAL" in x and "SUMIF" not in x for x in r_upper)
-                    if has_bc and has_sku and has_tj:
-                        hdr_dt_row = r_idx
-                        break
-                if hdr_dt_row <= 0:
-                    hdr_dt_row = 10 if len(dt_rows) >= 10 else 1
+            for r_idx, r_vals in enumerate(dt_rows[:70], start=1):
+                r_upper = [str(x or "").strip().upper() for x in r_vals]
+                # Header tabel transaksi selalu memiliki HARGA BELI dan STOK AWAL (tidak pernah ada di tabel rekap)
+                if any("HARGA BELI" in x or "HARGA" in x for x in r_upper) and any("STOK AWAL" in x for x in r_upper):
+                    hdr_dt_row = r_idx
+                    headers_dt = r_upper
+                    break
+
+            if hdr_dt_row is None:
+                hdr_dt_row = int(meta.get("data_hdr_row", 10 if len(dt_rows) >= 10 else 1))
+                headers_dt = [str(x or "").strip().upper() for x in dt_rows[hdr_dt_row - 1]]
 
             data_start_row = int(meta.get("data_start_row", hdr_dt_row + 1))
             data_end_row = int(meta.get("data_end_row", min(data_start_row + 59, len(dt_rows))))
 
-            col_brand_idx = int(meta.get("col_brand", 4))
-            col_kat_idx = int(meta.get("col_kat", 6))
-            col_terjual_idx = int(meta.get("col_terjual", 12))
-            col_sisa_idx = int(meta.get("col_sisa", 13))
-            col_x_idx = int(meta.get("col_xlookup", 14))
-            col_if_idx = int(meta.get("col_if", 15))
+            # Cari index kolom di tabel transaksi
+            col_brand_idx = next((i for i, c in enumerate(headers_dt, 1) if c == "BRAND"), int(meta.get("col_brand", 4)))
+            col_kat_idx = next((i for i, c in enumerate(headers_dt, 1) if c == "KATEGORI"), int(meta.get("col_kat", 6)))
+            col_terjual_idx = next((i for i, c in enumerate(headers_dt, 1) if c == "TERJUAL" and "SUMIF" not in c), int(meta.get("col_terjual", 12)))
+            col_sisa_idx = next((i for i, c in enumerate(headers_dt, 1) if "SISA" in c and "STATUS" not in c), int(meta.get("col_sisa", 13)))
+            col_x_idx = next((i for i, c in enumerate(headers_dt, 1) if "DISTRIBUTOR" in c or "XLOOKUP" in c), int(meta.get("col_xlookup", 14)))
+            col_if_idx = next((i for i, c in enumerate(headers_dt, 1) if "STATUS" in c or "IF" in c), int(meta.get("col_if", 15)))
 
-            # Ekstrak data transaksi aktual untuk acuan kunci jawaban (Ground Truth)
+            # Ambil seluruh 60 data aktual sebagai kunci jawaban
             records = []
             for r in range(data_start_row, data_end_row + 1):
                 br_val = str(ws_dt_v.cell(row=r, column=col_brand_idx).value or "").strip().upper()
@@ -4789,22 +4790,86 @@ class AppState:
                 })
             df_stk = pd.DataFrame(records)
 
-            # 4. KOORDINAT TABEL REKAPITULASI
-            cell_sum = meta.get("cell_sum", "B6")
-            cell_cnt = meta.get("cell_count", "B7")
+            # 4. DETEKSI POSISI TABEL REKAP (SUM, COUNT, SUMIF, COUNTIF, SUMIFS, COUNTIFS)
+            rk_rows = list(ws_rk_v.iter_rows(values_only=True))
 
-            t2_start = int(meta.get("t2_start", 11))
-            t2_end = int(meta.get("t2_end", t2_start + 2))
-            t2_col_brand = int(meta.get("t2_col_brand", 2))
-            t2_col_sumif = int(meta.get("t2_col_sumif", 3))
-            t2_col_countif = int(meta.get("t2_col_countif", 4))
+            # A. Cari Sel SUM dan COUNT
+            cell_sum = meta.get("cell_sum")
+            cell_cnt = meta.get("cell_count")
+            if not cell_sum or not cell_cnt:
+                for r_idx, r_vals in enumerate(rk_rows[:70], start=1):
+                    for c_idx, val in enumerate(r_vals, start=1):
+                        txt = str(val or "").strip().upper()
+                        if "SISA STOK" in txt and not cell_sum:
+                            cell_sum = ws_rk_v.cell(row=r_idx, column=c_idx + 1).coordinate
+                        elif "BARCODE" in txt and not cell_cnt:
+                            cell_cnt = ws_rk_v.cell(row=r_idx, column=c_idx + 1).coordinate
+            cell_sum = cell_sum or "B5"
+            cell_cnt = cell_cnt or "D5"
 
-            t3_start = int(meta.get("t3_start", 18))
-            t3_end = int(meta.get("t3_end", t3_start + 1))
-            t3_col_brand = int(meta.get("t3_col_brand", 2))
-            t3_col_kat = int(meta.get("t3_col_kat", 3))
-            t3_col_sumifs = int(meta.get("t3_col_sumifs", 4))
-            t3_col_countifs = int(meta.get("t3_col_countifs", 5))
+            # B. Deteksi Posisi Tabel SUMIF & COUNTIF Secara Relatif
+            t2_hdr_row, t2_col_sumif, t2_col_countif, t2_col_brand = None, None, None, None
+            for r_idx, r_vals in enumerate(rk_rows[:70], start=1):
+                for c_idx, val in enumerate(r_vals, start=1):
+                    txt = str(val or "").strip().upper()
+                    if "SUMIF)" in txt and "SUMIFS" not in txt:
+                        t2_hdr_row = r_idx
+                        t2_col_sumif = c_idx
+                        t2_col_brand = c_idx - 1  # Brand berada di sebelah kiri SUMIF
+                    elif "COUNTIF)" in txt and "COUNTIFS" not in txt:
+                        t2_col_countif = c_idx
+                if t2_col_sumif is not None:
+                    break
+
+            t2_col_brand = t2_col_brand or int(meta.get("t2_col_brand", 6))
+            t2_col_sumif = t2_col_sumif or int(meta.get("t2_col_sumif", 7))
+            t2_col_countif = t2_col_countif or int(meta.get("t2_col_countif", 8))
+            t2_start = t2_hdr_row + 1 if t2_hdr_row else int(meta.get("t2_start", 6))
+
+            # Ambil baris brand yang aktif (maksimal 4 baris, berhenti jika sel kosong)
+            t2_rows = []
+            curr_r = t2_start
+            while curr_r <= len(rk_rows) and len(t2_rows) < 5:
+                b_val = str(ws_rk_v.cell(row=curr_r, column=t2_col_brand).value or "").strip()
+                if not b_val or b_val.upper() in ["NO", "TOTAL", "KATEGORI"]:
+                    break
+                t2_rows.append(curr_r)
+                curr_r += 1
+            if not t2_rows:
+                t2_rows = list(range(t2_start, t2_start + 3))
+
+            # C. Deteksi Posisi Tabel SUMIFS & COUNTIFS Secara Relatif
+            t3_hdr_row, t3_col_sumifs, t3_col_countifs, t3_col_kat, t3_col_brand = None, None, None, None, None
+            for r_idx, r_vals in enumerate(rk_rows[:70], start=1):
+                for c_idx, val in enumerate(r_vals, start=1):
+                    txt = str(val or "").strip().upper()
+                    if "SUMIFS)" in txt:
+                        t3_hdr_row = r_idx
+                        t3_col_sumifs = c_idx
+                        t3_col_kat = c_idx - 1     # Kategori tepat di sebelah kiri SUMIFS
+                        t3_col_brand = c_idx - 2   # Brand di sebelah kiri Kategori
+                    elif "COUNTIFS)" in txt:
+                        t3_col_countifs = c_idx
+                if t3_col_sumifs is not None:
+                    break
+
+            t3_col_brand = t3_col_brand or int(meta.get("t3_col_brand", 11))
+            t3_col_kat = t3_col_kat or int(meta.get("t3_col_kat", 12))
+            t3_col_sumifs = t3_col_sumifs or int(meta.get("t3_col_sumifs", 13))
+            t3_col_countifs = t3_col_countifs or int(meta.get("t3_col_countifs", 14))
+            t3_start = t3_hdr_row + 1 if t3_hdr_row else int(meta.get("t3_start", 6))
+
+            t3_rows = []
+            curr_r3 = t3_start
+            while curr_r3 <= len(rk_rows) and len(t3_rows) < 4:
+                b3_val = str(ws_rk_v.cell(row=curr_r3, column=t3_col_brand).value or "").strip()
+                k3_val = str(ws_rk_v.cell(row=curr_r3, column=t3_col_kat).value or "").strip()
+                if not b3_val or not k3_val:
+                    break
+                t3_rows.append(curr_r3)
+                curr_r3 += 1
+            if not t3_rows:
+                t3_rows = list(range(t3_start, t3_start + 2))
 
             grading = []
             score_total = 0.0
@@ -4853,8 +4918,7 @@ class AppState:
             # 3. EVALUASI SUMIF
             # ------------------------------------------------------------------
             sumif_ok = 0
-            tot_t2 = max(1, t2_end - t2_start + 1)
-            for r in range(t2_start, t2_end + 1):
+            for r in t2_rows:
                 br = str(ws_rk_v.cell(row=r, column=t2_col_brand).value or "").strip().upper()
                 f_v = clean_f(ws_rk_f.cell(row=r, column=t2_col_sumif).value)
                 v_v = safe_float(ws_rk_v.cell(row=r, column=t2_col_sumif).value)
@@ -4862,11 +4926,12 @@ class AppState:
                 has_sumif = "SUMIF(" in f_v and "SUMIFS" not in f_v
                 if has_sumif and (int(round(v_v)) == gt or (v_v > 0 and abs(v_v - gt) <= 2) or str(gt) in f_v):
                     sumif_ok += 1
-            ok_3 = (sumif_ok >= max(1, tot_t2 - 1))
+
+            ok_3 = (sumif_ok >= max(1, len(t2_rows) - 1))
             if ok_3: score_total += 12.5
             grading.append({
                 "No": "3", "Bagian": "Rekap Brand (SUMIF)", "Rumus": "SUMIF",
-                "Jawaban Kamu": f"{sumif_ok}/{tot_t2} Baris Pas", "Kunci": "Sesuai Total Terjual",
+                "Jawaban Kamu": f"{sumif_ok}/{len(t2_rows)} Baris Pas", "Kunci": "Sesuai Total Terjual",
                 "Status": "✅ Benar" if ok_3 else "❌ Cek Lagi",
                 "Catatan": "Bagus, SUMIF sudah bener!" if ok_3 else "Cek range kuncian sel ($)-nya."
             })
@@ -4875,7 +4940,7 @@ class AppState:
             # 4. EVALUASI COUNTIF
             # ------------------------------------------------------------------
             countif_ok = 0
-            for r in range(t2_start, t2_end + 1):
+            for r in t2_rows:
                 br = str(ws_rk_v.cell(row=r, column=t2_col_brand).value or "").strip().upper()
                 f_v = clean_f(ws_rk_f.cell(row=r, column=t2_col_countif).value)
                 v_v = safe_float(ws_rk_v.cell(row=r, column=t2_col_countif).value)
@@ -4883,11 +4948,12 @@ class AppState:
                 has_countif = "COUNTIF(" in f_v and "COUNTIFS" not in f_v
                 if has_countif and (int(round(v_v)) == gt or (v_v > 0 and abs(v_v - gt) <= 1) or str(gt) in f_v):
                     countif_ok += 1
-            ok_4 = (countif_ok >= max(1, tot_t2 - 1))
+
+            ok_4 = (countif_ok >= max(1, len(t2_rows) - 1))
             if ok_4: score_total += 12.5
             grading.append({
                 "No": "4", "Bagian": "Rekap Brand (COUNTIF)", "Rumus": "COUNTIF",
-                "Jawaban Kamu": f"{countif_ok}/{tot_t2} Baris Pas", "Kunci": "Sesuai Jumlah SKU",
+                "Jawaban Kamu": f"{countif_ok}/{len(t2_rows)} Baris Pas", "Kunci": "Sesuai Jumlah SKU",
                 "Status": "✅ Benar" if ok_4 else "❌ Cek Lagi",
                 "Catatan": "Mantap, COUNTIF bener!" if ok_4 else "Cek range kriteria brand-nya."
             })
@@ -4896,8 +4962,7 @@ class AppState:
             # 5. EVALUASI SUMIFS
             # ------------------------------------------------------------------
             sumifs_ok = 0
-            tot_t3 = max(1, t3_end - t3_start + 1)
-            for r in range(t3_start, t3_end + 1):
+            for r in t3_rows:
                 br = str(ws_rk_v.cell(row=r, column=t3_col_brand).value or "").strip().upper()
                 kt = str(ws_rk_v.cell(row=r, column=t3_col_kat).value or "").strip().upper()
                 f_v = clean_f(ws_rk_f.cell(row=r, column=t3_col_sumifs).value)
@@ -4906,11 +4971,12 @@ class AppState:
                 has_sumifs = "SUMIFS(" in f_v
                 if has_sumifs and (int(round(v_v)) == gt or (v_v > 0 and abs(v_v - gt) <= 2) or str(gt) in f_v):
                     sumifs_ok += 1
-            ok_5 = (sumifs_ok >= max(1, tot_t3 - 1))
+
+            ok_5 = (sumifs_ok >= max(1, len(t3_rows) - 1))
             if ok_5: score_total += 12.5
             grading.append({
                 "No": "5", "Bagian": "Multi-Syarat (SUMIFS)", "Rumus": "SUMIFS",
-                "Jawaban Kamu": f"{sumifs_ok}/{tot_t3} Baris Pas", "Kunci": "Sesuai 2 Kriteria",
+                "Jawaban Kamu": f"{sumifs_ok}/{len(t3_rows)} Baris Pas", "Kunci": "Sesuai 2 Kriteria",
                 "Status": "✅ Benar" if ok_5 else "❌ Cek Lagi",
                 "Catatan": "Keren, rumus SUMIFS bener!" if ok_5 else "Cek urutan kolom rumus SUMIFS-nya."
             })
@@ -4919,7 +4985,7 @@ class AppState:
             # 6. EVALUASI COUNTIFS
             # ------------------------------------------------------------------
             countifs_ok = 0
-            for r in range(t3_start, t3_end + 1):
+            for r in t3_rows:
                 br = str(ws_rk_v.cell(row=r, column=t3_col_brand).value or "").strip().upper()
                 kt = str(ws_rk_v.cell(row=r, column=t3_col_kat).value or "").strip().upper()
                 f_v = clean_f(ws_rk_f.cell(row=r, column=t3_col_countifs).value)
@@ -4933,11 +4999,12 @@ class AppState:
                 has_countifs = "COUNTIFS(" in f_v
                 if has_countifs and (val_num in [gt_3, gt_gte, gt_2] or str(gt_3) in f_v or (val_num > 0 and abs(val_num - gt_3) <= 1)):
                     countifs_ok += 1
-            ok_6 = (countifs_ok >= max(1, tot_t3 - 1))
+
+            ok_6 = (countifs_ok >= max(1, len(t3_rows) - 1))
             if ok_6: score_total += 12.5
             grading.append({
                 "No": "6", "Bagian": "Hitung Syarat (COUNTIFS)", "Rumus": "COUNTIFS",
-                "Jawaban Kamu": f"{countifs_ok}/{tot_t3} Baris Pas", "Kunci": f"Stok >{int(countifs_limit)}",
+                "Jawaban Kamu": f"{countifs_ok}/{len(t3_rows)} Baris Pas", "Kunci": f"Stok >{int(countifs_limit)}",
                 "Status": "✅ Benar" if ok_6 else "❌ Cek Lagi",
                 "Catatan": "Sip, COUNTIFS bener!" if ok_6 else f'Pastikan kriteria tanda petiknya bener (">{int(countifs_limit)}").'
             })
@@ -4952,6 +5019,7 @@ class AppState:
                 has_lookup = any(k in f_n for k in ["XLOOKUP(", "VLOOKUP(", "INDEX("])
                 if has_lookup and (len(v_n) > 2 or "PT" in v_n or "GLOBAL" in v_n or not v_n):
                     x_ok += 1
+
             ok_7 = (x_ok >= 10)
             if ok_7: score_total += 12.5
             grading.append({
@@ -4973,6 +5041,7 @@ class AppState:
                 has_if = "IF(" in f_o or "IFS(" in f_o
                 if has_if and (v_o == expected or expected in f_o or v_o in [if_true_text, if_false_text]):
                     if_ok += 1
+
             ok_8 = (if_ok >= 10)
             if ok_8: score_total += 12.5
             grading.append({
