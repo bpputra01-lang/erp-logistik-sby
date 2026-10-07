@@ -4690,7 +4690,7 @@ class AppState:
 # ==========================================================================
     # AUTO-GRADER 100% DINAMIS (OTOMATIS MENYESUAIKAN SELURUH MODEL & PARADIGMA)
     # ==========================================================================
-   def grade_excel_practice(self, f_exam):
+    def grade_excel_practice(self, f_exam):
         try:
             import openpyxl
             import pandas as pd
