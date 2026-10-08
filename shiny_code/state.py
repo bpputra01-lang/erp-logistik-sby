@@ -1343,6 +1343,13 @@ class AppState:
     # --- STEP 1: COMPARE SCAN VS STOCK ---
     def run_cca_step1(self, f_scan, f_stock, sub_sel, brand_sel, bin_sys_sel):
         try:
+            # Reset state step berikutnya jika re-run Step 1
+            self.cca_step2_done.set(False)
+            self.cca_step3_done.set(False)
+            self.cca_step4_done.set(False)
+            self.cca_step5_done.set(False)
+            self.cca_step6_done.set(False)
+
             df_s_raw = load_data_from_info(f_scan)
             df_t_raw = load_data_from_info(f_stock)
 
@@ -1612,12 +1619,31 @@ class AppState:
             self.df_cca_rec_sys_headers.set(outstanding.columns.tolist())
             self.df_cca_rec_sys_rows.set(outstanding.fillna("").astype(str).values.tolist())
 
+
             self.cca_step2_done.set(True)
             self.cca_step3_done.set(True)
-            return True, "Allocation Step 2 & Recon Step 3 Selesai!"
-        except Exception as e:
-            return False, f"Gagal Allocation Step 2: {e}"
 
+            # --- TAMBAHAN OTOMATISASI JIKA RECON KOSONG ---
+            # Jika tidak ada item Real+ yang perlu direkon, otomatis selesaikan Step 4
+            if recon_real.empty:
+                self.cca_step4_done.set(True)
+                self.cca_qty_need_adj.set(0)
+                self.cca_sku_need_adj.set(0)
+                self._raw_df_cca_adj4 = pd.DataFrame(columns=['BIN', 'SKU', 'ITEM NAME', 'QTY_SCAN', 'QTY_SYSTEM', 'DIFF', 'NEED_ADJ'])
+            else:
+                self.cca_step4_done.set(False)
+
+            # Jika tidak ada item System+ yang outstanding, otomatis selesaikan Step 5
+            if outstanding.empty:
+                self.cca_step5_done.set(True)
+                self.cca_qty_karantina.set(0)
+                self.cca_sku_karantina.set(0)
+                self._raw_df_cca_karantina = pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
+            else:
+                self.cca_step5_done.set(False)
+
+            return True, "Allocation Step 2 & Recon Step 3 Selesai!"
+            
     # --- CCA STEP 4: RECON REAL + ANALYSIS (ANTI ERROR BILA KOSONG) ---
     def run_cca_step4(self, f_recon_real=None):
         try:
@@ -2077,12 +2103,19 @@ class AppState:
 # ==========================================================================
     # STOCK OPNAME ANALYZER (STEP 1 & STEP 2 - DENGAN INTEGRASI STOCK MINUS)
     # ================================================# --- STEP 1: COMPARE SCAN VS STOCK (PATOKAN FORMAT: STOCK SYSTEM) ---
+    # --- STEP 1: COMPARE SCAN VS STOCK (PATOKAN FORMAT: STOCK SYSTEM) ---
     def run_so_step1(self, f_scan, f_stock, sub_sel, bin_sys_sel):
         try:
             import re
-
+            self.so_step2_done.set(False)
+            self.so_step4_done.set(False)
+            self.so_step4_setup_done.set(False)
+            self.so_step5_done.set(False)
+            self.so_step6a_done.set(False)
+            self.so_step6b_done.set(False)
             df_s_raw = load_data_from_info(f_scan)
             df_t_raw = load_data_from_info(f_stock)
+
             if df_s_raw.empty or df_t_raw.empty:
                 return False, "File Data Scan dan Stock System tidak boleh kosong!"
 
@@ -2420,10 +2453,23 @@ class AppState:
             self.df_so_rec_sys_rows.set(outstanding.fillna("").astype(str).values.tolist())
 
             self.so_step2_done.set(True)
-            return True, "Allocation & Recon Selesai!"
-        except Exception as e:
-            return False, f"Gagal Allocation Step 2: {e}"
 
+            # --- TAMBAHAN OTOMATISASI JIKA RECON KOSONG ---
+            if recon_real.empty:
+                self.so_step4_done.set(True)
+                self.so_step4_setup_done.set(True)
+            else:
+                self.so_step4_done.set(False)
+
+            if outstanding.empty:
+                self.so_step5_done.set(True)
+                self.so_qty_karantina.set(0)
+                self.so_sku_karantina.set(0)
+                self._raw_df_so_karantina = pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
+            else:
+                self.so_step5_done.set(False)
+
+            return True, "Allocation & Recon Selesai!"
     # --- SO STEP 4: FINAL ADJUSTMENT (TOLERAN JIKA REAL + RECON KOSONG) ---
     def run_so_step4(self, f_r4, f_s4, f_m5):
         try:
@@ -2737,8 +2783,12 @@ class AppState:
             active_plus = load_data_from_info(f_plus) if f_plus else self._raw_df_so_mult
             active_minus = load_data_from_info(f_minus) if f_minus else None
 
-            if active_plus.empty:
-                return False, "Data Stock Adj + tidak ditemukan!"
+            has_plus = active_plus is not None and not active_plus.empty
+            has_minus = active_minus is not None and not active_minus.empty
+
+            # Perbaikan: Hanya tolak jika KEDUA-DUANYA kosong
+            if not has_plus and not has_minus:
+                return False, "Tidak ada data Stock Adj (+) maupun Adj (-) yang ditemukan untuk dihitung!"
 
             def process_data(df, status):
                 if df is None or (isinstance(df, pd.DataFrame) and df.empty):
@@ -2751,8 +2801,8 @@ class AppState:
                 temp["STATUS ADJ"] = status
                 return temp
 
-            df_adj_plus = process_data(active_plus, "ADJ +")
-            df_adj_minus = process_data(active_minus, "ADJ -")
+            df_adj_plus = process_data(active_plus, "ADJ +") if has_plus else pd.DataFrame(columns=cols_header)
+            df_adj_minus = process_data(active_minus, "ADJ -") if has_minus else pd.DataFrame(columns=cols_header)
             df_final = pd.concat([df_adj_plus, df_adj_minus], ignore_index=True)
 
             val_plus = df_adj_plus["VALUE ADJ"].sum() if not df_adj_plus.empty else 0
@@ -2784,7 +2834,6 @@ class AppState:
             return True, "Summary Adjustment Berhasil Dibuat!"
         except Exception as e:
             return False, f"Gagal Summary Adjustment: {e}"
-
 # ==========================================================================
     # JUSTIFICATION SO - NON REVERSAL (LOGIKA KESALAHAN ADJ DI-TAKE OUT)
     # ==========================================================================

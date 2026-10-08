@@ -1424,10 +1424,28 @@ def server(input: Inputs, output: Outputs, session: Session):
             df_s.to_excel(writer, sheet_name='SYSTEM_OUTSTANDING', index=False)
         buf.seek(0)
         yield buf.getvalue()
-    # --- KARTU MANDIRI STEP 4 ---
+    # ==========================================================================
+    # CYCLE COUNT ANALYZER CONTROLLER (STEP 4, 5, & 6)
+    # ==========================================================================
+    # --- STEP 4 CYCLE COUNT ---
     @render.ui
     def cca_step4_card_ui():
         if not state.cca_step2_done(): return ui.div()
+        
+        # JIKA DATA KOSONG: Tampilkan kartu konfirmasi hijau ringkas (tanpa form upload kosong)
+        if state._raw_df_cca_rec_real.empty:
+            return ui.div(
+                ui.h4("3️⃣ RECON REAL + PROCESS", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
+                ui.div(
+                    ui.tags.i(class_="fa-solid fa-circle-check", style="color: #22543D; font-size: 18px; margin-right: 8px;"),
+                    ui.span("Semua item Real + telah ter-cover penuh oleh System + dan BIN Coverage (0 Selisih). Langkah rekonsiliasi Real + selesai otomatis.", style="font-weight: 600; font-size: 13px;"),
+                    style="background: #C6F6D5; color: #22543D; padding: 0.85rem 1.25rem; border-radius: 8px; border: 1px solid #9AE6B4; display: flex; align-items: center;"
+                ),
+                class_="step-card-box",
+                style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+            )
+
+        # JIKA ADA DATA: Tampilkan uploader dan hasil analisis normal
         step4_results = ui.div()
         if state.cca_step4_done():
             step4_results = ui.div(
@@ -1453,96 +1471,50 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
         )
 
-    # Tombol Step 4 Cycle Count (Otomatis Aktif jika Memang Tidak Ada Real+ Recon)
+    # --- STEP 5 CYCLE COUNT ---
     @render.ui
-    def cca_step4_btn_ui():
-        f = input.cca_up_recon_real() if "cca_up_recon_real" in input else None
-        if state._raw_df_cca_rec_real.empty or (f and len(f) > 0):
-            lbl = "RUN RECON ANALYSIS" if not state._raw_df_cca_rec_real.empty else "LANJUT (TIDAK ADA REAL + RECON)"
+    def cca_step5_card_ui():
+        if not state.cca_step2_done() or not state.cca_step4_done():
+            return ui.div()
+
+        # JIKA DATA KOSONG: Tampilkan kartu konfirmasi hijau ringkas
+        if state._raw_df_cca_rec_sys.empty:
             return ui.div(
-                ui.tags.button(
-                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), lbl),
-                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_cca_step4', Math.random(), {priority: 'event'});",
-                    class_="btn-red-gradient"
-                ), style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+                ui.h4("4️⃣ RECON SYSTEM + (SET UP KARANTINA)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
+                ui.div(
+                    ui.tags.i(class_="fa-solid fa-circle-check", style="color: #22543D; font-size: 18px; margin-right: 8px;"),
+                    ui.span("Tidak ada item System + Outstanding (0 Selisih). Tidak ada stok yang perlu dimutasi ke Karantina. Langkah karantina selesai otomatis.", style="font-weight: 600; font-size: 13px;"),
+                    style="background: #C6F6D5; color: #22543D; padding: 0.85rem 1.25rem; border-radius: 8px; border: 1px solid #9AE6B4; display: flex; align-items: center;"
+                ),
+                class_="step-card-box",
+                style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
             )
-        return ui.div(ui.tags.button("UPLOAD HASIL RECON REAL + UNTUK ANALISIS", disabled=True, class_="btn-locked"), style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;")
-# LISTENER STEP 4 CYCLE COUNT (SEBELUMNYA HILANG)
-    @reactive.Effect
-    @reactive.event(input.btn_run_cca_step4)
-    def _proc_cca_step4():
-        f = input.cca_up_recon_real() if "cca_up_recon_real" in input else None
-        succ, msg = state.run_cca_step4(f)
-        if succ:
-            state.show_success_modal.set(True)
-        else:
-            state.error_modal_message.set(msg)
-            state.show_error_modal.set(True)
-    # Tombol Step 5 Cycle Count (Otomatis Aktif jika Memang Tidak Ada System+ Outstanding)
-    @render.ui
-    def cca_step5_btn_ui():
-        f = input.cca_up_recon_sys() if "cca_up_recon_sys" in input else None
-        if state._raw_df_cca_rec_sys.empty or (f and len(f) > 0):
-            lbl = "GENERATE KARANTINA" if not state._raw_df_cca_rec_sys.empty else "LANJUT (TIDAK ADA SYSTEM + RECON)"
-            return ui.div(
-                ui.tags.button(
-                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), lbl),
-                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_cca_step5', Math.random(), {priority: 'event'});",
-                    class_="btn-red-gradient"
-                ), style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
-            )
-        return ui.div(ui.tags.button("UPLOAD SYSTEM + RECON UNTUK GENERATE", disabled=True, class_="btn-locked"), style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;")
 
-    @reactive.Effect
-    @reactive.event(input.btn_run_cca_step5)
-    def _proc_cca_step5():
-        f = input.cca_up_recon_sys()
-        succ, msg = state.run_cca_step5(f)
-        if succ: state.show_success_modal.set(True)
-        else:
-            state.error_modal_message.set(msg)
-            state.show_error_modal.set(True)
-
-    @render.download(filename="Karantina.xlsx")
-    def btn_dl_cca_karantina():
-        buf = io.BytesIO()
-        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-            state._raw_df_cca_karantina.to_excel(writer, sheet_name='Karantina', index=False)
-            state._raw_df_cca_check5.to_excel(writer, sheet_name='Data_Pengecekan_Audit', index=False)
-        buf.seek(0)
-        yield buf.getvalue()
-
-    # --- KARTU MANDIRI STEP 6 ---
-    @render.ui
-    def cca_step6_card_ui():
-        if not state.cca_step5_done(): return ui.div()
-        step6_results = ui.div()
-        if state.cca_step6_done():
-            step6_results = ui.div(
+        # JIKA ADA DATA: Tampilkan uploader karantina normal
+        step5_results = ui.div()
+        if state.cca_step5_done():
+            step5_results = ui.div(
                 ui.hr(style="margin: 1rem 0; border-color: #E2E8F0;"),
                 ui.div(
-                    dark_metric_box("📦 TOTAL SKU MISS LOC.", f"{state.cca_sku_miss_loc():,} ITEM", "#E53E3E"),
-                    dark_metric_box("🔢 TOTAL QTY MISS LOC.", f"{state.cca_qty_miss_loc():,} ITEM", "#E53E3E"),
+                    dark_metric_box("☣️ QTY TO KARANTINA", f"{state.cca_qty_karantina():,} QTY", "#ECC94B"),
+                    dark_metric_box("🏷️ SKU TO KARANTINA", f"{state.cca_sku_karantina():,} SKU", "#ECC94B"),
                     style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
                 ),
                 ui.div(
-                    ui.download_button("btn_dl_cca_miss_loc", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD MISS LOC REPORT (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"),
+                    ui.download_button("btn_dl_cca_karantina", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD HASIL KARANTINA (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"),
                     style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
                 ),
                 ui.navset_card_tab(
-                    ui.nav_panel("📄 Detail List", ui.div(render_clean_table(state.df_cca_miss_loc_headers(), state.df_cca_miss_loc_rows(), "tbl_cca_miss_loc"), style="padding: 0.75rem 0;")),
-                    ui.nav_panel("📊 Summary", ui.div(render_clean_table(state.df_cca_sum_miss_headers(), state.df_cca_sum_miss_rows(), "tbl_cca_sum_miss"), style="padding: 0.75rem 0;"))
+                    ui.nav_panel("📦 HASIL KARANTINA", ui.div(render_clean_table(state.df_cca_karantina_headers(), state.df_cca_karantina_rows(), "tbl_cca_karantina"), style="padding: 0.75rem 0;")),
+                    ui.nav_panel("🔍 DATA PENGECEKAN (AUDIT)", ui.div(render_clean_table(state.df_cca_check5_headers(), state.df_cca_check5_rows(), "tbl_cca_check5"), style="padding: 0.75rem 0;"))
                 )
             )
 
         return ui.div(
-            ui.h4("5️⃣ MISS LOCATION REPORT", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
-            ui.tags.button(
-                ui.tags.span(ui.tags.i(class_="fa-solid fa-chart-pie", style="margin-right: 6px; font-size: 14px;"), "GENERATE MISS LOC REPORT"),
-                onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_cca_step6', Math.random(), {priority: 'event'});",
-                class_="btn-red-gradient"
-            ),
-            step6_results,
+            ui.h4("4️⃣ RECON SYSTEM + (SET UP KARANTINA)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+            custom_uploader_box("cca_up_recon_sys", "📥 Upload SYSTEM + RECON"),
+            ui.output_ui("cca_step5_btn_ui"),
+            step5_results,
             class_="step-card-box",
             style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
         )
@@ -2012,67 +1984,37 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         yield buf.getvalue()
 
-    # --- STEP 4: FINAL ADJUSTMENT + PROCESS ---
+    # ==========================================================================
+    # STOCK OPNAME CONTROLLER (STEP 4, 5, & 6)
+    # ==========================================================================
+    # --- STEP 4 STOCK OPNAME ---
     @render.ui
     def so_step4_card_ui():
         if not state.so_step2_done(): return ui.div()
+
+        # JIKA DATA KOSONG: Tampilkan kartu hijau ringkas
+        if state._raw_df_so_rec_real.empty:
+            return ui.div(
+                ui.h4("3️⃣ Final Adjustment + Process", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
+                ui.div(
+                    ui.tags.i(class_="fa-solid fa-circle-check", style="color: #22543D; font-size: 18px; margin-right: 8px;"),
+                    ui.span("Semua item Real + telah ter-cover penuh oleh System + dan BIN Coverage (0 Selisih). Langkah penyesuaian plus selesai otomatis.", style="font-weight: 600; font-size: 13px;"),
+                    style="background: #C6F6D5; color: #22543D; padding: 0.85rem 1.25rem; border-radius: 8px; border: 1px solid #9AE6B4; display: flex; align-items: center;"
+                ),
+                style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+            )
+
+        # JIKA ADA DATA: Tampilkan 3 uploader dan hasil tab normal
         step4_results = ui.div()
         if state.so_step4_done():
-            # Setup real content
-            if state.so_step4_setup_done():
-                setup_content = ui.div(
-                    ui.div(
-                        ui.download_button("btn_dl_so_setup4", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 13px;"), "Download Set Up Real + (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 6px 12px; cursor: pointer; font-size: 13px;"),
-                        style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.5rem;"
-                    ),
-                    render_clean_table(state.df_so_setup4_headers(), state.df_so_setup4_rows(), "tbl_so_setup4")
-                )
-            else:
-                setup_content = ui.div(
-                    ui.p("➡️ Klik tombol di bawah untuk membuat relokasi mutasi ke STAGING INBOUND:", style="color: #4A5568; font-weight: 600; margin-bottom: 0.75rem;"),
-                    ui.tags.button(
-                        ui.tags.span(ui.tags.i(class_="fa-solid fa-arrows-split-up-and-left", style="margin-right: 6px; font-size: 14px;"), "GENERATE SET UP REAL +"),
-                        onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_so_step4_setup', Math.random(), {priority: 'event'});",
-                        class_="btn-red-gradient"
-                    )
-                )
-
             step4_results = ui.div(
                 ui.hr(style="margin: 1rem 0; border-color: #E2E8F0;"),
                 ui.navset_card_tab(
-                    ui.nav_panel(
-                        "📦 MULTIPLE ADJ +",
-                        ui.div(
-                            ui.div(ui.download_button("btn_dl_so_mult", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 13px;"), "Download Multiple Adj + (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 6px 12px; cursor: pointer; font-size: 13px;"), style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.5rem;"),
-                            render_clean_table(state.df_so_mult_headers(), state.df_so_mult_rows(), "tbl_so_mult"),
-                            style="padding: 0.75rem 0;"
-                        )
-                    ),
-                    ui.nav_panel(
-                        "⚠️ SINGLE ADJ +",
-                        ui.div(
-                            ui.div(ui.download_button("btn_dl_so_sing", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 13px;"), "Download Single Adj + (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 6px 12px; cursor: pointer; font-size: 13px;"), style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.5rem;"),
-                            render_clean_table(state.df_so_sing_headers(), state.df_so_sing_rows(), "tbl_so_sing"),
-                            style="padding: 0.75rem 0;"
-                        )
-                    ),
-                    ui.nav_panel(
-                        "🔍 CEK ADJ + RESULT",
-                        ui.div(
-                            ui.div(ui.download_button("btn_dl_so_res4", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 13px;"), "Download Hasil Cek Adj + (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 6px 12px; cursor: pointer; font-size: 13px;"), style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.5rem;"),
-                            render_clean_table(state.df_so_res4_headers(), state.df_so_res4_rows(), "tbl_so_res4"),
-                            style="padding: 0.75rem 0;"
-                        )
-                    ),
-                    ui.nav_panel("➡️ SET UP REAL +", ui.div(setup_content, style="padding: 0.75rem 0;")),
-                    ui.nav_panel(
-                        "❌ Miss Lookup SKU on BIN",
-                        ui.div(
-                            ui.div(ui.download_button("btn_dl_so_miss4", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 13px;"), "Download Missing Items (.xlsx)"), style="background-color: #E50914; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 6px 12px; cursor: pointer; font-size: 13px;"), style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.5rem;"),
-                            render_clean_table(state.df_so_miss4_headers(), state.df_so_miss4_rows(), "tbl_so_miss4"),
-                            style="padding: 0.75rem 0;"
-                        )
-                    )
+                    ui.nav_panel("📦 MULTIPLE ADJ +", ui.div(ui.div(ui.download_button("btn_dl_so_mult", "Download Multiple Adj + (.xlsx)", class_="btn-download-green"), style="display: flex; justify-content: flex-end; margin-bottom: 0.5rem;"), render_clean_table(state.df_so_mult_headers(), state.df_so_mult_rows(), "tbl_so_mult"))),
+                    ui.nav_panel("⚠️ SINGLE ADJ +", ui.div(ui.div(ui.download_button("btn_dl_so_sing", "Download Single Adj + (.xlsx)", class_="btn-download-green"), style="display: flex; justify-content: flex-end; margin-bottom: 0.5rem;"), render_clean_table(state.df_so_sing_headers(), state.df_so_sing_rows(), "tbl_so_sing"))),
+                    ui.nav_panel("🔍 CEK ADJ + RESULT", ui.div(ui.div(ui.download_button("btn_dl_so_res4", "Download Hasil Cek Adj + (.xlsx)", class_="btn-download-green"), style="display: flex; justify-content: flex-end; margin-bottom: 0.5rem;"), render_clean_table(state.df_so_res4_headers(), state.df_so_res4_rows(), "tbl_so_res4"))),
+                    ui.nav_panel("➡️ SET UP REAL +", ui.div(ui.div(ui.download_button("btn_dl_so_setup4", "Download Set Up Real + (.xlsx)", class_="btn-download-green"), style="display: flex; justify-content: flex-end; margin-bottom: 0.5rem;"), render_clean_table(state.df_so_setup4_headers(), state.df_so_setup4_rows(), "tbl_so_setup4"))),
+                    ui.nav_panel("❌ Miss Lookup SKU on BIN", ui.div(ui.div(ui.download_button("btn_dl_so_miss4", "Download Missing Items (.xlsx)", class_="btn-download-red"), style="display: flex; justify-content: flex-end; margin-bottom: 0.5rem;"), render_clean_table(state.df_so_miss4_headers(), state.df_so_miss4_rows(), "tbl_so_miss4")))
                 )
             )
 
@@ -2096,84 +2038,25 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
         )
 
-    @reactive.Effect
-    @reactive.event(input.btn_run_so_step4)
-    def _proc_so_step4():
-        f1 = input.so_up_r4() if "so_up_r4" in input else None
-        f2, f3 = input.so_up_s4(), input.so_up_m5()
-
-        # Jika memang ada item Real+ Recon yang harus dicek, maka f1 wajib ada
-        if not state._raw_df_so_rec_real.empty and not f1:
-            state.error_modal_message.set("Upload sheet REAL + RECON terlebih dahulu!")
-            state.show_error_modal.set(True)
-            return
-
-        # File Cek Stock Adj+ dan Staging Inbound tetap wajib ada
-        if not f2 or not f3:
-            state.error_modal_message.set("File Cek Stock Adj (+) dan Staging Inbound wajib diupload!")
-            state.show_error_modal.set(True)
-            return
-
-        succ, msg = state.run_so_step4(f1, f2, f3)
-        if succ:
-            state.show_success_modal.set(True)
-        else:
-            state.error_modal_message.set(msg)
-            state.show_error_modal.set(True)
-
-    @reactive.Effect
-    @reactive.event(input.btn_run_so_step4_setup)
-    def _proc_so_step4_setup():
-        succ, msg = state.run_so_step4_setup_real()
-        if succ: state.show_success_modal.set(True)
-        else:
-            state.error_modal_message.set(msg)
-            state.show_error_modal.set(True)
-
-    @render.download(filename="final_adj_multiple.xlsx")
-    def btn_dl_so_mult():
-        buf = io.BytesIO()
-        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-            state._raw_df_so_mult.to_excel(writer, sheet_name='MULTIPLE_ADJ_PLUS', index=False)
-        buf.seek(0)
-        yield buf.getvalue()
-
-    @render.download(filename="final_adj_single.xlsx")
-    def btn_dl_so_sing():
-        buf = io.BytesIO()
-        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-            state._raw_df_so_sing.to_excel(writer, sheet_name='SINGLE_ADJ_PLUS', index=False)
-        buf.seek(0)
-        yield buf.getvalue()
-
-    @render.download(filename="hasil_lookup_full.xlsx")
-    def btn_dl_so_res4():
-        buf = io.BytesIO()
-        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-            state._raw_df_so_res4.to_excel(writer, sheet_name='CEK_ADJ_RESULT', index=False)
-        buf.seek(0)
-        yield buf.getvalue()
-
-    @render.download(filename="set_up_real_plus.xlsx")
-    def btn_dl_so_setup4():
-        buf = io.BytesIO()
-        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-            state._raw_df_so_setup4.to_excel(writer, sheet_name='SET_UP_REAL_PLUS', index=False)
-        buf.seek(0)
-        yield buf.getvalue()
-
-    @render.download(filename="missing_items_recon.xlsx")
-    def btn_dl_so_miss4():
-        buf = io.BytesIO()
-        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-            state._raw_df_so_miss4.to_excel(writer, sheet_name='MISSING_ITEMS', index=False)
-        buf.seek(0)
-        yield buf.getvalue()
-
-    # --- STEP 5: RECON SYSTEM + (SET UP KARANTINA) ---
+    # --- STEP 5 STOCK OPNAME ---
     @render.ui
     def so_step5_card_ui():
-        if not state.so_step4_done(): return ui.div()
+        if not state.so_step2_done() or not state.so_step4_done():
+            return ui.div()
+
+        # JIKA DATA KOSONG: Tampilkan kartu hijau ringkas
+        if state._raw_df_so_rec_sys.empty:
+            return ui.div(
+                ui.h4("4️⃣ Recon System + Process (Set Up Karantina)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
+                ui.div(
+                    ui.tags.i(class_="fa-solid fa-circle-check", style="color: #22543D; font-size: 18px; margin-right: 8px;"),
+                    ui.span("Tidak ada item System + Outstanding (0 Selisih). Tidak ada stok yang perlu dimutasi ke Karantina. Langkah karantina selesai otomatis.", style="font-weight: 600; font-size: 13px;"),
+                    style="background: #C6F6D5; color: #22543D; padding: 0.85rem 1.25rem; border-radius: 8px; border: 1px solid #9AE6B4; display: flex; align-items: center;"
+                ),
+                style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+            )
+
+        # JIKA ADA DATA: Tampilkan 2 uploader karantina normal
         step5_results = ui.div()
         if state.so_step5_done():
             step5_results = ui.div(
@@ -2218,7 +2101,6 @@ def server(input: Inputs, output: Outputs, session: Session):
         f1 = input.so_up_k6() if "so_up_k6" in input else None
         f2 = input.so_up_adj6() if "so_up_adj6" in input else None
 
-        # Jika memang tidak ada item System+ Recon dari Step 3, langsung jalankan tanpa blokir file
         if state._raw_df_so_rec_sys.empty:
             succ, msg = state.run_so_step5(None, None)
         else:
@@ -2233,20 +2115,13 @@ def server(input: Inputs, output: Outputs, session: Session):
         else:
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
-            
-    @render.download(filename="Karantina_SO.xlsx")
-    def btn_dl_so_karantina():
-        buf = io.BytesIO()
-        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-            state._raw_df_so_karantina.to_excel(writer, sheet_name='Karantina', index=False)
-            state._raw_df_so_check5.to_excel(writer, sheet_name='Data_Pengecekan_Audit', index=False)
-        buf.seek(0)
-        yield buf.getvalue()
 
-    # --- STEP 6: MISS LOCATION, SUMMARY ADJ, & MASTER REPORT ---
+    # --- STEP 6 STOCK OPNAME ---
     @render.ui
     def so_step6_card_ui():
-        if not state.so_step5_done(): return ui.div()
+        # Step 6 baru muncul jika Step 5 selesai
+        if not state.so_step2_done() or not state.so_step5_done():
+            return ui.div()
 
         # Miss Location Results
         miss_loc_results = ui.div()
