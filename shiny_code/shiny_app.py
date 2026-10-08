@@ -1481,12 +1481,14 @@ def server(input: Inputs, output: Outputs, session: Session):
             class_="step-card-box",
             style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
         )
+    # ==========================================================================
+    # CYCLE COUNT ANALYZER - STEP 5: RECON SYSTEM + & CEK ADJUSTMENT
+    # ==========================================================================
     @render.ui
     def cca_step5_card_ui():
         if not state.cca_step2_done() or not state.cca_step4_done():
             return ui.div()
 
-        # JIKA DATA KOSONG: Tampilkan kartu hijau ringkas
         if state._raw_df_cca_rec_sys.empty:
             return ui.div(
                 ui.h4("4️⃣ RECON SYSTEM + (SET UP KARANTINA)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
@@ -1499,7 +1501,6 @@ def server(input: Inputs, output: Outputs, session: Session):
                 style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
             )
 
-        # JIKA ADA DATA: Tampilkan uploader dan hasil
         step5_results = ui.div()
         if state.cca_step5_done():
             step5_results = ui.div(
@@ -1524,9 +1525,12 @@ def server(input: Inputs, output: Outputs, session: Session):
             )
 
         return ui.div(
-            ui.h4("4️⃣ RECON SYSTEM + (SET UP KARANTINA)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
-            custom_uploader_box("cca_up_recon_sys", "📥 Upload SYSTEM + RECON"),
-            # 👇 TOMBOL LANGSUNG (PASTI MUNCUL) 👇
+            ui.h4("4️⃣ Recon System + Process (Set Up Karantina & Cek Adjustment)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+            ui.div(
+                custom_uploader_box("cca_up_recon_sys", "1. Upload SYSTEM + RECON"),
+                custom_uploader_box("cca_up_adj_sys", "2. Upload STOCK CEK ADJUSMENT (-) (Opsional)"),
+                style="display: flex; gap: 1rem; width: 100%; margin-bottom: 0.5rem; flex-wrap: wrap;"
+            ),
             ui.div(
                 ui.tags.button(
                     ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "GENERATE KARANTINA"),
@@ -1543,35 +1547,90 @@ def server(input: Inputs, output: Outputs, session: Session):
     @reactive.Effect
     @reactive.event(input.btn_run_cca_step5)
     def _proc_cca_step5():
-        f = input.cca_up_recon_sys() if "cca_up_recon_sys" in input else None
-        if not f:
-            ui.insert_ui(ui.tags.script("window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
-            state.error_modal_message.set("Upload file SYSTEM + RECON terlebih dahulu!")
-            state.show_error_modal.set(True)
-            return
+        f1 = input.cca_up_recon_sys() if "cca_up_recon_sys" in input else None
+        f2 = input.cca_up_adj_sys() if "cca_up_adj_sys" in input else None
 
-        succ, msg = state.run_cca_step5(f)
+        if state._raw_df_cca_rec_sys.empty:
+            succ, msg = state.run_cca_step5(None, None)
+        else:
+            if not f1:
+                ui.insert_ui(ui.tags.script("window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+                state.error_modal_message.set("Upload file SYSTEM + RECON terlebih dahulu!")
+                state.show_error_modal.set(True)
+                return
+            succ, msg = state.run_cca_step5(f1, f2)
+
         ui.insert_ui(ui.tags.script("window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
         if succ: state.show_success_modal.set(True)
         else:
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
-            
+
+    # ==========================================================================
+    # CYCLE COUNT ANALYZER - STEP 6: MISS LOCATION REPORT LENGKAP
+    # ==========================================================================
+    @render.ui
+    def cca_step6_card_ui():
+        if not state.cca_step2_done() or not state.cca_step5_done():
+            return ui.div()
+
+        step6_results = ui.div()
+        if state.cca_step6_done():
+            step6_results = ui.div(
+                ui.hr(style="margin: 1rem 0; border-color: #E2E8F0;"),
+                ui.div(
+                    dark_metric_box("📦 TOTAL SKU MISS LOC.", f"{state.cca_sku_miss_loc():,} ITEM", "#3182CE"),
+                    dark_metric_box("🔢 TOTAL QTY MISS LOC.", f"{state.cca_qty_miss_loc():,} ITEM", "#E53E3E"),
+                    dark_metric_box("☣️ QTY KE KARANTINA", f"{state.cca_qty_karantina():,} ITEM", "#ECC94B"),
+                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
+                ),
+                ui.div(
+                    ui.download_button(
+                        "btn_dl_cca_miss_loc", 
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD MISS LOC REPORT FULL (.xlsx)"), 
+                        style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
+                    ),
+                    style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
+                ),
+                ui.navset_card_tab(
+                    ui.nav_panel("📄 Salah Letak (Rak ke Rak)", ui.div(render_clean_table(state.df_cca_miss_loc_headers(), state.df_cca_miss_loc_rows(), "tbl_cca_miss_loc"), style="padding: 0.75rem 0;")),
+                    ui.nav_panel("☣️ Miss Loc ke Karantina", ui.div(render_clean_table(state.df_cca_karantina_headers(), state.df_cca_karantina_rows(), "tbl_cca_karan_loc"), style="padding: 0.75rem 0;")),
+                    ui.nav_panel("📊 Summary Rekapitulasi", ui.div(render_clean_table(state.df_cca_sum_miss_headers(), state.df_cca_sum_miss_rows(), "tbl_cca_sum_miss"), style="padding: 0.75rem 0;"))
+                )
+            )
+
+        return ui.div(
+            ui.h4("5️⃣ MISS LOCATION REPORT", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+            ui.div(
+                ui.tags.button(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-chart-pie", style="margin-right: 6px; font-size: 14px;"), "GENERATE MISS LOC REPORT"),
+                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_run_cca_step6', Math.random(), {priority: 'event'});",
+                    class_="btn-red-gradient"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+            ),
+            step6_results,
+            class_="step-card-box",
+            style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+        )
+
     @reactive.Effect
     @reactive.event(input.btn_run_cca_step6)
     def _proc_cca_step6():
         succ, msg = state.run_cca_step6()
+        ui.insert_ui(ui.tags.script("window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
         if succ: state.show_success_modal.set(True)
         else:
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
 
-    @render.download(filename="Miss_Location_Report.xlsx")
+    @render.download(filename="Miss_Location_Report_Cycle_Count.xlsx")
     def btn_dl_cca_miss_loc():
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-            state._raw_df_cca_miss_loc.to_excel(writer, sheet_name='DETAIL_MISS_LOC', index=False)
-            state._raw_df_cca_sum_miss.to_excel(writer, sheet_name='SUMMARY', index=False)
+            state._raw_df_cca_miss_loc.to_excel(writer, sheet_name='MISS_LOC_RAK_KE_RAK', index=False)
+            state._raw_df_cca_karantina.to_excel(writer, sheet_name='MISS_LOC_KE_KARANTINA', index=False)
+            state._raw_df_cca_sum_miss.to_excel(writer, sheet_name='SUMMARY_MISS_LOCATION', index=False)
         buf.seek(0)
         yield buf.getvalue()
 

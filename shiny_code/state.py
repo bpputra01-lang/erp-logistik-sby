@@ -1689,13 +1689,13 @@ class AppState:
         except Exception as e:
             return False, f"Gagal Step 4: {e}"
 
-    # --- CCA STEP 5: RECON SYSTEM + (ANTI ERROR BILA KOSONG) ---
-    def run_cca_step5(self, f_recon_sys=None):
+    # --- CCA STEP 5: RECON SYSTEM + (DENGAN LOGIC CEK ADJUSTMENT) ---
+    def run_cca_step5(self, f_recon_sys=None, f_adj_sys=None):
         try:
             # Jika dari Step 3 memang tidak ada outstanding
             if self._raw_df_cca_rec_sys.empty or len(self._raw_df_cca_rec_sys) == 0:
-                df_karantina = pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
-                df_check = pd.DataFrame(columns=['BIN', 'SKU', 'QTY_SYSTEM_J', 'QTY_RECON_N', 'SELISIH'])
+                df_karantina = pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'ITEM NAME', 'QUANTITY', 'NOTES'])
+                df_check = pd.DataFrame(columns=['BIN', 'SKU', 'ITEM NAME', 'QTY_SYSTEM_J', 'QTY_RECON_N', 'SELISIH'])
                 self.cca_qty_karantina.set(0)
                 self.cca_sku_karantina.set(0)
                 self._raw_df_cca_karantina = df_karantina.copy()
@@ -1707,10 +1707,12 @@ class AppState:
                 self.cca_step5_done.set(True)
                 return True, "Tidak ada data System + yang perlu dikarantina."
 
-            df_raw6 = load_data_from_info(f_recon_sys) if f_recon_sys else pd.DataFrame()
-            if df_raw6.empty or len(df_raw6) == 0:
-                df_karantina = pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
-                df_check = pd.DataFrame(columns=['BIN', 'SKU', 'QTY_SYSTEM_J', 'QTY_RECON_N', 'SELISIH'])
+            df_outstanding = load_data_from_info(f_recon_sys) if f_recon_sys else pd.DataFrame()
+            df_recon_adj = load_data_from_info(f_adj_sys) if f_adj_sys else pd.DataFrame()
+
+            if df_outstanding.empty or len(df_outstanding) == 0:
+                df_karantina = pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'ITEM NAME', 'QUANTITY', 'NOTES'])
+                df_check = pd.DataFrame(columns=['BIN', 'SKU', 'ITEM NAME', 'QTY_SYSTEM_J', 'QTY_RECON_N', 'SELISIH'])
                 self.cca_qty_karantina.set(0)
                 self.cca_sku_karantina.set(0)
                 self._raw_df_cca_karantina = df_karantina.copy()
@@ -1722,29 +1724,80 @@ class AppState:
                 self.cca_step5_done.set(True)
                 return True, "File System + Recon kosong / tidak ada selisih."
 
-            df_raw6.columns = df_raw6.columns.astype(str).str.strip().str.upper()
+            def clean_val(x):
+                if pd.isna(x): return ""
+                s = str(x).strip().upper()
+                if s.startswith("SPE"): s = s[3:].strip()
+                if s.endswith('.0'): s = s[:-2]
+                return s
+
             audit_results, karantina_results = [], []
 
-            for _, row in df_raw6.iterrows():
-                try:
-                    bin_raw, sku_raw = row.get('BIN'), row.get('SKU')
-                    if pd.isna(bin_raw) and pd.isna(sku_raw): continue
-                    bin_val = str(bin_raw).strip().upper()
-                    sku_val = str(sku_raw).strip().upper()
-                    if bin_val.endswith('.0'): bin_val = bin_val[:-2]
-                    if sku_val.endswith('.0'): sku_val = sku_val[:-2]
+            # 1. Mode Dual File (Ada File Cek Adjustment Kedua)
+            if not df_recon_adj.empty:
+                sys_map = {}
+                for _, row in df_recon_adj.iterrows():
+                    try:
+                        k_sys = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}"
+                        val_sys = pd.to_numeric(row.iloc[9], errors='coerce')
+                        sys_map[k_sys] = val_sys if not pd.isna(val_sys) else 0
+                    except: continue
 
-                    q_sys_num = pd.to_numeric(row.get('QTY SYSTEM', '0'), errors='coerce') or 0
-                    q_rec_num = pd.to_numeric(row.get('HASIL REKONSILIASI', '0'), errors='coerce') or 0
-                    diff = q_sys_num - q_rec_num
+                recon_map = {}
+                for _, row in df_outstanding.iterrows():
+                    try:
+                        k_rec = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}"
+                        val_rec = pd.to_numeric(row.iloc[13], errors='coerce') if df_outstanding.shape[1] > 13 else pd.to_numeric(row.iloc[-1], errors='coerce')
+                        recon_map[k_rec] = val_rec if not pd.isna(val_rec) else 0
+                    except: continue
+
+                for _, row in df_outstanding.iterrows():
+                    bin_val = clean_val(row.iloc[1])
+                    sku_val = clean_val(row.iloc[2])
+                    key = f"{bin_val}|{sku_val}"
+                    q_sys = sys_map.get(key, 0)
+                    q_rec = recon_map.get(key, 0)
+                    diff = q_sys - q_rec
+                    item_name = self._cca_map_dict.get(sku_val, "-")
 
                     if diff != 0:
-                        audit_results.append({'BIN': bin_val, 'SKU': sku_val, 'QTY_SYSTEM_J': q_sys_num, 'QTY_RECON_N': q_rec_num, 'SELISIH': diff})
-                        karantina_results.append({"BIN AWAL": bin_val, "BIN TUJUAN": "KARANTINA", "SKU": sku_val, "QUANTITY": int(abs(diff)), "NOTES": "MISS LOCATION"})
-                except: continue
+                        audit_results.append({
+                            'BIN': bin_val, 'SKU': sku_val, 'ITEM NAME': item_name,
+                            'QTY_SYSTEM_J': int(q_sys), 'QTY_RECON_N': int(q_rec), 'SELISIH': int(diff)
+                        })
+                        if diff > 0:
+                            karantina_results.append({
+                                "BIN AWAL": bin_val, "BIN TUJUAN": "KARANTINA", "SKU": sku_val,
+                                "ITEM NAME": item_name, "QUANTITY": int(diff), "NOTES": "MISS LOCATION"
+                            })
+            else:
+                # 2. Mode Single File (Fallback pembacaan langsung dari file recon)
+                df_outstanding.columns = df_outstanding.columns.astype(str).str.strip().str.upper()
+                for _, row in df_outstanding.iterrows():
+                    try:
+                        bin_val = clean_val(row.get('BIN'))
+                        sku_val = clean_val(row.get('SKU'))
+                        if not bin_val and not sku_val: continue
 
-            df_karantina = pd.DataFrame(karantina_results) if karantina_results else pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
-            df_check = pd.DataFrame(audit_results) if audit_results else pd.DataFrame(columns=['BIN', 'SKU', 'QTY_SYSTEM_J', 'QTY_RECON_N', 'SELISIH'])
+                        q_sys_num = pd.to_numeric(row.get('QTY SYSTEM', '0'), errors='coerce') or 0
+                        q_rec_num = pd.to_numeric(row.get('HASIL REKONSILIASI', '0'), errors='coerce') or 0
+                        diff = q_sys_num - q_rec_num
+                        item_name = self._cca_map_dict.get(sku_val, "-")
+
+                        if diff != 0:
+                            audit_results.append({
+                                'BIN': bin_val, 'SKU': sku_val, 'ITEM NAME': item_name,
+                                'QTY_SYSTEM_J': int(q_sys_num), 'QTY_RECON_N': int(q_rec_num), 'SELISIH': int(diff)
+                            })
+                            if diff > 0:
+                                karantina_results.append({
+                                    "BIN AWAL": bin_val, "BIN TUJUAN": "KARANTINA", "SKU": sku_val,
+                                    "ITEM NAME": item_name, "QUANTITY": int(abs(diff)), "NOTES": "MISS LOCATION"
+                                })
+                    except: continue
+
+            df_karantina = pd.DataFrame(karantina_results) if karantina_results else pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'ITEM NAME', 'QUANTITY', 'NOTES'])
+            df_check = pd.DataFrame(audit_results) if audit_results else pd.DataFrame(columns=['BIN', 'SKU', 'ITEM NAME', 'QTY_SYSTEM_J', 'QTY_RECON_N', 'SELISIH'])
 
             self.cca_qty_karantina.set(int(df_karantina['QUANTITY'].sum()) if not df_karantina.empty and 'QUANTITY' in df_karantina.columns else 0)
             self.cca_sku_karantina.set(df_karantina['SKU'].nunique() if not df_karantina.empty and 'SKU' in df_karantina.columns else 0)
@@ -1761,27 +1814,62 @@ class AppState:
         except Exception as e:
             return False, f"Gagal Step 5: {e}"
 
-    # --- CCA STEP 6: MISS LOCATION REPORT (ANTI ERROR BILA KOSONG) ---
+    # --- CCA STEP 6: MISS LOCATION REPORT LENGKAP ---
     def run_cca_step6(self):
         try:
-            columns_ref = ["BIN SYSTEM +", "BIN REAL +", "SKU", "QTY MISS LOC."]
+            columns_ref = ["BIN SYSTEM (AWAL)", "BIN REAL (TUJUAN)", "SKU", "ITEM NAME", "QTY MISS LOC.", "NOTES"]
+
+            # 1. Miss Location dari Alokasi Rak ke Rak (Step 2 Setup Real +)
             if self._raw_df_cca_setup_real.empty or len(self._raw_df_cca_setup_real) == 0:
                 df_out = pd.DataFrame(columns=columns_ref)
-                df_sum = pd.DataFrame({"METRIC": ["Total SKU Miss Loc", "Total Qty Miss Loc"], "VALUE": [0, 0]})
-                self.cca_sku_miss_loc.set(0)
-                self.cca_qty_miss_loc.set(0)
+                count_sku_rak = 0
+                count_qty_rak = 0
             else:
-                df_out = self._raw_df_cca_setup_real.iloc[:, 0:4].copy()
-                df_out.columns = columns_ref
-                df_out["QTY MISS LOC."] = pd.to_numeric(df_out["QTY MISS LOC."], errors='coerce').fillna(0)
-                count_sku = df_out["SKU"].nunique()
-                count_qty = int(df_out["QTY MISS LOC."].sum())
-                df_sum = pd.DataFrame({"METRIC": ["Total SKU Miss Loc", "Total Qty Miss Loc"], "VALUE": [count_sku, count_qty]})
-                self.cca_sku_miss_loc.set(count_sku)
-                self.cca_qty_miss_loc.set(count_qty)
+                df_out = self._raw_df_cca_setup_real.copy()
+                if 'ITEM NAME' not in df_out.columns:
+                    df_out['ITEM NAME'] = df_out['SKU'].astype(str).str.strip().str.upper().map(self._cca_map_dict).fillna("-")
+
+                rename_map = {
+                    "BIN AWAL": "BIN SYSTEM (AWAL)",
+                    "BIN TUJUAN": "BIN REAL (TUJUAN)",
+                    "QUANTITY": "QTY MISS LOC."
+                }
+                df_out = df_out.rename(columns=rename_map)
+                cols_order = [c for c in columns_ref if c in df_out.columns]
+                df_out = df_out[cols_order].copy()
+                df_out["QTY MISS LOC."] = pd.to_numeric(df_out["QTY MISS LOC."], errors='coerce').fillna(0).astype(int)
+                count_sku_rak = df_out["SKU"].nunique()
+                count_qty_rak = int(df_out["QTY MISS LOC."].sum())
+
+            # 2. Miss Location ke Karantina (Step 5)
+            df_karan = self._raw_df_cca_karantina.copy() if not self._raw_df_cca_karantina.empty else pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'ITEM NAME', 'QUANTITY', 'NOTES'])
+            count_qty_karan = int(df_karan["QUANTITY"].sum()) if not df_karan.empty and 'QUANTITY' in df_karan.columns else 0
+
+            # 3. Summary Gabungan
+            total_unique_skus = len(set(df_out['SKU'].dropna().unique()) | set(df_karan['SKU'].dropna().unique()))
+            total_qty_miss_all = count_qty_rak + count_qty_karan
+
+            df_sum = pd.DataFrame({
+                "METRIC": [
+                    "Total SKU Miss Location (Semua)",
+                    "Total QTY Miss Location (Rak ke Rak)",
+                    "Total QTY Miss Location (ke Karantina)",
+                    "Grand Total QTY Miss Location"
+                ],
+                "VALUE": [
+                    total_unique_skus,
+                    count_qty_rak,
+                    count_qty_karan,
+                    total_qty_miss_all
+                ]
+            })
+
+            self.cca_sku_miss_loc.set(total_unique_skus)
+            self.cca_qty_miss_loc.set(total_qty_miss_all)
 
             self._raw_df_cca_miss_loc = df_out.copy()
             self._raw_df_cca_sum_miss = df_sum.copy()
+
             self.df_cca_miss_loc_headers.set(df_out.columns.tolist())
             self.df_cca_miss_loc_rows.set(df_out.fillna("").astype(str).values.tolist())
             self.df_cca_sum_miss_headers.set(df_sum.columns.tolist())
@@ -1791,7 +1879,6 @@ class AppState:
             return True, "Miss Location Report Berhasil Dibuat!"
         except Exception as e:
             return False, f"Gagal Step 6: {e}"
-
 # ==========================================================================
     # COMPARE RTO ALGORITHMS (PORTED FROM STREAMLIT)
     # ==========================================================================
