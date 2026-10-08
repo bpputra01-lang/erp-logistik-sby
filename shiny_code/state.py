@@ -1643,7 +1643,8 @@ class AppState:
                 self.cca_step5_done.set(False)
 
             return True, "Allocation Step 2 & Recon Step 3 Selesai!"
-            
+        except Exception as e:
+            return False, f"Gagal Allocation Step 2: {e}"
     # --- CCA STEP 4: RECON REAL + ANALYSIS (ANTI ERROR BILA KOSONG) ---
     def run_cca_step4(self, f_recon_real=None):
         try:
@@ -2107,15 +2108,17 @@ class AppState:
     def run_so_step1(self, f_scan, f_stock, sub_sel, bin_sys_sel):
         try:
             import re
+
+            # Reset state step berikutnya jika re-run Step 1
             self.so_step2_done.set(False)
             self.so_step4_done.set(False)
             self.so_step4_setup_done.set(False)
             self.so_step5_done.set(False)
             self.so_step6a_done.set(False)
             self.so_step6b_done.set(False)
+
             df_s_raw = load_data_from_info(f_scan)
             df_t_raw = load_data_from_info(f_stock)
-
             if df_s_raw.empty or df_t_raw.empty:
                 return False, "File Data Scan dan Stock System tidak boleh kosong!"
 
@@ -2124,7 +2127,6 @@ class AppState:
                 if pd.isna(val) or val is None:
                     return ""
                 s = str(val).strip().upper()
-                # Tangani float bawaan excel jika tidak sengaja terbaca .0 di akhir
                 if s.endswith('.0') and s[:-2].replace('.', '', 1).isdigit():
                     if isinstance(val, (float, int)) or (isinstance(val, str) and val.endswith('.0')):
                         s = s[:-2]
@@ -2132,7 +2134,6 @@ class AppState:
 
             # Helper strip leading zero HANYA untuk kunci pencocokan (lookup key)
             def get_base_numeric_key(s):
-                # Tangani angka bulat atau angka berkoma (misal 42.5)
                 if re.match(r'^\d+(\.\d+)?$', s):
                     if '.' in s:
                         depan, belakang = s.split('.', 1)
@@ -2159,8 +2160,6 @@ class AppState:
             # Master SKU resmi dari Stock System
             system_skus_set = set(dt[col_s].unique())
             
-            # Map: {base_key: SKU_RESMI_SISTEM}
-            # Contoh: {"1023232": "01023232", "110212142.5": "0110212142.5"}
             base_to_system_sku = {}
             for s_sys in system_skus_set:
                 if s_sys:
@@ -2174,19 +2173,14 @@ class AppState:
             ds['SKU'] = ds['SKU'].apply(clean_str)
             ds['QTY_SCAN'] = pd.to_numeric(ds['QTY_SCAN'], errors='coerce').fillna(0)
 
-            # Fungsi cerdas menyesuaikan SKU Scan agar sama persis dengan Stock System
             def align_scan_sku_to_stock(scan_sku):
-                # A. Jika sudah cocok persis dengan SKU di sistem
                 if scan_sku in system_skus_set:
                     return scan_sku
-                # B. Jika di sistem ada SKU berawalan '0' (misal scan 1023232 -> stock 01023232)
                 base_k = get_base_numeric_key(scan_sku)
                 if base_k in base_to_system_sku:
                     return base_to_system_sku[base_k]
-                # C. Jika memang barang baru / tidak ada di sistem
                 return scan_sku
 
-            # Terapkan penyesuaian: SKU scan otomatis bertambah angka 0 jika di stock ada nolnya
             ds['SKU'] = ds['SKU'].apply(align_scan_sku_to_stock)
 
             # 3. Aggregasi Stock System
@@ -2194,7 +2188,6 @@ class AppState:
             dt_sub.columns = ['BIN', 'SKU', 'QTY_SYSTEM']
             dt_grouped = dt_sub.groupby(['BIN', 'SKU'], as_index=False)['QTY_SYSTEM'].sum()
 
-            # Mapping Nama Item (Menggunakan SKU resmi sistem)
             item_map = dt[[col_s, dt.columns[4]]].dropna().astype(str)
             item_map.columns = ['SKU', 'NAME']
             item_map['SKU'] = item_map['SKU'].str.strip().str.upper()
@@ -2204,7 +2197,6 @@ class AppState:
             res_scan = ds.merge(dt_grouped, on=['BIN', 'SKU'], how='left').fillna(0)
             res_scan['DIFF'] = res_scan['QTY_SCAN'] - res_scan['QTY_SYSTEM']
 
-            # Labeling Note (HURUF BESAR SEMUA: STOCK MINUS)
             cond_scan = [
                 (res_scan['QTY_SYSTEM'] < 0),
                 (res_scan['DIFF'] > 0),
@@ -2213,7 +2205,6 @@ class AppState:
             choices_scan = ["STOCK MINUS", "REAL +", "SYSTEM +"]
             res_scan['NOTE'] = np.select(cond_scan, choices_scan, default="OK")
 
-            # CEK STOCK MINUS DARI SISTEM YANG TIDAK TERSCAN SAMA SEKALI (QTY SCAN = 0)
             scanned_keys = set(zip(res_scan['BIN'], res_scan['SKU']))
             missing_minus = dt_grouped[dt_grouped['QTY_SYSTEM'] < 0].copy()
             
@@ -2255,7 +2246,6 @@ class AppState:
             res_stock = dt_merged.drop(columns=['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN'], errors='ignore')
             res_stock['ITEM NAME'] = res_stock[col_s].map(map_dict).fillna("-")
 
-            # Masukkan REAL + dan STOCK MINUS ke dalam tabel real_plus
             real_plus = res_scan[res_scan['NOTE'].isin(["REAL +", "STOCK MINUS"])].copy()
             system_plus = res_stock[res_stock['NOTE'] == "SYSTEM +"].copy()
 
@@ -2454,7 +2444,7 @@ class AppState:
 
             self.so_step2_done.set(True)
 
-            # --- TAMBAHAN OTOMATISASI JIKA RECON KOSONG ---
+          # --- TAMBAHAN OTOMATISASI JIKA RECON KOSONG ---
             if recon_real.empty:
                 self.so_step4_done.set(True)
                 self.so_step4_setup_done.set(True)
@@ -2470,6 +2460,8 @@ class AppState:
                 self.so_step5_done.set(False)
 
             return True, "Allocation & Recon Selesai!"
+        except Exception as e:
+            return False, f"Gagal Allocation Step 2: {e}"
     # --- SO STEP 4: FINAL ADJUSTMENT (TOLERAN JIKA REAL + RECON KOSONG) ---
     def run_so_step4(self, f_r4, f_s4, f_m5):
         try:
