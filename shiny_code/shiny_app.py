@@ -1318,8 +1318,6 @@ def server(input: Inputs, output: Outputs, session: Session):
                     ui.nav_panel("📦 SET UP REAL +", ui.div(render_clean_table(state.df_cca_setup_real_headers(), state.df_cca_setup_real_rows(), "tbl_cca_setup_real"), style="padding: 0.75rem 0;"))
                 ),
                 ui.hr(style="margin: 1.5rem 0; border-color: #E2E8F0;"),
-                
-                # --- BAGIAN RECON STEP 3 DENGAN TOMBOL DOWNLOAD LENGKAP & STABIL ---
                 ui.div(
                     ui.h4("📋 RECON REPORTS (HASIL STEP 1 - 3)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0;"),
                     ui.download_button(
@@ -1330,7 +1328,6 @@ def server(input: Inputs, output: Outputs, session: Session):
                     style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 1rem; flex-wrap: wrap; gap: 8px;"
                 ),
                 ui.div(
-                    # Box 1: Real + Recon
                     ui.div(
                         ui.div(
                             ui.h5("📋 REAL + RECON", style="font-size: 14px; font-weight: 800; color: #1A202C; margin: 0;"),
@@ -1340,7 +1337,6 @@ def server(input: Inputs, output: Outputs, session: Session):
                         render_clean_table(state.df_cca_rec_real_headers(), state.df_cca_rec_real_rows(), "tbl_cca_rec_real"),
                         style="flex: 1; min-width: 320px; background: #F8FAFC; padding: 1rem; border-radius: 8px; border: 1px solid #CBD5E0;"
                     ),
-                    # Box 2: System + Outstanding
                     ui.div(
                         ui.div(
                             ui.h5("🔐 SYSTEM + OUTSTANDING", style="font-size: 14px; font-weight: 800; color: #1A202C; margin: 0;"),
@@ -1357,7 +1353,15 @@ def server(input: Inputs, output: Outputs, session: Session):
         return ui.div(
             ui.h4("2️⃣ Upload BIN COVERAGE (ALL BIN DEFAULT & KARANTINA)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
             custom_uploader_box("cca_up_cov", "📥 FILE BIN COVERAGE"),
-            ui.output_ui("cca_step2_btn_ui"),
+            # 👇 TOMBOL LANGSUNG (PASTI MUNCUL) 👇
+            ui.div(
+                ui.tags.button(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "RUN ALLOCATION"),
+                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_run_cca_step2', Math.random(), {priority: 'event'});",
+                    class_="btn-red-gradient"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.75rem;"
+            ),
             step2_results,
             class_="step-card-box",
             style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
@@ -1427,12 +1431,11 @@ def server(input: Inputs, output: Outputs, session: Session):
     # ==========================================================================
     # CYCLE COUNT ANALYZER CONTROLLER (STEP 4, 5, & 6)
     # ==========================================================================
-    # --- STEP 4 CYCLE COUNT ---
     @render.ui
     def cca_step4_card_ui():
         if not state.cca_step2_done(): return ui.div()
         
-        # JIKA DATA KOSONG: Tampilkan kartu konfirmasi hijau ringkas (tanpa form upload kosong)
+        # JIKA DATA KOSONG: Tampilkan kartu hijau ringkas
         if state._raw_df_cca_rec_real.empty:
             return ui.div(
                 ui.h4("3️⃣ RECON REAL + PROCESS", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
@@ -1445,7 +1448,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                 style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
             )
 
-        # JIKA ADA DATA: Tampilkan uploader dan hasil analisis normal
+        # JIKA ADA DATA: Tampilkan uploader dan hasil
         step4_results = ui.div()
         if state.cca_step4_done():
             step4_results = ui.div(
@@ -1465,19 +1468,25 @@ def server(input: Inputs, output: Outputs, session: Session):
         return ui.div(
             ui.h4("3️⃣ RECON REAL + PROCESS", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
             custom_uploader_box("cca_up_recon_real", "📥 Upload HASIL RECON REAL +"),
-            ui.output_ui("cca_step4_btn_ui"),
+            # 👇 TOMBOL LANGSUNG (PASTI MUNCUL) 👇
+            ui.div(
+                ui.tags.button(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "RUN RECON ANALYSIS"),
+                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_run_cca_step4', Math.random(), {priority: 'event'});",
+                    class_="btn-red-gradient"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.75rem;"
+            ),
             step4_results,
             class_="step-card-box",
             style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
         )
-
-    # --- STEP 5 CYCLE COUNT ---
     @render.ui
     def cca_step5_card_ui():
         if not state.cca_step2_done() or not state.cca_step4_done():
             return ui.div()
 
-        # JIKA DATA KOSONG: Tampilkan kartu konfirmasi hijau ringkas
+        # JIKA DATA KOSONG: Tampilkan kartu hijau ringkas
         if state._raw_df_cca_rec_sys.empty:
             return ui.div(
                 ui.h4("4️⃣ RECON SYSTEM + (SET UP KARANTINA)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
@@ -1490,7 +1499,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                 style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
             )
 
-        # JIKA ADA DATA: Tampilkan uploader karantina normal
+        # JIKA ADA DATA: Tampilkan uploader dan hasil
         step5_results = ui.div()
         if state.cca_step5_done():
             step5_results = ui.div(
@@ -1501,7 +1510,11 @@ def server(input: Inputs, output: Outputs, session: Session):
                     style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
                 ),
                 ui.div(
-                    ui.download_button("btn_dl_cca_karantina", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD HASIL KARANTINA (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"),
+                    ui.download_button(
+                        "btn_dl_cca_karantina",
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD HASIL KARANTINA (.xlsx)"),
+                        style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
+                    ),
                     style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
                 ),
                 ui.navset_card_tab(
@@ -1513,12 +1526,37 @@ def server(input: Inputs, output: Outputs, session: Session):
         return ui.div(
             ui.h4("4️⃣ RECON SYSTEM + (SET UP KARANTINA)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
             custom_uploader_box("cca_up_recon_sys", "📥 Upload SYSTEM + RECON"),
-            ui.output_ui("cca_step5_btn_ui"),
+            # 👇 TOMBOL LANGSUNG (PASTI MUNCUL) 👇
+            ui.div(
+                ui.tags.button(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "GENERATE KARANTINA"),
+                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_run_cca_step5', Math.random(), {priority: 'event'});",
+                    class_="btn-red-gradient"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.75rem;"
+            ),
             step5_results,
             class_="step-card-box",
             style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
         )
 
+    @reactive.Effect
+    @reactive.event(input.btn_run_cca_step5)
+    def _proc_cca_step5():
+        f = input.cca_up_recon_sys() if "cca_up_recon_sys" in input else None
+        if not f:
+            ui.insert_ui(ui.tags.script("window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+            state.error_modal_message.set("Upload file SYSTEM + RECON terlebih dahulu!")
+            state.show_error_modal.set(True)
+            return
+
+        succ, msg = state.run_cca_step5(f)
+        ui.insert_ui(ui.tags.script("window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+        if succ: state.show_success_modal.set(True)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+            
     @reactive.Effect
     @reactive.event(input.btn_run_cca_step6)
     def _proc_cca_step6():
