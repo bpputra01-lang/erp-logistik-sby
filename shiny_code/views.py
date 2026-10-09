@@ -28,7 +28,38 @@ CUSTOM_HEAD = ui.head_content(
 
     # --- 2. SCRIPT UTAMA ---
     ui.tags.script("""
-        // --- 1. GEMBOK OTOMATIS JUDUL & FAVICON ---
+        // --- 1. DEFINISI ROUTING MENU DI PALING AWAL (ANTI-UNDEFINED) ---
+        function getContainer() {
+            return document.getElementById("main-scroll-container");
+        }
+
+        window.setMenuRoute = function(menuName, slug) {
+            try {
+                if (typeof userScrollTop !== 'undefined') userScrollTop = 0;
+                let c = getContainer();
+                if (c) c.scrollTop = 0;
+
+                let basePath = window.location.pathname.replace(/index\.html$/, '');
+                if (!basePath.endsWith('/')) basePath += '/';
+                if (window.history.pushState) window.history.pushState(null, '', basePath + '#' + slug);
+                else window.location.hash = '#' + slug;
+            } catch(e) {
+                try { window.location.hash = '#' + slug; } catch(err) {}
+            }
+            if (window.Shiny && window.Shiny.setInputValue) {
+                Shiny.setInputValue('select_menu_item', menuName, {priority: 'event'});
+            }
+        };
+
+        window.updateUrlMenu = function(menuName) {
+            try {
+                let slug = menuName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+                if (window.history.pushState) window.history.pushState(null, '', '#' + slug);
+                else window.location.hash = '#' + slug;
+            } catch(e) {}
+        };
+
+        // --- 2. GEMBOK OTOMATIS JUDUL & FAVICON ---
         function setBrandTab() {
             if (document.title !== "ZKN WAREHOUSE ERP") document.title = "ZKN WAREHOUSE ERP";
             let favicon = document.querySelector("link[rel~='icon']");
@@ -43,7 +74,7 @@ CUSTOM_HEAD = ui.head_content(
         setBrandTab();
         setInterval(setBrandTab, 1000);
 
-        // --- 2. ENGINE PAGINASI CEPAT (0ms) ---
+        // --- 3. ENGINE PAGINASI CEPAT (0ms) ---
         window.fastTables = window.fastTables || {};
         window.renderFastTablePage = function(tableId) {
             let tState = window.fastTables[tableId];
@@ -102,38 +133,12 @@ CUSTOM_HEAD = ui.head_content(
             }
         };
 
-        // --- 3. DRAG & DROP FILE ---
-        document.addEventListener('dragover', function(e) {
-            let box = e.target.closest('.reflex-upload-container, .csv-batch-box');
-            if (box) { e.preventDefault(); box.style.borderColor = '#E50914'; box.style.backgroundColor = '#FFF5F5'; }
-        });
-        document.addEventListener('dragleave', function(e) {
-            let box = e.target.closest('.reflex-upload-container, .csv-batch-box');
-            if (box) { e.preventDefault(); box.style.borderColor = ''; box.style.backgroundColor = ''; }
-        });
-        document.addEventListener('drop', function(e) {
-            let box = e.target.closest('.reflex-upload-container, .csv-batch-box');
-            if (box && e.dataTransfer && e.dataTransfer.files.length > 0) {
-                e.preventDefault(); box.style.borderColor = ''; box.style.backgroundColor = '';
-                let fileInput = box.querySelector('input[type="file"]');
-                if (fileInput) {
-                    fileInput.files = e.dataTransfer.files;
-                    fileInput.dispatchEvent(new Event('change', { bubbles: true }));
-                }
-            }
-        });
-
         // --- 4. HUMAN-AWARE ZERO-GLITCH SCROLL ENGINE ---
         let userScrollTop = 0;
         let isHumanScrolling = false;
         let humanScrollTimer = null;
         let isFileInteracting = false;
 
-        function getContainer() {
-            return document.getElementById("main-scroll-container");
-        }
-
-        // Deteksi bahwa scroll dilakukan oleh manusia asli (Wheel, Touch, Keyboard, Drag Scrollbar)
         function markHumanScroll() {
             isHumanScrolling = true;
             clearTimeout(humanScrollTimer);
@@ -148,7 +153,6 @@ CUSTOM_HEAD = ui.head_content(
             if ([32, 33, 34, 35, 36, 38, 40].includes(e.keyCode)) markHumanScroll();
         }, { passive: true, capture: true });
         
-        // Deteksi klik/drag pada scrollbar
         document.addEventListener('mousedown', function(e) {
             let c = getContainer();
             if (c) {
@@ -160,115 +164,57 @@ CUSTOM_HEAD = ui.head_content(
             if (e.buttons === 1) markHumanScroll();
         }, true);
 
-        // KONTROL SCROLL: HANYA ubah userScrollTop jika manusia yang scroll.
-        // Jika browser mencoba melompat ke 0 secara sepihak (glitch), tahan seketika!
         document.addEventListener('scroll', function(e) {
             let c = getContainer();
             if (!c) return;
 
             if (e.target === c || e.target === document) {
                 if (isHumanScrolling) {
-                    // Manusia sedang scroll -> simpan posisi terbarunya! (Bebas ke atas / ke bawah)
                     userScrollTop = c.scrollTop;
                 } else if (userScrollTop > 0 && c.scrollTop === 0) {
-                    // GLITCH BROWSER TERDETEKSI: Tiba-tiba jadi 0 tanpa ada scroll manusia!
-                    // Tahan seketika di posisi semula!
                     c.scrollTop = userScrollTop;
                 }
             }
         }, true);
 
-        // KUNCI POSISI SAAT KLIK UPLOAD (Cegah lompat sebelum jendela file terbuka)
-        document.addEventListener('pointerdown', function(e) {
-            let c = getContainer();
-            if (c && c.scrollTop > 0) {
-                userScrollTop = c.scrollTop;
-            }
-            if (e.target && (e.target.closest('.reflex-upload-container') || e.target.closest('.btn-file') || e.target.type === 'file')) {
-                isFileInteracting = true;
-            }
-        }, true);
-
-        // TAHAN POSISI SAAT FILE TERPILIH DARI EXPLORER
-        document.addEventListener('change', function(e) {
-            if (e.target && e.target.type === 'file') {
-                let c = getContainer();
-                if (c && userScrollTop > 0) {
-                    c.scrollTop = userScrollTop;
-                    // Jaga posisi selama 350ms saat jendela explorer menutup
-                    let count = 0;
-                    let holdTimer = setInterval(function() {
-                        if (c && c.scrollTop !== userScrollTop) c.scrollTop = userScrollTop;
-                        count++;
-                        if (count >= 14) {
-                            clearInterval(holdTimer);
-                            isFileInteracting = false;
-                        }
-                    }, 25);
-                }
-            }
-        }, true);
-
-        // CEGAH BROWSER MELEMPAR FOKUS KE ATAS SAAT INPUT FILE MENERIMA FOKUS
-        window.addEventListener('focusin', function(e) {
-            if (e.target && e.target.type === 'file') {
-                let c = getContainer();
-                if (c && userScrollTop > 0) {
-                    c.scrollTop = userScrollTop;
-                }
-            }
-        }, true);
-
-        // --- 5. SPINNER CONTROLLER (STABIL & TETAP BERPUTAR HINGGA MODAL MUNCUL) ---
+        // --- 5. SPINNER CONTROLLER ---
         window.hideGlobalSpinner = function() {
             clearTimeout(window.spinnerSafetyTimer);
-            document.body.classList.remove('process-running');
+            if (document.body) document.body.classList.remove('process-running');
             let spinner = document.getElementById('global_reflex_loading');
             if (spinner) spinner.style.display = 'none';
         };
 
         window.showGlobalSpinner = function() {
             let spinner = document.getElementById('global_reflex_loading');
-            if (spinner) {
-                spinner.style.display = 'flex';
-            }
-            document.body.classList.add('process-running');
+            if (spinner) spinner.style.display = 'flex';
+            if (document.body) document.body.classList.add('process-running');
 
-            // Pengaman fail-safe jika server hang (beri waktu 120 detik, jangan 5 detik)
             clearTimeout(window.spinnerSafetyTimer);
             window.spinnerSafetyTimer = setTimeout(function() {
                 window.hideGlobalSpinner();
             }, 120000);
         };
 
-        // Otomatis matikan spinner HANYA KETIKA modal sukses/error atau notifikasi benar-benar muncul di layar
-        let modalObserver = new MutationObserver(function() {
-            let hasModal = document.getElementById('success-modal-overlay') || 
-                           document.getElementById('error-modal-overlay') ||
-                           document.querySelector('.shiny-notification');
-            if (hasModal) {
-                window.hideGlobalSpinner();
+        // AMAN: Tunggu DOMContentLoaded agar document.body tidak NULL saat di-observe
+        document.addEventListener("DOMContentLoaded", function() {
+            if (document.body) {
+                let modalObserver = new MutationObserver(function() {
+                    let hasModal = document.getElementById('success-modal-overlay') || 
+                                   document.getElementById('error-modal-overlay') ||
+                                   document.querySelector('.shiny-notification');
+                    if (hasModal) {
+                        window.hideGlobalSpinner();
+                    }
+                });
+                modalObserver.observe(document.body, { childList: true, subtree: true });
+            }
+
+            let h = window.location.hash.replace('#', '').trim();
+            if (h && window.Shiny) {
+                setTimeout(function() { Shiny.setInputValue('initial_url_hash', h, {priority: 'event'}); }, 500);
             }
         });
-        modalObserver.observe(document.body, { childList: true, subtree: true });
-
-        // Klik pada area gelap menutup spinner jika user ingin membatalkan
-        document.addEventListener('click', function(e) {
-            let overlay = document.getElementById('global_reflex_loading');
-            if (overlay && (e.target === overlay)) {
-                window.hideGlobalSpinner();
-            }
-        });
-
-        // Tombol download otomatis mencabut layar gelap setelah 1 detik
-        document.addEventListener('click', function(e) {
-            if (e.target && (e.target.closest('.shiny-download-link') || e.target.closest('a[download]'))) {
-                setTimeout(function() {
-                    window.hideGlobalSpinner();
-                }, 1000);
-            }
-        });
-
         // --- 6. SHINY EVENT LISTENERS (HAPUS SHINY:IDLE AGAR TIDAK MATI PREMATUR) ---
         if (window.jQuery) {
             $(document).on('shiny:fileuploaded shiny:inputchanged', function() {
@@ -1362,15 +1308,26 @@ def auditor_view(state: AppState):
 def menu_item(label: str, target_menu: str, current_menu: str):
     import re
     is_active = (current_menu == target_menu)
-    bg_style = "background: linear-gradient(135deg, #E50914 0%, #B20710 100%); color: #FFFFFF; font-weight: 700; box-shadow: 0 4px 12px rgba(229, 9, 20, 0.4);" if is_active else "background: transparent; color: #CBD5E0; font-weight: 500;"
+    bg_style = (
+        "background: linear-gradient(135deg, #E50914 0%, #B20710 100%); color: #FFFFFF; font-weight: 700; box-shadow: 0 4px 12px rgba(229, 9, 20, 0.4);"
+        if is_active else 
+        "background: transparent; color: #CBD5E0; font-weight: 500;"
+    )
     
     slug = re.sub(r'[^a-zA-Z0-9]+', '-', target_menu).strip('-').lower()
     
-    # Panggil fungsi 1 baris rapat agar browser mengeksekusinya seketika
-    onclick_js = f"window.setMenuRoute('{target_menu}', '{slug}');"
+    # Panggil fungsi navigasi dengan fallback langsung ke Shiny jika fungsi JS belum ter-load
+    onclick_js = f"""
+        if (typeof window.setMenuRoute === 'function') {{
+            window.setMenuRoute('{target_menu}', '{slug}');
+        }} else if (window.Shiny) {{
+            Shiny.setInputValue('select_menu_item', '{target_menu}', {{priority: 'event'}});
+        }}
+    """
     
     return ui.tags.button(
         label, 
+        type="button",
         onclick=onclick_js, 
         style=f"width: 100%; text-align: left; padding: 0.5rem 0.75rem; margin-bottom: 3px; border-radius: 6px; font-size: 0.85rem; border: none; cursor: pointer; justify-content: flex-start; transition: all 0.2s ease; {bg_style}"
     )
