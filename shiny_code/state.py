@@ -597,18 +597,28 @@ class AppState:
             print("Supabase load error:", e)
 
     def save_single_ongkir(self, supp: str, eksp: str, koli_str: str, ongkir_str: str, tgl_str: str):
-        if not supp.strip(): return False, "Nama Supplier Wajib Diisi!"
+        if not supp.strip(): 
+            return False, "Nama Supplier Wajib Diisi!"
+        
+        client = get_supabase()
         payload = {
-            "supplier": supp.upper().strip(), "ekspedisi": eksp.upper().strip(),
-            "total_koli": safe_int(koli_str, 0), "total_ongkir": safe_int(ongkir_str, 0),
+            "supplier": supp.upper().strip(), 
+            "ekspedisi": eksp.upper().strip(),
+            "total_koli": safe_int(koli_str, 0), 
+            "total_ongkir": safe_int(ongkir_str, 0),
             "created_at": f"{tgl_str} {datetime.now().strftime('%H:%M:%S')}"
         }
+        
         try:
-            client = get_supabase()
-            if client: client.table("shipping_costs").insert(payload).execute()
+            res = client.table("shipping_costs").insert(payload).execute()
+            # Validasi apakah data benar-benar dikembalikan oleh Supabase
+            if not res or not hasattr(res, 'data') or len(res.data) == 0:
+                return False, "Data gagal tersimpan ke Supabase (Response kosong)!"
+                
             self.load_ongkir_data()
-            return True, "✅ Data Berhasil Disimpan!"
-        except Exception as e: return False, f"Gagal Simpan: {e}"
+            return True, "✅ Data Ongkir Berhasil Disimpan ke Supabase!"
+        except Exception as e: 
+            return False, f"Gagal Simpan ke Database: {str(e)}"
 
     def batch_upload_csv(self, file_bytes: bytes):
         try:
