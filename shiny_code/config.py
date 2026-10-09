@@ -1,25 +1,33 @@
 import io
 import json
 import urllib.request
+import urllib.error
 import pandas as pd
 
 # ==============================================================================
-# Konfigurasi Supabase Baru
+# Konfigurasi Supabase
 # ==============================================================================
 SUPABASE_URL = "https://fanzsmghhbefhhaicrok.supabase.co"
 
-# Gunakan Publishable Key (Anon Key)
-SUPABASE_KEY = "sb_publishable_pKXe0FX4YxwNhuqD1saHaw_NORud8cJ"
+# Gunakan JWT Anon Key resmi Anda agar diterima penuh oleh REST API PostgREST
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhbnpzbWdoaGJlZmhoYWljcm9rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxNTQzNDgsImV4cCI6MjEwMzczMDM0OH0.brCSOO9nHAUK8CxDWPperpJ--_NA_nwy5cO9OqGv3I0"
 
 class SimpleSupabaseTable:
     def __init__(self, base_url, key, table_name):
         self.url = f"{base_url}/rest/v1/{table_name}"
+        
+        # Header dasar
         self.headers = {
             "apikey": key,
-            "Authorization": f"Bearer {key}",
             "Content-Type": "application/json",
             "Prefer": "return=representation"
         }
+        
+        # Header Authorization HANYA dikirim jika key bertipe JWT (berawalan 'eyJ')
+        # Kunci 'sb_publishable_' tidak boleh dikirim sebagai Bearer token
+        if key.startswith("eyJ"):
+            self.headers["Authorization"] = f"Bearer {key}"
+
         self.params = []
         self.method = "GET"
         self.body = None
@@ -54,8 +62,12 @@ class SimpleSupabaseTable:
             with urllib.request.urlopen(req) as resp:
                 res_data = resp.read().decode("utf-8")
                 return type("Response", (), {"data": json.loads(res_data) if res_data else []})()
+        except urllib.error.HTTPError as e:
+            err_msg = e.read().decode("utf-8") if e.fp else ""
+            print(f"❌ Supabase REST HTTPError [{e.code}]: {err_msg}")
+            return type("Response", (), {"data": []})()
         except Exception as e:
-            print(f"Supabase REST error: {e}")
+            print(f"❌ Supabase REST error: {e}")
             return type("Response", (), {"data": []})()
 
 class SimpleSupabaseClient:
@@ -99,13 +111,11 @@ def load_data_from_info(file_info) -> pd.DataFrame:
 def format_datetime_wib(df: pd.DataFrame, kolom: str, format_tampilan: str = "%d-%m-%Y %H:%M") -> pd.DataFrame:
     """
     Mengubah format ISO Supabase (UTC) ke waktu Indonesia Barat (WIB) yang rapi.
-    Contoh output: 08-07-2026 02:38
+    Contoh output: 16-02-2026 18:55
     """
     if df is not None and not df.empty and kolom in df.columns:
         try:
-            # Parse datetime
             converted = pd.to_datetime(df[kolom], errors="coerce")
-            # Konversi timezone ke Asia/Jakarta (WIB)
             if converted.dt.tz is not None:
                 converted = converted.dt.tz_convert("Asia/Jakarta")
             else:
