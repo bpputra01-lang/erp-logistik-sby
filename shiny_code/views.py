@@ -219,8 +219,9 @@ CUSTOM_HEAD = ui.head_content(
             }
         }, true);
 
-        // --- 5. SPINNER CONTROLLER (PENGAMAN ANTI-LAYAR GELAP) ---
+        // --- 5. SPINNER CONTROLLER (STABIL & TETAP BERPUTAR HINGGA MODAL MUNCUL) ---
         window.hideGlobalSpinner = function() {
+            clearTimeout(window.spinnerSafetyTimer);
             document.body.classList.remove('process-running');
             let spinner = document.getElementById('global_reflex_loading');
             if (spinner) spinner.style.display = 'none';
@@ -228,17 +229,30 @@ CUSTOM_HEAD = ui.head_content(
 
         window.showGlobalSpinner = function() {
             let spinner = document.getElementById('global_reflex_loading');
-            if (spinner) spinner.style.removeProperty('display');
+            if (spinner) {
+                spinner.style.display = 'flex';
+            }
             document.body.classList.add('process-running');
 
-            // Pengaman 1: Maksimal 5 detik layar gelap wajib hilang
+            // Pengaman fail-safe jika server hang (beri waktu 120 detik, jangan 5 detik)
             clearTimeout(window.spinnerSafetyTimer);
             window.spinnerSafetyTimer = setTimeout(function() {
                 window.hideGlobalSpinner();
-            }, 5000);
+            }, 120000);
         };
 
-        // Pengaman 2: Klik di mana saja pada area gelap langsung menutupnya
+        // Otomatis matikan spinner HANYA KETIKA modal sukses/error atau notifikasi benar-benar muncul di layar
+        let modalObserver = new MutationObserver(function() {
+            let hasModal = document.getElementById('success-modal-overlay') || 
+                           document.getElementById('error-modal-overlay') ||
+                           document.querySelector('.shiny-notification');
+            if (hasModal) {
+                window.hideGlobalSpinner();
+            }
+        });
+        modalObserver.observe(document.body, { childList: true, subtree: true });
+
+        // Klik pada area gelap menutup spinner jika user ingin membatalkan
         document.addEventListener('click', function(e) {
             let overlay = document.getElementById('global_reflex_loading');
             if (overlay && (e.target === overlay)) {
@@ -246,7 +260,7 @@ CUSTOM_HEAD = ui.head_content(
             }
         });
 
-        // Pengaman 3: Semua tombol download langsung mencabut layar gelap setelah 1 detik
+        // Tombol download otomatis mencabut layar gelap setelah 1 detik
         document.addEventListener('click', function(e) {
             if (e.target && (e.target.closest('.shiny-download-link') || e.target.closest('a[download]'))) {
                 setTimeout(function() {
@@ -255,7 +269,7 @@ CUSTOM_HEAD = ui.head_content(
             }
         });
 
-        // --- 6. SHINY EVENT LISTENERS ---
+        // --- 6. SHINY EVENT LISTENERS (HAPUS SHINY:IDLE AGAR TIDAK MATI PREMATUR) ---
         if (window.jQuery) {
             $(document).on('shiny:fileuploaded shiny:inputchanged', function() {
                 let c = getContainer();
@@ -263,13 +277,7 @@ CUSTOM_HEAD = ui.head_content(
                     c.scrollTop = userScrollTop;
                 }
             });
-
-            $(document).on('shiny:idle', function() {
-                document.body.classList.remove('process-running');
-                let spinner = document.getElementById('global_reflex_loading');
-                if (spinner) spinner.style.removeProperty('display');
-                isFileInteracting = false;
-            });
+            // shiny:idle sengaja tidak mematikan spinner agar spinner tetap berputar sampai komputasi Python selesai
         }
 
         // --- 7. ROUTING MENU ---

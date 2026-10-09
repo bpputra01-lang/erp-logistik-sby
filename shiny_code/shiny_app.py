@@ -748,16 +748,15 @@ def server(input: Inputs, output: Outputs, session: Session):
     def putaway_action_btn_ui():
         f_ds, f_as = input.ds_putaway_file() if "ds_putaway_file" in input else None, input.asal_putaway_file() if "asal_putaway_file" in input else None
         if (f_ds and len(f_ds) > 0) and (f_as and len(f_as) > 0):
-            return ui.div(ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "COMPARE PUTAWAY"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_compare_putaway', Math.random(), {priority: 'event'});", class_="btn-red-gradient"), style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;")
+            return ui.div(ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "COMPARE PUTAWAY"), onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_compare_putaway', Math.random(), {priority: 'event'});", class_="btn-red-gradient"), style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;")
         return ui.div(ui.tags.button(ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"), "PILIH KEDUA FILE UNTUK MEMULAI", disabled=True, class_="btn-locked"), style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;")
 
     @render.ui
     def compare_system_action_btn_ui():
         f1, f2 = input.uploader_sys1() if "uploader_sys1" in input else None, input.uploader_sys2() if "uploader_sys2" in input else None
         if (f1 and len(f1) > 0) and (f2 and len(f2) > 0):
-            return ui.div(ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "RUN COMPARE"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_compare_system', Math.random(), {priority: 'event'});", class_="btn-red-gradient"), style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;")
+            return ui.div(ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "RUN COMPARE"), onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_run_compare_system', Math.random(), {priority: 'event'});", class_="btn-red-gradient"), style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;")
         return ui.div(ui.tags.button(ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"), "PILIH FILE UTAMA (SYS 1 & SYS 2) UNTUK MEMULAI", disabled=True, class_="btn-locked"), style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;")
-
     # Result Views
     @render.ui
     def compare_system_results_container():
@@ -1022,7 +1021,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             return ui.div(
                 ui.tags.button(
                     ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "PROSES DATA"),
-                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_process_cycle_count', Math.random(), {priority: 'event'});",
+                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_process_cycle_count', Math.random(), {priority: 'event'});",
                     class_="btn-red-gradient"
                 ),
                 style="display: flex; justify-content: flex-end; width: 100%; margin-top: 1rem;"
@@ -1034,7 +1033,6 @@ def server(input: Inputs, output: Outputs, session: Session):
             ),
             style="display: flex; justify-content: flex-end; width: 100%; margin-top: 1rem;"
         )
-
     # 1. Container Filter: HANYA merender kontrol input (TIDAK membaca cc_total_* agar tidak ter-reset)
     @render.ui
     def cycle_count_results_container():
@@ -1136,7 +1134,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             return ui.div(
                 ui.tags.button(
                     ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "RUN AUDIT PROCESS"),
-                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_process_ppa_audit', Math.random(), {priority: 'event'});",
+                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_process_ppa_audit', Math.random(), {priority: 'event'});",
                     class_="btn-red-gradient"
                 ),
                 style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
@@ -2686,7 +2684,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             return ui.div(
                 ui.tags.button(
                     ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "RUN MATCHING PROCESS"),
-                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_cross_check', Math.random(), {priority: 'event'});",
+                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_run_cross_check', Math.random(), {priority: 'event'});",
                     class_="btn-red-gradient"
                 ),
                 style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
@@ -2700,7 +2698,6 @@ def server(input: Inputs, output: Outputs, session: Session):
             ),
             style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
         )
-
     @reactive.Effect
     @reactive.event(input.btn_run_cross_check)
     def _proc_cross_check():
@@ -2816,7 +2813,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             return ui.div(
                 ui.tags.button(
                     ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "RUN BALANCING PROCESS"),
-                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_balancing_stock', Math.random(), {priority: 'event'});",
+                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_run_balancing_stock', Math.random(), {priority: 'event'});",
                     class_="btn-red-gradient"
                 ),
                 style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
