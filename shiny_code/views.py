@@ -1309,7 +1309,6 @@ def auditor_view(state: AppState):
 # VIEW: MEMO PENGAJUAN (2 TAB: FORM PENGAJUAN & HISTORY APPROVAL)
 # ==============================================================================
 def memo_pengajuan_view(state: AppState):
-    # Opsi Divisi & Jenis Pengajuan
     divisi_choices = [
         "MARKOM", "RETAIL / STORE", "OPERASIONAL", "PURCHASING", 
         "FINANCE & ACCOUNTING", "HRD & GA", "LOGISTIK DC", "IT SUPPORT"
@@ -1384,7 +1383,7 @@ def memo_pengajuan_view(state: AppState):
                 style="margin-bottom: 1.5rem;"
             ),
 
-            # Tombol Submit Memo
+            # Bagian Bawah: Tombol Submit Memo
             ui.div(
                 ui.tags.button(
                     ui.tags.span(ui.tags.i(class_="fa-solid fa-paper-plane", style="margin-right: 8px; font-size: 15px;"), "SUBMIT MEMO PENGAJUAN & KIRIM NOTIFIKASI WA"),
@@ -1398,6 +1397,10 @@ def memo_pengajuan_view(state: AppState):
                 ),
                 style="display: flex; justify-content: flex-end; width: 100%;"
             ),
+            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
+        ),
+        style="padding: 0.5rem 0;"
+    )
 
     # --- TAB 2: RIWAYAT & WORKFLOW APPROVAL ---
     tab2_history = ui.div(
@@ -1405,11 +1408,13 @@ def memo_pengajuan_view(state: AppState):
         style="padding: 0.5rem 0;"
     )
 
+    
+
     return ui.div(
         ui.navset_card_tab(
             ui.nav_panel("📝 BUAT MEMO PENGAJUAN", tab1_form, value="tab_memo_form"),
             ui.nav_panel("📊 HISTORY & APPROVAL TRACKING", tab2_history, value="tab_memo_history"),
-            id="memo_navset"   # <-- PENTING: ID ini dipakai untuk otomatis pindah ke Tab 2
+            id="memo_navset"
         ),
         style="width: 100%; padding: 1rem;"
     )
