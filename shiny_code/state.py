@@ -615,12 +615,9 @@ class AppState:
         
         client = get_supabase()
         
-        # Validasi format tanggal agar ISO 8601 kompatibel dengan Supabase TIMESTAMPTZ
-        try:
-            now_time = datetime.now().strftime("%H:%M:%S")
-            iso_timestamp = f"{tgl_str}T{now_time}Z"
-        except Exception:
-            iso_timestamp = datetime.utcnow().isoformat() + "Z"
+        # GUNAKAN +07:00 (WIB) AGAR TANGGAL TIDAK BERGESER +7 JAM
+        now_time = datetime.now().strftime("%H:%M:%S")
+        iso_timestamp = f"{tgl_str}T{now_time}+07:00"
 
         payload = {
             "supplier": supp.upper().strip(), 
@@ -640,8 +637,6 @@ class AppState:
     def batch_upload_csv(self, file_bytes: bytes):
         try:
             df = pd.read_csv(io.BytesIO(file_bytes))
-            
-            # Rapikan nama kolom (hapus spasi & jadikan huruf besar)
             df.columns = [str(c).strip().upper() for c in df.columns]
             
             required = ["SUPPLIER", "EKSPEDISI", "TOTAL KOLI", "ONGKIR", "TANGGAL_JAM"]
@@ -651,23 +646,20 @@ class AppState:
             batch_data = []
             for _, row in df.iterrows():
                 sup = str(row["SUPPLIER"]).upper().strip() if not pd.isna(row["SUPPLIER"]) else ""
-                if not sup:
-                    continue
-                
-                # Variabel di sini bernama 'eks'
+                if not sup: continue
                 eks = str(row["EKSPEDISI"]).upper().strip() if not pd.isna(row["EKSPEDISI"]) else ""
                 
-                # Format tanggal aman untuk Supabase TIMESTAMPTZ
+                # Format tanggal WIB (+07:00) agar tidak melompat ke hari berikutnya
                 tgl_raw = row["TANGGAL_JAM"]
                 try:
                     dt_parsed = pd.to_datetime(tgl_raw, dayfirst=True)
-                    fix_dt = dt_parsed.strftime("%Y-%m-%dT%H:%M:%SZ")
+                    fix_dt = dt_parsed.strftime("%Y-%m-%dT%H:%M:%S+07:00")
                 except Exception:
-                    fix_dt = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
+                    fix_dt = datetime.now().strftime("%Y-%m-%dT%H:%M:%S+07:00")
 
                 batch_data.append({
                     "supplier": sup, 
-                    "ekspedisi": eks,  # <-- SUDAH DIPERBAIKI (sebelumnya tertulis 'eksp')
+                    "ekspedisi": eks, 
                     "total_koli": safe_int(row.get("TOTAL KOLI", 1), 1), 
                     "total_ongkir": safe_int(row.get("ONGKIR", 0), 0), 
                     "created_at": fix_dt
@@ -675,21 +667,26 @@ class AppState:
                 
             if batch_data:
                 client = get_supabase()
-                if client: 
-                    client.table("shipping_costs").insert(batch_data).execute()
+                if client: client.table("shipping_costs").insert(batch_data).execute()
                 self.load_ongkir_data()
                 return True, f"🚀 Berhasil Upload {len(batch_data)} Data CSV!"
-                
-            return False, "Tidak ada data valid yang dapat diupload."
+            return False, "Tidak ada data valid yang diupload."
         except Exception as e: 
-            return False, f"Gagal Upload Batch: {str(e)}"
+            return False, f"Gagal Upload Batch: {e}"
 
-    def toggle_select_id(self, item_id: str):
-        s = list(self.selected_ids())
-        if item_id in s: s.remove(item_id)
-        else: s.append(item_id)
-        self.selected_ids.set(s)
-
+    # FITUR SELECT ALL & UNSELECT ALL
+    def toggle_select_all_filtered(self):
+        filtered_items = self.get_filtered_ongkir()
+        all_ids = [str(x.get("id")) for x in filtered_items if x.get("id") is not None]
+        
+        cur_selected = set(self.selected_ids())
+        # Jika semua data yang terfilter sudah tercentang -> Uncheck semua
+        if all_ids and all(item_id in cur_selected for item_id in all_ids):
+            self.selected_ids.set([])
+        else:
+            # Jika belum semua -> Centang semua
+            self.selected_ids.set(all_ids)
+            
     def execute_delete(self):
         s = self.selected_ids()
         try:

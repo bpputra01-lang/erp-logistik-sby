@@ -51,6 +51,11 @@ def server(input: Inputs, output: Outputs, session: Session):
         state.filter_tgl_end.set("")
 
     @reactive.Effect
+    @reactive.event(input.btn_toggle_select_all)
+    def _toggle_select_all():
+        state.toggle_select_all_filtered()
+
+    @reactive.Effect
     @reactive.event(input.btn_fetch_stock_minus_jezpro)
     def _fetch_stock_minus_jezpro():
         succ, msg = state.trigger_pc_sync_and_load()

@@ -713,28 +713,49 @@ def putaway_view(state: AppState):
 # VIEW 4: DATABASE ONGKIR (MAIN DASHBOARD)
 # ==============================================================================
 def ongkir_tab2_view(state: AppState):
+    filtered_data = state.get_filtered_ongkir()
+    filtered_ids = [str(r.get("id")) for r in filtered_data if r.get("id") is not None]
+    
+    # Cek apakah semua baris yang tampil sudah dipilih
+    is_all_selected = len(filtered_ids) > 0 and all(item_id in set(state.selected_ids()) for item_id in filtered_ids)
     selected_count = len(state.selected_ids())
+
+    # Tombol Hapus & Tombol Select All
     del_btn_ui = ui.tags.button(
         f"🗑️ HAPUS ({selected_count}) DATA", 
         onclick="Shiny.setInputValue('btn_open_delete_modal', Math.random(), {priority: 'event'})", 
         style="background: #E53E3E; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px;"
     ) if selected_count > 0 else ui.div()
-    
+
+    btn_select_all_text = "☑️ Batal Pilih Semua" if is_all_selected else "☑️ Pilih Semua"
+    select_all_btn = ui.tags.button(
+        btn_select_all_text,
+        onclick="Shiny.setInputValue('btn_toggle_select_all', Math.random(), {priority: 'event'});",
+        style="background: #EDF2F7; color: #2D3748; border: 1.5px solid #CBD5E0; border-radius: 6px; font-weight: 700; font-size: 12px; padding: 6px 12px; cursor: pointer;"
+    ) if len(filtered_ids) > 0 else ui.div()
+
     select_options = [ui.tags.option(opt, value=opt, selected=(opt == state.filter_ekspedisi())) for opt in state.get_list_ekspedisi_options()]
 
     # Baris data tabel
     table_rows = [
         ui.tags.tr(
-            ui.tags.td(ui.tags.input(type="checkbox", checked=(str(r.get("id", "")) in set(state.selected_ids())), onchange=f"Shiny.setInputValue('toggle_row_id', '{r.get('id', '')}', {{priority: 'event'}})")),
+            ui.tags.td(
+                ui.tags.input(
+                    type="checkbox", 
+                    checked=(str(r.get("id", "")) in set(state.selected_ids())), 
+                    onchange=f"Shiny.setInputValue('toggle_row_id', '{r.get('id', '')}', {{priority: 'event'}})",
+                    style="cursor: pointer; transform: scale(1.15);"
+                ),
+                style="text-align: center;"
+            ),
             ui.tags.td(str(r.get("created_at", r.get("tanggal", "")))), 
             ui.tags.td(str(r.get("supplier", ""))), 
             ui.tags.td(str(r.get("ekspedisi", ""))),
             ui.tags.td(str(safe_int(r.get("total_koli", r.get("koli", 0))))), 
             ui.tags.td(f"Rp {safe_int(r.get('total_ongkir', 0)):,}")
-        ) for r in state.get_filtered_ongkir()
+        ) for r in filtered_data
     ]
 
-    # Tombol Reset Tanggal jika filter tanggal sedang aktif
     has_date_filter = bool(state.filter_tgl_start() or state.filter_tgl_end())
     reset_tgl_btn = ui.tags.button(
         "🔄 Reset Tgl",
@@ -783,7 +804,11 @@ def ongkir_tab2_view(state: AppState):
                 reset_tgl_btn,
                 style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px;"
             ), 
-            del_btn_ui, 
+            ui.div(
+                select_all_btn,
+                del_btn_ui,
+                style="display: flex; align-items: center; gap: 8px;"
+            ),
             style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 1.5rem; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 10px;"
         ),
         ui.div(
@@ -799,7 +824,17 @@ def ongkir_tab2_view(state: AppState):
             ui.tags.table(
                 ui.tags.thead(
                     ui.tags.tr(
-                        ui.tags.th("SELECT", style="text-align: center;"), 
+                        # Checkbox Select All pada Header Kolom
+                        ui.tags.th(
+                            ui.tags.input(
+                                type="checkbox", 
+                                checked=is_all_selected,
+                                onchange="Shiny.setInputValue('btn_toggle_select_all', Math.random(), {priority: 'event'});",
+                                title="Pilih Semua / Batal Semua",
+                                style="cursor: pointer; transform: scale(1.2);"
+                            ),
+                            style="text-align: center; width: 45px;"
+                        ), 
                         ui.tags.th("TANGGAL"), 
                         ui.tags.th("SUPPLIER"), 
                         ui.tags.th("EKSPEDISI"), 
@@ -809,7 +844,7 @@ def ongkir_tab2_view(state: AppState):
                     style="background-color: #CBD5E0 !important;"
                 ), 
                 ui.tags.tbody(*table_rows) if len(table_rows) > 0 else ui.tags.tr(
-                    ui.tags.td("Tidak ada transaksi ongkir pada rentang tanggal tersebut.", colspan="6", style="text-align: center; color: #718096; padding: 2rem;")
+                    ui.tags.td("Tidak ada transaksi ongkir.", colspan="6", style="text-align: center; color: #718096; padding: 2rem;")
                 ), 
                 class_="custom-clean-table"
             ), 
