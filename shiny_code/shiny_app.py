@@ -3810,7 +3810,9 @@ def server(input: Inputs, output: Outputs, session: Session):
         if not sel:
             yield b""
         else:
-            pdf_bytes = generate_memo_pdf_bytes(sel)
-            yield pdf_bytes
-
+            content = generate_memo_pdf_bytes(sel)
+            if isinstance(content, str):
+                yield content.encode("utf-8")
+            else:
+                yield content
 app = App(app_ui, server)

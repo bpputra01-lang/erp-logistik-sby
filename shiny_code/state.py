@@ -5605,20 +5605,15 @@ class AppState:
     def submit_memo_pengajuan(self, tanggal: str, divisi: str, jenis: str, tujuan: str, diajukan_oleh: str):
         items = list(self.memo_current_items())
         if not items:
-            return False, "Daftar item barang masih kosong! Tambahkan minimal 1 item terlebih dahulu.", None
-
-        if not divisi or not jenis:
-            return False, "Pilih Divisi dan Jenis Pengajuan terlebih dahulu!", None
+            return False, "Daftar item barang masih kosong!", None
 
         tot_nominal = sum([safe_int(x.get("subtotal", 0)) for x in items])
-        # Generate No Memo aman
         rand_code = random.randint(100, 999)
-        tgl_code = datetime.now().strftime('%Y%m%d')
-        memo_no = f"MEMO/ZKN/{tgl_code}/{rand_code}"
+        memo_no = f"MEMO/ZKN/{datetime.now().strftime('%Y%m%d')}/{rand_code}"
 
         new_memo = {
             "id": memo_no,
-            "tanggal": tanggal if tanggal else datetime.now().strftime("%Y-%m-%d"),
+            "tanggal": tanggal,
             "divisi": divisi,
             "jenis": jenis,
             "tujuan": tujuan if tujuan else "-",
@@ -5633,16 +5628,25 @@ class AppState:
             "items": items
         }
 
-        # Simpan ke memori list memo
         cur_list = list(self.memo_list())
         cur_list.insert(0, new_memo)
         self.memo_list.set(cur_list)
-
-        # Reset item form draft
         self.memo_current_items.set([])
 
-        # Susun Link WhatsApp ke +62 823-3292-9992 sesuai format permintaan
-        pesan_wa = f"Ada Request dari {divisi} dengan {jenis}, Tolong Proses ya"
+        # Susun daftar barang untuk chat WA
+        rincian_barang = "\\n".join([f"- {it['sku']} ({it['item_name']}): {it['qty']} pcs" for it in items[:4]])
+        if len(items) > 4:
+            rincian_barang += f"\\n...dan {len(items)-4} item lainnya"
+
+        # Format pesan WA lengkap
+        pesan_wa = (
+            f"Ada Request dari {divisi} dengan {jenis}\\n"
+            f"*No Memo:* {memo_no}\\n"
+            f"*Tujuan:* {tujuan}\\n"
+            f"*Nominal:* Rp {tot_nominal:,}\\n"
+            f"*Rincian Barang:*\\n{rincian_barang}\\n\\n"
+            f"Tolong Proses ya 🙏"
+        )
         wa_url = f"https://api.whatsapp.com/send?text={urllib.parse.quote(pesan_wa)}"
 
         return True, f"Memo {memo_no} berhasil dibuat!", wa_url
