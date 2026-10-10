@@ -610,20 +610,24 @@ class AppState:
             return False, "Nama Supplier Wajib Diisi!"
         
         client = get_supabase()
+        
+        # Validasi format tanggal agar ISO 8601 kompatibel dengan Supabase TIMESTAMPTZ
+        try:
+            now_time = datetime.now().strftime("%H:%M:%S")
+            iso_timestamp = f"{tgl_str}T{now_time}Z"
+        except Exception:
+            iso_timestamp = datetime.utcnow().isoformat() + "Z"
+
         payload = {
             "supplier": supp.upper().strip(), 
             "ekspedisi": eksp.upper().strip(),
-            "total_koli": safe_int(koli_str, 0), 
+            "total_koli": safe_int(koli_str, 1), 
             "total_ongkir": safe_int(ongkir_str, 0),
-            "created_at": f"{tgl_str} {datetime.now().strftime('%H:%M:%S')}"
+            "created_at": iso_timestamp
         }
         
         try:
             res = client.table("shipping_costs").insert(payload).execute()
-            # Validasi apakah data benar-benar dikembalikan oleh Supabase
-            if not res or not hasattr(res, 'data') or len(res.data) == 0:
-                return False, "Data gagal tersimpan ke Supabase (Response kosong)!"
-                
             self.load_ongkir_data()
             return True, "✅ Data Ongkir Berhasil Disimpan ke Supabase!"
         except Exception as e: 
@@ -635,21 +639,38 @@ class AppState:
             required = ["SUPPLIER", "EKSPEDISI", "TOTAL KOLI", "ONGKIR", "TANGGAL_JAM"]
             if not all(col in df.columns for col in required):
                 return False, "Format CSV Salah! Kolom wajib: SUPPLIER, EKSPEDISI, TOTAL KOLI, ONGKIR, TANGGAL_JAM"
+            
             batch_data = []
             for _, row in df.iterrows():
                 sup = str(row["SUPPLIER"]).upper().strip() if not pd.isna(row["SUPPLIER"]) else ""
                 if not sup: continue
                 eks = str(row["EKSPEDISI"]).upper().strip() if not pd.isna(row["EKSPEDISI"]) else ""
+                
+                # Format tanggal aman
                 tgl_raw = row["TANGGAL_JAM"]
-                fix_dt = datetime.now().strftime("%Y-%m-%d %H:%M:%S") if pd.isna(tgl_raw) else str(tgl_raw)
-                batch_data.append({"supplier": sup, "ekspedisi": eks, "total_koli": safe_int(row.get("TOTAL KOLI", 0)), "total_ongkir": safe_int(row.get("ONGKIR", 0)), "created_at": fix_dt})
+                try:
+                    dt_parsed = pd.to_datetime(tgl_raw)
+                    fix_dt = dt_parsed.strftime("%Y-%m-%dT%H:%M:%SZ")
+                except Exception:
+                    fix_dt = datetime.utcnow().isoformat() + "Z"
+
+                batch_data.append({
+                    "supplier": sup, 
+                    "ekspedisi": eksp, 
+                    "total_koli": safe_int(row.get("TOTAL KOLI", 1), 1), 
+                    "total_ongkir": safe_int(row.get("ONGKIR", 0), 0), 
+                    "created_at": fix_dt
+                })
+                
             if batch_data:
                 client = get_supabase()
-                if client: client.table("shipping_costs").insert(batch_data).execute()
+                if client: 
+                    client.table("shipping_costs").insert(batch_data).execute()
                 self.load_ongkir_data()
                 return True, f"🚀 Berhasil Upload {len(batch_data)} Data CSV!"
             return False, "Tidak ada data valid yang diupload."
-        except Exception as e: return False, f"Gagal Upload Batch: {e}"
+        except Exception as e: 
+            return False, f"Gagal Upload Batch: {e}"
 
     def toggle_select_id(self, item_id: str):
         s = list(self.selected_ids())

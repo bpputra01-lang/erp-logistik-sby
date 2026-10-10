@@ -41,6 +41,7 @@ class SimpleSupabaseTable:
     def insert(self, payload):
         self.method = "POST"
         self.body = payload if isinstance(payload, list) else [payload]
+        self.headers["Prefer"] = "return=representation"
         return self
     # 👇 TAMBAHKAN DUA FUNGSI INI 👇
     def update(self, payload):
