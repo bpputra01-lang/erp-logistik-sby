@@ -5406,7 +5406,7 @@ class AppState:
             "Counter": "Counter A",
             "Auditor Verified": "No",
             "Remarks": ""
-        })
+        }).reset_index(drop=True) 
 
         self._raw_df_auditor_filtered = count_sheet_df.copy()
         self.df_auditor_headers.set(count_sheet_df.columns.tolist() if not count_sheet_df.empty else [])

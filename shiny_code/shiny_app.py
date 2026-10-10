@@ -3472,37 +3472,69 @@ def server(input: Inputs, output: Outputs, session: Session):
 
         # Terapkan filter ke tabel data dan metrik
         state.apply_auditor_filters(valid_brands, valid_subs, valid_bins)
+# --------------------------------------------------------------------------
+    # CONTROLLER AUDITOR (LANGSUNG KETIK DI TABEL - POP-UP HILANG TOTAL)
+    # --------------------------------------------------------------------------
     @render.ui
     def auditor_results_container():
         if not state.auditor_processed():
             return ui.div()
 
+        from views import render_auditor_editable_table
+
         return ui.div(
             ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
             ui.h4("📋 RINGKASAN DATA SASARAN AUDIT", style="font-size: 16px; font-weight: 800; color: #1A202C; margin-bottom: 1rem;"),
-            ui.div(
-                dark_metric_box("🏭 TOTAL LOKASI BIN", f"{state.auditor_total_bin():,} BIN", "#3182CE"),
-                dark_metric_box("📦 TOTAL SKU HARUS DICEK", f"{state.auditor_total_sku():,} SKU", "#C5A059"),
-                dark_metric_box("🔢 TOTAL QTY SYSTEM", f"{state.auditor_total_qty():,} PCS", "#10B981"),
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
-            ),
+            
+            # Kartu Metrik Live Update
+            ui.output_ui("auditor_metrics_cards_ui"),
+
+            # Tabel Detail Yang Bisa Diketik Langsung
             ui.div(
                 ui.div(
-                    ui.h4("Preview Tabel Data Stock Auditor", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0;"),
+                    ui.div(
+                        ui.h4("Stock Count Sheet (Tabel Hitung Langsung di Web)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 2px 0;"),
+                        ui.span(f"Petugas Counter: {state.auditor_counter()} | Masukkan angka fisik langsung pada kotak kuning di bawah.", style="color: #059669; font-weight: 700; font-size: 12px;"),
+                    ),
                     ui.download_button(
                         "btn_dl_auditor_pack",
-                        ui.tags.span(ui.tags.i(class_="fa-solid fa-file-excel", style="margin-right: 8px; font-size: 14px;"), "DOWNLOAD FORM AUDITOR LENGKAP (.XLSX)"),
-                        onclick="setTimeout(function() { document.body.classList.remove('process-running'); }, 1500);",
-                        style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; font-weight: 800; border-radius: 8px; border: none; padding: 10px 20px; cursor: pointer; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);"
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-file-excel", style="margin-right: 8px; font-size: 14px;"), "DOWNLOAD EXCEL COUNT SHEET (.XLSX)"),
+                        style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; font-weight: 800; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);"
                     ),
-                    style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem;"
+                    style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 8px;"
                 ),
-                render_clean_table(state.df_auditor_headers(), state.df_auditor_rows(), "tbl_auditor_preview"),
+                render_auditor_editable_table(state._raw_df_auditor_filtered, state.auditor_counter()),
                 style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
             ),
             style="width: 100%;"
         )
 
+    # Kartu Ringkasan (Terpisah agar tidak membuat tabel refresh saat user mengetik)
+    @render.ui
+    def auditor_metrics_cards_ui():
+        var_col = "#10B981" if state.auditor_total_var() == 0 else "#E53E3E"
+        return ui.div(
+            dark_metric_box("🏭 TOTAL LOKASI BIN", f"{state.auditor_total_bin():,} BIN", "#3182CE"),
+            dark_metric_box("📦 TOTAL SKU HARUS DICEK", f"{state.auditor_total_sku():,} SKU", "#C5A059"),
+            dark_metric_box("🔢 TOTAL QTY SYSTEM", f"{state.auditor_total_qty():,} PCS", "#10B981"),
+            dark_metric_box("🎯 TOTAL PHYSICAL COUNT", f"{state.auditor_total_phys():,} PCS", "#3182CE"),
+            dark_metric_box("⚠️ TOTAL NET VARIANCE", f"{state.auditor_total_var():,} PCS", var_col),
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+        )
+
+    # Handler Saat Angka Diketik Langsung di Baris Tabel
+    @reactive.Effect
+    @reactive.event(input.auditor_row_inline_update)
+    def _on_auditor_inline_update():
+        d = input.auditor_row_inline_update() or {}
+        idx = d.get("idx", 0)
+        phys = d.get("phys", "")
+        ver = d.get("ver", "No")
+        rem = d.get("rem", "")
+
+        state.update_single_count_row(idx, phys, ver, rem)
+
+    # Handler Download Excel Bawaan
     @render.download(
         filename=lambda: f"EXTERNAL_AUDIT_PACK_{datetime.now().strftime('%d_%m_%Y_%H%M')}.xlsx"
     )
@@ -3518,136 +3550,16 @@ def server(input: Inputs, output: Outputs, session: Session):
             "manager": input.aud_manager() if "aud_manager" in input else "",
             "supervisor": input.aud_supervisor() if "aud_supervisor" in input else "",
             "currency": input.aud_currency() if "aud_currency" in input else "IDR",
-            "counter_name": input.sign_counter() if "sign_counter" in input else "",
+            "counter_name": state.auditor_counter(),
             "checker_name": input.sign_checker() if "sign_checker" in input else "",
             "finance_manager": input.sign_finance() if "sign_finance" in input else "",
             "audit_firm": input.sign_kap() if "sign_kap" in input else "KAP Independent & Partners",
             "audit_partner": input.sign_partner() if "sign_partner" in input else "",
-            # Ambil data dari Tab 3:
-            "obs_area": input.obs_area() if "obs_area" in input else "Condition of stock",
-            "obs_case": input.obs_case() if "obs_case" in input else "",
-            "obs_risk": input.obs_risk() if "obs_risk" in input else "Medium",
-            "obs_recom": input.obs_recom() if "obs_recom" in input else "",
-            "obs_status": input.obs_status() if "obs_status" in input else "Open",
         }
         content = state.generate_auditor_excel_pack(meta_dict)
         yield content
 
 # ==========================================================================
-    # AUDITOR EXTENDED CONTROLLER (POIN 1 - 7)
-    # ==========================================================================
-
-    # 1. Listener Perubahan Counter di Tab 1 -> Langsung Sinkron ke Tab 2
-    @reactive.Effect
-    @reactive.event(input.change_auditor_counter_name)
-    def _on_change_counter_name():
-        c_name = input.change_auditor_counter_name()
-        state.update_auditor_counter(c_name)
-
-    # 2. Render Card & Tabel Tab 2 (Dengan Fitur Edit Web Langsung)
-    @render.ui
-    def auditor_results_container():
-        if not state.auditor_processed():
-            return ui.div()
-
-        return ui.div(
-            ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
-            ui.h4("📋 RINGKASAN DATA SASARAN AUDIT", style="font-size: 16px; font-weight: 800; color: #1A202C; margin-bottom: 1rem;"),
-            ui.div(
-                dark_metric_box("🏭 TOTAL LOKASI BIN", f"{state.auditor_total_bin():,} BIN", "#3182CE"),
-                dark_metric_box("📦 TOTAL SKU HARUS DICEK", f"{state.auditor_total_sku():,} SKU", "#C5A059"),
-                dark_metric_box("🔢 TOTAL QTY SYSTEM", f"{state.auditor_total_qty():,} PCS", "#10B981"),
-                dark_metric_box("🎯 TOTAL PHYSICAL COUNT", f"{state.auditor_total_phys():,} PCS", "#3182CE"),
-                dark_metric_box("⚠️ TOTAL NET VARIANCE", f"{state.auditor_total_var():,} PCS", "#E53E3E" if state.auditor_total_var() != 0 else "#10B981"),
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
-            ),
-            ui.div(
-                ui.div(
-                    ui.div(
-                        ui.h4("Stock Count Sheet (Tabel Hitung Lapangan)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 2px 0;"),
-                        ui.span(f"Petugas Counter: {state.auditor_counter()} | Klik tombol edit baris untuk mengisi langsung di web.", style="color: #718096; font-size: 12px;"),
-                    ),
-                    ui.div(
-                        ui.tags.button(
-                            ui.tags.i(class_="fa-solid fa-pen-to-square", style="margin-right: 6px;"), "Edit Data Fisik di Web",
-                            onclick="Shiny.setInputValue('btn_open_web_count_modal', Math.random(), {priority: 'event'});",
-                            style="background: #3182CE; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer; margin-right: 8px;"
-                        ),
-                        ui.download_button(
-                            "btn_dl_auditor_pack",
-                            ui.tags.span(ui.tags.i(class_="fa-solid fa-file-excel", style="margin-right: 8px; font-size: 14px;"), "DOWNLOAD EXCEL COUNT SHEET (.XLSX)"),
-                            style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; font-weight: 800; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);"
-                        ),
-                        style="display: flex; align-items: center;"
-                    ),
-                    style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 8px;"
-                ),
-                render_clean_table(state.df_auditor_headers(), state.df_auditor_rows(), "tbl_auditor_preview"),
-                style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
-            ),
-            style="width: 100%;"
-        )
-
-    # 3. Modal Input / Edit Langsung Physical Count di Web (Poin 2)
-    @reactive.Effect
-    @reactive.event(input.btn_open_web_count_modal)
-    def _open_web_count_modal():
-        df = state._raw_df_auditor_filtered
-        if df.empty:
-            ui.notification_show("Tidak ada baris data untuk diedit!", type="warning")
-            return
-
-        sku_choices = {str(i): f"{r['Bin Location']} | {r['SKU']} - {r['Description'][:25]} (Sys: {r['Qty System']})" for i, r in df.iterrows()}
-
-        ui.modal_show(ui.modal(
-            ui.div(
-                ui.p("Pilih barang yang ingin diinputkan hasil hitung fisik (Physical Count) langsung melalui web:", style="font-size: 13px; color: #4A5568; margin-bottom: 12px;"),
-                ui.input_select("web_edit_sku_idx", "Pilih Baris Target:", choices=sku_choices, width="100%"),
-                ui.div(
-                    ui.div(ui.span("Physical Count:", style="font-weight: 700; font-size: 12px;"), ui.tags.input(id="web_edit_phys_val", type="number", value="0", min="0", class_="form-control"), style="flex: 1;"),
-                    ui.div(
-                        ui.span("Auditor Verified:", style="font-weight: 700; font-size: 12px;"),
-                        ui.tags.select(ui.tags.option("Yes", value="Yes"), ui.tags.option("No", value="No"), id="web_edit_verified", class_="form-control"),
-                        style="flex: 1;"
-                    ),
-                    style="display: flex; gap: 1rem; margin-top: 10px;"
-                ),
-                ui.div(
-                    ui.span("Remarks / Catatan Lapangan:", style="font-weight: 700; font-size: 12px; margin-top: 10px; display: block;"),
-                    ui.tags.input(id="web_edit_remarks", type="text", placeholder="Catatan auditor (misal: kemasan sobek)...", class_="form-control", style="width: 100%;"),
-                ),
-                style="padding: 0.5rem 0;"
-            ),
-            title="✏️ Input Physical Count Langsung di Web",
-            easy_close=True,
-            footer=ui.div(
-                ui.modal_button("Batal"),
-                ui.tags.button(
-                    "Simpan Perubahan",
-                    onclick="""
-                        let idx = parseInt(document.getElementById('web_edit_sku_idx').value);
-                        let p = document.getElementById('web_edit_phys_val').value;
-                        let v = document.getElementById('web_edit_verified').value;
-                        let rem = document.getElementById('web_edit_remarks').value;
-                        Shiny.setInputValue('btn_submit_single_web_count', {idx: idx, phys: p, ver: v, rem: rem}, {priority: 'event'});
-                    """,
-                    class_="btn-red-gradient", style="margin-left: 8px; font-weight: 800; border-radius: 6px; padding: 6px 14px;"
-                ),
-                style="display: flex; justify-content: flex-end;"
-            )
-        ))
-
-    @reactive.Effect
-    @reactive.event(input.btn_submit_single_web_count)
-    def _submit_single_web_count():
-        d = input.btn_submit_single_web_count() or {}
-        succ, msg = state.update_single_count_row(d.get("idx", 0), d.get("phys", ""), d.get("ver", "Yes"), d.get("rem", ""))
-        ui.modal_remove()
-        if succ:
-            ui.notification_show("✅ " + msg, type="message", duration=3)
-        else:
-            ui.notification_show("⚠️ " + msg, type="warning", duration=4)
-
     # 4. Handler Upload File Excel yang Sudah Diisi (Poin 3)
     @reactive.Effect
     @reactive.event(input.btn_execute_import_count_sheet)
