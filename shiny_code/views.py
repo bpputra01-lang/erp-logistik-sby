@@ -716,11 +716,9 @@ def ongkir_tab2_view(state: AppState):
     filtered_data = state.get_filtered_ongkir()
     filtered_ids = [str(r.get("id")) for r in filtered_data if r.get("id") is not None]
     
-    # Cek apakah semua baris yang tampil sudah dipilih
     is_all_selected = len(filtered_ids) > 0 and all(item_id in set(state.selected_ids()) for item_id in filtered_ids)
     selected_count = len(state.selected_ids())
 
-    # Tombol Hapus & Tombol Select All
     del_btn_ui = ui.tags.button(
         f"🗑️ HAPUS ({selected_count}) DATA", 
         onclick="Shiny.setInputValue('btn_open_delete_modal', Math.random(), {priority: 'event'})", 
@@ -736,7 +734,6 @@ def ongkir_tab2_view(state: AppState):
 
     select_options = [ui.tags.option(opt, value=opt, selected=(opt == state.filter_ekspedisi())) for opt in state.get_list_ekspedisi_options()]
 
-    # Baris data tabel
     table_rows = [
         ui.tags.tr(
             ui.tags.td(
@@ -764,9 +761,9 @@ def ongkir_tab2_view(state: AppState):
     ) if has_date_filter else ui.div()
 
     return ui.div(
+        # --- KONTROL FILTER & BUTTONS ---
         ui.div(
             ui.div(
-                # Filter Ekspedisi
                 ui.div(
                     ui.span("EKSPEDISI:", style="font-size: 12px; font-weight: 800; color: #111111; margin-right: 6px;"),
                     ui.tags.select(
@@ -777,7 +774,6 @@ def ongkir_tab2_view(state: AppState):
                     ),
                     style="display: flex; align-items: center;"
                 ),
-                # Filter Tanggal Awal
                 ui.div(
                     ui.span("TGL AWAL:", style="font-size: 12px; font-weight: 800; color: #111111; margin-left: 10px; margin-right: 6px;"),
                     ui.tags.input(
@@ -789,7 +785,6 @@ def ongkir_tab2_view(state: AppState):
                     ),
                     style="display: flex; align-items: center;"
                 ),
-                # Filter Tanggal Akhir
                 ui.div(
                     ui.span("TGL AKHIR:", style="font-size: 12px; font-weight: 800; color: #111111; margin-left: 8px; margin-right: 6px;"),
                     ui.tags.input(
@@ -809,22 +804,42 @@ def ongkir_tab2_view(state: AppState):
                 del_btn_ui,
                 style="display: flex; align-items: center; gap: 8px;"
             ),
-            style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 1.5rem; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 10px;"
+            style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 1.5rem; margin-bottom: 1rem; flex-wrap: wrap; gap: 10px;"
         ),
+
+        # --- 3 ROW METRIC BOXES LENGKAP (PERSIS DENGAN KODE STREAMLIT) ---
         ui.div(
-            metric_box("💰 BIAYA ALL", state.metric_total_biaya_all(), "#C53030", "linear-gradient(135deg, #FED7D7 0%, #FEB2B2 100%)"),
-            metric_box("📦 KOLI ALL", state.metric_total_koli_all(), "#1A202C", "linear-gradient(135deg, #E2E8F0 0%, #CBD5E0 100%)"),
-            metric_box("📊 AVG COST ALL", state.metric_avg_cost_all(), "#C53030", "linear-gradient(135deg, #FED7D7 0%, #FEB2B2 100%)"),
-            metric_box("🚚 BIAYA DATANG", state.metric_biaya_datang(), "#276749", "linear-gradient(135deg, #C6F6D5 0%, #9AE6B4 100%)"),
-            metric_box("📦 KOLI DATANG", state.metric_koli_datang(), "#276749", "linear-gradient(135deg, #C6F6D5 0%, #9AE6B4 100%)"),
-            metric_box("🔄 BIAYA RTO", state.metric_biaya_rto(), "#9B2C2C", "linear-gradient(135deg, #FED7D7 0%, #FEB2B2 100%)"),
-            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.5rem;"
+            # ROW 1: TOTAL KESELURUHAN (ALL)
+            ui.div(
+                ongkir_dark_card("💰 TOTAL BIAYA ALL", state.metric_total_biaya_all(), "#38BDF8", "#38BDF8"),
+                ongkir_dark_card("📦 TOTAL KOLI ALL", state.metric_total_koli_all(), "#38BDF8", "#FFFFFF"),
+                ongkir_dark_card("📊 AVG COST ALL", state.metric_avg_cost_all(), "#38BDF8", "#38BDF8"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
+            ),
+
+            # ROW 2: BARANG DATANG (HIJAU NEON #00EB93)
+            ui.div(
+                ongkir_dark_card("🚚 BIAYA BARANG DATANG", state.metric_biaya_datang(), "#00EB93", "#00EB93"),
+                ongkir_dark_card("📦 KOLI BARANG DATANG", state.metric_koli_datang(), "#00EB93", "#00EB93"),
+                ongkir_dark_card("📊 AVG COST BARANG DATANG", state.metric_avg_datang(), "#00EB93", "#00EB93"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
+            ),
+
+            # ROW 3: RTO (MERAH NEON #FF4B4B)
+            ui.div(
+                ongkir_dark_card("🔄 BIAYA RTO", state.metric_biaya_rto(), "#FF4B4B", "#FF4B4B"),
+                ongkir_dark_card("📦 KOLI RTO", state.metric_koli_rto(), "#FF4B4B", "#FF4B4B"),
+                ongkir_dark_card("📊 AVG COST RTO", state.metric_avg_rto(), "#FF4B4B", "#FF4B4B"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.5rem;"
+            ),
+            style="width: 100%;"
         ),
+
+        # --- TABEL DATA ---
         ui.div(
             ui.tags.table(
                 ui.tags.thead(
                     ui.tags.tr(
-                        # Checkbox Select All pada Header Kolom
                         ui.tags.th(
                             ui.tags.input(
                                 type="checkbox", 
