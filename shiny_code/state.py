@@ -499,6 +499,11 @@ class AppState:
         self._raw_df_auditor_base = pd.DataFrame()
         self._raw_df_auditor_filtered = pd.DataFrame()
 
+        # --- MEMO PENGAJUAN STATE ---
+        self.memo_list = reactive.Value([])            # List semua memo
+        self.memo_current_items = reactive.Value([])    # List item barang di form draft
+        self.memo_selected_for_pdf = reactive.Value(None)
+
 
         # --- PHYSICAL INVENTORY LIST STATE (UNIFIED) ---
         self.pil_mode = reactive.Value("")
@@ -576,6 +581,7 @@ class AppState:
         elif cur_menu in ["Precentage Display", "Percentage Display", "Refill Toko"]: return "percentage_display"
         elif cur_menu in ["Latihan Rumus Excel", "Excel Practice", "latihan_excel"]: return "excel_practice"
         elif cur_menu in ["Form Auditor", "Audit Form", "form_auditor"]: return "form_auditor"
+        elif cur_menu in ["Memo Pengajuan", "memo_pengajuan"]: return "memo_pengajuan"
         return "under_development"
 
 
@@ -5561,3 +5567,122 @@ class AppState:
         wb.save(buf)
         buf.seek(0)
         return buf.getvalue()
+
+
+# ==========================================================================
+    # LOGIKA WORKFLOW MEMO PENGAJUAN
+    # ==========================================================================
+    def add_memo_item_draft(self, sku: str, name: str, cogs_str: str, qty_str: str):
+        sku = str(sku).strip().upper()
+        name = str(name).strip().upper()
+        cogs = safe_int(cogs_str, 0)
+        qty = safe_int(qty_str, 1)
+
+        if not sku:
+            return False, "SKU Barang tidak boleh kosong!"
+        if qty <= 0:
+            return False, "Quantity barang minimal 1!"
+
+        items = list(self.memo_current_items())
+        items.append({
+            "sku": sku,
+            "item_name": name if name else sku,
+            "cogs": cogs,
+            "qty": qty,
+            "subtotal": cogs * qty
+        })
+        self.memo_current_items.set(items)
+        return True, "Item berhasil ditambahkan ke daftar pengajuan!"
+
+    def remove_memo_item_draft(self, index: int):
+        items = list(self.memo_current_items())
+        if 0 <= index < len(items):
+            items.pop(index)
+            self.memo_current_items.set(items)
+
+    def submit_memo_pengajuan(self, tanggal: str, divisi: str, jenis: str, tujuan: str, diajukan_oleh: str):
+        items = list(self.memo_current_items())
+        if not items:
+            return False, "Daftar item barang masih kosong! Tambahkan minimal 1 item.", None
+
+        if not divisi or not jenis:
+            return False, "Pilih Divisi dan Jenis Pengajuan terlebih dahulu!", None
+
+        tot_nominal = sum([safe_int(x.get("subtotal", 0)) for x in items])
+        memo_no = f"MEMO/ZKN/{datetime.now().strftime('%Y%m%d')}/{random.randint(100, 999)}"
+
+        new_memo = {
+            "id": memo_no,
+            "tanggal": tanggal,
+            "divisi": divisi,
+            "jenis": jenis,
+            "tujuan": tujuan if tujuan else "-",
+            "nominal": tot_nominal,
+            "diajukan_oleh": diajukan_oleh if diajukan_oleh else "Tim " + divisi,
+            "diproses_oleh": "-",
+            "status_logistik": "Belum Diproses",
+            "diperiksa_oleh": "-",
+            "status_spv": "Belum Diperiksa",
+            "status_akhir": "Menunggu Logistik",
+            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "items": items
+        }
+
+        # Simpan ke list state
+        cur_list = list(self.memo_list())
+        cur_list.insert(0, new_memo)
+        self.memo_list.set(cur_list)
+
+        # Kosongkan draft item
+        self.memo_current_items.set([])
+
+        # Susun Link WhatsApp ke +62 823-3292-9992
+        import urllib.parse
+        msg_wa1 = f"Ada Request dari {divisi} dengan {jenis}, Tolong Proses ya. (No: {memo_no}, Nominal: Rp {tot_nominal:,})"
+        wa_url1 = f"https://api.whatsapp.com/send?phone=6282332929992&text={urllib.parse.quote(msg_wa1)}"
+
+        return True, f"Memo {memo_no} berhasil dibuat dan diajukan!", wa_url1
+
+    def approve_memo_by_logistik(self, memo_id: str, nama_logistik: str):
+        cur_list = list(self.memo_list())
+        found = False
+        target_memo = None
+
+        for m in cur_list:
+            if m["id"] == memo_id:
+                m["diproses_oleh"] = nama_logistik if nama_logistik else "Tim Logistik DC"
+                m["status_logistik"] = "Disetujui Logistik"
+                m["status_akhir"] = "Diproses Logistik (Menunggu SPV)"
+                target_memo = m
+                found = True
+                break
+
+        if not found:
+            return False, "Memo tidak ditemukan!", None
+
+        self.memo_list.set(cur_list)
+
+        # Susun Link WhatsApp Notifikasi ke 081232844032
+        import urllib.parse
+        msg_wa2 = f"Halo SPV, Memo Pengajuan {target_memo['id']} dari {target_memo['divisi']} ({target_memo['jenis']}) telah DIPROSES & DISETUJUI oleh Logistik ({target_memo['diproses_oleh']}). Mohon cek dan verifikasi proses barang."
+        wa_url2 = f"https://api.whatsapp.com/send?phone=6281232844032&text={urllib.parse.quote(msg_wa2)}"
+
+        return True, f"Memo {memo_id} berhasil diproses oleh Logistik!", wa_url2
+
+    def approve_memo_by_spv(self, memo_id: str, nama_spv: str):
+        cur_list = list(self.memo_list())
+        found = False
+
+        for m in cur_list:
+            if m["id"] == memo_id:
+                m["diperiksa_oleh"] = nama_spv if nama_spv else "SPV Warehouse"
+                m["status_spv"] = "Disetujui SPV"
+                m["status_akhir"] = "Disetujui SPV (Selesai)"
+                found = True
+                break
+
+        if not found:
+            return False, "Memo tidak ditemukan!"
+
+        self.memo_list.set(cur_list)
+        return True, f"Memo {memo_id} telah diverifikasi SPV! File PDF resmi sekarang dapat didownload."

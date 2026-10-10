@@ -1304,6 +1304,115 @@ def auditor_view(state: AppState):
         main_tabs,
         style="width: 100%; padding: 1rem;"
     )
+
+# ==============================================================================
+# VIEW: MEMO PENGAJUAN (2 TAB: FORM PENGAJUAN & HISTORY APPROVAL)
+# ==============================================================================
+def memo_pengajuan_view(state: AppState):
+    # Opsi Divisi & Jenis Pengajuan
+    divisi_choices = [
+        "MARKOM", "RETAIL / STORE", "OPERASIONAL", "PURCHASING", 
+        "FINANCE & ACCOUNTING", "HRD & GA", "LOGISTIK DC", "IT SUPPORT"
+    ]
+    jenis_choices = [
+        "Peminjaman Barang Display / Event",
+        "Pengeluaran Sample Promosi & Endorsement",
+        "Pengadaan Alat & Perlengkapan Kerja",
+        "Mutasi Barang Antar Divisi / Cabang",
+        "Penggantian Barang Rusak / Defect",
+        "Lainnya"
+    ]
+
+    # --- TAB 1: FORM INPUT MEMO & LIST BARANG ---
+    tab1_form = ui.div(
+        ui.div(
+            # Bagian Atas: Form Header Memo
+            ui.div(
+                ui.h4("📝 Identitas & Detail Pengajuan Memo", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 1rem;"),
+                ui.div(
+                    ui.div(
+                        ui.span("Tanggal Pengajuan:", style="font-size: 12px; font-weight: 800; color: #2D3748; display: block; margin-bottom: 4px;"),
+                        ui.input_date("memo_in_tanggal", None, value=datetime.now().strftime("%Y-%m-%d")),
+                        style="flex: 1; min-width: 180px;"
+                    ),
+                    ui.div(
+                        ui.span("Divisi Pemohon:", style="font-size: 12px; font-weight: 800; color: #2D3748; display: block; margin-bottom: 4px;"),
+                        ui.input_select("memo_in_divisi", None, choices=divisi_choices, selected="MARKOM"),
+                        style="flex: 1; min-width: 200px;"
+                    ),
+                    ui.div(
+                        ui.span("Jenis Pengajuan:", style="font-size: 12px; font-weight: 800; color: #2D3748; display: block; margin-bottom: 4px;"),
+                        ui.input_select("memo_in_jenis", None, choices=jenis_choices, selected=jenis_choices[0]),
+                        style="flex: 1.5; min-width: 260px;"
+                    ),
+                    style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;"
+                ),
+                ui.div(
+                    ui.div(
+                        ui.span("Tujuan / Keperluan:", style="font-size: 12px; font-weight: 800; color: #2D3748; display: block; margin-bottom: 4px;"),
+                        ui.tags.input(id="memo_in_tujuan", type="text", placeholder="Contoh: Keperluan Photoshoot Campaign Ramadhan / Event Surabaya", class_="form-control", style="width: 100%; border: 1.5px solid #CBD5E0; border-radius: 6px; padding: 8px 12px; font-size: 13px;"),
+                        style="flex: 2; min-width: 280px;"
+                    ),
+                    ui.div(
+                        ui.span("Diajukan Oleh (Nama PIC):", style="font-size: 12px; font-weight: 800; color: #2D3748; display: block; margin-bottom: 4px;"),
+                        ui.tags.input(id="memo_in_pemohon", type="text", placeholder="Nama Pemohon...", class_="form-control", style="width: 100%; border: 1.5px solid #CBD5E0; border-radius: 6px; padding: 8px 12px; font-size: 13px;"),
+                        style="flex: 1; min-width: 180px;"
+                    ),
+                    style="display: flex; gap: 1rem; flex-wrap: wrap;"
+                ),
+                style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 1.25rem; margin-bottom: 1.5rem;"
+            ),
+
+            # Bagian Tengah: Input List Barang (SKU, Item Name, COGS, QTY)
+            ui.div(
+                ui.h4("📦 List Item Barang yang Diajukan", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+                ui.div(
+                    ui.div(ui.span("SKU Barang:", style="font-size: 11px; font-weight: 700;"), ui.tags.input(id="item_in_sku", type="text", placeholder="Contoh: SPT-SPE-42-01", class_="form-control"), style="flex: 1; min-width: 160px;"),
+                    ui.div(ui.span("Item Name / Deskripsi:", style="font-size: 11px; font-weight: 700;"), ui.tags.input(id="item_in_name", type="text", placeholder="Nama Barang...", class_="form-control"), style="flex: 1.5; min-width: 220px;"),
+                    ui.div(ui.span("COGS (Harga Pokok):", style="font-size: 11px; font-weight: 700;"), ui.tags.input(id="item_in_cogs", type="number", value="0", placeholder="Rp...", class_="form-control"), style="flex: 1; min-width: 130px;"),
+                    ui.div(ui.span("Qty:", style="font-size: 11px; font-weight: 700;"), ui.tags.input(id="item_in_qty", type="number", value="1", min="1", class_="form-control"), style="width: 90px;"),
+                    ui.div(
+                        ui.tags.button(
+                            ui.tags.i(class_="fa-solid fa-plus", style="margin-right: 6px;"), "Tambah Item",
+                            onclick="Shiny.setInputValue('btn_add_item_to_memo', {sku: document.getElementById('item_in_sku').value, name: document.getElementById('item_in_name').value, cogs: document.getElementById('item_in_cogs').value, qty: document.getElementById('item_in_qty').value}, {priority: 'event'});",
+                            style="background: #10B981; color: white; font-weight: 700; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; height: 38px; display: flex; align-items: center; margin-top: 18px;"
+                        )
+                    ),
+                    style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: flex-start; margin-bottom: 1rem; background: #FFFFFF; border: 1px dashed #CBD5E0; padding: 1rem; border-radius: 8px;"
+                ),
+                ui.output_ui("memo_draft_items_table_ui"),
+                style="margin-bottom: 1.5rem;"
+            ),
+
+            # Bagian Bawah: Tombol Submit Memo
+            ui.div(
+                ui.tags.button(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-paper-plane", style="margin-right: 8px; font-size: 15px;"), "SUBMIT MEMO PENGAJUAN & KIRIM NOTIFIKASI WA"),
+                    onclick="Shiny.setInputValue('btn_execute_submit_memo', {tujuan: document.getElementById('memo_in_tujuan').value, pemohon: document.getElementById('memo_in_pemohon').value}, {priority: 'event'});",
+                    class_="btn-red-gradient",
+                    style="padding: 12px 24px; font-size: 14px; font-weight: 800;"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%;"
+            ),
+            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
+        ),
+        style="padding: 0.5rem 0;"
+    )
+
+    # --- TAB 2: RIWAYAT & WORKFLOW APPROVAL ---
+    tab2_history = ui.div(
+        ui.output_ui("memo_history_table_ui"),
+        style="padding: 0.5rem 0;"
+    )
+
+    return ui.div(
+        ui.navset_card_tab(
+            ui.nav_panel("📝 BUAT MEMO PENGAJUAN", tab1_form),
+            ui.nav_panel("📊 HISTORY & APPROVAL TRACKING", tab2_history)
+        ),
+        style="width: 100%; padding: 1rem;"
+    )
+
     
 def menu_item(label: str, target_menu: str, current_menu: str):
     import re

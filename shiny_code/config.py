@@ -156,3 +156,191 @@ def format_datetime_wib(df: pd.DataFrame, kolom: str, format_tampilan: str = "%d
         except Exception as e:
             print(f"Error saat memformat tanggal kolom '{kolom}': {e}")
     return df
+
+
+# ==============================================================================
+# GENERATOR PDF MEMO PENGAJUAN (SESUAI FORMAT GAMBAR JEZ)
+# ==============================================================================
+def generate_memo_pdf_bytes(memo_dict: dict) -> bytes:
+    """Menghasilkan file PDF Memo Pengajuan resmi dengan Kop Surat JEZ & 3 Kolom TTD"""
+    import io
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+
+    buf = io.BytesIO()
+    # Menggunakan orientasi landscape atau portrait A4 (portrait pas untuk format memo)
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=A4,
+        rightMargin=36,
+        leftMargin=36,
+        topMargin=30,
+        bottomMargin=30
+    )
+
+    story = []
+    styles = getSampleStyleSheet()
+
+    # Style Kustom
+    title_jez = ParagraphStyle(
+        'JezTitle',
+        fontName='Helvetica-Bold',
+        fontSize=24,
+        leading=26,
+        textColor=colors.HexColor('#E50914')
+    )
+    sub_jez = ParagraphStyle(
+        'JezSub',
+        fontName='Helvetica-Bold',
+        fontSize=9,
+        leading=11,
+        textColor=colors.black
+    )
+    title_memo = ParagraphStyle(
+        'MemoHeader',
+        fontName='Helvetica-Bold',
+        fontSize=20,
+        leading=22,
+        alignment=2,  # Rata Kanan
+        textColor=colors.HexColor('#E50914')
+    )
+    normal_bold = ParagraphStyle(
+        'NormalBold',
+        fontName='Helvetica-Bold',
+        fontSize=10,
+        leading=14
+    )
+    normal_text = ParagraphStyle(
+        'NormalText',
+        fontName='Helvetica',
+        fontSize=10,
+        leading=14
+    )
+    center_bold = ParagraphStyle(
+        'CenterBold',
+        fontName='Helvetica-Bold',
+        fontSize=9,
+        leading=12,
+        alignment=1
+    )
+    center_text = ParagraphStyle(
+        'CenterText',
+        fontName='Helvetica',
+        fontSize=9,
+        leading=12,
+        alignment=1
+    )
+
+    # 1. KOP SURAT (JEZ di Kiri, MEMO PENGAJUAN di Kanan)
+    kop_data = [
+        [
+            Paragraph("<b>JEZ</b><br/><font size=8>PT. ZONA KARYA NUSANTARA</font>", title_jez),
+            Paragraph("<u>MEMO PENGAJUAN</u>", title_memo)
+        ]
+    ]
+    kop_table = Table(kop_data, colWidths=[280, 240])
+    kop_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+    ]))
+    story.append(kop_table)
+    story.append(Spacer(1, 4))
+    story.append(HRFlowable(width="100%", thickness=1.5, color=colors.black, spaceAfter=12))
+
+    # 2. DETAIL INFORMASI MEMO
+    nominal_str = f"Rp {memo_dict.get('nominal', 0):,}"
+    info_data = [
+        [Paragraph("Tanggal", normal_bold), Paragraph(":", normal_bold), Paragraph(str(memo_dict.get('tanggal', '-')), normal_text)],
+        [Paragraph("Divisi", normal_bold), Paragraph(":", normal_bold), Paragraph(str(memo_dict.get('divisi', '-')), normal_text)],
+        [Paragraph("Jenis Pengajuan", normal_bold), Paragraph(":", normal_bold), Paragraph(str(memo_dict.get('jenis', '-')), normal_text)],
+        [Paragraph("Tujuan", normal_bold), Paragraph(":", normal_bold), Paragraph(str(memo_dict.get('tujuan', '-')), normal_text)],
+        [Paragraph("Nominal Pengajuan", normal_bold), Paragraph(":", normal_bold), Paragraph(nominal_str, normal_bold)],
+        [Paragraph("List Item Barang", normal_bold), Paragraph(":", normal_bold), Paragraph("Terlampir pada tabel di bawah ini :", normal_text)]
+    ]
+    info_table = Table(info_data, colWidths=[130, 15, 375])
+    info_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ('TOPPADDING', (0, 0), (-1, -1), 2),
+    ]))
+    story.append(info_table)
+    story.append(Spacer(1, 10))
+
+    # 3. TABEL DAFTAR BARANG
+    items = memo_dict.get("items", [])
+    table_rows = [
+        [
+            Paragraph("<b>NO</b>", center_bold),
+            Paragraph("<b>SKU</b>", center_bold),
+            Paragraph("<b>ITEM NAME</b>", center_bold),
+            Paragraph("<b>COGS (RP)</b>", center_bold),
+            Paragraph("<b>QTY</b>", center_bold),
+            Paragraph("<b>TOTAL (RP)</b>", center_bold)
+        ]
+    ]
+
+    for idx, it in enumerate(items, start=1):
+        cogs = safe_int(it.get('cogs', 0))
+        qty = safe_int(it.get('qty', 0))
+        subtot = cogs * qty
+        table_rows.append([
+            Paragraph(str(idx), center_text),
+            Paragraph(str(it.get('sku', '-')), center_text),
+            Paragraph(str(it.get('item_name', '-')), normal_text),
+            Paragraph(f"{cogs:,}", center_text),
+            Paragraph(str(qty), center_text),
+            Paragraph(f"{subtot:,}", center_text)
+        ])
+
+    # Baris Total
+    table_rows.append([
+        Paragraph("<b>TOTAL</b>", center_bold),
+        Paragraph("", center_bold),
+        Paragraph("", center_bold),
+        Paragraph("", center_bold),
+        Paragraph(f"<b>{sum([safe_int(x.get('qty', 0)) for x in items]):,}</b>", center_bold),
+        Paragraph(f"<b>Rp {memo_dict.get('nominal', 0):,}</b>", center_bold)
+    ])
+
+    items_table = Table(table_rows, colWidths=[30, 95, 185, 70, 45, 95])
+    items_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F1F5F9')),
+        ('GRID', (0, 0), (-1, -1), 0.8, colors.black),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('SPAN', (0, -1), (3, -1)),  # Merge NO s/d COGS untuk baris total
+        ('ALIGN', (0, -1), (3, -1), 'CENTER'),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+    ]))
+    story.append(items_table)
+    story.append(Spacer(1, 25))
+
+    # 4. KOTAK TANDA TANGAN (PERSIS FORMAT GAMBAR: Diajukan oleh | Diproses oleh | Diperiksa oleh)
+    sign_data = [
+        [
+            Paragraph("<b>Diajukan oleh,</b>", center_bold),
+            Paragraph("<b>Diproses oleh,</b>", center_bold),
+            Paragraph("<b>Diperiksa oleh,</b>", center_bold)
+        ],
+        [
+            Paragraph(f"<br/><br/><br/><b>({memo_dict.get('diajukan_oleh', 'Tim Pemohon')})</b><br/><font size=7 color='#666'>Tgl: {memo_dict.get('tanggal', '-')}</font>", center_text),
+            Paragraph(f"<br/><br/><br/><b>({memo_dict.get('diproses_oleh', 'Tim Logistik')})</b><br/><font size=7 color='#666'>Status: {memo_dict.get('status_logistik', 'Pending')}</font>", center_text),
+            Paragraph(f"<br/><br/><br/><b>({memo_dict.get('diperiksa_oleh', 'SPV / Manager')})</b><br/><font size=7 color='#666'>Status: {memo_dict.get('status_spv', 'Pending')}</font>", center_text)
+        ]
+    ]
+
+    sign_table = Table(sign_data, colWidths=[173, 173, 174])
+    sign_table.setStyle(TableStyle([
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('TOPPADDING', (0, 0), (-1, 0), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+        ('BOTTOMPADDING', (0, 1), (-1, 1), 10),
+    ]))
+    story.append(sign_table)
+
+    doc.build(story)
+    buf.seek(0)
+    return buf.getvalue()
