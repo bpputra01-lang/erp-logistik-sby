@@ -5643,7 +5643,7 @@ class AppState:
 
         # Susun Link WhatsApp ke +62 823-3292-9992 sesuai format permintaan
         pesan_wa = f"Ada Request dari {divisi} dengan {jenis}, Tolong Proses ya"
-        wa_url = f"https://api.whatsapp.com/send?phone=6282332929992&text={urllib.parse.quote(pesan_wa)}"
+        wa_url = f"https://api.whatsapp.com/send?text={urllib.parse.quote(pesan_wa)}"
 
         return True, f"Memo {memo_no} berhasil dibuat!", wa_url
 

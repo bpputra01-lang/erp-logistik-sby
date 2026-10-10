@@ -3664,13 +3664,13 @@ def server(input: Inputs, output: Outputs, session: Session):
             else:
                 badge_bg = "#FED7D7"; badge_col = "#742A2A"
 
-            # Link WhatsApp Cadangan (+62 823-3292-9992)
-            pesan_wa = urllib.parse.quote(f"Ada Request dari {divisi} dengan {jenis}, Tolong Proses ya")
-            wa_href = f"https://api.whatsapp.com/send?phone=6282332929992&text={pesan_wa}"
+            # Tombol Chat WhatsApp ke Grup
+            pesan_wa = urllib.parse.quote(f"Ada Request dari {divisi} dengan {jenis}, Tolong Proses ya (No: {m_id})")
+            wa_href = f"https://api.whatsapp.com/send?text={pesan_wa}"
 
             wa_link_btn = ui.tags.a(
                 ui.tags.i(class_="fa-brands fa-whatsapp", style="margin-right: 6px; font-size: 13px;"),
-                "Chat WA Logistik",
+                "Share ke Grup DC",
                 href=wa_href,
                 target="_blank",
                 style="background: #25D366; color: white; padding: 7px 12px; border-radius: 6px; text-decoration: none; font-weight: 700; font-size: 12px; display: inline-flex; align-items: center;"
