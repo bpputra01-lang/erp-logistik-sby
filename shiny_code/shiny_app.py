@@ -3639,6 +3639,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             ui.notification_show(f"⚠️ {msg}", type="warning", duration=5)
 
     # 5. Render Tabel History & Approval Tracking di Tab 2
+    # 5. Render Tabel History & Approval Tracking di Tab 2
     @render.ui
     def memo_history_table_ui():
         memos = state.memo_list()
@@ -3665,16 +3666,10 @@ def server(input: Inputs, output: Outputs, session: Session):
             else:
                 badge_bg = "#FED7D7"; badge_col = "#742A2A"
 
-            # Format Rincian Barang
-            item_lines = []
-            for idx, it in enumerate(m.get('items', []), start=1):
-                item_lines.append(f"{idx}. {it.get('sku', '')} & {it.get('item_name', '')} & {it.get('qty', 1)}")
+            # Format Chat WA ke Grup
+            item_lines = [f"{idx}. {it.get('sku')} & {it.get('item_name')} & {it.get('qty')}" for idx, it in enumerate(m.get('items', []), 1)]
             list_str = "\n".join(item_lines)
-
-            # Format Pesan Sesuai Permintaan
-            pesan_wa = urllib.parse.quote(
-                f"Ada Request dari {divisi} dengan {jenis}, Tolong Proses ya (No: {m_id})\n\n{list_str}"
-            )
+            pesan_wa = urllib.parse.quote(f"Ada Request dari {divisi} dengan {jenis}, Tolong Proses ya (No: {m_id})\n\n{list_str}")
             wa_href = f"https://api.whatsapp.com/send?text={pesan_wa}"
 
             wa_link_btn = ui.tags.a(
@@ -3693,7 +3688,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                     ui.tags.button(
                         ui.tags.i(class_="fa-solid fa-box-open", style="margin-right: 6px;"),
                         "PROSES & APPROVE LOGISTIK",
-                        onclick=f"Shiny.setInputValue('btn_approve_logistik', '{m_id}', {{priority: 'event'}})",
+                        onclick=f"Shiny.setInputValue('btn_open_approve_logistik_modal', '{m_id}', {{priority: 'event'}})",
                         style="background: #3182CE; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer;"
                     )
                 )
@@ -3702,7 +3697,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                     ui.tags.button(
                         ui.tags.i(class_="fa-solid fa-user-check", style="margin-right: 6px;"),
                         "VERIFIKASI & APPROVE SPV",
-                        onclick=f"Shiny.setInputValue('btn_approve_spv', '{m_id}', {{priority: 'event'}})",
+                        onclick=f"Shiny.setInputValue('btn_open_approve_spv_modal', '{m_id}', {{priority: 'event'}})",
                         style="background: #10B981; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer;"
                     )
                 )
@@ -3715,6 +3710,15 @@ def server(input: Inputs, output: Outputs, session: Session):
                         style="background: linear-gradient(135deg, #E50914 0%, #B20710 100%); color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer; box-shadow: 0 4px 10px rgba(229,9,20,0.3);"
                     )
                 )
+
+            # 👇 TOMBOL HAPUS MEMO DITAMBAHKAN PADA SETIAP KARTU 👇
+            btn_hapus_memo = ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-trash", style="margin-right: 4px; font-size: 12px;"),
+                "Hapus",
+                onclick=f"Shiny.setInputValue('btn_open_del_memo_modal', '{m_id}', {{priority: 'event'}})",
+                style="background: #FFF5F5; color: #E53E3E; border: 1.5px solid #FEB2B2; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer; display: inline-flex; align-items: center;"
+            )
+            action_buttons.append(btn_hapus_memo)
 
             cards.append(ui.div(
                 ui.div(
@@ -3729,7 +3733,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                     ui.div(
                         ui.span(f"Total: Rp {m.get('nominal', 0):,}", style="font-weight: 800; font-size: 16px; color: #E50914; margin-right: 12px;"),
                         *action_buttons,
-                        style="display: flex; align-items: center; gap: 8px;"
+                        style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"
                     ),
                     style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;"
                 ),
@@ -3749,12 +3753,63 @@ def server(input: Inputs, output: Outputs, session: Session):
             ui.output_ui("memo_pdf_downloader_container_ui")
         )
 
-    # 6. Handler Approval Logistik -> Notif WA ke 081232844032
+    # 6A. Pop-up Modal Input Nama Petugas Logistik Sebelum Approval
     @reactive.Effect
-    @reactive.event(input.btn_approve_logistik)
-    def _on_approve_logistik():
-        m_id = input.btn_approve_logistik()
-        succ, msg, wa_url = state.approve_memo_by_logistik(m_id, state.user_display_name())
+    @reactive.event(input.btn_open_approve_logistik_modal)
+    def _open_logistik_modal():
+        m_id = input.btn_open_approve_logistik_modal()
+        ui.modal_show(ui.modal(
+            ui.div(
+                ui.h4(f"Proses Memo: {m_id}", style="font-weight: 800; color: #1A202C; margin-bottom: 8px; font-size: 15px;"),
+                ui.p("Wajib mengisi nama petugas Logistik yang memproses pengeluaran barang ini sebelum mengirimkan notifikasi ke SPV.", style="font-size: 13px; color: #4A5568; margin-bottom: 12px;"),
+                ui.div(
+                    ui.span("Nama Petugas Logistik (Wajib):", style="font-weight: 700; font-size: 12px; display: block; margin-bottom: 4px; color: #2D3748;"),
+                    ui.tags.input(
+                        id="input_nama_logistik_modal",
+                        type="text",
+                        placeholder="Masukkan nama Anda (misal: Yudi / Danar)...",
+                        class_="form-control",
+                        style="width: 100%; border: 1.5px solid #CBD5E0; border-radius: 6px; padding: 8px 12px; font-size: 13px;"
+                    ),
+                    style="margin-bottom: 1rem;"
+                ),
+                style="padding: 0.5rem 0;"
+            ),
+            title="📦 Input PIC Logistik",
+            easy_close=True,
+            footer=ui.div(
+                ui.modal_button("Batal"),
+                ui.tags.button(
+                    "Proses & Kirim WA ke SPV",
+                    onclick=f"""
+                        let nama = document.getElementById('input_nama_logistik_modal') ? document.getElementById('input_nama_logistik_modal').value.trim() : '';
+                        if (!nama) {{
+                            alert('Nama Petugas Logistik wajib diisi!');
+                            return;
+                        }}
+                        Shiny.setInputValue('btn_confirm_approve_logistik', {{id: '{m_id}', nama: nama}}, {{priority: 'event'}});
+                    """,
+                    class_="btn-red-gradient",
+                    style="padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 800; margin-left: 8px;"
+                ),
+                style="display: flex; justify-content: flex-end;"
+            )
+        ))
+
+    # 6B. Eksekusi Approval Logistik
+    @reactive.Effect
+    @reactive.event(input.btn_confirm_approve_logistik)
+    def _on_confirm_approve_logistik():
+        data = input.btn_confirm_approve_logistik() or {}
+        m_id = data.get("id", "")
+        nama = data.get("nama", "")
+
+        if not nama.strip():
+            ui.notification_show("⚠️ Nama Petugas Logistik wajib diisi!", type="warning", duration=4)
+            return
+
+        ui.modal_remove()
+        succ, msg, wa_url = state.approve_memo_by_logistik(m_id, nama)
         if succ:
             ui.insert_ui(
                 ui.tags.script(f"""
@@ -3769,20 +3824,104 @@ def server(input: Inputs, output: Outputs, session: Session):
         else:
             ui.notification_show(f"⚠️ {msg}", type="warning", duration=4)
 
-    # 7. Handler Approval SPV
+    # 7A. Pop-up Modal Input Nama SPV Sebelum Verifikasi
     @reactive.Effect
-    @reactive.event(input.btn_approve_spv)
-    def _on_approve_spv():
-        m_id = input.btn_approve_spv()
-        succ, msg = state.approve_memo_by_spv(m_id, state.user_display_name())
+    @reactive.event(input.btn_open_approve_spv_modal)
+    def _open_spv_modal():
+        m_id = input.btn_open_approve_spv_modal()
+        ui.modal_show(ui.modal(
+            ui.div(
+                ui.h4(f"Verifikasi SPV: {m_id}", style="font-weight: 800; color: #1A202C; margin-bottom: 8px; font-size: 15px;"),
+                ui.p("Wajib mengisi nama SPV / Verifikator untuk menyelesaikan status memo ini dan membuka akses download PDF.", style="font-size: 13px; color: #4A5568; margin-bottom: 12px;"),
+                ui.div(
+                    ui.span("Nama SPV / Verifikator (Wajib):", style="font-weight: 700; font-size: 12px; display: block; margin-bottom: 4px; color: #2D3748;"),
+                    ui.tags.input(
+                        id="input_nama_spv_modal",
+                        type="text",
+                        placeholder="Masukkan nama SPV (misal: Bintang)...",
+                        class_="form-control",
+                        style="width: 100%; border: 1.5px solid #CBD5E0; border-radius: 6px; padding: 8px 12px; font-size: 13px;"
+                    ),
+                    style="margin-bottom: 1rem;"
+                ),
+                style="padding: 0.5rem 0;"
+            ),
+            title="🛡️ Input PIC SPV Warehouse",
+            easy_close=True,
+            footer=ui.div(
+                ui.modal_button("Batal"),
+                ui.tags.button(
+                    "Setujui & Selesaikan Memo",
+                    onclick=f"""
+                        let nama = document.getElementById('input_nama_spv_modal') ? document.getElementById('input_nama_spv_modal').value.trim() : '';
+                        if (!nama) {{
+                            alert('Nama SPV wajib diisi!');
+                            return;
+                        }}
+                        Shiny.setInputValue('btn_confirm_approve_spv', {{id: '{m_id}', nama: nama}}, {{priority: 'event'}});
+                    """,
+                    style="background: #10B981; color: white; border: none; padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 800; cursor: pointer; margin-left: 8px;"
+                ),
+                style="display: flex; justify-content: flex-end;"
+            )
+        ))
+
+    # 7B. Eksekusi Approval SPV
+    @reactive.Effect
+    @reactive.event(input.btn_confirm_approve_spv)
+    def _on_confirm_approve_spv():
+        data = input.btn_confirm_approve_spv() or {}
+        m_id = data.get("id", "")
+        nama = data.get("nama", "")
+
+        if not nama.strip():
+            ui.notification_show("⚠️ Nama SPV wajib diisi!", type="warning", duration=4)
+            return
+
+        ui.modal_remove()
+        succ, msg = state.approve_memo_by_spv(m_id, nama)
         if succ:
             state.show_success_modal.set(True)
-            ui.notification_show(msg, type="message", duration=4)
+            ui.notification_show(f"✅ {msg}", type="message", duration=4)
         else:
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
 
-    # 8. Handler Persiapan Download PDF
+    # 8A. Pop-up Modal Konfirmasi Hapus Memo
+    @reactive.Effect
+    @reactive.event(input.btn_open_del_memo_modal)
+    def _open_del_memo_modal():
+        m_id = input.btn_open_del_memo_modal()
+        ui.modal_show(ui.modal(
+            ui.div(
+                ui.tags.i(class_="fa-solid fa-triangle-exclamation", style="font-size: 40px; color: #E53E3E; margin-bottom: 8px;"),
+                ui.h4(f"Hapus Memo {m_id}?", style="font-weight: 800; color: #1A202C; margin: 0 0 6px 0;"),
+                ui.p("Apakah Anda yakin ingin menghapus data memo ini secara permanen dari database Supabase?", style="color: #718096; font-size: 13px; margin: 0;"),
+                style="text-align: center; padding: 1rem 0;"
+            ),
+            title="🗑️ Konfirmasi Hapus Memo",
+            easy_close=True,
+            footer=ui.div(
+                ui.modal_button("Batal"),
+                ui.tags.button(
+                    "Ya, Hapus Permanen",
+                    onclick=f"Shiny.setInputValue('btn_confirm_del_memo', '{m_id}', {{priority: 'event'}})",
+                    style="background: #E53E3E; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-left: 8px;"
+                ),
+                style="display: flex; justify-content: flex-end;"
+            )
+        ))
+
+    # 8B. Eksekusi Hapus Memo
+    @reactive.Effect
+    @reactive.event(input.btn_confirm_del_memo)
+    def _on_confirm_del_memo():
+        m_id = input.btn_confirm_del_memo()
+        ui.modal_remove()
+        succ, msg = state.delete_memo(m_id)
+        ui.notification_show(f"🗑️ {msg}", type="message", duration=4)
+
+    # 9. Handler Download PDF
     @reactive.Effect
     @reactive.event(input.btn_prepare_pdf_memo)
     def _on_prep_pdf():
@@ -3792,7 +3931,6 @@ def server(input: Inputs, output: Outputs, session: Session):
             state.memo_selected_for_pdf.set(memos[0])
             ui.notification_show("Dokumen PDF siap diunduh! Klik tombol download hijau di bawah.", type="message", duration=4)
 
-    # 9. Tombol Download PDF yang Muncul Otomatis
     @render.ui
     def memo_pdf_downloader_container_ui():
         sel = state.memo_selected_for_pdf()
@@ -3811,7 +3949,6 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="background: #D1FAE5; border: 1.5px solid #6EE7B7; border-radius: 8px; padding: 10px 14px; margin-top: 1rem;"
         )
 
-    # 10. Generator File PDF
     @render.download(filename=lambda: f"{state.memo_selected_for_pdf().get('id', 'MEMO').replace('/', '_')}.pdf" if state.memo_selected_for_pdf() else "MEMO.pdf")
     def btn_dl_memo_pdf_file():
         from config import generate_memo_pdf_bytes
@@ -3820,7 +3957,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             yield b""
         else:
             yield generate_memo_pdf_bytes(sel)
-
+            
 # A. Buka Pop-up Modal Bulk Upload
     @reactive.Effect
     @reactive.event(input.btn_open_memo_bulk_modal)

@@ -5718,10 +5718,28 @@ class AppState:
 
         return True, f"Memo {memo_no} berhasil disimpan ke database!", wa_url
 
-    # 3. Update di approve_memo_by_logistik: Gunakan Enter (\n) yang benar
+    # 1. Fungsi Hapus Memo Permanen dari Database Supabase
+    def delete_memo(self, memo_id: str):
+        try:
+            client = get_supabase()
+            if client:
+                client.table("memo_pengajuan").delete().in_("id", [memo_id]).execute()
+            self.load_memo_data()
+            return True, f"Memo {memo_id} berhasil dihapus dari database!"
+        except Exception as e:
+            print("Gagal hapus memo dari Supabase:", e)
+            cur_list = [m for m in self.memo_list() if m["id"] != memo_id]
+            self.memo_list.set(cur_list)
+            return True, f"Memo {memo_id} berhasil dihapus!"
+
+    # 2. Update Approval Logistik (Menyimpan Nama Petugas Logistik)
     def approve_memo_by_logistik(self, memo_id: str, nama_logistik: str):
+        nama = str(nama_logistik).strip().upper()
+        if not nama or nama in ["-", "NONE", "NAN"]:
+            return False, "Nama Petugas Logistik wajib diisi!", None
+
         payload = {
-            "diproses_oleh": nama_logistik if nama_logistik else "Tim Logistik DC",
+            "diproses_oleh": nama,
             "status_logistik": "Disetujui Logistik",
             "status_akhir": "Diproses Logistik (Menunggu SPV)"
         }
@@ -5736,15 +5754,21 @@ class AppState:
         target_memo = next((m for m in self.memo_list() if m["id"] == memo_id), None)
         item_lines = [f"{idx}. {it.get('sku')} & {it.get('item_name')} & {it.get('qty')}" for idx, it in enumerate(target_memo.get('items', []), 1)] if target_memo else []
         list_str = "\n".join(item_lines)
-        pesan_wa2 = f"Halo SPV, Memo {memo_id} telah DIPROSES oleh Logistik. Mohon dicek untuk verifikasi pengeluaran barang.\n\n{list_str}"
+
+        # Pesan WA SPV mencantumkan nama petugas logistik yang memproses
+        pesan_wa2 = f"Halo SPV, Memo {memo_id} telah DIPROSES oleh Logistik ({nama}). Mohon dicek untuk verifikasi pengeluaran barang.\n\n{list_str}"
         wa_url2 = f"https://api.whatsapp.com/send?phone=6281232844032&text={urllib.parse.quote(pesan_wa2)}"
 
-        return True, f"Memo {memo_id} berhasil diproses oleh Logistik!", wa_url2
+        return True, f"Memo {memo_id} berhasil diproses oleh {nama}!", wa_url2
 
-    # 4. Update status SPV di Supabase
+    # 3. Update Approval SPV (Menyimpan Nama SPV)
     def approve_memo_by_spv(self, memo_id: str, nama_spv: str):
+        nama = str(nama_spv).strip().upper()
+        if not nama or nama in ["-", "NONE", "NAN"]:
+            return False, "Nama SPV wajib diisi!"
+
         payload = {
-            "diperiksa_oleh": nama_spv if nama_spv else "SPV Warehouse",
+            "diperiksa_oleh": nama,
             "status_spv": "Disetujui SPV",
             "status_akhir": "Disetujui SPV (Selesai)"
         }
@@ -5756,4 +5780,4 @@ class AppState:
         except Exception as e:
             print("Gagal update SPV di Supabase:", e)
 
-        return True, f"Memo {memo_id} telah disetujui SPV! Dokumen PDF resmi siap diunduh."
+        return True, f"Memo {memo_id} telah disetujui oleh SPV ({nama})! Dokumen PDF resmi siap diunduh."
