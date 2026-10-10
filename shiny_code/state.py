@@ -476,7 +476,7 @@ class AppState:
         self.df_exam_result_rows = reactive.Value([])
         self._raw_df_exam_result = pd.DataFrame()
 
-        # --- FORM AUDITOR (EXTERNAL AUDIT PACK) STATE ---
+        # --- FORM AUDITOR (EXTENDED PRO) ---
         self.auditor_uploaded = reactive.Value(False)
         self.auditor_processed = reactive.Value(False)
         self.auditor_list_brand = reactive.Value([])
@@ -486,6 +486,8 @@ class AppState:
         self.auditor_total_bin = reactive.Value(0)
         self.auditor_total_sku = reactive.Value(0)
         self.auditor_total_qty = reactive.Value(0)
+        self.auditor_total_phys = reactive.Value(0)
+        self.auditor_total_var = reactive.Value(0)
 
         # Engagement Details
         self.auditor_company = reactive.Value("PT ZONA KARYA NUSANTARA")
@@ -497,12 +499,15 @@ class AppState:
         self.auditor_lead = reactive.Value("")
         self.auditor_manager = reactive.Value("")
         self.auditor_supervisor = reactive.Value("")
+        self.auditor_counter = reactive.Value("Counter A")
         self.auditor_currency = reactive.Value("IDR")
 
-        self.df_auditor_headers = reactive.Value([])
-        self.df_auditor_rows = reactive.Value([])
-        self._raw_df_auditor_base = pd.DataFrame()
-        self._raw_df_auditor_filtered = pd.DataFrame()
+        # Tab 3: Dynamic Observations & Findings
+        self.auditor_findings_list = reactive.Value([])
+
+        # Tab 5: History Audit Supabase
+        self.auditor_history_list = reactive.Value([])
+        self.auditor_selected_for_pdf = reactive.Value(None)
 
         # --- MEMO PENGAJUAN STATE ---
         self.memo_list = reactive.Value([])            # List semua memo
@@ -5403,7 +5408,7 @@ class AppState:
         self.df_auditor_rows.set(count_sheet_df.fillna("").astype(str).values.tolist() if not count_sheet_df.empty else [])
         self.auditor_processed.set(True)
 
-    def generate_auditor_excel_pack(self, form_meta: dict):
+def generate_auditor_excel_pack(self, form_meta: dict):
         import io
         from openpyxl import Workbook
         from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -5425,7 +5430,7 @@ class AppState:
         )
 
         # ======================================================================
-        # SHEET 1: ENGAGEMENT DETAILS (GAMBAR 1)
+        # SHEET 1: ENGAGEMENT DETAILS
         # ======================================================================
         ws_eng = wb.active
         ws_eng.title = "ENGAGEMENT DETAILS"
@@ -5470,7 +5475,7 @@ class AppState:
         ws_eng.column_dimensions['D'].width = 35
 
         # ======================================================================
-        # SHEET 2: STOCK COUNT SHEET (GAMBAR 2 - HASIL FILTER DROPDOWN AUDITOR)
+        # SHEET 2: STOCK COUNT SHEET (DENGAN HASIL INPUT FISIK & COUNTER AKTIF)
         # ======================================================================
         ws_cnt = wb.create_sheet(title="STOCK COUNT SHEET")
         ws_cnt.sheet_view.showGridLines = True
@@ -5497,29 +5502,32 @@ class AppState:
 
         df_out = self._raw_df_auditor_filtered
         for r_idx, row in enumerate(df_out.itertuples(index=False), start=7):
-            # Posisi: row[0]=No, row[1]=Bin, row[2]=SKU, row[3]=Desc, row[4]=Cat, row[5]=UoM, row[6]=QtySys
             ws_cnt.cell(row=r_idx, column=1, value=r_idx - 6).alignment = Alignment(horizontal="center")
-            c_bin = ws_cnt.cell(row=r_idx, column=2, value=str(row[1])); c_bin.font = font_blue
-            c_sku = ws_cnt.cell(row=r_idx, column=3, value=str(row[2])); c_sku.font = font_blue
-            c_desc = ws_cnt.cell(row=r_idx, column=4, value=str(row[3])); c_desc.font = font_blue
-            c_cat = ws_cnt.cell(row=r_idx, column=5, value=str(row[4])); c_cat.font = font_blue
-            c_uom = ws_cnt.cell(row=r_idx, column=6, value=str(row[5])); c_uom.font = font_blue; c_uom.alignment = Alignment(horizontal="center")
+            ws_cnt.cell(row=r_idx, column=2, value=str(row[1])).font = font_blue
+            ws_cnt.cell(row=r_idx, column=3, value=str(row[2])).font = font_blue
+            ws_cnt.cell(row=r_idx, column=4, value=str(row[3])).font = font_blue
+            ws_cnt.cell(row=r_idx, column=5, value=str(row[4])).font = font_blue
+            ws_cnt.cell(row=r_idx, column=6, value=str(row[5])).font = font_blue
+            ws_cnt.cell(row=r_idx, column=6).alignment = Alignment(horizontal="center")
             
             # Qty System
             ws_cnt.cell(row=r_idx, column=7, value=int(row[6])).alignment = Alignment(horizontal="right")
             
-            # Physical Count (Kuning Kosong untuk diisi Auditor di lapangan)
-            c_phys = ws_cnt.cell(row=r_idx, column=8, value="")
+            # Physical Count (Jika sudah diisi di web, tetap tercetak rapi)
+            phys_val = row[7] if str(row[7]).strip() != "" else ""
+            c_phys = ws_cnt.cell(row=r_idx, column=8, value=phys_val)
             c_phys.fill = yellow_fill
             c_phys.alignment = Alignment(horizontal="right")
             
-            # Rumus Variance (Actual - System)
+            # Rumus Variance
             ws_cnt.cell(row=r_idx, column=9, value=f'=IF(H{r_idx}="","",H{r_idx}-G{r_idx})').alignment = Alignment(horizontal="right")
             
-            # Counter, Verified, Remarks
-            c_ctr = ws_cnt.cell(row=r_idx, column=10, value="Counter A"); c_ctr.font = font_blue; c_ctr.alignment = Alignment(horizontal="center")
-            c_ver = ws_cnt.cell(row=r_idx, column=11, value="No"); c_ver.font = font_blue; c_ver.alignment = Alignment(horizontal="center")
-            ws_cnt.cell(row=r_idx, column=12, value="")
+            # Counter & Status Verified
+            ctr_val = str(row[9]) if str(row[9]).strip() != "" else form_meta.get("counter_name", "Counter A")
+            c_ctr = ws_cnt.cell(row=r_idx, column=10, value=ctr_val); c_ctr.font = font_blue; c_ctr.alignment = Alignment(horizontal="center")
+            ver_val = str(row[10]) if str(row[10]).strip() != "" else "No"
+            c_ver = ws_cnt.cell(row=r_idx, column=11, value=ver_val); c_ver.font = font_blue; c_ver.alignment = Alignment(horizontal="center")
+            ws_cnt.cell(row=r_idx, column=12, value=str(row[11]))
 
             for c in range(1, 13):
                 ws_cnt.cell(row=r_idx, column=c).border = thin_border
@@ -5529,7 +5537,7 @@ class AppState:
             ws_cnt.column_dimensions[col_letter].width = width
 
         # ======================================================================
-        # SHEET 3: AUDITOR OBSERVATIONS & FINDINGS (GAMBAR 3)
+        # SHEET 3: OBSERVATIONS & FINDINGS (LOOP LENGKAP SEMUA TEMUAN)
         # ======================================================================
         ws_obs = wb.create_sheet(title="OBSERVATIONS & FINDINGS")
         ws_obs.sheet_view.showGridLines = True
@@ -5546,43 +5554,36 @@ class AppState:
             cell.font = font_th
             cell.alignment = Alignment(horizontal="center", vertical="center")
 
-        # Baris Contoh Sesuai Gambar 3
-        c_a = ws_obs.cell(row=5, column=1, value="Condition of stock"); c_a.font = font_blue
-        c_b = ws_obs.cell(row=5, column=2, value="EXAMPLE: Several footwear cartons in Zone C show water damage, not segregated."); c_b.font = font_blue
-        c_c = ws_obs.cell(row=5, column=3, value="Medium"); c_c.fill = yellow_fill; c_c.font = font_blue; c_c.alignment = Alignment(horizontal="center")
-        c_d = ws_obs.cell(row=5, column=4, value="Segregate and assess for markdown / write-down to NRV."); c_d.font = font_blue
-        ws_obs.cell(row=5, column=5, value="")
-        ws_obs.cell(row=5, column=6, value="")
-        c_g = ws_obs.cell(row=5, column=7, value="Open"); c_g.font = font_blue; c_g.alignment = Alignment(horizontal="center")
-        for c in range(1, 8): ws_obs.cell(row=5, column=c).border = thin_border
-
-        # Baris Temuan dari Input Tab 3 Web (Jika diisi auditor)
-        if form_meta.get("obs_case"):
-            c_a2 = ws_obs.cell(row=6, column=1, value=form_meta.get("obs_area", "Condition of stock")); c_a2.font = font_blue
-            c_b2 = ws_obs.cell(row=6, column=2, value=form_meta.get("obs_case", "")); c_b2.font = font_blue
-            c_c2 = ws_obs.cell(row=6, column=3, value=form_meta.get("obs_risk", "Medium")); c_c2.fill = yellow_fill; c_c2.font = font_blue; c_c2.alignment = Alignment(horizontal="center")
-            c_d2 = ws_obs.cell(row=6, column=4, value=form_meta.get("obs_recom", "")); c_d2.font = font_blue
-            ws_obs.cell(row=6, column=5, value="")
-            ws_obs.cell(row=6, column=6, value="")
-            c_g2 = ws_obs.cell(row=6, column=7, value=form_meta.get("obs_status", "Open")); c_g2.font = font_blue; c_g2.alignment = Alignment(horizontal="center")
-            for c in range(1, 8): ws_obs.cell(row=6, column=c).border = thin_border
-            start_empty = 7
+        findings = list(self.auditor_findings_list())
+        curr_obs_row = 5
+        if findings:
+            for fd in findings:
+                ws_obs.cell(row=curr_obs_row, column=1, value=str(fd.get("area", "Condition of stock"))).font = font_blue
+                ws_obs.cell(row=curr_obs_row, column=2, value=str(fd.get("case", ""))).font = font_blue
+                c_risk = ws_obs.cell(row=curr_obs_row, column=3, value=str(fd.get("risk", "Medium")))
+                c_risk.fill = yellow_fill; c_risk.font = font_blue; c_risk.alignment = Alignment(horizontal="center")
+                ws_obs.cell(row=curr_obs_row, column=4, value=str(fd.get("recom", ""))).font = font_blue
+                ws_obs.cell(row=curr_obs_row, column=5, value="")
+                ws_obs.cell(row=curr_obs_row, column=6, value="")
+                c_st = ws_obs.cell(row=curr_obs_row, column=7, value=str(fd.get("status", "Open")))
+                c_st.font = font_blue; c_st.alignment = Alignment(horizontal="center")
+                for c in range(1, 8): ws_obs.cell(row=curr_obs_row, column=c).border = thin_border
+                curr_obs_row += 1
         else:
-            start_empty = 6
-
-        # Baris Kosong Berbingkai untuk Auditor
-        for r_empty in range(start_empty, 16):
-            c_risk = ws_obs.cell(row=r_empty, column=3, value="")
-            c_risk.fill = yellow_fill
-            for c in range(1, 8):
-                ws_obs.cell(row=r_empty, column=c).border = thin_border
+            ws_obs.cell(row=curr_obs_row, column=1, value="Condition of stock").font = font_blue
+            ws_obs.cell(row=curr_obs_row, column=2, value="EXAMPLE: Stock in good order, no segregation required.").font = font_blue
+            c_c = ws_obs.cell(row=curr_obs_row, column=3, value="Low"); c_c.fill = yellow_fill; c_c.font = font_blue; c_c.alignment = Alignment(horizontal="center")
+            ws_obs.cell(row=curr_obs_row, column=4, value="Maintain cleanliness.").font = font_blue
+            ws_obs.cell(row=curr_obs_row, column=7, value="Closed").alignment = Alignment(horizontal="center")
+            for c in range(1, 8): ws_obs.cell(row=curr_obs_row, column=c).border = thin_border
+            curr_obs_row += 1
 
         col_widths_obs = {'A': 22, 'B': 45, 'C': 15, 'D': 45, 'E': 30, 'F': 15, 'G': 15}
         for col_letter, width in col_widths_obs.items():
             ws_obs.column_dimensions[col_letter].width = width
 
         # ======================================================================
-        # SHEET 4: STOCK COUNT SIGN-OFF (GAMBAR 4)
+        # SHEET 4: STOCK COUNT SIGN-OFF
         # ======================================================================
         ws_sign = wb.create_sheet(title="STOCK COUNT SIGN-OFF")
         ws_sign.sheet_view.showGridLines = True
@@ -5631,6 +5632,191 @@ class AppState:
         wb.save(buf)
         buf.seek(0)
         return buf.getvalue()
+
+    # -------------------------------------------------------------------------
+    # METODE SINKRONISASI COUNTER & COUNT SHEET WEB INTERAKTIF
+    # -------------------------------------------------------------------------
+    def update_auditor_counter(self, counter_name: str):
+        c_name = counter_name.strip() if counter_name else "Counter A"
+        self.auditor_counter.set(c_name)
+        if not self._raw_df_auditor_filtered.empty and 'Counter' in self._raw_df_auditor_filtered.columns:
+            self._raw_df_auditor_filtered['Counter'] = c_name
+            self.df_auditor_rows.set(self._raw_df_auditor_filtered.fillna("").astype(str).values.tolist())
+
+    def update_single_count_row(self, row_index: int, phys_val: str, verified: str, remarks: str):
+        try:
+            if not self._raw_df_auditor_filtered.empty and 0 <= row_index < len(self._raw_df_auditor_filtered):
+                p_int = safe_int(phys_val, 0) if phys_val != "" else ""
+                sys_qty = safe_int(self._raw_df_auditor_filtered.iloc[row_index]['Qty System'], 0)
+                var_val = (p_int - sys_qty) if p_int != "" else ""
+
+                self._raw_df_auditor_filtered.at[row_index, 'Physical Count'] = p_int
+                self._raw_df_auditor_filtered.at[row_index, 'Variance Value'] = var_val
+                self._raw_df_auditor_filtered.at[row_index, 'Auditor Verified'] = verified
+                self._raw_df_auditor_filtered.at[row_index, 'Remarks'] = remarks
+
+                self.df_auditor_rows.set(self._raw_df_auditor_filtered.fillna("").astype(str).values.tolist())
+                self._recalc_auditor_totals()
+                return True, "Data baris berhasil diperbarui!"
+            return False, "Indeks baris tidak ditemukan!"
+        except Exception as e:
+            return False, str(e)
+
+    def _recalc_auditor_totals(self):
+        if not self._raw_df_auditor_filtered.empty:
+            df = self._raw_df_auditor_filtered
+            tot_p = sum([safe_int(x, 0) for x in df['Physical Count'] if str(x).strip() != ''])
+            tot_v = sum([safe_int(x, 0) for x in df['Variance Value'] if str(x).strip() != ''])
+            self.auditor_total_phys.set(tot_p)
+            self.auditor_total_var.set(tot_v)
+
+    def import_filled_count_sheet(self, file_info):
+        """Mengunggah file Excel hasil download yang sudah diisi auditor"""
+        try:
+            df_in = load_data_from_info(file_info)
+            if df_in.empty or df_in.shape[1] < 8:
+                return False, "File tidak valid atau format kolom kurang!"
+
+            df_base = self._raw_df_auditor_filtered.copy()
+            if df_base.empty:
+                return False, "Data master count sheet kosong. Muat file stock terlebih dahulu!"
+
+            df_in_cols = [str(c).strip().upper() for c in df_in.columns]
+
+            def find_col(kw, default_idx):
+                for idx, c in enumerate(df_in_cols):
+                    if any(k in c for k in kw): return idx
+                return default_idx
+
+            c_bin = find_col(['BIN', 'LOCATION'], 1)
+            c_sku = find_col(['SKU', 'ITEM'], 2)
+            c_phys = find_col(['PHYSICAL', 'ACTUAL', 'COUNT'], 7)
+            c_ver = find_col(['VERIFIED', 'AUDITOR'], 10)
+            c_rem = find_col(['REMARKS', 'NOTE'], 11)
+
+            fill_map = {}
+            for _, r in df_in.iterrows():
+                b = str(r.iloc[c_bin]).strip().upper()
+                s = str(r.iloc[c_sku]).split('.')[0].strip().upper()
+                p = r.iloc[c_phys]
+                v = str(r.iloc[c_ver]).strip() if df_in.shape[1] > c_ver else "Yes"
+                rem = str(r.iloc[c_rem]).strip() if df_in.shape[1] > c_rem else ""
+                fill_map[(b, s)] = (p, v, rem)
+
+            updated_cnt = 0
+            for idx, r in df_base.iterrows():
+                b_curr = str(r['Bin Location']).strip().upper()
+                s_curr = str(r['SKU']).strip().upper()
+                if (b_curr, s_curr) in fill_map:
+                    p_val, v_val, rem_val = fill_map[(b_curr, s_curr)]
+                    p_int = safe_int(p_val, 0)
+                    sys_qty = safe_int(r['Qty System'], 0)
+                    df_base.at[idx, 'Physical Count'] = p_int
+                    df_base.at[idx, 'Variance Value'] = p_int - sys_qty
+                    df_base.at[idx, 'Auditor Verified'] = v_val if v_val else "Yes"
+                    df_base.at[idx, 'Remarks'] = rem_val
+                    updated_cnt += 1
+
+            self._raw_df_auditor_filtered = df_base
+            self.df_auditor_rows.set(df_base.fillna("").astype(str).values.tolist())
+            self._recalc_auditor_totals()
+            return True, f"Berhasil sinkronisasi {updated_cnt} baris Physical Count ke Tab 2!"
+        except Exception as e:
+            return False, f"Gagal membaca file count sheet: {str(e)}"
+
+    # -------------------------------------------------------------------------
+    # METODE TAB 3: DYNAMIC OBSERVATIONS & FINDINGS (TAMBAH BANYAK BARIS)
+    # -------------------------------------------------------------------------
+    def add_auditor_finding(self, area: str, case_desc: str, risk: str, recom: str, status: str = "Open"):
+        if not case_desc.strip():
+            return False, "Deskripsi temuan (Case) tidak boleh kosong!"
+        cur = list(self.auditor_findings_list())
+        cur.append({
+            "area": area.strip() if area else "Condition of stock",
+            "case": case_desc.strip(),
+            "risk": risk.strip() if risk else "Medium",
+            "recom": recom.strip(),
+            "status": status.strip() if status else "Open"
+        })
+        self.auditor_findings_list.set(cur)
+        return True, "Temuan berhasil ditambahkan ke daftar!"
+
+    def delete_auditor_finding(self, index: int):
+        cur = list(self.auditor_findings_list())
+        if 0 <= index < len(cur):
+            cur.pop(index)
+            self.auditor_findings_list.set(cur)
+
+    # -------------------------------------------------------------------------
+    # METODE TAB 5 & SUPABASE: SIMPAN LENGKAP AUDIT SESSION
+    # -------------------------------------------------------------------------
+    def load_auditor_history(self):
+        try:
+            client = get_supabase()
+            if client:
+                res = client.table("audit_sessions").select("*").order("created_at", desc=True).execute()
+                if res and hasattr(res, 'data') and res.data:
+                    self.auditor_history_list.set(res.data)
+                else:
+                    self.auditor_history_list.set([])
+        except Exception as e:
+            print("Supabase load audit history error:", e)
+
+    def save_audit_session_to_supabase(self, form_meta: dict):
+        try:
+            if self._raw_df_auditor_filtered.empty:
+                return False, "Tidak ada data count sheet untuk disimpan!"
+
+            audit_id = f"AUD/{form_meta.get('branch', 'SBY')[:3]}/{datetime.now().strftime('%Y%m%d')}/{random.randint(100, 999)}"
+            
+            items_payload = self._raw_df_auditor_filtered.to_dict(orient='records')
+            findings_payload = list(self.auditor_findings_list())
+
+            tot_sku = self.auditor_total_sku()
+            tot_sys = self.auditor_total_qty()
+            tot_phys = self.auditor_total_phys()
+            tot_var = self.auditor_total_var()
+
+            session_record = {
+                "id": audit_id,
+                "company": form_meta.get("company", "PT ZONA KARYA NUSANTARA"),
+                "branch": form_meta.get("branch", "SZ SURABAYA"),
+                "count_date": form_meta.get("date", datetime.now().strftime("%Y-%m-%d")),
+                "start_time": form_meta.get("start_time", "08:00"),
+                "end_time": form_meta.get("end_time", "17:00"),
+                "count_method": form_meta.get("method", "Full count (wall-to-wall)"),
+                "lead_auditor": form_meta.get("lead", ""),
+                "manager": form_meta.get("manager", ""),
+                "supervisor": form_meta.get("supervisor", ""),
+                "counter_name": form_meta.get("counter", "Counter A"),
+                "currency": form_meta.get("currency", "IDR"),
+                "total_sku": tot_sku,
+                "total_qty_system": tot_sys,
+                "total_qty_physical": tot_phys,
+                "total_variance_qty": tot_var,
+                "total_findings": len(findings_payload),
+                "sign_counter_name": form_meta.get("sign_counter_name", ""),
+                "sign_counter_img": form_meta.get("sign_counter_img", ""),
+                "sign_checker_name": form_meta.get("sign_checker_name", ""),
+                "sign_checker_img": form_meta.get("sign_checker_img", ""),
+                "sign_supervisor_name": form_meta.get("sign_supervisor_name", ""),
+                "sign_supervisor_img": form_meta.get("sign_supervisor_img", ""),
+                "sign_manager_name": form_meta.get("sign_manager_name", ""),
+                "sign_manager_img": form_meta.get("sign_manager_img", ""),
+                "sign_lead_name": form_meta.get("sign_lead_name", ""),
+                "sign_lead_img": form_meta.get("sign_lead_img", ""),
+                "items": items_payload,
+                "findings": findings_payload
+            }
+
+            client = get_supabase()
+            if client:
+                client.table("audit_sessions").insert(session_record).execute()
+            
+            self.load_auditor_history()
+            return True, f"✅ Data Audit ({audit_id}) Berhasil Disimpan ke Supabase!"
+        except Exception as e:
+            return False, f"Gagal simpan ke database: {str(e)}"
 
 
 # ==========================================================================

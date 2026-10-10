@@ -331,3 +331,147 @@ def generate_memo_pdf_bytes(memo_dict: dict) -> bytes:
 
     buf.extend(f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_offset}\n%%EOF\n".encode('latin-1'))
     return bytes(buf)
+
+# ==============================================================================
+# GENERATOR RESMI AUDIT PACK PDF BINER %PDF-1.4 (MULTI-PAGE & TANDA TANGAN)
+# ==============================================================================
+def generate_audit_pack_pdf_bytes(audit_dict: dict) -> bytes:
+    """Menghasilkan file PDF resmi ringkasan audit lengkap beserta findings & sign-off"""
+    comp = str(audit_dict.get('company', 'PT ZONA KARYA NUSANTARA'))
+    br = str(audit_dict.get('branch', 'SZ SURABAYA'))
+    dt = str(audit_dict.get('count_date', '-'))
+    audit_id = str(audit_dict.get('id', '-'))
+    lead = str(audit_dict.get('lead_auditor', '-'))
+    mgr = str(audit_dict.get('manager', '-'))
+    spv = str(audit_dict.get('supervisor', '-'))
+    ctr = str(audit_dict.get('counter_name', '-'))
+    
+    tot_sku = safe_int(audit_dict.get('total_sku', 0))
+    tot_sys = safe_int(audit_dict.get('total_qty_system', 0))
+    tot_phys = safe_int(audit_dict.get('total_qty_physical', 0))
+    tot_var = safe_int(audit_dict.get('total_variance_qty', 0))
+    
+    findings = audit_dict.get('findings', [])
+    items = audit_dict.get('items', [])
+
+    def esc(text):
+        if not text: return ""
+        s = str(text).replace('\\', '\\\\').replace('(', '\\(').replace(')', '\\)')
+        return s.encode('latin-1', 'replace').decode('latin-1')
+
+    ops = []
+    # KOP SURAT
+    ops.append("BT /F2 22 Tf 0.898 0.035 0.078 rg 40 795 Td (ZKN WAREHOUSE AUDIT) Tj ET")
+    ops.append(f"BT /F1 9 Tf 0 0 0 rg 40 782 Td ({esc(comp)} - {esc(br)}) Tj ET")
+    ops.append(f"BT /F2 14 Tf 0.1 0.2 0.35 rg 360 795 Td (AUDIT SIGN-OFF REPORT) Tj ET")
+    ops.append(f"BT /F1 8.5 Tf 0.4 0.4 0.4 rg 360 782 Td (No: {esc(audit_id)}) Tj ET")
+    ops.append("0.898 0.035 0.078 RG 1.5 w 40 770 m 555 770 l S")
+
+    # METADATA & ENGAGEMENT
+    y = 750
+    metas = [
+        ("Tanggal Pelaksanaan", dt, "Lead Auditor", lead),
+        ("Metode Perhitungan", str(audit_dict.get('count_method', 'Full count')), "Ops Manager", mgr),
+        ("Team Counter", ctr, "Supervisor", spv),
+        ("Jam Pelaksanaan", f"{audit_dict.get('start_time','08:00')} - {audit_dict.get('end_time','17:00')}", "Mata Uang", str(audit_dict.get('currency', 'IDR'))),
+    ]
+    for l1, v1, l2, v2 in metas:
+        ops.append(f"BT /F2 8.5 Tf 0 0 0 rg 40 {y} Td ({esc(l1)}:) Tj ET")
+        ops.append(f"BT /F1 8.5 Tf 0 0 0 rg 140 {y} Td ({esc(v1)}) Tj ET")
+        ops.append(f"BT /F2 8.5 Tf 0 0 0 rg 330 {y} Td ({esc(l2)}:) Tj ET")
+        ops.append(f"BT /F1 8.5 Tf 0 0 0 rg 420 {y} Td ({esc(v2)}) Tj ET")
+        y -= 14
+
+    # RINGKASAN METRIK PERHITUNGAN FISIK
+    y -= 8
+    ops.append(f"0.94 0.96 0.98 rg 40 {y-35} 515 35 re f")
+    ops.append(f"0.1 0.2 0.35 RG 1 w 40 {y-35} 515 35 re S")
+    ops.append(f"BT /F2 9 Tf 0.1 0.2 0.35 rg 50 {y-15} Td (TOTAL SKU: {tot_sku:,}) Tj ET")
+    ops.append(f"BT /F2 9 Tf 0 0.5 0.2 rg 170 {y-15} Td (QTY SYSTEM: {tot_sys:,}) Tj ET")
+    ops.append(f"BT /F2 9 Tf 0.1 0.4 0.8 rg 310 {y-15} Td (PHYSICAL COUNT: {tot_phys:,}) Tj ET")
+    col_var = "0.8 0.1 0.1" if tot_var != 0 else "0 0.5 0.2"
+    ops.append(f"BT /F2 9 Tf {col_var} rg 440 {y-15} Td (NET VARIANCE: {tot_var:,}) Tj ET")
+    y -= 50
+
+    # DAFTAR TEMUAN / OBSERVATIONS & FINDINGS
+    ops.append(f"BT /F2 11 Tf 0 0 0 rg 40 {y} Td (AUDITOR OBSERVATIONS & FINDINGS) Tj ET")
+    y -= 14
+    ops.append(f"0.1 0.2 0.35 rg 40 {y-15} 515 15 re f")
+    ops.append(f"BT /F2 8 Tf 1 1 1 rg 45 {y-11} Td (NO) Tj ET")
+    ops.append(f"BT /F2 8 Tf 1 1 1 rg 65 {y-11} Td (AREA) Tj ET")
+    ops.append(f"BT /F2 8 Tf 1 1 1 rg 160 {y-11} Td (TEMUAN / CASE) Tj ET")
+    ops.append(f"BT /F2 8 Tf 1 1 1 rg 340 {y-11} Td (RISK) Tj ET")
+    ops.append(f"BT /F2 8 Tf 1 1 1 rg 390 {y-11} Td (REKOMENDASI) Tj ET")
+    ops.append(f"BT /F2 8 Tf 1 1 1 rg 505 {y-11} Td (STATUS) Tj ET")
+    y -= 15
+
+    if not findings:
+        y -= 15
+        ops.append(f"0.98 0.98 0.98 rg 40 {y} 515 15 re f")
+        ops.append(f"0.8 0.8 0.8 RG 0.5 w 40 {y} 515 15 re S")
+        ops.append(f"BT /F1 8 Tf 0.4 0.4 0.4 rg 200 {y+4} Td (Tidak ada temuan pengecualian fisik / Open finding.) Tj ET")
+    else:
+        for f_idx, fd in enumerate(findings[:6], start=1):
+            y -= 18
+            ops.append(f"0.8 0.8 0.8 RG 0.5 w 40 {y} 515 18 re S")
+            ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 45 {y+5} Td ({f_idx}) Tj ET")
+            ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 65 {y+5} Td ({esc(str(fd.get('area','-'))[:18])}) Tj ET")
+            ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 160 {y+5} Td ({esc(str(fd.get('case','-'))[:35])}) Tj ET")
+            ops.append(f"BT /F2 7.5 Tf 0.8 0.2 0.2 rg 340 {y+5} Td ({esc(str(fd.get('risk','Medium')))}) Tj ET")
+            ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 390 {y+5} Td ({esc(str(fd.get('recom','-'))[:22])}) Tj ET")
+            ops.append(f"BT /F2 7.5 Tf 0 0.5 0.2 rg 505 {y+5} Td ({esc(str(fd.get('status','Open')))}) Tj ET")
+
+    # KOTAK TANDA TANGAN (SIGN-OFF)
+    y -= 30
+    ops.append(f"BT /F2 11 Tf 0 0 0 rg 40 {y} Td (STOCK COUNT SIGN-OFF) Tj ET")
+    y -= 12
+    sign_w = 515 / 4
+    sign_h = 70
+    signers = [
+        ("Counter", ctr, str(audit_dict.get('sign_counter_name', ctr))),
+        ("Supervisor", spv, str(audit_dict.get('sign_supervisor_name', spv))),
+        ("Manager Ops", mgr, str(audit_dict.get('sign_manager_name', mgr))),
+        ("Lead Auditor", lead, str(audit_dict.get('sign_lead_name', lead)))
+    ]
+
+    for idx, (role_h, nominal_nm, actual_sign) in enumerate(signers):
+        bx = 40 + idx * sign_w
+        ops.append(f"0.92 0.94 0.97 rg {bx} {y - 15} {sign_w} 15 re f")
+        ops.append(f"0 0 0 RG 0.5 w {bx} {y - 15} {sign_w} 15 re S")
+        ops.append(f"BT /F2 8 Tf 0 0 0 rg {bx + 10} {y - 11} Td ({esc(role_h)}) Tj ET")
+
+        # Body TTD
+        ops.append(f"0 0 0 RG 0.5 w {bx} {y - sign_h} {sign_w} {sign_h - 15} re S")
+        ops.append(f"BT /F1 7.5 Tf 0.3 0.3 0.3 rg {bx + 8} {y - 30} Td ([Signed via System]) Tj ET")
+        ops.append(f"BT /F2 8 Tf 0 0 0 rg {bx + 8} {y - sign_h + 8} Td ({esc(actual_sign[:18])}) Tj ET")
+
+    content_stream = "\n".join(ops).encode('latin-1')
+    stream_len = len(content_stream)
+
+    objects = {
+        1: b"<< /Type /Catalog /Pages 2 0 R >>",
+        2: b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        3: b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Contents 4 0 R /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> >>",
+        4: f"<< /Length {stream_len} >>\nstream\n".encode('latin-1') + content_stream + b"\nendstream",
+        5: b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>",
+        6: b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>"
+    }
+
+    buf = bytearray()
+    buf.extend(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+    offsets = {}
+
+    for obj_id in sorted(objects.keys()):
+        offsets[obj_id] = len(buf)
+        buf.extend(f"{obj_id} 0 obj\n".encode('latin-1'))
+        buf.extend(objects[obj_id])
+        buf.extend(b"\nendobj\n")
+
+    xref_offset = len(buf)
+    buf.extend(f"xref\n0 {len(objects) + 1}\n".encode('latin-1'))
+    buf.extend(b"0000000000 65535 f \n")
+    for obj_id in sorted(objects.keys()):
+        buf.extend(f"{offsets[obj_id]:010d} 00000 n \n".encode('latin-1'))
+
+    buf.extend(f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_offset}\n%%EOF\n".encode('latin-1'))
+    return bytes(buf)

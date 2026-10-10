@@ -1292,7 +1292,7 @@ def excel_practice_view(state: AppState):
 
 
 # ==============================================================================
-# VIEW: FORM AUDITOR (4 TAB EXTERNAL AUDIT PACK)
+# VIEW: FORM AUDITOR (5 TAB EXTENDED AUDIT PACK DENGAN DATABASE & TTD)
 # ==============================================================================
 def auditor_view(state: AppState):
     # KARTU ATAS: UPLOADER & FILTER DROPDOWN AUDITOR
@@ -1320,13 +1320,15 @@ def auditor_view(state: AppState):
         style="display: flex; gap: 1.5rem; flex-wrap: wrap; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
     )
 
-    # TAB 1: ENGAGEMENT DETAILS (GAMBAR 1)
+    # --------------------------------------------------------------------------
+    # TAB 1: ENGAGEMENT DETAILS (DENGAN INPUT COUNTER SINKRON KE TAB 2)
+    # --------------------------------------------------------------------------
     tab1_eng = ui.div(
         ui.h4("📋 Engagement Details (ISA 501 / PSAK 14)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 1rem;"),
         ui.div(
             ui.div(ui.span("🏢 Company Name:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="aud_company", type="text", value="PT ZONA KARYA NUSANTARA", class_="form-control"), style="flex: 1; min-width: 220px;"),
             ui.div(ui.span("🏬 Warehouse Branch:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="aud_branch", type="text", value="SZ SURABAYA", class_="form-control"), style="flex: 1; min-width: 180px;"),
-            ui.div(ui.span("📅 Stock Count Date:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="aud_date", type="text", value="12 JANUARI 2027", class_="form-control"), style="flex: 1; min-width: 160px;"),
+            ui.div(ui.span("📅 Stock Count Date:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="aud_date", type="text", value=datetime.now().strftime("%d %B %Y").upper(), class_="form-control"), style="flex: 1; min-width: 160px;"),
             style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;"
         ),
         ui.div(
@@ -1347,65 +1349,249 @@ def auditor_view(state: AppState):
             ui.div(ui.span("👤 Lead Auditor:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="aud_lead", type="text", placeholder="Nama Lead Auditor...", class_="form-control"), style="flex: 1; min-width: 200px;"),
             ui.div(ui.span("👤 Warehouse/Ops. Manager:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="aud_manager", type="text", placeholder="Nama Manager Ops...", class_="form-control"), style="flex: 1; min-width: 200px;"),
             ui.div(ui.span("👤 Count Team Supervisor:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="aud_supervisor", type="text", placeholder="Nama Supervisor...", class_="form-control"), style="flex: 1; min-width: 200px;"),
-            ui.div(ui.span("💵 Currency:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="aud_currency", type="text", value="IDR", class_="form-control"), style="width: 120px;"),
+            # 👇 POIN 1: INPUT NAMA COUNTER DISINKRONKAN LANGSUNG KE TAB 2 👇
+            ui.div(
+                ui.span("📦 Counter Name / Tim Hitung (Sync ke Tab 2):", style="font-size: 12px; font-weight: 800; color: #E50914;"),
+                ui.tags.input(
+                    id="aud_counter", type="text", value="Counter A", placeholder="Contoh: Counter A / Budi...",
+                    oninput="Shiny.setInputValue('change_auditor_counter_name', this.value, {priority: 'event'})",
+                    class_="form-control", style="border: 1.5px solid #E50914;"
+                ),
+                style="flex: 1; min-width: 200px;"
+            ),
+            ui.div(ui.span("💵 Currency:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="aud_currency", type="text", value="IDR", class_="form-control"), style="width: 100px;"),
             style="display: flex; gap: 1rem; flex-wrap: wrap;"
         ),
         style="padding: 1rem 0;"
     )
 
-    # TAB 2: STOCK COUNT SHEET (GAMBAR 2)
+    # --------------------------------------------------------------------------
+    # TAB 2: STOCK COUNT SHEET (BISA DIISI DI WEB & UPLOAD EXCEL YANG SUDAH DIISI)
+    # --------------------------------------------------------------------------
     tab2_count = ui.div(
+        # Kotak Upload Excel yang Sudah Diisi
+        ui.div(
+            ui.div(
+                ui.h4("📥 Upload Hasil Count Sheet yang Telah Diisi (.xlsx)", style="font-size: 14px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
+                ui.p("Unduh format count sheet di bawah, isi kolom 'Physical Count', lalu upload kembali file tersebut ke sini untuk sinkronisasi otomatis.", style="color: #718096; font-size: 12px; margin: 0;"),
+            ),
+            ui.div(
+                ui.input_file("upload_filled_count_sheet", None, accept=[".xlsx", ".xls"], button_label="Pilih File Terisi", placeholder="Upload file hasil hitung..."),
+                ui.tags.button(
+                    ui.tags.i(class_="fa-solid fa-cloud-arrow-up", style="margin-right: 6px;"), "SINKRONISASI HASIL",
+                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_execute_import_count_sheet', Math.random(), {priority: 'event'})",
+                    style="background: #10B981; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer; white-space: nowrap;"
+                ),
+                style="display: flex; gap: 8px; align-items: center;"
+            ),
+            style="background: #F0FDF4; border: 1.5px dashed #86EFAC; padding: 1.25rem; border-radius: 10px; margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;"
+        ),
+        # Kontainer Hasil Tabel & Form Isi Web Langsung
         ui.output_ui("auditor_results_container"),
-        style="padding: 1rem 0;"
+        style="padding: 0.5rem 0;"
     )
 
-    # TAB 3: OBSERVATIONS & FINDINGS (GAMBAR 3)
+    # --------------------------------------------------------------------------
+    # TAB 3: OBSERVATIONS & FINDINGS (DENGAN TOMBOL TAMBAH DINAMIS)
+    # --------------------------------------------------------------------------
     tab3_obs = ui.div(
         ui.h4("🔍 Auditor Observations & Findings", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
-        ui.p("Catatan temuan penyimpangan fisik di lapangan beserta tingkat risiko (*High / Medium / Low*).", style="color: #718096; font-size: 13px; margin-bottom: 1rem;"),
+        ui.p("Catat seluruh temuan dan observasi fisik auditor. Gunakan tombol 'Tambah Temuan' untuk memasukkan banyak data.", style="color: #718096; font-size: 13px; margin-bottom: 1rem;"),
+        # Form Input Temuan
         ui.div(
-            ui.div(ui.span("Area:", style="font-weight: 700; font-size: 12px;"), ui.tags.input(id="obs_area", type="text", value="Condition of stock", class_="form-control"), style="flex: 1; min-width: 180px;"),
-            ui.div(ui.span("Case / Temuan:", style="font-weight: 700; font-size: 12px;"), ui.tags.input(id="obs_case", type="text", placeholder="Deskripsi kasus...", class_="form-control"), style="flex: 2; min-width: 250px;"),
             ui.div(
-                ui.span("Risk Rating:", style="font-weight: 700; font-size: 12px;"),
-                ui.tags.select(ui.tags.option("Medium", value="Medium"), ui.tags.option("High", value="High"), ui.tags.option("Low", value="Low"), id="obs_risk", class_="form-control"),
-                style="width: 140px;"
+                ui.div(ui.span("Area / Lokasi:", style="font-weight: 700; font-size: 12px;"), ui.tags.input(id="obs_area_in", type="text", value="Condition of stock", class_="form-control"), style="flex: 1; min-width: 160px;"),
+                ui.div(ui.span("Kasus / Temuan Fisik:", style="font-weight: 700; font-size: 12px;"), ui.tags.input(id="obs_case_in", type="text", placeholder="Contoh: Kardus basah, barang tercecer...", class_="form-control"), style="flex: 2; min-width: 250px;"),
+                ui.div(
+                    ui.span("Tingkat Risiko:", style="font-weight: 700; font-size: 12px;"),
+                    ui.tags.select(ui.tags.option("Medium", value="Medium"), ui.tags.option("High", value="High"), ui.tags.option("Low", value="Low"), id="obs_risk_in", class_="form-control"),
+                    style="width: 130px;"
+                ),
+                style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem;"
             ),
-            style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;"
+            ui.div(
+                ui.div(ui.span("Rekomendasi Auditor:", style="font-weight: 700; font-size: 12px;"), ui.tags.input(id="obs_recom_in", type="text", placeholder="Rekomendasi penanganan...", class_="form-control"), style="flex: 2; min-width: 250px;"),
+                ui.div(ui.span("Status:", style="font-weight: 700; font-size: 12px;"), ui.tags.select(ui.tags.option("Open", value="Open"), ui.tags.option("Closed", value="Closed"), id="obs_status_in", class_="form-control"), style="width: 130px;"),
+                ui.div(
+                    ui.tags.button(
+                        ui.tags.i(class_="fa-solid fa-plus", style="margin-right: 6px;"), "Tambah Temuan",
+                        onclick="""
+                            let a = document.getElementById('obs_area_in').value;
+                            let c = document.getElementById('obs_case_in').value;
+                            let r = document.getElementById('obs_risk_in').value;
+                            let rec = document.getElementById('obs_recom_in').value;
+                            let s = document.getElementById('obs_status_in').value;
+                            if(!c.trim()) { alert('Kasus/Temuan tidak boleh kosong!'); return; }
+                            Shiny.setInputValue('btn_add_obs_finding', {area: a, case: c, risk: r, recom: rec, status: s}, {priority: 'event'});
+                            document.getElementById('obs_case_in').value = '';
+                            document.getElementById('obs_recom_in').value = '';
+                        """,
+                        style="background: #E50914; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer; height: 38px; display: flex; align-items: center; margin-top: 18px;"
+                    )
+                ),
+                style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-start;"
+            ),
+            style="background: #F8FAFC; border: 1.5px solid #E2E8F0; padding: 1.25rem; border-radius: 10px; margin-bottom: 1.5rem;"
         ),
-        ui.div(
-            ui.div(ui.span("Recommendation:", style="font-weight: 700; font-size: 12px;"), ui.tags.input(id="obs_recom", type="text", placeholder="Rekomendasi auditor...", class_="form-control"), style="flex: 2; min-width: 250px;"),
-            ui.div(ui.span("Status:", style="font-weight: 700; font-size: 12px;"), ui.tags.select(ui.tags.option("Open", value="Open"), ui.tags.option("Closed", value="Closed"), id="obs_status", class_="form-control"), style="width: 140px;"),
-            style="display: flex; gap: 1rem; flex-wrap: wrap;"
-        ),
-        style="padding: 1rem 0;"
+        # Tabel List Temuan Dinamis
+        ui.output_ui("auditor_findings_table_ui"),
+        style="padding: 0.5rem 0;"
     )
 
-    # TAB 4: SIGN-OFF (GAMBAR 4)
+    # --------------------------------------------------------------------------
+    # TAB 4: SIGN-OFF (DENGAN NAMA & CANVAS DIGITAL TANDA TANGAN)
+    # --------------------------------------------------------------------------
     tab4_sign = ui.div(
-        ui.h4("✍️ Stock Count Sign-Off (Daftar Penandatangan)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
-        ui.p("Masukkan nama penandatangan agar tercetak rapi di Sheet 4 Excel.", style="color: #718096; font-size: 13px; margin-bottom: 1rem;"),
+        ui.h4("✍️ Stock Count Sign-Off (Nama & Tanda Tangan Digital)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
+        ui.p("Isi nama penandatangan dan bubuhkan tanda tangan langsung pada kotak kanvas di bawah.", style="color: #718096; font-size: 13px; margin-bottom: 1.25rem;"),
+        
+        # 4 Card Penandatangan
         ui.div(
-            ui.div(ui.span("Counter(s) Name:", style="font-weight: 700; font-size: 12px;"), ui.tags.input(id="sign_counter", type="text", placeholder="Nama Penghitung Fisik...", class_="form-control"), style="flex: 1; min-width: 200px;"),
-            ui.div(ui.span("Checker(s) Name:", style="font-weight: 700; font-size: 12px;"), ui.tags.input(id="sign_checker", type="text", placeholder="Nama Checker...", class_="form-control"), style="flex: 1; min-width: 200px;"),
-            ui.div(ui.span("Finance Manager:", style="font-weight: 700; font-size: 12px;"), ui.tags.input(id="sign_finance", type="text", placeholder="Nama Finance Manager...", class_="form-control"), style="flex: 1; min-width: 200px;"),
-            style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;"
+            # 1. Counter
+            ui.div(
+                ui.strong("1. Counter (Penghitung)", style="font-size: 13px; color: #1A202C; display: block; margin-bottom: 4px;"),
+                ui.tags.input(id="sign_counter_name_in", type="text", placeholder="Nama Counter...", class_="form-control", style="margin-bottom: 8px; font-size: 12px;"),
+                ui.tags.canvas(id="canvas_sign_counter", width="240", height="90", style="border: 1px dashed #CBD5E0; border-radius: 6px; background: #FFF; cursor: crosshair; display: block; width: 100%;"),
+                ui.tags.button("Bersihkan TTD", type="button", onclick="window.clearSignCanvas('canvas_sign_counter')", style="background: #EDF2F7; border: 1px solid #CBD5E0; font-size: 11px; padding: 2px 8px; border-radius: 4px; margin-top: 4px; cursor: pointer;"),
+                style="flex: 1; min-width: 220px; background: #F8FAFC; padding: 1rem; border-radius: 8px; border: 1px solid #E2E8F0;"
+            ),
+            # 2. Supervisor
+            ui.div(
+                ui.strong("2. Count Supervisor", style="font-size: 13px; color: #1A202C; display: block; margin-bottom: 4px;"),
+                ui.tags.input(id="sign_supervisor_name_in", type="text", placeholder="Nama Supervisor...", class_="form-control", style="margin-bottom: 8px; font-size: 12px;"),
+                ui.tags.canvas(id="canvas_sign_spv", width="240", height="90", style="border: 1px dashed #CBD5E0; border-radius: 6px; background: #FFF; cursor: crosshair; display: block; width: 100%;"),
+                ui.tags.button("Bersihkan TTD", type="button", onclick="window.clearSignCanvas('canvas_sign_spv')", style="background: #EDF2F7; border: 1px solid #CBD5E0; font-size: 11px; padding: 2px 8px; border-radius: 4px; margin-top: 4px; cursor: pointer;"),
+                style="flex: 1; min-width: 220px; background: #F8FAFC; padding: 1rem; border-radius: 8px; border: 1px solid #E2E8F0;"
+            ),
+            # 3. Manager
+            ui.div(
+                ui.strong("3. Warehouse/Ops Manager", style="font-size: 13px; color: #1A202C; display: block; margin-bottom: 4px;"),
+                ui.tags.input(id="sign_manager_name_in", type="text", placeholder="Nama Manager Ops...", class_="form-control", style="margin-bottom: 8px; font-size: 12px;"),
+                ui.tags.canvas(id="canvas_sign_mgr", width="240", height="90", style="border: 1px dashed #CBD5E0; border-radius: 6px; background: #FFF; cursor: crosshair; display: block; width: 100%;"),
+                ui.tags.button("Bersihkan TTD", type="button", onclick="window.clearSignCanvas('canvas_sign_mgr')", style="background: #EDF2F7; border: 1px solid #CBD5E0; font-size: 11px; padding: 2px 8px; border-radius: 4px; margin-top: 4px; cursor: pointer;"),
+                style="flex: 1; min-width: 220px; background: #F8FAFC; padding: 1rem; border-radius: 8px; border: 1px solid #E2E8F0;"
+            ),
+            # 4. Lead Auditor
+            ui.div(
+                ui.strong("4. External Lead Auditor", style="font-size: 13px; color: #1A202C; display: block; margin-bottom: 4px;"),
+                ui.tags.input(id="sign_lead_name_in", type="text", placeholder="Nama Lead Auditor...", class_="form-control", style="margin-bottom: 8px; font-size: 12px;"),
+                ui.tags.canvas(id="canvas_sign_lead", width="240", height="90", style="border: 1px dashed #CBD5E0; border-radius: 6px; background: #FFF; cursor: crosshair; display: block; width: 100%;"),
+                ui.tags.button("Bersihkan TTD", type="button", onclick="window.clearSignCanvas('canvas_sign_lead')", style="background: #EDF2F7; border: 1px solid #CBD5E0; font-size: 11px; padding: 2px 8px; border-radius: 4px; margin-top: 4px; cursor: pointer;"),
+                style="flex: 1; min-width: 220px; background: #F8FAFC; padding: 1rem; border-radius: 8px; border: 1px solid #E2E8F0;"
+            ),
+            style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem;"
         ),
+        # Tombol Final Simpan ke Database
         ui.div(
-            ui.div(ui.span("Nama Kantor Akuntan Publik (KAP):", style="font-weight: 700; font-size: 12px;"), ui.tags.input(id="sign_kap", type="text", value="KAP Independent & Partners", class_="form-control"), style="flex: 1; min-width: 200px;"),
-            ui.div(ui.span("Audit Partner / Manager:", style="font-weight: 700; font-size: 12px;"), ui.tags.input(id="sign_partner", type="text", placeholder="Nama Partner KAP...", class_="form-control"), style="flex: 1; min-width: 200px;"),
-            style="display: flex; gap: 1rem; flex-wrap: wrap;"
+            ui.tags.button(
+                ui.tags.span(ui.tags.i(class_="fa-solid fa-floppy-disk", style="margin-right: 8px; font-size: 15px;"), "SIMPAN AUDIT KE DATABASE SUPABASE & GENERATE REPORT"),
+                onclick="""
+                    let getCanvasData = function(id) {
+                        let c = document.getElementById(id);
+                        return c ? c.toDataURL() : '';
+                    };
+                    let meta = {
+                        company: document.getElementById('aud_company') ? document.getElementById('aud_company').value : '',
+                        branch: document.getElementById('aud_branch') ? document.getElementById('aud_branch').value : '',
+                        date: document.getElementById('aud_date') ? document.getElementById('aud_date').value : '',
+                        start_time: document.getElementById('aud_start_time') ? document.getElementById('aud_start_time').value : '',
+                        end_time: document.getElementById('aud_end_time') ? document.getElementById('aud_end_time').value : '',
+                        method: document.getElementById('aud_method') ? document.getElementById('aud_method').value : '',
+                        lead: document.getElementById('aud_lead') ? document.getElementById('aud_lead').value : '',
+                        manager: document.getElementById('aud_manager') ? document.getElementById('aud_manager').value : '',
+                        supervisor: document.getElementById('aud_supervisor') ? document.getElementById('aud_supervisor').value : '',
+                        counter: document.getElementById('aud_counter') ? document.getElementById('aud_counter').value : 'Counter A',
+                        currency: document.getElementById('aud_currency') ? document.getElementById('aud_currency').value : 'IDR',
+                        sign_counter_name: document.getElementById('sign_counter_name_in') ? document.getElementById('sign_counter_name_in').value : '',
+                        sign_counter_img: getCanvasData('canvas_sign_counter'),
+                        sign_supervisor_name: document.getElementById('sign_supervisor_name_in') ? document.getElementById('sign_supervisor_name_in').value : '',
+                        sign_supervisor_img: getCanvasData('canvas_sign_spv'),
+                        sign_manager_name: document.getElementById('sign_manager_name_in') ? document.getElementById('sign_manager_name_in').value : '',
+                        sign_manager_img: getCanvasData('canvas_sign_mgr'),
+                        sign_lead_name: document.getElementById('sign_lead_name_in') ? document.getElementById('sign_lead_name_in').value : '',
+                        sign_lead_img: getCanvasData('canvas_sign_lead')
+                    };
+                    window.showGlobalSpinner();
+                    Shiny.setInputValue('btn_execute_save_audit_supabase', meta, {priority: 'event'});
+                """,
+                class_="btn-red-gradient",
+                style="padding: 12px 24px; font-size: 14px; font-weight: 800; border-radius: 8px;"
+            ),
+            style="display: flex; justify-content: flex-end; width: 100%;"
         ),
-        style="padding: 1rem 0;"
+        # JS Inisialisasi Canvas Tanda Tangan
+        ui.tags.script("""
+            function initSignCanvases() {
+                ['canvas_sign_counter', 'canvas_sign_spv', 'canvas_sign_mgr', 'canvas_sign_lead'].forEach(function(id) {
+                    let canvas = document.getElementById(id);
+                    if (!canvas || canvas.dataset.initialized) return;
+                    canvas.dataset.initialized = "true";
+                    let ctx = canvas.getContext('2d');
+                    ctx.lineWidth = 2;
+                    ctx.lineCap = 'round';
+                    ctx.strokeStyle = '#000000';
+                    let drawing = false;
+
+                    function getPos(e) {
+                        let rect = canvas.getBoundingClientRect();
+                        let clientX = e.clientX || (e.touches && e.touches[0].clientX);
+                        let clientY = e.clientY || (e.touches && e.touches[0].clientY);
+                        return { x: clientX - rect.left, y: clientY - rect.top };
+                    }
+                    function start(e) { drawing = true; let p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); }
+                    function draw(e) { if (!drawing) return; let p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); }
+                    function stop() { drawing = false; }
+
+                    canvas.addEventListener('mousedown', start);
+                    canvas.addEventListener('mousemove', draw);
+                    window.addEventListener('mouseup', stop);
+                    canvas.addEventListener('touchstart', function(e) { e.preventDefault(); start(e); });
+                    canvas.addEventListener('touchmove', function(e) { e.preventDefault(); draw(e); });
+                    canvas.addEventListener('touchend', stop);
+                });
+            }
+            window.clearSignCanvas = function(id) {
+                let canvas = document.getElementById(id);
+                if (canvas) {
+                    let ctx = canvas.getContext('2d');
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                }
+            };
+            setTimeout(initSignCanvases, 600);
+        """),
+        style="padding: 0.5rem 0;"
     )
 
-    # 4 TAB CARD UTAMA
+    # --------------------------------------------------------------------------
+    # TAB 5: AUDIT HISTORY & DOWNLOAD PDF RESMI (POIN 5)
+    # --------------------------------------------------------------------------
+    tab5_history = ui.div(
+        ui.div(
+            ui.div(
+                ui.h4("📂 Riwayat & Arsip Audit Pack (Tersimpan di Supabase)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
+                ui.p("Auditor dapat meninjau hasil stock opname terdahulu dan mengunduh laporan PDF resmi.", style="color: #718096; font-size: 13px; margin: 0;"),
+            ),
+            ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-arrows-rotate", style="margin-right: 6px;"), "Refresh History",
+                onclick="Shiny.setInputValue('btn_refresh_audit_history', Math.random(), {priority: 'event'})",
+                style="background: #EDF2F7; color: #2D3748; border: 1.5px solid #CBD5E0; padding: 6px 14px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer;"
+            ),
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 8px;"
+        ),
+        ui.output_ui("auditor_history_cards_ui"),
+        ui.output_ui("auditor_pdf_downloader_container_ui"),
+        style="padding: 0.5rem 0;"
+    )
+
+    # CARD NAVSET UTAMA 5 TAB
     main_tabs = ui.div(
         ui.navset_card_tab(
             ui.nav_panel("📋 1. ENGAGEMENT DETAILS", tab1_eng),
             ui.nav_panel("📦 2. STOCK COUNT SHEET", tab2_count),
             ui.nav_panel("🔍 3. OBSERVATIONS & FINDINGS", tab3_obs),
-            ui.nav_panel("✍️ 4. SIGN-OFF", tab4_sign)
+            ui.nav_panel("✍️ 4. SIGN-OFF", tab4_sign),
+            ui.nav_panel("📂 5. AUDIT HISTORY & PDF", tab5_history),
+            id="auditor_navset_tab"
         ),
         style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
     )

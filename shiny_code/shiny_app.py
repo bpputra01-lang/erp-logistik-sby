@@ -94,6 +94,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         if success:
             state.load_ongkir_data()
             state.load_memo_data()
+            state.load_auditor_history()
             ui.notification_show(msg, type="message", duration=4)
         else:
             state.error_modal_message.set(msg)
@@ -3532,7 +3533,304 @@ def server(input: Inputs, output: Outputs, session: Session):
         content = state.generate_auditor_excel_pack(meta_dict)
         yield content
 
+# ==========================================================================
+    # AUDITOR EXTENDED CONTROLLER (POIN 1 - 7)
+    # ==========================================================================
 
+    # 1. Listener Perubahan Counter di Tab 1 -> Langsung Sinkron ke Tab 2
+    @reactive.Effect
+    @reactive.event(input.change_auditor_counter_name)
+    def _on_change_counter_name():
+        c_name = input.change_auditor_counter_name()
+        state.update_auditor_counter(c_name)
+
+    # 2. Render Card & Tabel Tab 2 (Dengan Fitur Edit Web Langsung)
+    @render.ui
+    def auditor_results_container():
+        if not state.auditor_processed():
+            return ui.div()
+
+        return ui.div(
+            ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
+            ui.h4("📋 RINGKASAN DATA SASARAN AUDIT", style="font-size: 16px; font-weight: 800; color: #1A202C; margin-bottom: 1rem;"),
+            ui.div(
+                dark_metric_box("🏭 TOTAL LOKASI BIN", f"{state.auditor_total_bin():,} BIN", "#3182CE"),
+                dark_metric_box("📦 TOTAL SKU HARUS DICEK", f"{state.auditor_total_sku():,} SKU", "#C5A059"),
+                dark_metric_box("🔢 TOTAL QTY SYSTEM", f"{state.auditor_total_qty():,} PCS", "#10B981"),
+                dark_metric_box("🎯 TOTAL PHYSICAL COUNT", f"{state.auditor_total_phys():,} PCS", "#3182CE"),
+                dark_metric_box("⚠️ TOTAL NET VARIANCE", f"{state.auditor_total_var():,} PCS", "#E53E3E" if state.auditor_total_var() != 0 else "#10B981"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+            ),
+            ui.div(
+                ui.div(
+                    ui.div(
+                        ui.h4("Stock Count Sheet (Tabel Hitung Lapangan)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 2px 0;"),
+                        ui.span(f"Petugas Counter: {state.auditor_counter()} | Klik tombol edit baris untuk mengisi langsung di web.", style="color: #718096; font-size: 12px;"),
+                    ),
+                    ui.div(
+                        ui.tags.button(
+                            ui.tags.i(class_="fa-solid fa-pen-to-square", style="margin-right: 6px;"), "Edit Data Fisik di Web",
+                            onclick="Shiny.setInputValue('btn_open_web_count_modal', Math.random(), {priority: 'event'});",
+                            style="background: #3182CE; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer; margin-right: 8px;"
+                        ),
+                        ui.download_button(
+                            "btn_dl_auditor_pack",
+                            ui.tags.span(ui.tags.i(class_="fa-solid fa-file-excel", style="margin-right: 8px; font-size: 14px;"), "DOWNLOAD EXCEL COUNT SHEET (.XLSX)"),
+                            style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; font-weight: 800; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);"
+                        ),
+                        style="display: flex; align-items: center;"
+                    ),
+                    style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 8px;"
+                ),
+                render_clean_table(state.df_auditor_headers(), state.df_auditor_rows(), "tbl_auditor_preview"),
+                style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
+            ),
+            style="width: 100%;"
+        )
+
+    # 3. Modal Input / Edit Langsung Physical Count di Web (Poin 2)
+    @reactive.Effect
+    @reactive.event(input.btn_open_web_count_modal)
+    def _open_web_count_modal():
+        df = state._raw_df_auditor_filtered
+        if df.empty:
+            ui.notification_show("Tidak ada baris data untuk diedit!", type="warning")
+            return
+
+        sku_choices = {str(i): f"{r['Bin Location']} | {r['SKU']} - {r['Description'][:25]} (Sys: {r['Qty System']})" for i, r in df.iterrows()}
+
+        ui.modal_show(ui.modal(
+            ui.div(
+                ui.p("Pilih barang yang ingin diinputkan hasil hitung fisik (Physical Count) langsung melalui web:", style="font-size: 13px; color: #4A5568; margin-bottom: 12px;"),
+                ui.input_select("web_edit_sku_idx", "Pilih Baris Target:", choices=sku_choices, width="100%"),
+                ui.div(
+                    ui.div(ui.span("Physical Count:", style="font-weight: 700; font-size: 12px;"), ui.tags.input(id="web_edit_phys_val", type="number", value="0", min="0", class_="form-control"), style="flex: 1;"),
+                    ui.div(
+                        ui.span("Auditor Verified:", style="font-weight: 700; font-size: 12px;"),
+                        ui.tags.select(ui.tags.option("Yes", value="Yes"), ui.tags.option("No", value="No"), id="web_edit_verified", class_="form-control"),
+                        style="flex: 1;"
+                    ),
+                    style="display: flex; gap: 1rem; margin-top: 10px;"
+                ),
+                ui.div(
+                    ui.span("Remarks / Catatan Lapangan:", style="font-weight: 700; font-size: 12px; margin-top: 10px; display: block;"),
+                    ui.tags.input(id="web_edit_remarks", type="text", placeholder="Catatan auditor (misal: kemasan sobek)...", class_="form-control", style="width: 100%;"),
+                ),
+                style="padding: 0.5rem 0;"
+            ),
+            title="✏️ Input Physical Count Langsung di Web",
+            easy_close=True,
+            footer=ui.div(
+                ui.modal_button("Batal"),
+                ui.tags.button(
+                    "Simpan Perubahan",
+                    onclick="""
+                        let idx = parseInt(document.getElementById('web_edit_sku_idx').value);
+                        let p = document.getElementById('web_edit_phys_val').value;
+                        let v = document.getElementById('web_edit_verified').value;
+                        let rem = document.getElementById('web_edit_remarks').value;
+                        Shiny.setInputValue('btn_submit_single_web_count', {idx: idx, phys: p, ver: v, rem: rem}, {priority: 'event'});
+                    """,
+                    class_="btn-red-gradient", style="margin-left: 8px; font-weight: 800; border-radius: 6px; padding: 6px 14px;"
+                ),
+                style="display: flex; justify-content: flex-end;"
+            )
+        ))
+
+    @reactive.Effect
+    @reactive.event(input.btn_submit_single_web_count)
+    def _submit_single_web_count():
+        d = input.btn_submit_single_web_count() or {}
+        succ, msg = state.update_single_count_row(d.get("idx", 0), d.get("phys", ""), d.get("ver", "Yes"), d.get("rem", ""))
+        ui.modal_remove()
+        if succ:
+            ui.notification_show("✅ " + msg, type="message", duration=3)
+        else:
+            ui.notification_show("⚠️ " + msg, type="warning", duration=4)
+
+    # 4. Handler Upload File Excel yang Sudah Diisi (Poin 3)
+    @reactive.Effect
+    @reactive.event(input.btn_execute_import_count_sheet)
+    def _proc_import_count_sheet():
+        f = input.upload_filled_count_sheet() if "upload_filled_count_sheet" in input else None
+        if not f:
+            ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+            ui.notification_show("Pilih file Excel yang telah diisi terlebih dahulu!", type="warning", duration=4)
+            return
+
+        succ, msg = state.import_filled_count_sheet(f)
+        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+        if succ:
+            ui.notification_show(msg, type="message", duration=5)
+        else:
+            ui.notification_show(msg, type="error", duration=5)
+
+    # 5. Handler Tambah & Hapus Findings Dinamis di Tab 3 (Poin 7)
+    @reactive.Effect
+    @reactive.event(input.btn_add_obs_finding)
+    def _add_obs_finding():
+        d = input.btn_add_obs_finding() or {}
+        succ, msg = state.add_auditor_finding(d.get("area", ""), d.get("case", ""), d.get("risk", "Medium"), d.get("recom", ""), d.get("status", "Open"))
+        if succ:
+            ui.notification_show("✅ " + msg, type="message", duration=3)
+        else:
+            ui.notification_show("⚠️ " + msg, type="warning", duration=4)
+
+    @reactive.Effect
+    @reactive.event(input.btn_delete_obs_finding_idx)
+    def _del_obs_finding():
+        idx = input.btn_delete_obs_finding_idx()
+        state.delete_auditor_finding(idx)
+        ui.notification_show("🗑️ Temuan berhasil dihapus.", type="message", duration=2)
+
+    @render.ui
+    def auditor_findings_table_ui():
+        findings = state.auditor_findings_list()
+        if not findings:
+            return ui.div(
+                ui.p("Belum ada temuan pengecualian fisik yang ditambahkan. Gunakan formulir di atas untuk mencatat temuan auditor.", style="color: #718096; font-style: italic; text-align: center; padding: 1.5rem;"),
+                style="background: #F8FAFC; border: 1px dashed #CBD5E0; border-radius: 8px;"
+            )
+
+        tr_list = []
+        for idx, it in enumerate(findings, start=1):
+            del_btn = ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-trash", style="color: #E53E3E;"),
+                onclick=f"Shiny.setInputValue('btn_delete_obs_finding_idx', {idx-1}, {{priority: 'event'}})",
+                style="background: transparent; border: none; cursor: pointer; padding: 4px;"
+            )
+            r_col = "#E53E3E" if it.get('risk') == "High" else ("#DD6B20" if it.get('risk') == "Medium" else "#3182CE")
+            tr_list.append(ui.tags.tr(
+                ui.tags.td(str(idx), style="text-align: center; font-weight: bold;"),
+                ui.tags.td(str(it.get("area", "-"))),
+                ui.tags.td(str(it.get("case", "-"))),
+                ui.tags.td(str(it.get("risk", "Medium")), style=f"font-weight: 800; color: {r_col}; text-align: center;"),
+                ui.tags.td(str(it.get("recom", "-"))),
+                ui.tags.td(str(it.get("status", "Open")), style="text-align: center; font-weight: bold;"),
+                ui.tags.td(del_btn, style="text-align: center;")
+            ))
+
+        headers = ["NO", "AREA", "TEMUAN / CASE", "RISK", "REKOMENDASI", "STATUS", "AKSI"]
+        th_list = [ui.tags.th(h, style="text-align: center;" if h in ["NO", "RISK", "STATUS", "AKSI"] else "") for h in headers]
+
+        return ui.div(
+            ui.tags.table(
+                ui.tags.thead(ui.tags.tr(*th_list)),
+                ui.tags.tbody(*tr_list),
+                class_="custom-clean-table",
+                style="border: 1px solid #CBD5E0; border-radius: 8px; overflow: hidden; width: 100%;"
+            ),
+            style="width: 100%; overflow-x: auto;"
+        )
+
+    # 6. Handler Simpan Sesi Audit Lengkap ke Supabase (Poin 4 & 6)
+    @reactive.Effect
+    @reactive.event(input.btn_execute_save_audit_supabase)
+    def _save_audit_session_supabase():
+        meta = input.btn_execute_save_audit_supabase() or {}
+        succ, msg = state.save_audit_session_to_supabase(meta)
+        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+        if succ:
+            state.show_success_modal.set(True)
+            ui.update_navs("auditor_navset_tab", selected="5. AUDIT HISTORY & PDF")
+            ui.notification_show(msg, type="message", duration=5)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+
+    # 7. Render History di Tab 5 & Download PDF (Poin 5)
+    @reactive.Effect
+    @reactive.event(input.btn_refresh_audit_history)
+    def _refresh_audit_hist():
+        state.load_auditor_history()
+        ui.notification_show("Data riwayat audit telah dimuat ulang dari Supabase.", type="message", duration=3)
+
+    @render.ui
+    def auditor_history_cards_ui():
+        histories = state.auditor_history_list()
+        if not histories:
+            return ui.div(
+                ui.p("Belum ada riwayat audit tersimpan di database Supabase. Selesaikan sesi audit pada Tab 4 untuk menyimpan dokumen.", style="color: #718096; font-style: italic; text-align: center; padding: 2rem;"),
+                style="background: #F8FAFC; border-radius: 10px; border: 1px dashed #CBD5E0;"
+            )
+
+        cards = []
+        for h in histories:
+            h_id = h.get("id", "-")
+            dt = h.get("count_date", "-")
+            br = h.get("branch", "-")
+            lead = h.get("lead_auditor", "-")
+            sku_cnt = h.get("total_sku", 0)
+            sys_cnt = h.get("total_qty_system", 0)
+            phys_cnt = h.get("total_qty_physical", 0)
+            var_cnt = h.get("total_variance_qty", 0)
+            var_color = "#E53E3E" if var_cnt != 0 else "#10B981"
+
+            cards.append(ui.div(
+                ui.div(
+                    ui.div(
+                        ui.div(
+                            ui.span(h_id, style="font-weight: 800; font-size: 15px; color: #1A202C; margin-right: 8px;"),
+                            ui.span(f"Tanggal: {dt}", style="background: #EDF2F7; color: #2D3748; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 4px;"),
+                            style="display: flex; align-items: center; margin-bottom: 4px;"
+                        ),
+                        ui.p(f"Cabang: {br} • Lead Auditor: {lead} • Metode: {h.get('count_method', '-')}", style="margin: 0; font-size: 12px; color: #718096;")
+                    ),
+                    ui.div(
+                        ui.tags.button(
+                            ui.tags.i(class_="fa-solid fa-file-pdf", style="margin-right: 6px;"), "DOWNLOAD PDF RESMI",
+                            onclick=f"Shiny.setInputValue('btn_prepare_audit_pdf', '{h_id}', {{priority: 'event'}})",
+                            style="background: linear-gradient(135deg, #E50914 0%, #B20710 100%); color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer; box-shadow: 0 4px 10px rgba(229,9,20,0.3);"
+                        ),
+                        style="display: flex; align-items: center;"
+                    ),
+                    style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;"
+                ),
+                ui.div(
+                    ui.span(f"📦 Total SKU: {sku_cnt:,} | 💻 Qty System: {sys_cnt:,} | 🎯 Physical Count: {phys_cnt:,} | ", style="font-size: 12px; color: #4A5568;"),
+                    ui.span(f"Net Variance: {var_cnt:,} PCS", style=f"font-size: 12px; font-weight: 800; color: {var_color};"),
+                    style="border-top: 1px dashed #E2E8F0; padding-top: 8px; margin-top: 8px;"
+                ),
+                style="background: white; border: 1.5px solid #CBD5E0; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 0.85rem; box-shadow: 0 2px 6px rgba(0,0,0,0.02);"
+            ))
+
+        return ui.div(*cards)
+
+    @reactive.Effect
+    @reactive.event(input.btn_prepare_audit_pdf)
+    def _prep_audit_pdf():
+        a_id = input.btn_prepare_audit_pdf()
+        matches = [h for h in state.auditor_history_list() if h.get("id") == a_id]
+        if matches:
+            state.auditor_selected_for_pdf.set(matches[0])
+            ui.notification_show(f"Dokumen PDF {a_id} siap diunduh! Klik tombol hijau di bawah.", type="message", duration=4)
+
+    @render.ui
+    def auditor_pdf_downloader_container_ui():
+        sel = state.auditor_selected_for_pdf()
+        if not sel:
+            return ui.div()
+        return ui.div(
+            ui.div(
+                ui.span(f"📄 Dokumen Audit {sel.get('id')} Siap Diunduh:", style="font-weight: 700; font-size: 13px; color: #065F46;"),
+                ui.download_button(
+                    "btn_dl_audit_pdf_file",
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-file-pdf", style="margin-right: 6px;"), f"DOWNLOAD {str(sel.get('id')).replace('/', '_')}.PDF"),
+                    style="background: #10B981; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer;"
+                ),
+                style="display: flex; justify-content: space-between; align-items: center; width: 100%;"
+            ),
+            style="background: #D1FAE5; border: 1.5px solid #6EE7B7; border-radius: 8px; padding: 12px 16px; margin-top: 1rem;"
+        )
+
+    @render.download(filename=lambda: f"{str(state.auditor_selected_for_pdf().get('id', 'AUDIT')).replace('/', '_')}.pdf" if state.auditor_selected_for_pdf() else "AUDIT_REPORT.pdf")
+    def btn_dl_audit_pdf_file():
+        from config import generate_audit_pack_pdf_bytes
+        sel = state.auditor_selected_for_pdf()
+        if not sel:
+            yield b""
+        else:
+            yield generate_audit_pack_pdf_bytes(sel)
 # ==========================================================================
     # MEMO PENGAJUAN CONTROLLER & HANDLERS (FULL FIX ANTI-GLITCH)
     # ==========================================================================
