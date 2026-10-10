@@ -27,7 +27,6 @@ class AppState:
         self.sidebar_open = reactive.Value(True)
         self.dropdown_operational = reactive.Value(True)
         self.dropdown_inventory = reactive.Value(False)
-        self.dropdown_reject = reactive.Value(False)
         self.dropdown_extras = reactive.Value(False)
 
         # Modals
@@ -521,7 +520,6 @@ class AppState:
     def toggle_dropdown(self, key: str):
         if key == "operational": self.dropdown_operational.set(not self.dropdown_operational())
         elif key == "inventory": self.dropdown_inventory.set(not self.dropdown_inventory())
-        elif key == "reject": self.dropdown_reject.set(not self.dropdown_reject())
         elif key == "extras": self.dropdown_extras.set(not self.dropdown_extras())
 
     def handle_login(self, u: str, p: str):
