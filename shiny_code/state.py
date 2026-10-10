@@ -560,9 +560,6 @@ class AppState:
             return ["Stock Opname", "Cycle Count", "Justification SO", "Stock Minus", "Compare System", "Physical Inventory List", "Validation Barcode SKU", "Cross Check Real & System", "List Retur Out", "Reloc Koli to Koli"]
         return ["Stock Minus", "Cycle Count", "Compare System", "Justification SO"]
 
-    def get_menu_reject(self) -> list[str]:
-        return ["Defect & Reject Database"]
-
     def get_menu_extras(self) -> list[str]:
         if self.role() == "DC":
             return ["Balancing Stock", "Data Timbang Ongkir", "Database Ongkir In/Out", "Precentage Display","Latihan Rumus Excel", "Form Auditor", "Memo Pengajuan"]
