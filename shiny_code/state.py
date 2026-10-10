@@ -535,6 +535,7 @@ class AppState:
             self.branch.set("SURABAYA")
             self.user_display_name.set("User Cabang")
             self.login_timestamp_ms.set(int(time.time() * 1000))
+            self.load_memo_data()
             return True, "Berhasil Login sebagai User Cabang!"
         return False, "Username atau Password salah! Periksa kembali."
 
@@ -5656,14 +5657,24 @@ class AppState:
             return True, f"Berhasil menambahkan {added_count} barang ke dalam draft memo!"
         except Exception as e:
             return False, f"Gagal membaca file: {str(e)}"
+# 1. Fungsi penarik data dari Supabase saat aplikasi dibuka
+    def load_memo_data(self):
+        try:
+            client = get_supabase()
+            if client:
+                res = client.table("memo_pengajuan").select("*").order("created_at", desc=True).execute()
+                if res and hasattr(res, 'data') and res.data:
+                    self.memo_list.set(res.data)
+                else:
+                    self.memo_list.set([])
+        except Exception as e:
+            print("Supabase load memo error:", e)
 
+    # 2. Simpan permanen ke Supabase saat submit
     def submit_memo_pengajuan(self, tanggal: str, divisi: str, jenis: str, tujuan: str, diajukan_oleh: str):
         items = list(self.memo_current_items())
         if not items:
-            return False, "Daftar item barang masih kosong! Tambahkan minimal 1 item.", None
-
-        if not divisi or not jenis:
-            return False, "Pilih Divisi dan Jenis Pengajuan terlebih dahulu!", None
+            return False, "Daftar item barang masih kosong!", None
 
         tot_nominal = sum([safe_int(x.get("subtotal", 0)) for x in items])
         rand_code = random.randint(100, 999)
@@ -5682,85 +5693,67 @@ class AppState:
             "diperiksa_oleh": "-",
             "status_spv": "Belum Diperiksa",
             "status_akhir": "Menunggu Logistik",
-            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
             "items": items
         }
 
-        cur_list = list(self.memo_list())
-        cur_list.insert(0, new_memo)
-        self.memo_list.set(cur_list)
+        # Simpan ke Supabase
+        try:
+            client = get_supabase()
+            if client:
+                client.table("memo_pengajuan").insert(new_memo).execute()
+            self.load_memo_data()
+        except Exception as e:
+            print("Gagal simpan memo ke Supabase:", e)
+            cur_list = list(self.memo_list())
+            cur_list.insert(0, new_memo)
+            self.memo_list.set(cur_list)
+
         self.memo_current_items.set([])
 
-        # SUSUN LIST BARANG PERSIS SESUAI PERMINTAAN:
-        # 1. SKU & ITEM NAME & QTY
-        # 2. SKU & ITEM NAME & QTY
-        item_lines = []
-        for idx, it in enumerate(items, start=1):
-            s_code = it.get('sku', '')
-            s_name = it.get('item_name', '')
-            s_qty = it.get('qty', 1)
-            item_lines.append(f"{idx}. {s_code} & {s_name} & {s_qty}")
-        
-        list_barang_str = "\n".join(item_lines)
+        # Format Chat WA dengan Enter Asli (\n)
+        item_lines = [f"{idx}. {it.get('sku')} & {it.get('item_name')} & {it.get('qty')}" for idx, it in enumerate(items, 1)]
+        list_str = "\n".join(item_lines)
+        pesan_wa = f"Ada Request dari {divisi} dengan {jenis}, Tolong Proses ya (No: {memo_no})\n\n{list_str}"
+        wa_url = f"https://api.whatsapp.com/send?text={urllib.parse.quote(pesan_wa)}"
 
-        # PESAN WHATSAPP LENGKAP:
-        pesan_wa = (
-            f"Ada Request dari {divisi} dengan {jenis}, Tolong Proses ya (No: {memo_no})\n\n"
-            f"{list_barang_str}"
-        )
-        
-        # Link share ke WhatsApp (Pilih Grup ZKN Distribution Center)
-        wa_url = f"https://api.whatsapp.com/send?phone=6282332929992&text={urllib.parse.quote(pesan_wa)}"
+        return True, f"Memo {memo_no} berhasil disimpan ke database!", wa_url
 
-        return True, f"Memo {memo_no} berhasil dibuat!", wa_url
-
+    # 3. Update di approve_memo_by_logistik: Gunakan Enter (\n) yang benar
     def approve_memo_by_logistik(self, memo_id: str, nama_logistik: str):
-        cur_list = list(self.memo_list())
-        found = False
-        target_memo = None
+        payload = {
+            "diproses_oleh": nama_logistik if nama_logistik else "Tim Logistik DC",
+            "status_logistik": "Disetujui Logistik",
+            "status_akhir": "Diproses Logistik (Menunggu SPV)"
+        }
+        try:
+            client = get_supabase()
+            if client:
+                client.table("memo_pengajuan").update(payload).in_("id", [memo_id]).execute()
+            self.load_memo_data()
+        except Exception as e:
+            print("Gagal update logistik di Supabase:", e)
 
-        for m in cur_list:
-            if m["id"] == memo_id:
-                m["diproses_oleh"] = nama_logistik if nama_logistik else "Tim Logistik DC"
-                m["status_logistik"] = "Disetujui Logistik"
-                m["status_akhir"] = "Diproses Logistik (Menunggu SPV)"
-                target_memo = m
-                found = True
-                break
-
-        if not found:
-            return False, "Memo tidak ditemukan!", None
-
-        self.memo_list.set(cur_list)
-
-        # Susun rincian barang untuk SPV
-        item_lines = []
-        for idx, it in enumerate(target_memo.get('items', []), start=1):
-            item_lines.append(f"{idx}. {it.get('sku', '')} & {it.get('item_name', '')} & {it.get('qty', 1)}")
-        list_barang_str = "\n".join(item_lines)
-
-        pesan_wa2 = (
-            f"Halo SPV, Memo {target_memo['id']} dari {target_memo['divisi']} ({target_memo['jenis']}) telah DIPROSES oleh Logistik. Mohon dicek untuk verifikasi pengeluaran barang.\n\n"
-            f"{list_barang_str}"
-        )
+        target_memo = next((m for m in self.memo_list() if m["id"] == memo_id), None)
+        item_lines = [f"{idx}. {it.get('sku')} & {it.get('item_name')} & {it.get('qty')}" for idx, it in enumerate(target_memo.get('items', []), 1)] if target_memo else []
+        list_str = "\n".join(item_lines)
+        pesan_wa2 = f"Halo SPV, Memo {memo_id} telah DIPROSES oleh Logistik. Mohon dicek untuk verifikasi pengeluaran barang.\n\n{list_str}"
         wa_url2 = f"https://api.whatsapp.com/send?phone=6281232844032&text={urllib.parse.quote(pesan_wa2)}"
 
         return True, f"Memo {memo_id} berhasil diproses oleh Logistik!", wa_url2
 
+    # 4. Update status SPV di Supabase
     def approve_memo_by_spv(self, memo_id: str, nama_spv: str):
-        cur_list = list(self.memo_list())
-        found = False
+        payload = {
+            "diperiksa_oleh": nama_spv if nama_spv else "SPV Warehouse",
+            "status_spv": "Disetujui SPV",
+            "status_akhir": "Disetujui SPV (Selesai)"
+        }
+        try:
+            client = get_supabase()
+            if client:
+                client.table("memo_pengajuan").update(payload).in_("id", [memo_id]).execute()
+            self.load_memo_data()
+        except Exception as e:
+            print("Gagal update SPV di Supabase:", e)
 
-        for m in cur_list:
-            if m["id"] == memo_id:
-                m["diperiksa_oleh"] = nama_spv if nama_spv else "SPV Warehouse"
-                m["status_spv"] = "Disetujui SPV"
-                m["status_akhir"] = "Disetujui SPV (Selesai)"
-                found = True
-                break
-
-        if not found:
-            return False, "Memo tidak ditemukan!"
-
-        self.memo_list.set(cur_list)
-        return True, f"Memo {memo_id} telah diverifikasi SPV! File PDF resmi sekarang dapat didownload."
+        return True, f"Memo {memo_id} telah disetujui SPV! Dokumen PDF resmi siap diunduh."

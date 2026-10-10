@@ -77,6 +77,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         success, msg = state.handle_login(u, p)
         if success:
             state.load_ongkir_data()
+            state.load_memo_data()
             ui.notification_show(msg, type="message", duration=4)
         else:
             state.error_modal_message.set(msg)

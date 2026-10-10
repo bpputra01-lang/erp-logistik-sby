@@ -42,6 +42,16 @@ class SimpleSupabaseTable:
         self.method = "POST"
         self.body = payload if isinstance(payload, list) else [payload]
         return self
+    # 👇 TAMBAHKAN DUA FUNGSI INI 👇
+    def update(self, payload):
+        self.method = "PATCH"
+        self.body = payload
+        return self
+
+    def order(self, column, desc=False):
+        direction = "desc" if desc else "asc"
+        self.params.append(f"order={column}.{direction}")
+        return self
 
     def delete(self):
         self.method = "DELETE"
