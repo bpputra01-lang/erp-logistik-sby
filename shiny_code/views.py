@@ -494,7 +494,19 @@ def dark_metric_box(title: str, val_str: str, border_color: str):
         ui.div(val_str, style=f"color: {border_color}; font-size: 22px; font-weight: bold;"),
         style=f"background: #1A1A1A; padding: 1rem; border-radius: 8px; border-left: 4px solid {border_color}; width: 100%; text-align: center;"
     )
-
+def ongkir_dark_card(title: str, val_str: str, border_color: str, text_color: str):
+    return ui.div(
+        ui.span(title, style="color: #A0AEC0; font-size: 0.85rem; font-weight: bold; display: block; margin-bottom: 4px;"),
+        ui.span(val_str, style=f"color: {text_color}; font-size: 1.7rem; font-weight: 800;"),
+        style=f"""
+            background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%);
+            padding: 16px 18px;
+            border-radius: 12px;
+            border-left: 5px solid {border_color};
+            box-shadow: 2px 4px 15px rgba(0,0,0,0.3);
+            width: 100%;
+        """
+    )
 def render_clean_table(headers: list, rows: list, table_id: str = None):
     if not rows or len(rows) == 0:
         return ui.div(ui.div("Tidak ada data untuk ditampilkan.", style="color: #718096; padding: 1.5rem; font-style: italic; text-align: center;"), style="background: white; border-radius: 8px; border: 1px solid #E2E8F0; width: 100%;")
