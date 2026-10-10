@@ -636,6 +636,10 @@ class AppState:
     def batch_upload_csv(self, file_bytes: bytes):
         try:
             df = pd.read_csv(io.BytesIO(file_bytes))
+            
+            # Rapikan nama kolom (hapus spasi & jadikan huruf besar)
+            df.columns = [str(c).strip().upper() for c in df.columns]
+            
             required = ["SUPPLIER", "EKSPEDISI", "TOTAL KOLI", "ONGKIR", "TANGGAL_JAM"]
             if not all(col in df.columns for col in required):
                 return False, "Format CSV Salah! Kolom wajib: SUPPLIER, EKSPEDISI, TOTAL KOLI, ONGKIR, TANGGAL_JAM"
@@ -643,20 +647,23 @@ class AppState:
             batch_data = []
             for _, row in df.iterrows():
                 sup = str(row["SUPPLIER"]).upper().strip() if not pd.isna(row["SUPPLIER"]) else ""
-                if not sup: continue
+                if not sup:
+                    continue
+                
+                # Variabel di sini bernama 'eks'
                 eks = str(row["EKSPEDISI"]).upper().strip() if not pd.isna(row["EKSPEDISI"]) else ""
                 
-                # Format tanggal aman
+                # Format tanggal aman untuk Supabase TIMESTAMPTZ
                 tgl_raw = row["TANGGAL_JAM"]
                 try:
-                    dt_parsed = pd.to_datetime(tgl_raw)
+                    dt_parsed = pd.to_datetime(tgl_raw, dayfirst=True)
                     fix_dt = dt_parsed.strftime("%Y-%m-%dT%H:%M:%SZ")
                 except Exception:
-                    fix_dt = datetime.utcnow().isoformat() + "Z"
+                    fix_dt = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
 
                 batch_data.append({
                     "supplier": sup, 
-                    "ekspedisi": eksp, 
+                    "ekspedisi": eks,  # <-- SUDAH DIPERBAIKI (sebelumnya tertulis 'eksp')
                     "total_koli": safe_int(row.get("TOTAL KOLI", 1), 1), 
                     "total_ongkir": safe_int(row.get("ONGKIR", 0), 0), 
                     "created_at": fix_dt
@@ -668,9 +675,10 @@ class AppState:
                     client.table("shipping_costs").insert(batch_data).execute()
                 self.load_ongkir_data()
                 return True, f"🚀 Berhasil Upload {len(batch_data)} Data CSV!"
-            return False, "Tidak ada data valid yang diupload."
+                
+            return False, "Tidak ada data valid yang dapat diupload."
         except Exception as e: 
-            return False, f"Gagal Upload Batch: {e}"
+            return False, f"Gagal Upload Batch: {str(e)}"
 
     def toggle_select_id(self, item_id: str):
         s = list(self.selected_ids())
