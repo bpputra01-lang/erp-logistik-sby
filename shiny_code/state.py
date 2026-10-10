@@ -509,6 +509,11 @@ class AppState:
         self.auditor_history_list = reactive.Value([])
         self.auditor_selected_for_pdf = reactive.Value(None)
 
+        self.df_auditor_headers = reactive.Value([])
+        self.df_auditor_rows = reactive.Value([])
+        self._raw_df_auditor_base = pd.DataFrame()
+        self._raw_df_auditor_filtered = pd.DataFrame()
+
         # --- MEMO PENGAJUAN STATE ---
         self.memo_list = reactive.Value([])            # List semua memo
         self.memo_current_items = reactive.Value([])    # List item barang di form draft
