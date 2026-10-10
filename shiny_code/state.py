@@ -5710,7 +5710,7 @@ class AppState:
         )
         
         # Link share ke WhatsApp (Pilih Grup ZKN Distribution Center)
-        wa_url = f"https://api.whatsapp.com/send?text={urllib.parse.quote(pesan_wa)}"
+        wa_url = f"https://api.whatsapp.com/send?phone=6282332929992&text={urllib.parse.quote(pesan_wa)}"
 
         return True, f"Memo {memo_no} berhasil dibuat!", wa_url
 
