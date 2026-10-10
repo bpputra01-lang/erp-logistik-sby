@@ -5408,7 +5408,7 @@ class AppState:
         self.df_auditor_rows.set(count_sheet_df.fillna("").astype(str).values.tolist() if not count_sheet_df.empty else [])
         self.auditor_processed.set(True)
 
-def generate_auditor_excel_pack(self, form_meta: dict):
+    def generate_auditor_excel_pack(self, form_meta: dict):
         import io
         from openpyxl import Workbook
         from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
