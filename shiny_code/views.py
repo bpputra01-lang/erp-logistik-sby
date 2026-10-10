@@ -1370,6 +1370,8 @@ def memo_pengajuan_view(state: AppState):
                     ui.div(ui.span("Item Name / Deskripsi:", style="font-size: 11px; font-weight: 700;"), ui.tags.input(id="item_in_name", type="text", placeholder="Nama Barang...", class_="form-control"), style="flex: 1.5; min-width: 220px;"),
                     ui.div(ui.span("COGS (Harga Pokok):", style="font-size: 11px; font-weight: 700;"), ui.tags.input(id="item_in_cogs", type="number", value="0", placeholder="Rp...", class_="form-control"), style="flex: 1; min-width: 130px;"),
                     ui.div(ui.span("Qty:", style="font-size: 11px; font-weight: 700;"), ui.tags.input(id="item_in_qty", type="number", value="1", min="1", class_="form-control"), style="width: 90px;"),
+                    
+                    # 1. Tombol Tambah Item Manual (Cukup 1 saja)
                     ui.div(
                         ui.tags.button(
                             ui.tags.i(class_="fa-solid fa-plus", style="margin-right: 6px;"), "Tambah Item",
@@ -1377,12 +1379,19 @@ def memo_pengajuan_view(state: AppState):
                             style="background: #10B981; color: white; font-weight: 700; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; height: 38px; display: flex; align-items: center; margin-top: 18px;"
                         )
                     ),
+                    # 2. Tombol Pop-up Bulk Upload Excel/CSV
+                    ui.div(
+                        ui.tags.button(
+                            ui.tags.i(class_="fa-solid fa-file-excel", style="margin-right: 6px;"), "Bulk Upload Item",
+                            onclick="Shiny.setInputValue('btn_open_memo_bulk_modal', Math.random(), {priority: 'event'});",
+                            style="background: #3182CE; color: white; font-weight: 700; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; height: 38px; display: flex; align-items: center; margin-top: 18px;"
+                        )
+                    ),
                     style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: flex-start; margin-bottom: 1rem; background: #FFFFFF; border: 1px dashed #CBD5E0; padding: 1rem; border-radius: 8px;"
                 ),
                 ui.output_ui("memo_draft_items_table_ui"),
                 style="margin-bottom: 1.5rem;"
             ),
-
             # Bagian Bawah: Tombol Submit Memo
             ui.div(
                 ui.tags.button(

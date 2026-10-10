@@ -5601,11 +5601,69 @@ class AppState:
         if 0 <= index < len(items):
             items.pop(index)
             self.memo_current_items.set(items)
+    
+    def process_bulk_memo_items(self, file_info):
+        """Membaca file Excel/CSV secara massal dan memasukkannya ke draft memo"""
+        try:
+            df = load_data_from_info(file_info)
+            if df is None or df.empty:
+                return False, "File yang diupload kosong atau format tidak sesuai!"
+
+            df_cols = [str(c).strip().upper() for c in df.columns]
+
+            def find_col(keywords, default_idx):
+                for i, col in enumerate(df_cols):
+                    if any(k in col for k in keywords):
+                        return i
+                return default_idx if df.shape[1] > default_idx else 0
+
+            # Deteksi otomatis kolom: SKU, Name, COGS, Qty
+            c_sku = find_col(['SKU', 'KODE', 'BARCODE', 'ITEM CODE'], 0)
+            c_name = find_col(['ITEM NAME', 'NAME', 'DESKRIPSI', 'NAMA', 'DESCRIPTION'], 1)
+            c_cogs = find_col(['COGS', 'HARGA', 'PRICE', 'BELI', 'POKOK', 'MODAL'], 2)
+            c_qty = find_col(['QTY', 'JUMLAH', 'QUANTITY', 'TOTAL'], 3)
+
+            current_items = list(self.memo_current_items())
+            added_count = 0
+
+            for _, row in df.iterrows():
+                raw_sku = str(row.iloc[c_sku]).split('.')[0].strip().upper() if not pd.isna(row.iloc[c_sku]) else ""
+                if not raw_sku or raw_sku in ["NAN", "NONE", "SKU"]:
+                    continue
+
+                raw_name = str(row.iloc[c_name]).strip().upper() if df.shape[1] > c_name and not pd.isna(row.iloc[c_name]) else raw_sku
+                if raw_name in ["NAN", "NONE", ""]:
+                    raw_name = raw_sku
+
+                raw_cogs = safe_int(row.iloc[c_cogs], 0) if df.shape[1] > c_cogs else 0
+                raw_qty = safe_int(row.iloc[c_qty], 1) if df.shape[1] > c_qty else 1
+                if raw_qty <= 0:
+                    raw_qty = 1
+
+                current_items.append({
+                    "sku": raw_sku,
+                    "item_name": raw_name,
+                    "cogs": raw_cogs,
+                    "qty": raw_qty,
+                    "subtotal": raw_cogs * raw_qty
+                })
+                added_count += 1
+
+            if added_count == 0:
+                return False, "Tidak ditemukan baris barang yang valid pada file!"
+
+            self.memo_current_items.set(current_items)
+            return True, f"Berhasil menambahkan {added_count} barang ke dalam draft memo!"
+        except Exception as e:
+            return False, f"Gagal membaca file: {str(e)}"
 
     def submit_memo_pengajuan(self, tanggal: str, divisi: str, jenis: str, tujuan: str, diajukan_oleh: str):
         items = list(self.memo_current_items())
         if not items:
-            return False, "Daftar item barang masih kosong!", None
+            return False, "Daftar item barang masih kosong! Tambahkan minimal 1 item.", None
+
+        if not divisi or not jenis:
+            return False, "Pilih Divisi dan Jenis Pengajuan terlebih dahulu!", None
 
         tot_nominal = sum([safe_int(x.get("subtotal", 0)) for x in items])
         rand_code = random.randint(100, 999)
@@ -5613,7 +5671,7 @@ class AppState:
 
         new_memo = {
             "id": memo_no,
-            "tanggal": tanggal,
+            "tanggal": tanggal if tanggal else datetime.now().strftime("%Y-%m-%d"),
             "divisi": divisi,
             "jenis": jenis,
             "tujuan": tujuan if tujuan else "-",
@@ -5633,20 +5691,25 @@ class AppState:
         self.memo_list.set(cur_list)
         self.memo_current_items.set([])
 
-        # Susun daftar barang untuk chat WA
-        rincian_barang = "\\n".join([f"- {it['sku']} ({it['item_name']}): {it['qty']} pcs" for it in items[:4]])
-        if len(items) > 4:
-            rincian_barang += f"\\n...dan {len(items)-4} item lainnya"
+        # SUSUN LIST BARANG PERSIS SESUAI PERMINTAAN:
+        # 1. SKU & ITEM NAME & QTY
+        # 2. SKU & ITEM NAME & QTY
+        item_lines = []
+        for idx, it in enumerate(items, start=1):
+            s_code = it.get('sku', '')
+            s_name = it.get('item_name', '')
+            s_qty = it.get('qty', 1)
+            item_lines.append(f"{idx}. {s_code} & {s_name} & {s_qty}")
+        
+        list_barang_str = "\n".join(item_lines)
 
-        # Format pesan WA lengkap
+        # PESAN WHATSAPP LENGKAP:
         pesan_wa = (
-            f"Ada Request dari {divisi} dengan {jenis}\\n"
-            f"*No Memo:* {memo_no}\\n"
-            f"*Tujuan:* {tujuan}\\n"
-            f"*Nominal:* Rp {tot_nominal:,}\\n"
-            f"*Rincian Barang:*\\n{rincian_barang}\\n\\n"
-            f"Tolong Proses ya 🙏"
+            f"Ada Request dari {divisi} dengan {jenis}, Tolong Proses ya (No: {memo_no})\n\n"
+            f"{list_barang_str}"
         )
+        
+        # Link share ke WhatsApp (Pilih Grup ZKN Distribution Center)
         wa_url = f"https://api.whatsapp.com/send?text={urllib.parse.quote(pesan_wa)}"
 
         return True, f"Memo {memo_no} berhasil dibuat!", wa_url
@@ -5670,10 +5733,17 @@ class AppState:
 
         self.memo_list.set(cur_list)
 
-        # Susun Link WhatsApp Notifikasi ke 081232844032
-        import urllib.parse
-        msg_wa2 = f"Halo SPV, Memo Pengajuan {target_memo['id']} dari {target_memo['divisi']} ({target_memo['jenis']}) telah DIPROSES & DISETUJUI oleh Logistik ({target_memo['diproses_oleh']}). Mohon cek dan verifikasi proses barang."
-        wa_url2 = f"https://api.whatsapp.com/send?phone=6281232844032&text={urllib.parse.quote(msg_wa2)}"
+        # Susun rincian barang untuk SPV
+        item_lines = []
+        for idx, it in enumerate(target_memo.get('items', []), start=1):
+            item_lines.append(f"{idx}. {it.get('sku', '')} & {it.get('item_name', '')} & {it.get('qty', 1)}")
+        list_barang_str = "\n".join(item_lines)
+
+        pesan_wa2 = (
+            f"Halo SPV, Memo {target_memo['id']} dari {target_memo['divisi']} ({target_memo['jenis']}) telah DIPROSES oleh Logistik. Mohon dicek untuk verifikasi pengeluaran barang.\n\n"
+            f"{list_barang_str}"
+        )
+        wa_url2 = f"https://api.whatsapp.com/send?phone=6281232844032&text={urllib.parse.quote(pesan_wa2)}"
 
         return True, f"Memo {memo_id} berhasil diproses oleh Logistik!", wa_url2
 

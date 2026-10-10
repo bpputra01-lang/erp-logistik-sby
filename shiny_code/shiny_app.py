@@ -3664,8 +3664,16 @@ def server(input: Inputs, output: Outputs, session: Session):
             else:
                 badge_bg = "#FED7D7"; badge_col = "#742A2A"
 
-            # Tombol Chat WhatsApp ke Grup
-            pesan_wa = urllib.parse.quote(f"Ada Request dari {divisi} dengan {jenis}, Tolong Proses ya (No: {m_id})")
+            # Format Rincian Barang
+            item_lines = []
+            for idx, it in enumerate(m.get('items', []), start=1):
+                item_lines.append(f"{idx}. {it.get('sku', '')} & {it.get('item_name', '')} & {it.get('qty', 1)}")
+            list_str = "\n".join(item_lines)
+
+            # Format Pesan Sesuai Permintaan
+            pesan_wa = urllib.parse.quote(
+                f"Ada Request dari {divisi} dengan {jenis}, Tolong Proses ya (No: {m_id})\n\n{list_str}"
+            )
             wa_href = f"https://api.whatsapp.com/send?text={pesan_wa}"
 
             wa_link_btn = ui.tags.a(
@@ -3810,9 +3818,85 @@ def server(input: Inputs, output: Outputs, session: Session):
         if not sel:
             yield b""
         else:
-            content = generate_memo_pdf_bytes(sel)
-            if isinstance(content, str):
-                yield content.encode("utf-8")
-            else:
-                yield content
+            yield generate_memo_pdf_bytes(sel)
+
+# A. Buka Pop-up Modal Bulk Upload
+    @reactive.Effect
+    @reactive.event(input.btn_open_memo_bulk_modal)
+    def _open_bulk_memo_modal():
+        ui.modal_show(ui.modal(
+            ui.div(
+                ui.div(
+                    ui.p(
+                        ui.strong("📋 Ketentuan File: "),
+                        "Upload file Excel (.xlsx, .xls) atau CSV dengan urutan 4 kolom: ",
+                        ui.tags.code("SKU"), ", ",
+                        ui.tags.code("ITEM NAME"), ", ",
+                        ui.tags.code("COGS"), ", dan ",
+                        ui.tags.code("QTY"), ".",
+                        style="color: #2D3748; font-size: 13px; margin-bottom: 8px;"
+                    ),
+                    ui.div(
+                        ui.download_button(
+                            "btn_dl_template_bulk_memo",
+                            ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px;"), "Download Contoh Template (.xlsx)"),
+                            style="background: #10B981; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer; text-decoration: none;"
+                        ),
+                        style="margin-bottom: 0.5rem;"
+                    ),
+                    style="background: #F8FAFC; border: 1px solid #E2E8F0; padding: 12px 14px; border-radius: 8px; margin-bottom: 1rem;"
+                ),
+                ui.input_file(
+                    "upload_memo_bulk_items", "Pilih File List Barang:",
+                    accept=[".xlsx", ".xls", ".csv"], multiple=False,
+                    placeholder="Pilih file Excel / CSV..."
+                ),
+                ui.div(
+                    ui.tags.button(
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-cloud-arrow-up", style="margin-right: 6px;"), "PROSES & IMPORT KE MEMO"),
+                        onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_execute_memo_bulk', Math.random(), {priority: 'event'});",
+                        class_="btn-red-gradient",
+                        style="padding: 10px 20px; font-size: 13px; font-weight: 800; cursor: pointer;"
+                    ),
+                    style="display: flex; justify-content: flex-end; width: 100%; margin-top: 1rem;"
+                )
+            ),
+            title="📥 Bulk Upload Item Barang ke Memo",
+            easy_close=True,
+            footer=ui.modal_button("Tutup", class_="btn-locked")
+        ))
+
+    # B. Eksekusi Proses File Bulk Upload
+    @reactive.Effect
+    @reactive.event(input.btn_execute_memo_bulk)
+    def _execute_bulk_memo():
+        f = input.upload_memo_bulk_items() if "upload_memo_bulk_items" in input else None
+        if not f:
+            ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner(); document.body.classList.remove('process-running');"), selector="head", where="beforeEnd")
+            ui.notification_show("Pilih file Excel/CSV terlebih dahulu!", type="warning", duration=4)
+            return
+
+        succ, msg = state.process_bulk_memo_items(f)
+        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner(); document.body.classList.remove('process-running');"), selector="head", where="beforeEnd")
+        
+        if succ:
+            ui.modal_remove()
+            ui.notification_show(f"✅ {msg}", type="message", duration=5)
+        else:
+            ui.notification_show(f"⚠️ {msg}", type="error", duration=5)
+
+    # C. Download Template Excel Bawaan untuk Bulk Upload
+    @render.download(filename="TEMPLATE_BULK_ITEM_MEMO.xlsx")
+    def btn_dl_template_bulk_memo():
+        buf = io.BytesIO()
+        df_tpl = pd.DataFrame([
+            {"SKU": "SPT-SPE-42-01", "ITEM NAME": "SPECS LIGHTSPEED 42", "COGS": 250000, "QTY": 2},
+            {"SKU": "JSY-MIL-L-05", "ITEM NAME": "JERSEY TIMNAS HOME L", "COGS": 150000, "QTY": 5},
+            {"SKU": "ACC-AVO-M-11", "ITEM NAME": "KAOS KAKI AVO GRIP M", "COGS": 25000, "QTY": 10}
+        ])
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            df_tpl.to_excel(writer, sheet_name='ITEMS', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
 app = App(app_ui, server)
