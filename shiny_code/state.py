@@ -1,6 +1,8 @@
 import os  
 import io
 import time
+import random               # <-- WAJIB: Cegah NameError saat generate nomor memo
+import urllib.parse 
 from datetime import datetime
 import numpy as np       
 import pandas as pd
@@ -5603,22 +5605,25 @@ class AppState:
     def submit_memo_pengajuan(self, tanggal: str, divisi: str, jenis: str, tujuan: str, diajukan_oleh: str):
         items = list(self.memo_current_items())
         if not items:
-            return False, "Daftar item barang masih kosong! Tambahkan minimal 1 item.", None
+            return False, "Daftar item barang masih kosong! Tambahkan minimal 1 item terlebih dahulu.", None
 
         if not divisi or not jenis:
             return False, "Pilih Divisi dan Jenis Pengajuan terlebih dahulu!", None
 
         tot_nominal = sum([safe_int(x.get("subtotal", 0)) for x in items])
-        memo_no = f"MEMO/ZKN/{datetime.now().strftime('%Y%m%d')}/{random.randint(100, 999)}"
+        # Generate No Memo aman
+        rand_code = random.randint(100, 999)
+        tgl_code = datetime.now().strftime('%Y%m%d')
+        memo_no = f"MEMO/ZKN/{tgl_code}/{rand_code}"
 
         new_memo = {
             "id": memo_no,
-            "tanggal": tanggal,
+            "tanggal": tanggal if tanggal else datetime.now().strftime("%Y-%m-%d"),
             "divisi": divisi,
             "jenis": jenis,
             "tujuan": tujuan if tujuan else "-",
             "nominal": tot_nominal,
-            "diajukan_oleh": diajukan_oleh if diajukan_oleh else "Tim " + divisi,
+            "diajukan_oleh": diajukan_oleh if diajukan_oleh else f"Tim {divisi}",
             "diproses_oleh": "-",
             "status_logistik": "Belum Diproses",
             "diperiksa_oleh": "-",
@@ -5628,20 +5633,19 @@ class AppState:
             "items": items
         }
 
-        # Simpan ke list state
+        # Simpan ke memori list memo
         cur_list = list(self.memo_list())
         cur_list.insert(0, new_memo)
         self.memo_list.set(cur_list)
 
-        # Kosongkan draft item
+        # Reset item form draft
         self.memo_current_items.set([])
 
-        # Susun Link WhatsApp ke +62 823-3292-9992
-        import urllib.parse
-        msg_wa1 = f"Ada Request dari {divisi} dengan {jenis}, Tolong Proses ya. (No: {memo_no}, Nominal: Rp {tot_nominal:,})"
-        wa_url1 = f"https://api.whatsapp.com/send?phone=6282332929992&text={urllib.parse.quote(msg_wa1)}"
+        # Susun Link WhatsApp ke +62 823-3292-9992 sesuai format permintaan
+        pesan_wa = f"Ada Request dari {divisi} dengan {jenis}, Tolong Proses ya"
+        wa_url = f"https://api.whatsapp.com/send?phone=6282332929992&text={urllib.parse.quote(pesan_wa)}"
 
-        return True, f"Memo {memo_no} berhasil dibuat dan diajukan!", wa_url1
+        return True, f"Memo {memo_no} berhasil dibuat!", wa_url
 
     def approve_memo_by_logistik(self, memo_id: str, nama_logistik: str):
         cur_list = list(self.memo_list())

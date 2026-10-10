@@ -3602,162 +3602,67 @@ def server(input: Inputs, output: Outputs, session: Session):
         idx = input.btn_del_item_idx()
         state.remove_memo_item_draft(idx)
 
-    # 3. Handler Submit Memo Pengajuan & Pemicu WA Ke +62 823-3292-9992
+    # 3. Handler Submit Memo Pengajuan -> Pindah ke Tab 2 & Buka WA Otomatis
     @reactive.Effect
     @reactive.event(input.btn_execute_submit_memo)
     def _on_submit_memo():
-        d = input.btn_execute_submit_memo()
-        tgl = str(input.memo_in_tanggal()) if "memo_in_tanggal" in input else datetime.now().strftime("%Y-%m-%d")
-        divisi = str(input.memo_in_divisi()) if "memo_in_divisi" in input else "MARKOM"
-        jenis = str(input.memo_in_jenis()) if "memo_in_jenis" in input else "Peminjaman Barang"
+        d = input.btn_execute_submit_memo() or {}
+        
+        # Ambil input form secara aman
+        tgl = str(input.memo_in_tanggal()) if "memo_in_tanggal" in input and input.memo_in_tanggal() is not None else datetime.now().strftime("%Y-%m-%d")
+        divisi = str(input.memo_in_divisi()) if "memo_in_divisi" in input and input.memo_in_divisi() is not None else "MARKOM"
+        jenis = str(input.memo_in_jenis()) if "memo_in_jenis" in input and input.memo_in_jenis() is not None else "Peminjaman Barang Display / Event"
         tujuan = d.get("tujuan", "")
         pemohon = d.get("pemohon", "")
 
         succ, msg, wa_url = state.submit_memo_pengajuan(tgl, divisi, jenis, tujuan, pemohon)
+        
         if succ:
-            state.show_success_modal.set(True)
-            # Tampilkan Pop-Up Dialog langsung untuk konfirmasi kirim WhatsApp
-            ui.modal_show(ui.modal(
-                ui.div(
-                    ui.tags.i(class_="fa-brands fa-whatsapp", style="font-size: 45px; color: #25D366; margin-bottom: 10px;"),
-                    ui.h4("Pengajuan Berhasil Dibuat!", style="font-weight: 800; color: #1A202C; margin: 0 0 6px 0;"),
-                    ui.p(f"Request dari tim {divisi} siap dikirimkan ke Tim Logistik (+62 823-3292-9992).", style="color: #4A5568; font-size: 13px;"),
-                    ui.tags.a(
-                        ui.tags.i(class_="fa-solid fa-paper-plane", style="margin-right: 8px;"),
-                        "KIRIM NOTIFIKASI WA SEKARANG",
-                        href=wa_url,
-                        target="_blank",
-                        class_="btn-red-gradient",
-                        style="text-decoration: none; display: inline-flex; align-items: center; justify-content: center; width: 100%; height: 44px; margin-top: 10px; font-size: 13px;"
-                    ),
-                    style="text-align: center; padding: 1rem 0;"
-                ),
-                title="📲 Notifikasi Pengajuan Memo",
-                easy_close=True,
-                footer=ui.modal_button("Tutup", class_="btn-locked")
-            ))
-        else:
-            state.error_modal_message.set(msg)
-            state.show_error_modal.set(True)
+            # 1. OTOMATIS PINDAHKAN TAMPILAN KE TAB 2 (HISTORY)
+            ui.update_navs("memo_navset", selected="tab_memo_history")
 
-    # 4. Render Tabel History Approval di Tab 2
-    @render.ui
-    def memo_history_table_ui():
-        memos = state.memo_list()
-        if not memos:
-            return ui.div(
-                ui.p("Belum ada riwayat memo pengajuan. Buat memo pertama pada Tab 1.", style="color: #718096; font-style: italic; text-align: center; padding: 2rem;"),
-                style="background: white; border-radius: 10px; border: 1px solid #E2E8F0;"
+            # 2. HILANGKAN SEMUA OVERLAY GELAP / SPINNER
+            # 3. LANGSUNG BUKA WHATSAPP DI TAB BARU
+            ui.insert_ui(
+                ui.tags.script(f"""
+                    if (window.hideGlobalSpinner) window.hideGlobalSpinner();
+                    document.body.classList.remove('process-running');
+                    
+                    // Buka WhatsApp Otomatis ke +62 823-3292-9992
+                    window.open('{wa_url}', '_blank');
+                """),
+                selector="head",
+                where="beforeEnd"
             )
 
-        cards = []
-        for m in memos:
-            m_id = m["id"]
-            stat = m.get("status_akhir", "")
+            # Notifikasi Sukses Hijau di Layar
+            ui.notification_show("✅ Memo berhasil diajukan! Dialihkan ke Tab History & WhatsApp sedang dibuka...", type="message", duration=5)
+        else:
+            # Hilangkan spinner jika gagal validasi
+            ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner(); document.body.classList.remove('process-running');"), selector="head", where="beforeEnd")
+            ui.notification_show(f"⚠️ {msg}", type="warning", duration=5)
 
-            # Badge Warna Status
-            if "Disetujui SPV" in stat:
-                badge_bg = "#C6F6D5"; badge_col = "#22543D"
-            elif "Diproses Logistik" in stat:
-                badge_bg = "#FEFCBF"; badge_col = "#744210"
-            else:
-                badge_bg = "#FED7D7"; badge_col = "#742A2A"
 
-            # Logika Tombol Aksi Sesuai Tahap Workflow
-            action_buttons = []
-            if stat == "Menunggu Logistik":
-                action_buttons.append(
-                    ui.tags.button(
-                        ui.tags.i(class_="fa-solid fa-box-open", style="margin-right: 6px;"),
-                        "PROSES & APPROVE LOGISTIK",
-                        onclick=f"Shiny.setInputValue('btn_approve_logistik', '{m_id}', {{priority: 'event'}})",
-                        style="background: #3182CE; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer;"
-                    )
-                )
-            elif "Menunggu SPV" in stat:
-                action_buttons.append(
-                    ui.tags.button(
-                        ui.tags.i(class_="fa-solid fa-user-check", style="margin-right: 6px;"),
-                        "VERIFIKASI & APPROVE SPV",
-                        onclick=f"Shiny.setInputValue('btn_approve_spv', '{m_id}', {{priority: 'event'}})",
-                        style="background: #10B981; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer;"
-                    )
-                )
-            elif "Disetujui SPV" in stat:
-                # Tombol Download PDF Aktif
-                action_buttons.append(
-                    ui.tags.button(
-                        ui.tags.i(class_="fa-solid fa-file-pdf", style="margin-right: 6px;"),
-                        "DOWNLOAD PDF RESMI",
-                        onclick=f"Shiny.setInputValue('btn_prepare_pdf_memo', '{m_id}', {{priority: 'event'}})",
-                        style="background: linear-gradient(135deg, #E50914 0%, #B20710 100%); color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer; box-shadow: 0 4px 10px rgba(229,9,20,0.3);"
-                    )
-                )
-
-            cards.append(ui.div(
-                ui.div(
-                    ui.div(
-                        ui.div(
-                            ui.span(m_id, style="font-weight: 800; font-size: 14px; color: #1A202C; margin-right: 8px;"),
-                            ui.span(stat, style=f"background: {badge_bg}; color: {badge_col}; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 4px;"),
-                            style="display: flex; align-items: center; margin-bottom: 4px;"
-                        ),
-                        ui.p(f"Divisi: {m.get('divisi')} • Jenis: {m.get('jenis')} • Tanggal: {m.get('tanggal')}", style="margin: 0; font-size: 12px; color: #718096;")
-                    ),
-                    ui.div(
-                        ui.span(f"Total: Rp {m.get('nominal', 0):,}", style="font-weight: 800; font-size: 16px; color: #E50914; margin-right: 12px;"),
-                        *action_buttons,
-                        style="display: flex; align-items: center; gap: 8px;"
-                    ),
-                    style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;"
-                ),
-                ui.div(
-                    ui.span(f"📌 Tujuan: {m.get('tujuan')}", style="font-size: 12px; color: #4A5568; display: block; margin-top: 8px;"),
-                    ui.span(f"👤 Diajukan: {m.get('diajukan_oleh')} | 📦 Logistik: {m.get('diproses_oleh')} ({m.get('status_logistik')}) | 🛡️ SPV: {m.get('diperiksa_oleh')} ({m.get('status_spv')})", style="font-size: 11px; color: #A0AEC0; margin-top: 4px; display: block;"),
-                    style="border-top: 1px dashed #E2E8F0; padding-top: 8px; margin-top: 8px;"
-                ),
-                style="background: white; border: 1.5px solid #CBD5E0; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 0.85rem; box-shadow: 0 2px 6px rgba(0,0,0,0.02);"
-            ))
-
-        return ui.div(
-            ui.div(
-                ui.h4("📋 Riwayat & Status Approval Memo Pengajuan", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 1rem;"),
-                *cards
-            ),
-            # Container Download Button Tersembunyi (Trigger saat PDF siap)
-            ui.output_ui("memo_pdf_downloader_container_ui")
-        )
-
-    # 5. Handler Approval Logistik -> Notif WA ke 081232844032
+    # 4. Handler Approval Logistik -> Notif WA ke 081232844032
     @reactive.Effect
     @reactive.event(input.btn_approve_logistik)
     def _on_approve_logistik():
         m_id = input.btn_approve_logistik()
         succ, msg, wa_url = state.approve_memo_by_logistik(m_id, state.user_display_name())
         if succ:
-            state.show_success_modal.set(True)
-            ui.modal_show(ui.modal(
-                ui.div(
-                    ui.tags.i(class_="fa-brands fa-whatsapp", style="font-size: 45px; color: #25D366; margin-bottom: 10px;"),
-                    ui.h4("Memo Berhasil Diproses Logistik!", style="font-weight: 800; color: #1A202C; margin: 0 0 6px 0;"),
-                    ui.p("Kirimkan notifikasi verifikasi barang ke nomor SPV Warehouse (081232844032):", style="color: #4A5568; font-size: 13px;"),
-                    ui.tags.a(
-                        ui.tags.i(class_="fa-solid fa-paper-plane", style="margin-right: 8px;"),
-                        "KIRIM NOTIFIKASI WA KE SPV (081232844032)",
-                        href=wa_url,
-                        target="_blank",
-                        class_="btn-red-gradient",
-                        style="text-decoration: none; display: inline-flex; align-items: center; justify-content: center; width: 100%; height: 44px; margin-top: 10px; font-size: 13px;"
-                    ),
-                    style="text-align: center; padding: 1rem 0;"
-                ),
-                title="📲 Verifikasi Proses Barang",
-                easy_close=True,
-                footer=ui.modal_button("Tutup", class_="btn-locked")
-            ))
+            # Langsung Buka WhatsApp Otomatis ke SPV (081232844032)
+            ui.insert_ui(
+                ui.tags.script(f"""
+                    if (window.hideGlobalSpinner) window.hideGlobalSpinner();
+                    document.body.classList.remove('process-running');
+                    window.open('{wa_url}', '_blank');
+                """),
+                selector="head",
+                where="beforeEnd"
+            )
+            ui.notification_show(f"✅ {msg} Membuka WhatsApp SPV (081232844032)...", type="message", duration=5)
         else:
-            state.error_modal_message.set(msg)
-            state.show_error_modal.set(True)
+            ui.notification_show(f"⚠️ {msg}", type="warning", duration=4)
 
     # 6. Handler Approval SPV
     @reactive.Effect
@@ -3809,5 +3714,5 @@ def server(input: Inputs, output: Outputs, session: Session):
         else:
             pdf_bytes = generate_memo_pdf_bytes(sel)
             yield pdf_bytes
-            
+
 app = App(app_ui, server)
