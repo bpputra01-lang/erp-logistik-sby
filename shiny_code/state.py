@@ -558,7 +558,7 @@ class AppState:
 
     def get_menu_extras(self) -> list[str]:
         if self.role() == "DC":
-            return ["Balancing Stock", "Data Timbang Ongkir", "Database Ongkir In/Out", "Precentage Display","Latihan Rumus Excel", "Form Auditor"]
+            return ["Balancing Stock", "Data Timbang Ongkir", "Database Ongkir In/Out", "Precentage Display","Latihan Rumus Excel", "Form Auditor", "Memo Pengajuan"]
         return ["Precentage Display", "Refill Toko", "Store Leader RTO Decission"]
 
     def get_active_content_type(self) -> str:
