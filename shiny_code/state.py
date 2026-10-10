@@ -4276,21 +4276,21 @@ class AppState:
 
             # Standarisasi Kolom Indeks
             # Col 1: BIN, Col 2: SKU, Col 3: BRAND, Col 4: ITEM NAME, Col 5: VARIANT/SIZE, Col 6: SUB KAT, Col 9: QTY
-            col_b = df.columns[1]
-            col_s = df.columns[2]
-            col_br = df.columns[3] if df.shape[1] > 3 else df.columns[2]
-            col_desc = df.columns[4]
-            col_size = df.columns[5]
-            col_sub = df.columns[6]
-            col_q = df.columns[9]
+            col_b = df_clean.columns[1]   # BIN
+            col_s = df_clean.columns[2]   # SKU
+            col_d = df_clean.columns[3]   # BRAND
+            col_e = df_clean.columns[4]   # ITEM NAME
+            col_g = df_clean.columns[6]   # SUB KATEGORI
+            col_h = df_clean.columns[7]   # HARGA BELI (Kolom H)
+            col_j = df_clean.columns[9]   # QTY SYSTEM
 
-            # Bersihkan tipe data dasar
-            df['BIN_CLEAN'] = df[col_b].fillna('').astype(str).str.strip().str.upper()
-            df['SKU_CLEAN'] = df[col_s].fillna('').astype(str).str.split('.').str[0].str.strip().str.upper()
-            df['QTY_NUM'] = pd.to_numeric(df[col_q], errors='coerce').fillna(0)
-            df['ARTICLE'] = df[col_desc].fillna('').astype(str).str.strip().apply(lambda x: x.split(' ')[0].upper() if x else '')
-            df['SUB_CLEAN'] = df[col_sub].fillna('').astype(str).str.strip().str.upper()
-
+            df_clean['BIN_CLEAN'] = df_clean[col_b].fillna('').astype(str).str.strip().str.upper()
+            df_clean['SKU_CLEAN'] = df_clean[col_s].fillna('').astype(str).str.split('.').str[0].str.strip().str.upper()
+            df_clean['BRAND_CLEAN'] = df_clean[col_d].fillna('UNKNOWN').astype(str).str.strip().str.upper()
+            df_clean['DESC_CLEAN'] = df_clean[col_e].fillna('-').astype(str).str.strip()
+            df_clean['CAT_CLEAN'] = df_clean[col_g].fillna('UNKNOWN').astype(str).str.strip().str.upper()
+            df_clean['HARGA_BELI'] = pd.to_numeric(df_clean[col_h], errors='coerce').fillna(0).astype(int)  # <-- TAMBAHKAN INI
+            df_clean['QTY_SYS'] = pd.to_numeric(df_clean[col_j], errors='coerce').fillna(0).astype(int)
             # ------------------------------------------------------------------
             # 1. LOGIKA MODUL A: PERCENTAGE DISPLAY CONTROL (ARTICLE BASE)
             # ------------------------------------------------------------------
@@ -5400,6 +5400,7 @@ class AppState:
             "Description": df['DESC_CLEAN'],
             "Category": df['CAT_CLEAN'],
             "UoM (PAIR / PCS)": df['UOM'],
+            "Harga Beli": df['HARGA_BELI'], 
             "Qty System": df['QTY_SYS'],
             "Physical Count": "",
             "Variance Value": "",
@@ -5651,9 +5652,12 @@ class AppState:
     def update_single_count_row(self, row_index: int, phys_val: str, verified: str, remarks: str):
         try:
             if not self._raw_df_auditor_filtered.empty and 0 <= row_index < len(self._raw_df_auditor_filtered):
-                p_int = safe_int(phys_val, 0) if phys_val != "" else ""
+                p_int = safe_int(phys_val, 0) if str(phys_val).strip() != "" else ""
                 sys_qty = safe_int(self._raw_df_auditor_filtered.iloc[row_index]['Qty System'], 0)
-                var_val = (p_int - sys_qty) if p_int != "" else ""
+                harga_beli = safe_int(self._raw_df_auditor_filtered.iloc[row_index].get('Harga Beli', 0), 0)
+
+                # Variance Value = Selisih QTY x Harga Beli
+                var_val = ((p_int - sys_qty) * harga_beli) if p_int != "" else ""
 
                 self._raw_df_auditor_filtered.at[row_index, 'Physical Count'] = p_int
                 self._raw_df_auditor_filtered.at[row_index, 'Variance Value'] = var_val

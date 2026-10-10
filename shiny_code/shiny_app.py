@@ -3513,15 +3513,17 @@ def server(input: Inputs, output: Outputs, session: Session):
     @render.ui
     def auditor_metrics_cards_ui():
         var_col = "#10B981" if state.auditor_total_var() == 0 else "#E53E3E"
+        # Format nilai variance ke format Rupiah
+        tot_var_rp = f"Rp {state.auditor_total_var():,}" if state.auditor_total_var() >= 0 else f"-Rp {abs(state.auditor_total_var()):,}"
+        
         return ui.div(
             dark_metric_box("🏭 TOTAL LOKASI BIN", f"{state.auditor_total_bin():,} BIN", "#3182CE"),
             dark_metric_box("📦 TOTAL SKU HARUS DICEK", f"{state.auditor_total_sku():,} SKU", "#C5A059"),
             dark_metric_box("🔢 TOTAL QTY SYSTEM", f"{state.auditor_total_qty():,} PCS", "#10B981"),
             dark_metric_box("🎯 TOTAL PHYSICAL COUNT", f"{state.auditor_total_phys():,} PCS", "#3182CE"),
-            dark_metric_box("⚠️ TOTAL NET VARIANCE", f"{state.auditor_total_var():,} PCS", var_col),
+            dark_metric_box("⚖️ TOTAL NET VARIANCE VALUE", tot_var_rp, var_col),
             style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
         )
-
     # Handler Saat Angka Diketik Langsung di Baris Tabel
     @reactive.Effect
     @reactive.event(input.auditor_row_inline_update)

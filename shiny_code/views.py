@@ -1615,21 +1615,22 @@ def render_auditor_editable_table(df_data, counter_name="Counter A"):
 
     headers = [
         "No.", "Bin Location", "SKU", "Description", "Category", 
-        "UoM", "Qty System", "Physical Count (Ketik Disini)", "Variance Value", 
+        "UoM", "Harga Beli", "Qty System", "Physical Count (Ketik Disini)", "Variance Value (Rp)", 
         "Counter", "Auditor Verified", "Remarks"
     ]
-    th_cells = [ui.tags.th(h, style="background: #1A365D; color: white; padding: 10px; font-size: 12px; white-space: nowrap; text-align: center;" if h in ["No.","UoM","Qty System","Physical Count (Ketik Disini)","Variance Value","Auditor Verified"] else "background: #1A365D; color: white; padding: 10px; font-size: 12px; white-space: nowrap;") for h in headers]
+    th_cells = [ui.tags.th(h, style="background: #1A365D; color: white; padding: 10px; font-size: 12px; white-space: nowrap; text-align: center;" if h in ["No.","UoM","Harga Beli","Qty System","Physical Count (Ketik Disini)","Variance Value (Rp)","Auditor Verified"] else "background: #1A365D; color: white; padding: 10px; font-size: 12px; white-space: nowrap;") for h in headers]
 
     tr_rows = []
     for idx, r in df_data.iterrows():
         sys_q = safe_int(r.get('Qty System', 0))
+        harga_beli = safe_int(r.get('Harga Beli', 0))
         phys_val = r.get('Physical Count', '')
         phys_str = str(phys_val) if phys_val != '' and not pd.isna(phys_val) else ''
         
         var_val = r.get('Variance Value', '')
         if var_val != '' and not pd.isna(var_val):
             v_int = safe_int(var_val)
-            v_text = f"{v_int:+d}" if v_int != 0 else "0"
+            v_text = f"Rp {v_int:+,}" if v_int != 0 else "Rp 0"
             v_color = "#10B981" if v_int == 0 else "#E53E3E"
         else:
             v_text = "-"
@@ -1638,34 +1639,32 @@ def render_auditor_editable_table(df_data, counter_name="Counter A"):
         ver_val = str(r.get('Auditor Verified', 'No'))
         rem_val = str(r.get('Remarks', '')) if not pd.isna(r.get('Remarks', '')) else ''
 
-        # Input angka fisik langsung di baris tabel (warna kuning Excel)
+        # Input Physical Count langsung di tabel (warna kuning Excel)
         input_phys = ui.tags.input(
             id=f"phys_in_{idx}",
             type="number",
             min="0",
             value=phys_str,
             placeholder="0",
-            oninput=f"window.onAuditorRowChange({idx}, {sys_q})",
-            style="width: 90px; text-align: right; font-weight: 800; font-size: 13px; padding: 5px 8px; border-radius: 6px; border: 1.5px solid #CBD5E0; background-color: #FEFCBF; outline: none;"
+            oninput=f"window.onAuditorRowChange({idx}, {sys_q}, {harga_beli})",
+            style="width: 85px; text-align: right; font-weight: 800; font-size: 13px; padding: 5px 8px; border-radius: 6px; border: 1.5px solid #CBD5E0; background-color: #FEFCBF; outline: none;"
         )
 
-        # Dropdown verified langsung di tabel
         select_ver = ui.tags.select(
             ui.tags.option("No", value="No", selected=(ver_val == "No")),
             ui.tags.option("Yes", value="Yes", selected=(ver_val == "Yes")),
             id=f"ver_in_{idx}",
-            onchange=f"window.onAuditorRowChange({idx}, {sys_q})",
+            onchange=f"window.onAuditorRowChange({idx}, {sys_q}, {harga_beli})",
             style="padding: 4px 8px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; background: white; cursor: pointer;"
         )
 
-        # Input catatan remarks langsung di tabel
         input_rem = ui.tags.input(
             id=f"rem_in_{idx}",
             type="text",
             value=rem_val,
             placeholder="Catatan...",
-            onchange=f"window.onAuditorRowChange({idx}, {sys_q})",
-            style="width: 140px; font-size: 12px; padding: 4px 8px; border-radius: 6px; border: 1px solid #CBD5E0; background: white; outline: none;"
+            onchange=f"window.onAuditorRowChange({idx}, {sys_q}, {harga_beli})",
+            style="width: 130px; font-size: 12px; padding: 4px 8px; border-radius: 6px; border: 1px solid #CBD5E0; background: white; outline: none;"
         )
 
         tr_rows.append(ui.tags.tr(
@@ -1675,6 +1674,7 @@ def render_auditor_editable_table(df_data, counter_name="Counter A"):
             ui.tags.td(str(r.get('Description', ''))),
             ui.tags.td(str(r.get('Category', ''))),
             ui.tags.td(str(r.get('UoM (PAIR / PCS)', 'PCS')), style="text-align: center;"),
+            ui.tags.td(f"Rp {harga_beli:,}", style="text-align: right; color: #4A5568; font-weight: 600;"),
             ui.tags.td(str(sys_q), id=f"sys_cell_{idx}", style="text-align: right; font-weight: 700;"),
             ui.tags.td(input_phys, style="text-align: center; background: #FFFDF0;"),
             ui.tags.td(
@@ -1698,7 +1698,7 @@ def render_auditor_editable_table(df_data, counter_name="Counter A"):
         ),
         ui.tags.script("""
             window.auditorDebounceTimers = window.auditorDebounceTimers || {};
-            window.onAuditorRowChange = function(idx, sysQty) {
+            window.onAuditorRowChange = function(idx, sysQty, hargaBeli) {
                 let physEl = document.getElementById('phys_in_' + idx);
                 let verEl = document.getElementById('ver_in_' + idx);
                 let remEl = document.getElementById('rem_in_' + idx);
@@ -1708,17 +1708,21 @@ def render_auditor_editable_table(df_data, counter_name="Counter A"):
                 let verVal = verEl ? verEl.value : 'No';
                 let remVal = remEl ? remEl.value : '';
 
+                // Hitung Variance Value = (Physical - System) * Harga Beli
                 if (varCell) {
                     if (physStr === '') {
                         varCell.innerText = '-';
                         varCell.style.color = '#718096';
                     } else {
-                        let diff = parseInt(physStr) - parseInt(sysQty);
-                        varCell.innerText = (diff > 0 ? '+' : '') + diff;
-                        varCell.style.color = (diff === 0) ? '#10B981' : '#E53E3E';
+                        let diffQty = parseInt(physStr) - parseInt(sysQty);
+                        let diffVal = diffQty * parseInt(hargaBeli);
+                        let formatted = (diffVal < 0 ? '-Rp ' : (diffVal > 0 ? '+Rp ' : 'Rp ')) + Math.abs(diffVal).toLocaleString('id-ID');
+                        varCell.innerText = formatted;
+                        varCell.style.color = (diffVal === 0) ? '#10B981' : '#E53E3E';
                     }
                 }
 
+                // Kirim perubahan ke backend Shiny
                 clearTimeout(window.auditorDebounceTimers[idx]);
                 window.auditorDebounceTimers[idx] = setTimeout(function() {
                     if (window.Shiny && Shiny.setInputValue) {
@@ -1734,7 +1738,6 @@ def render_auditor_editable_table(df_data, counter_name="Counter A"):
         """),
         style="width: 100%; margin-top: 0.5rem;"
     )
-
 # ==============================================================================
 # VIEW: MEMO PENGAJUAN (2 TAB: FORM PENGAJUAN & HISTORY APPROVAL)
 # ==============================================================================
