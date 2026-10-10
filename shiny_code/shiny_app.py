@@ -35,9 +35,20 @@ def server(input: Inputs, output: Outputs, session: Session):
         state.show_success_modal.set(False)
 
     @reactive.Effect
-    @reactive.event(input.change_filter_periode)
-    def _update_filter_periode():
-        state.filter_periode.set(input.change_filter_periode())
+    @reactive.event(input.change_filter_tgl_start)
+    def _update_filter_tgl_start():
+        state.filter_tgl_start.set(input.change_filter_tgl_start())
+
+    @reactive.Effect
+    @reactive.event(input.change_filter_tgl_end)
+    def _update_filter_tgl_end():
+        state.filter_tgl_end.set(input.change_filter_tgl_end())
+
+    @reactive.Effect
+    @reactive.event(input.btn_reset_filter_tgl)
+    def _reset_filter_tgl():
+        state.filter_tgl_start.set("")
+        state.filter_tgl_end.set("")
 
     @reactive.Effect
     @reactive.event(input.btn_fetch_stock_minus_jezpro)
@@ -3957,7 +3968,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             yield b""
         else:
             yield generate_memo_pdf_bytes(sel)
-            
+
 # A. Buka Pop-up Modal Bulk Upload
     @reactive.Effect
     @reactive.event(input.btn_open_memo_bulk_modal)

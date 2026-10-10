@@ -44,7 +44,11 @@ class AppState:
         self.input_ongkir = reactive.Value("0")
         self.input_tgl = reactive.Value(datetime.now().strftime("%Y-%m-%d"))
         self.filter_ekspedisi = reactive.Value("SEMUA")
-        self.filter_periode = reactive.Value("SEMUA")
+        
+        # GANTI INI: Gunakan Filter Tanggal Awal & Akhir (Default kosong = tampilkan semua)
+        self.filter_tgl_start = reactive.Value("")
+        self.filter_tgl_end = reactive.Value("")
+        
         self.active_ongkir_tab = reactive.Value("tab_input")
         self.selected_ids = reactive.Value([])
         self.show_delete_modal = reactive.Value(False)
@@ -705,31 +709,33 @@ class AppState:
         if flt_eks != "SEMUA":
             res = [x for x in res if str(x.get("ekspedisi", "")).upper() == flt_eks.upper()]
             
-        # 2. Filter Periode Waktu
-        flt_waktu = self.filter_periode()
-        if flt_waktu != "SEMUA" and res:
-            now = datetime.now()
+        # 2. Filter Berdasarkan Tanggal (Tgl Awal s/d Tgl Akhir)
+        tgl_start_str = str(self.filter_tgl_start()).strip()
+        tgl_end_str = str(self.filter_tgl_end()).strip()
+
+        if (tgl_start_str or tgl_end_str) and res:
+            try:
+                dt_start = pd.to_datetime(tgl_start_str).date() if tgl_start_str else None
+            except Exception:
+                dt_start = None
+
+            try:
+                dt_end = pd.to_datetime(tgl_end_str).date() if tgl_end_str else None
+            except Exception:
+                dt_end = None
+
             filtered_res = []
             for x in res:
-                tgl_str = str(x.get("created_at", "")).strip()
+                tgl_raw = str(x.get("created_at", x.get("tanggal", ""))).strip()
                 try:
-                    # Parse format tanggal DD-MM-YYYY HH:MM
-                    dt = pd.to_datetime(tgl_str, dayfirst=True)
-                    if flt_waktu == "HARI INI":
-                        if dt.date() == now.date():
-                            filtered_res.append(x)
-                    elif flt_waktu == "7 HARI TERAKHIR":
-                        if (now - dt).days <= 7 and dt <= now:
-                            filtered_res.append(x)
-                    elif flt_waktu == "BULAN INI":
-                        if dt.year == now.year and dt.month == now.month:
-                            filtered_res.append(x)
-                    elif flt_waktu == "BULAN LALU":
-                        # Hitung bulan lalu
-                        first_day_cur = now.replace(day=1)
-                        last_month = first_day_cur - pd.Timedelta(days=1)
-                        if dt.year == last_month.year and dt.month == last_month.month:
-                            filtered_res.append(x)
+                    # Parse tanggal transaksi
+                    dt_transaksi = pd.to_datetime(tgl_raw, dayfirst=True).date()
+                    
+                    if dt_start and dt_transaksi < dt_start:
+                        continue
+                    if dt_end and dt_transaksi > dt_end:
+                        continue
+                    filtered_res.append(x)
                 except Exception:
                     filtered_res.append(x)
             res = filtered_res
