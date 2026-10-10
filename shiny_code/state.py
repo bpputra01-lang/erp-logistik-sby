@@ -5740,7 +5740,7 @@ class AppState:
 
         payload = {
             "diproses_oleh": nama,
-            "status_logistik": "Disetujui Logistik",
+            "status_logistik": "Logistik Teams",
             "status_akhir": "Diproses Logistik (Menunggu SPV)"
         }
         try:
