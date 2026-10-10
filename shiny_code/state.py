@@ -686,7 +686,7 @@ class AppState:
         else:
             # Jika belum semua -> Centang semua
             self.selected_ids.set(all_ids)
-
+            
     def execute_delete(self):
         s = self.selected_ids()
         try:
@@ -743,161 +743,51 @@ class AppState:
         eksp = list(set([str(x.get("ekspedisi", "")).upper() for x in self.data_list() if x.get("ekspedisi")]))
         return ["SEMUA"] + sorted(eksp)
 
-    def ongkir_tab2_view(state: AppState):
-        filtered_data = state.get_filtered_ongkir()
-        filtered_ids = [str(r.get("id")) for r in filtered_data if r.get("id") is not None]
-        
-        is_all_selected = len(filtered_ids) > 0 and all(item_id in set(state.selected_ids()) for item_id in filtered_ids)
-        selected_count = len(state.selected_ids())
+    # =========================================================================
+    # METRIK DATABASE ONGKIR (LENGKAP 9 METRIK: ALL, DATANG, RTO)
+    # =========================================================================
+    # --- ROW 1: TOTAL KESELURUHAN (ALL) ---
+    def metric_total_biaya_all(self) -> str: 
+        return f"Rp {sum([safe_int(x.get('total_ongkir', 0)) for x in self.get_filtered_ongkir()]):,.0f}"
 
-        del_btn_ui = ui.tags.button(
-            f"🗑️ HAPUS ({selected_count}) DATA", 
-            onclick="Shiny.setInputValue('btn_open_delete_modal', Math.random(), {priority: 'event'})", 
-            style="background: #E53E3E; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px;"
-        ) if selected_count > 0 else ui.div()
+    def metric_total_koli_all(self) -> str: 
+        return f"{sum([safe_int(x.get('total_koli', x.get('koli', 0))) for x in self.get_filtered_ongkir()]):,.0f} Koli"
 
-        btn_select_all_text = "☑️ Batal Pilih Semua" if is_all_selected else "☑️ Pilih Semua"
-        select_all_btn = ui.tags.button(
-            btn_select_all_text,
-            onclick="Shiny.setInputValue('btn_toggle_select_all', Math.random(), {priority: 'event'});",
-            style="background: #EDF2F7; color: #2D3748; border: 1.5px solid #CBD5E0; border-radius: 6px; font-weight: 700; font-size: 12px; padding: 6px 12px; cursor: pointer;"
-        ) if len(filtered_ids) > 0 else ui.div()
+    def metric_avg_cost_all(self) -> str:
+        data = self.get_filtered_ongkir()
+        biaya = sum([safe_int(x.get("total_ongkir", 0)) for x in data])
+        koli = sum([safe_int(x.get("total_koli", x.get("koli", 0))) for x in data])
+        return f"Rp {(biaya / koli) if koli > 0 else 0:,.0f}"
 
-        select_options = [ui.tags.option(opt, value=opt, selected=(opt == state.filter_ekspedisi())) for opt in state.get_list_ekspedisi_options()]
+    # --- ROW 2: BARANG DATANG ---
+    def metric_biaya_datang(self) -> str: 
+        data = [x for x in self.get_filtered_ongkir() if 'RTO' not in str(x.get('supplier', '')).upper()]
+        return f"Rp {sum([safe_int(x.get('total_ongkir', 0)) for x in data]):,.0f}"
 
-        table_rows = [
-            ui.tags.tr(
-                ui.tags.td(
-                    ui.tags.input(
-                        type="checkbox", 
-                        checked=(str(r.get("id", "")) in set(state.selected_ids())), 
-                        onchange=f"Shiny.setInputValue('toggle_row_id', '{r.get('id', '')}', {{priority: 'event'}})",
-                        style="cursor: pointer; transform: scale(1.15);"
-                    ),
-                    style="text-align: center;"
-                ),
-                ui.tags.td(str(r.get("created_at", r.get("tanggal", "")))), 
-                ui.tags.td(str(r.get("supplier", ""))), 
-                ui.tags.td(str(r.get("ekspedisi", ""))),
-                ui.tags.td(str(safe_int(r.get("total_koli", r.get("koli", 0))))), 
-                ui.tags.td(f"Rp {safe_int(r.get('total_ongkir', 0)):,}")
-            ) for r in filtered_data
-        ]
+    def metric_koli_datang(self) -> str: 
+        data = [x for x in self.get_filtered_ongkir() if 'RTO' not in str(x.get('supplier', '')).upper()]
+        return f"{sum([safe_int(x.get('total_koli', x.get('koli', 0))) for x in data]):,.0f} Koli"
 
-        has_date_filter = bool(state.filter_tgl_start() or state.filter_tgl_end())
-        reset_tgl_btn = ui.tags.button(
-            "🔄 Reset Tgl",
-            onclick="Shiny.setInputValue('btn_reset_filter_tgl', Math.random(), {priority: 'event'});",
-            style="background: #EDF2F7; color: #4A5568; border: 1.5px solid #CBD5E0; border-radius: 8px; font-weight: 700; font-size: 12px; padding: 5px 10px; cursor: pointer; margin-left: 6px;"
-        ) if has_date_filter else ui.div()
+    def metric_avg_datang(self) -> str:
+        data = [x for x in self.get_filtered_ongkir() if 'RTO' not in str(x.get('supplier', '')).upper()]
+        biaya = sum([safe_int(x.get("total_ongkir", 0)) for x in data])
+        koli = sum([safe_int(x.get("total_koli", x.get("koli", 0))) for x in data])
+        return f"Rp {(biaya / koli) if koli > 0 else 0:,.0f}"
 
-        return ui.div(
-            # --- KONTROL FILTER & BUTTONS ---
-            ui.div(
-                ui.div(
-                    ui.div(
-                        ui.span("EKSPEDISI:", style="font-size: 12px; font-weight: 800; color: #111111; margin-right: 6px;"),
-                        ui.tags.select(
-                            *select_options, 
-                            id="select_filter_ekspedisi", 
-                            onchange="Shiny.setInputValue('change_filter_ekspedisi', this.value, {priority: 'event'})", 
-                            style="background-color: #FFFFFF !important; color: #000000 !important; border: 2px solid #1A202C !important; border-radius: 8px !important; font-weight: 800 !important; width: 150px; padding: 5px 8px; cursor: pointer; font-size: 12px;"
-                        ),
-                        style="display: flex; align-items: center;"
-                    ),
-                    ui.div(
-                        ui.span("TGL AWAL:", style="font-size: 12px; font-weight: 800; color: #111111; margin-left: 10px; margin-right: 6px;"),
-                        ui.tags.input(
-                            type="date",
-                            id="filter_tgl_start",
-                            value=state.filter_tgl_start(),
-                            onchange="Shiny.setInputValue('change_filter_tgl_start', this.value, {priority: 'event'})",
-                            style="background-color: #FFFFFF !important; color: #000000 !important; border: 2px solid #1A202C !important; border-radius: 8px !important; font-weight: 700 !important; padding: 4px 8px; font-size: 12px; cursor: pointer;"
-                        ),
-                        style="display: flex; align-items: center;"
-                    ),
-                    ui.div(
-                        ui.span("TGL AKHIR:", style="font-size: 12px; font-weight: 800; color: #111111; margin-left: 8px; margin-right: 6px;"),
-                        ui.tags.input(
-                            type="date",
-                            id="filter_tgl_end",
-                            value=state.filter_tgl_end(),
-                            onchange="Shiny.setInputValue('change_filter_tgl_end', this.value, {priority: 'event'})",
-                            style="background-color: #FFFFFF !important; color: #000000 !important; border: 2px solid #1A202C !important; border-radius: 8px !important; font-weight: 700 !important; padding: 4px 8px; font-size: 12px; cursor: pointer;"
-                        ),
-                        style="display: flex; align-items: center;"
-                    ),
-                    reset_tgl_btn,
-                    style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px;"
-                ), 
-                ui.div(
-                    select_all_btn,
-                    del_btn_ui,
-                    style="display: flex; align-items: center; gap: 8px;"
-                ),
-                style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 1.5rem; margin-bottom: 1rem; flex-wrap: wrap; gap: 10px;"
-            ),
+    # --- ROW 3: RTO ---
+    def metric_biaya_rto(self) -> str: 
+        data = [x for x in self.get_filtered_ongkir() if 'RTO' in str(x.get('supplier', '')).upper()]
+        return f"Rp {sum([safe_int(x.get('total_ongkir', 0)) for x in data]):,.0f}"
 
-            # --- 3 ROW METRIC BOXES LENGKAP (PERSIS DENGAN KODE STREAMLIT) ---
-            ui.div(
-                # ROW 1: TOTAL KESELURUHAN (ALL)
-                ui.div(
-                    ongkir_dark_card("💰 TOTAL BIAYA ALL", state.metric_total_biaya_all(), "#38BDF8", "#38BDF8"),
-                    ongkir_dark_card("📦 TOTAL KOLI ALL", state.metric_total_koli_all(), "#38BDF8", "#FFFFFF"),
-                    ongkir_dark_card("📊 AVG COST ALL", state.metric_avg_cost_all(), "#38BDF8", "#38BDF8"),
-                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
-                ),
+    def metric_koli_rto(self) -> str: 
+        data = [x for x in self.get_filtered_ongkir() if 'RTO' in str(x.get('supplier', '')).upper()]
+        return f"{sum([safe_int(x.get('total_koli', x.get('koli', 0))) for x in data]):,.0f} Koli"
 
-                # ROW 2: BARANG DATANG (HIJAU NEON #00EB93)
-                ui.div(
-                    ongkir_dark_card("🚚 BIAYA BARANG DATANG", state.metric_biaya_datang(), "#00EB93", "#00EB93"),
-                    ongkir_dark_card("📦 KOLI BARANG DATANG", state.metric_koli_datang(), "#00EB93", "#00EB93"),
-                    ongkir_dark_card("📊 AVG COST BARANG DATANG", state.metric_avg_datang(), "#00EB93", "#00EB93"),
-                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
-                ),
-
-                # ROW 3: RTO (MERAH NEON #FF4B4B)
-                ui.div(
-                    ongkir_dark_card("🔄 BIAYA RTO", state.metric_biaya_rto(), "#FF4B4B", "#FF4B4B"),
-                    ongkir_dark_card("📦 KOLI RTO", state.metric_koli_rto(), "#FF4B4B", "#FF4B4B"),
-                    ongkir_dark_card("📊 AVG COST RTO", state.metric_avg_rto(), "#FF4B4B", "#FF4B4B"),
-                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.5rem;"
-                ),
-                style="width: 100%;"
-            ),
-
-            # --- TABEL DATA ---
-            ui.div(
-                ui.tags.table(
-                    ui.tags.thead(
-                        ui.tags.tr(
-                            ui.tags.th(
-                                ui.tags.input(
-                                    type="checkbox", 
-                                    checked=is_all_selected,
-                                    onchange="Shiny.setInputValue('btn_toggle_select_all', Math.random(), {priority: 'event'});",
-                                    title="Pilih Semua / Batal Semua",
-                                    style="cursor: pointer; transform: scale(1.2);"
-                                ),
-                                style="text-align: center; width: 45px;"
-                            ), 
-                            ui.tags.th("TANGGAL"), 
-                            ui.tags.th("SUPPLIER"), 
-                            ui.tags.th("EKSPEDISI"), 
-                            ui.tags.th("KOLI"), 
-                            ui.tags.th("TOTAL ONGKIR")
-                        ), 
-                        style="background-color: #CBD5E0 !important;"
-                    ), 
-                    ui.tags.tbody(*table_rows) if len(table_rows) > 0 else ui.tags.tr(
-                        ui.tags.td("Tidak ada transaksi ongkir.", colspan="6", style="text-align: center; color: #718096; padding: 2rem;")
-                    ), 
-                    class_="custom-clean-table"
-                ), 
-                style="background: #FFFFFF; border-radius: 16px; border: 2.5px solid #1A202C; padding: 1rem; width: 100%; box-shadow: 0 10px 25px rgba(0,0,0,0.04); overflow-x: auto;"
-            ),
-            style="width: 100%;"
-        )
+    def metric_avg_rto(self) -> str:
+        data = [x for x in self.get_filtered_ongkir() if 'RTO' in str(x.get('supplier', '')).upper()]
+        biaya = sum([safe_int(x.get("total_ongkir", 0)) for x in data])
+        koli = sum([safe_int(x.get("total_koli", x.get("koli", 0))) for x in data])
+        return f"Rp {(biaya / koli) if koli > 0 else 0:,.0f}"
     # --- Stock Minus Processing (SUPER FAST & IMMUNE TO COLUMN SPACES) ---
     def process_stock_minus_file(self, file_path_or_bytes, file_name: str):
         try:
