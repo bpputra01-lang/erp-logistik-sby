@@ -5662,8 +5662,8 @@ class AppState:
     # -------------------------------------------------------------------------
     # METODE SINKRONISASI COUNTER & COUNT SHEET WEB INTERAKTIF
     # -------------------------------------------------------------------------
-    def update_auditor_counter(self, counter_name: str):
-        c_name = counter_name.strip() if counter_name else "Counter A"
+    def update_auditor_counter(self, name: str):
+        c_name = name.strip() if name else "Counter A"
         self.auditor_counter.set(c_name)
         if not self._raw_df_auditor_filtered.empty and 'Counter' in self._raw_df_auditor_filtered.columns:
             self._raw_df_auditor_filtered['Counter'] = c_name

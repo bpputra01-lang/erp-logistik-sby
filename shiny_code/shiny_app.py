@@ -3663,70 +3663,73 @@ def server(input: Inputs, output: Outputs, session: Session):
     # RENDER RIWAYAT AUDIT (KARTU HISTORY DENGAN 3 TOMBOL: LIHAT, PDF, HAPUS)
     # --------------------------------------------------------------------------
     @render.ui
-    def auditor_history_cards_ui():
-        histories = state.auditor_history_list()
-        if not histories:
-            return ui.div(
-                ui.p("Belum ada riwayat audit tersimpan di database Supabase. Selesaikan sesi audit pada Tab 4 untuk menyimpan dokumen.", style="color: #718096; font-style: italic; text-align: center; padding: 2rem;"),
-                style="background: #F8FAFC; border-radius: 10px; border: 1px dashed #CBD5E0;"
-            )
+    def auditor_history_cards_ui_rendered(histories):
+    if not histories:
+        return ui.div(
+            ui.p("Belum ada riwayat audit tersimpan di database Supabase.", style="color: #718096; font-style: italic; text-align: center; padding: 2rem;"),
+            style="background: #F8FAFC; border-radius: 10px; border: 1px dashed #CBD5E0;"
+        )
 
-        cards = []
-        for h in histories:
-            h_id = h.get("id", "-")
-            dt = h.get("count_date", "-")
-            br = h.get("branch", "-")
-            lead = h.get("lead_auditor", "-")
-            sku_cnt = h.get("total_sku", 0)
-            sys_cnt = h.get("total_qty_system", 0)
-            phys_cnt = h.get("total_qty_physical", 0)
-            var_cnt = h.get("total_variance_qty", 0)
-            open_findings = sum(1 for f in h.get("findings", []) if f.get("status") == "Open")
-            var_color = "#E53E3E" if var_cnt != 0 else "#10B981"
+    cards = []
+    for h in histories:
+        h_id = h.get("id", "-")
+        dt = h.get("count_date", "-")
+        br = h.get("branch", "-")
+        lead = h.get("lead_auditor", "-")
+        sku_cnt = h.get("total_sku", 0)
+        sys_cnt = h.get("total_qty_system", 0)
+        phys_cnt = h.get("total_qty_physical", 0)
+        var_cnt = h.get("total_variance_qty", 0)
+        open_findings = sum(1 for f in h.get("findings", []) if f.get("status") == "Open")
+        var_color = "#E53E3E" if var_cnt != 0 else "#10B981"
 
-            cards.append(ui.div(
+        cards.append(ui.div(
+            ui.div(
                 ui.div(
                     ui.div(
-                        ui.div(
-                            ui.span(h_id, style="font-weight: 800; font-size: 15px; color: #1A202C; margin-right: 8px;"),
-                            ui.span(f"Tanggal: {dt}", style="background: #EDF2F7; color: #2D3748; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 4px; margin-right: 6px;"),
-                            ui.span(f"⚠️ {open_findings} Open Findings", style="background: #FED7D7; color: #9B2C2C; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 4px;") if open_findings > 0 else ui.span("✅ All Closed", style="background: #C6F6D5; color: #22543D; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 4px;"),
-                            style="display: flex; align-items: center; margin-bottom: 4px; flex-wrap: wrap; gap: 4px;"
-                        ),
-                        ui.p(f"Cabang: {br} • Lead Auditor: {lead} • Metode: {h.get('count_method', '-')}", style="margin: 0; font-size: 12px; color: #718096;")
+                        ui.span(h_id, style="font-weight: 800; font-size: 15px; color: #1A202C; margin-right: 8px;"),
+                        ui.span(f"Tanggal: {dt}", style="background: #EDF2F7; color: #2D3748; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 4px; margin-right: 6px;"),
+                        ui.span(f"⚠️ {open_findings} Open Findings", style="background: #FED7D7; color: #9B2C2C; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 4px;") if open_findings > 0 else ui.span("✅ All Closed", style="background: #C6F6D5; color: #22543D; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 4px;"),
+                        style="display: flex; align-items: center; margin-bottom: 4px; flex-wrap: wrap; gap: 4px;"
                     ),
-                    ui.div(
-                        # 1. Tombol Buka Hasil di Web
-                        ui.tags.button(
-                            ui.tags.i(class_="fa-solid fa-eye", style="margin-right: 6px;"), "BUKA HASIL DI WEB",
-                            onclick=f"Shiny.setInputValue('btn_open_audit_detail_modal', '{h_id}', {{priority: 'event'}})",
-                            style="background: #3182CE; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer; margin-right: 6px;"
-                        ),
-                        # 2. Tombol Download PDF
-                        ui.tags.button(
-                            ui.tags.i(class_="fa-solid fa-file-pdf", style="margin-right: 6px;"), "DOWNLOAD PDF",
-                            onclick=f"Shiny.setInputValue('btn_prepare_audit_pdf', '{h_id}', {{priority: 'event'}})",
-                            style="background: linear-gradient(135deg, #E50914 0%, #B20710 100%); color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer; box-shadow: 0 4px 10px rgba(229,9,20,0.25); margin-right: 6px;"
-                        ),
-                        # 3. Tombol Hapus Sesi Audit
-                        ui.tags.button(
-                            ui.tags.i(class_="fa-solid fa-trash", style="margin-right: 4px;"), "Hapus",
-                            onclick=f"Shiny.setInputValue('btn_open_del_audit_modal', '{h_id}', {{priority: 'event'}})",
-                            style="background: #FFF5F5; color: #E53E3E; border: 1.5px solid #FEB2B2; padding: 7px 12px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer;"
-                        ),
-                        style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px;"
-                    ),
-                    style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;"
+                    ui.p(f"Cabang: {br} • Lead Auditor: {lead}", style="margin: 0; font-size: 12px; color: #718096;")
                 ),
                 ui.div(
-                    ui.span(f"📦 Total SKU: {sku_cnt:,} | 💻 Qty System: {sys_cnt:,} | 🎯 Physical Count: {phys_cnt:,} | ", style="font-size: 12px; color: #4A5568;"),
-                    ui.span(f"Net Variance: {var_cnt:,} PCS", style=f"font-size: 12px; font-weight: 800; color: {var_color};"),
-                    style="border-top: 1px dashed #E2E8F0; padding-top: 8px; margin-top: 8px;"
+                    # 1. Tombol Buka Hasil di Web
+                    ui.tags.button(
+                        ui.tags.i(class_="fa-solid fa-eye", style="margin-right: 6px;"), "BUKA",
+                        onclick=f"Shiny.setInputValue('btn_open_audit_detail_modal', '{h_id}', {{priority: 'event'}})",
+                        style="background: #3182CE; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer; margin-right: 6px;"
+                    ),
+                    # 2. Tombol Direct Download PDF (Langsung memicu unduhan)
+                    ui.tags.button(
+                        ui.tags.i(class_="fa-solid fa-file-pdf", style="margin-right: 6px;"), "DOWNLOAD PDF",
+                        onclick=f"Shiny.setInputValue('btn_prepare_audit_pdf', '{h_id}', {{priority: 'event'}}); setTimeout(function() {{ document.getElementById('btn_dl_audit_pdf_file_hidden').click(); }}, 300);",
+                        style="background: linear-gradient(135deg, #E50914 0%, #B20710 100%); color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer; margin-right: 6px;"
+                    ),
+                    # 3. Tombol Hapus
+                    ui.tags.button(
+                        ui.tags.i(class_="fa-solid fa-trash", style="margin-right: 4px;"), "Hapus",
+                        onclick=f"Shiny.setInputValue('btn_open_del_audit_modal', '{h_id}', {{priority: 'event'}})",
+                        style="background: #FFF5F5; color: #E53E3E; border: 1.5px solid #FEB2B2; padding: 7px 12px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer;"
+                    ),
+                    style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px;"
                 ),
-                style="background: white; border: 1.5px solid #CBD5E0; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 0.85rem; box-shadow: 0 2px 6px rgba(0,0,0,0.02);"
-            ))
+                style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;"
+            ),
+            ui.div(
+                ui.span(f"📦 Total SKU: {sku_cnt:,} | 💻 Qty System: {sys_cnt:,} | 🎯 Physical Count: {phys_cnt:,} | ", style="font-size: 12px; color: #4A5568;"),
+                ui.span(f"Net Variance: {var_cnt:,} PCS", style=f"font-size: 12px; font-weight: 800; color: {var_color};"),
+                style="border-top: 1px dashed #E2E8F0; padding-top: 8px; margin-top: 8px;"
+            ),
+            style="background: white; border: 1.5px solid #CBD5E0; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 0.85rem;"
+        ))
 
-        return ui.div(*cards)
+    return ui.div(
+        *cards,
+        # Tombol download tersembunyi untuk memicu direct download PDF
+        ui.download_button("btn_dl_audit_pdf_file_hidden", "", style="display: none;")
+    )
 
     # --------------------------------------------------------------------------
     # POP-UP DETAIL HASIL AUDIT DI WEB
@@ -3994,9 +3997,14 @@ def server(input: Inputs, output: Outputs, session: Session):
         succ, msg = state.delete_audit_session(a_id)
         ui.notification_show(f"🗑️ {msg}", type="message", duration=4)
 
-    # --------------------------------------------------------------------------
-    # HANDLER DOWNLOAD PDF AUDIT
-    # --------------------------------------------------------------------------
+    # SINKRONISASI NAMA COUNTER DARI TAB 1 KE TAB 2
+    @reactive.Effect
+    @reactive.event(input.change_auditor_counter_name)
+    def _update_auditor_counter():
+        val = input.change_auditor_counter_name()
+        state.update_auditor_counter(val)
+
+    # DIRECT DOWNLOAD PDF (TANPA KOTAK NOTIFIKASI DI BAWAH)
     @reactive.Effect
     @reactive.event(input.btn_prepare_audit_pdf)
     def _prep_audit_pdf():
@@ -4004,35 +4012,15 @@ def server(input: Inputs, output: Outputs, session: Session):
         matches = [h for h in state.auditor_history_list() if h.get("id") == a_id]
         if matches:
             state.auditor_selected_for_pdf.set(matches[0])
-            ui.notification_show(f"Dokumen PDF {a_id} siap diunduh! Klik tombol hijau di bawah.", type="message", duration=4)
-
-    @render.ui
-    def auditor_pdf_downloader_container_ui():
-        sel = state.auditor_selected_for_pdf()
-        if not sel:
-            return ui.div()
-        return ui.div(
-            ui.div(
-                ui.span(f"📄 Dokumen Audit {sel.get('id')} Siap Diunduh:", style="font-weight: 700; font-size: 13px; color: #065F46;"),
-                ui.download_button(
-                    "btn_dl_audit_pdf_file",
-                    ui.tags.span(ui.tags.i(class_="fa-solid fa-file-pdf", style="margin-right: 6px;"), f"DOWNLOAD {str(sel.get('id')).replace('/', '_')}.PDF"),
-                    style="background: #10B981; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer;"
-                ),
-                style="display: flex; justify-content: space-between; align-items: center; width: 100%;"
-            ),
-            style="background: #D1FAE5; border: 1.5px solid #6EE7B7; border-radius: 8px; padding: 12px 16px; margin-top: 1rem;"
-        )
 
     @render.download(filename=lambda: f"{str(state.auditor_selected_for_pdf().get('id', 'AUDIT')).replace('/', '_')}.pdf" if state.auditor_selected_for_pdf() else "AUDIT_REPORT.pdf")
-    def btn_dl_audit_pdf_file():
+    def btn_dl_audit_pdf_file_hidden():
         from config import generate_audit_pack_pdf_bytes
         sel = state.auditor_selected_for_pdf()
         if not sel:
             yield b""
         else:
-            yield generate_audit_pack_pdf_bytes(sel)
-# ==========================================================================
+            yield generate_audit_pack_pdf_bytes(sel)# ==========================================================================
     # MEMO PENGAJUAN CONTROLLER & HANDLERS (FULL FIX ANTI-GLITCH)
     # ==========================================================================
 

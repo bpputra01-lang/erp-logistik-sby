@@ -1440,49 +1440,32 @@ def auditor_view(state: AppState):
     )
 
     # --------------------------------------------------------------------------
-    # TAB 4: SIGN-OFF (DENGAN NAMA & CANVAS DIGITAL TANDA TANGAN)
+    # TAB 4: SIGN-OFF (OTOMATIS SINKRON DARI TAB 1 - TIDAK PERLU ISI ULANG NAMA)
     # --------------------------------------------------------------------------
+    def sign_box_synced(role_title, sync_lbl_id, canvas_id):
+        return ui.div(
+            ui.strong(role_title, style="font-size: 13px; color: #1A202C; display: block; margin-bottom: 4px;"),
+            # Label Nama Otomatis dari Tab 1
+            ui.tags.div(
+                ui.tags.span("(Mengikuti Tab 1)", id=sync_lbl_id, style="font-weight: 700; color: #2B6CB0; font-size: 13px;"),
+                style="background: #EDF2F7; padding: 6px 10px; border-radius: 6px; margin-bottom: 8px; min-height: 28px; display: flex; align-items: center;"
+            ),
+            ui.tags.canvas(id=canvas_id, width="240", height="90", style="border: 1px dashed #CBD5E0; border-radius: 6px; background: #FFF; cursor: crosshair; display: block; width: 100%;"),
+            ui.tags.button("Bersihkan TTD", type="button", onclick=f"window.clearSignCanvas('{canvas_id}')", style="background: #EDF2F7; border: 1px solid #CBD5E0; font-size: 11px; padding: 2px 8px; border-radius: 4px; margin-top: 4px; cursor: pointer;"),
+            style="flex: 1; min-width: 220px; background: #F8FAFC; padding: 1rem; border-radius: 8px; border: 1px solid #E2E8F0;"
+        )
+
     tab4_sign = ui.div(
-        ui.h4("✍️ Stock Count Sign-Off (Nama & Tanda Tangan Digital)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
-        ui.p("Isi nama penandatangan dan bubuhkan tanda tangan langsung pada kotak kanvas di bawah.", style="color: #718096; font-size: 13px; margin-bottom: 1.25rem;"),
+        ui.h4("✍️ Stock Count Sign-Off (Tanda Tangan Digital Resmi)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
+        ui.p("Nama penandatangan di bawah disinkronkan otomatis dari data Engagement Details (Tab 1). Silakan bubuhkan tanda tangan pada kotak.", style="color: #718096; font-size: 13px; margin-bottom: 1.25rem;"),
         
-        # 4 Card Penandatangan
         ui.div(
-            # 1. Counter
-            ui.div(
-                ui.strong("1. Counter (Penghitung)", style="font-size: 13px; color: #1A202C; display: block; margin-bottom: 4px;"),
-                ui.tags.input(id="sign_counter_name_in", type="text", placeholder="Nama Counter...", class_="form-control", style="margin-bottom: 8px; font-size: 12px;"),
-                ui.tags.canvas(id="canvas_sign_counter", width="240", height="90", style="border: 1px dashed #CBD5E0; border-radius: 6px; background: #FFF; cursor: crosshair; display: block; width: 100%;"),
-                ui.tags.button("Bersihkan TTD", type="button", onclick="window.clearSignCanvas('canvas_sign_counter')", style="background: #EDF2F7; border: 1px solid #CBD5E0; font-size: 11px; padding: 2px 8px; border-radius: 4px; margin-top: 4px; cursor: pointer;"),
-                style="flex: 1; min-width: 220px; background: #F8FAFC; padding: 1rem; border-radius: 8px; border: 1px solid #E2E8F0;"
-            ),
-            # 2. Supervisor
-            ui.div(
-                ui.strong("2. Count Supervisor", style="font-size: 13px; color: #1A202C; display: block; margin-bottom: 4px;"),
-                ui.tags.input(id="sign_supervisor_name_in", type="text", placeholder="Nama Supervisor...", class_="form-control", style="margin-bottom: 8px; font-size: 12px;"),
-                ui.tags.canvas(id="canvas_sign_spv", width="240", height="90", style="border: 1px dashed #CBD5E0; border-radius: 6px; background: #FFF; cursor: crosshair; display: block; width: 100%;"),
-                ui.tags.button("Bersihkan TTD", type="button", onclick="window.clearSignCanvas('canvas_sign_spv')", style="background: #EDF2F7; border: 1px solid #CBD5E0; font-size: 11px; padding: 2px 8px; border-radius: 4px; margin-top: 4px; cursor: pointer;"),
-                style="flex: 1; min-width: 220px; background: #F8FAFC; padding: 1rem; border-radius: 8px; border: 1px solid #E2E8F0;"
-            ),
-            # 3. Manager
-            ui.div(
-                ui.strong("3. Warehouse/Ops Manager", style="font-size: 13px; color: #1A202C; display: block; margin-bottom: 4px;"),
-                ui.tags.input(id="sign_manager_name_in", type="text", placeholder="Nama Manager Ops...", class_="form-control", style="margin-bottom: 8px; font-size: 12px;"),
-                ui.tags.canvas(id="canvas_sign_mgr", width="240", height="90", style="border: 1px dashed #CBD5E0; border-radius: 6px; background: #FFF; cursor: crosshair; display: block; width: 100%;"),
-                ui.tags.button("Bersihkan TTD", type="button", onclick="window.clearSignCanvas('canvas_sign_mgr')", style="background: #EDF2F7; border: 1px solid #CBD5E0; font-size: 11px; padding: 2px 8px; border-radius: 4px; margin-top: 4px; cursor: pointer;"),
-                style="flex: 1; min-width: 220px; background: #F8FAFC; padding: 1rem; border-radius: 8px; border: 1px solid #E2E8F0;"
-            ),
-            # 4. Lead Auditor
-            ui.div(
-                ui.strong("4. External Lead Auditor", style="font-size: 13px; color: #1A202C; display: block; margin-bottom: 4px;"),
-                ui.tags.input(id="sign_lead_name_in", type="text", placeholder="Nama Lead Auditor...", class_="form-control", style="margin-bottom: 8px; font-size: 12px;"),
-                ui.tags.canvas(id="canvas_sign_lead", width="240", height="90", style="border: 1px dashed #CBD5E0; border-radius: 6px; background: #FFF; cursor: crosshair; display: block; width: 100%;"),
-                ui.tags.button("Bersihkan TTD", type="button", onclick="window.clearSignCanvas('canvas_sign_lead')", style="background: #EDF2F7; border: 1px solid #CBD5E0; font-size: 11px; padding: 2px 8px; border-radius: 4px; margin-top: 4px; cursor: pointer;"),
-                style="flex: 1; min-width: 220px; background: #F8FAFC; padding: 1rem; border-radius: 8px; border: 1px solid #E2E8F0;"
-            ),
+            sign_box_synced("1. Counter (Penghitung)", "lbl_sync_counter", "canvas_sign_counter"),
+            sign_box_synced("2. Count Supervisor", "lbl_sync_supervisor", "canvas_sign_spv"),
+            sign_box_synced("3. Warehouse/Ops Manager", "lbl_sync_manager", "canvas_sign_mgr"),
+            sign_box_synced("4. External Lead Auditor", "lbl_sync_lead", "canvas_sign_lead"),
             style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem;"
         ),
-        # Tombol Final Simpan ke Database
         ui.div(
             ui.tags.button(
                 ui.tags.span(ui.tags.i(class_="fa-solid fa-floppy-disk", style="margin-right: 8px; font-size: 15px;"), "SIMPAN AUDIT KE DATABASE SUPABASE & GENERATE REPORT"),
@@ -1503,13 +1486,13 @@ def auditor_view(state: AppState):
                         supervisor: document.getElementById('aud_supervisor') ? document.getElementById('aud_supervisor').value : '',
                         counter: document.getElementById('aud_counter') ? document.getElementById('aud_counter').value : 'Counter A',
                         currency: document.getElementById('aud_currency') ? document.getElementById('aud_currency').value : 'IDR',
-                        sign_counter_name: document.getElementById('sign_counter_name_in') ? document.getElementById('sign_counter_name_in').value : '',
+                        sign_counter_name: document.getElementById('aud_counter') ? document.getElementById('aud_counter').value : '',
                         sign_counter_img: getCanvasData('canvas_sign_counter'),
-                        sign_supervisor_name: document.getElementById('sign_supervisor_name_in') ? document.getElementById('sign_supervisor_name_in').value : '',
+                        sign_supervisor_name: document.getElementById('aud_supervisor') ? document.getElementById('aud_supervisor').value : '',
                         sign_supervisor_img: getCanvasData('canvas_sign_spv'),
-                        sign_manager_name: document.getElementById('sign_manager_name_in') ? document.getElementById('sign_manager_name_in').value : '',
+                        sign_manager_name: document.getElementById('aud_manager') ? document.getElementById('aud_manager').value : '',
                         sign_manager_img: getCanvasData('canvas_sign_mgr'),
-                        sign_lead_name: document.getElementById('sign_lead_name_in') ? document.getElementById('sign_lead_name_in').value : '',
+                        sign_lead_name: document.getElementById('aud_lead') ? document.getElementById('aud_lead').value : '',
                         sign_lead_img: getCanvasData('canvas_sign_lead')
                     };
                     window.showGlobalSpinner();
@@ -1520,8 +1503,26 @@ def auditor_view(state: AppState):
             ),
             style="display: flex; justify-content: flex-end; width: 100%;"
         ),
-        # JS Inisialisasi Canvas Tanda Tangan
+        # JS untuk Sinkronisasi Nama Live & Canvas TTD
         ui.tags.script("""
+            function syncAllAuditNames() {
+                let c = document.getElementById('aud_counter');
+                let s = document.getElementById('aud_supervisor');
+                let m = document.getElementById('aud_manager');
+                let l = document.getElementById('aud_lead');
+                
+                if (c && document.getElementById('lbl_sync_counter')) document.getElementById('lbl_sync_counter').innerText = c.value || '(Belum diisi)';
+                if (s && document.getElementById('lbl_sync_supervisor')) document.getElementById('lbl_sync_supervisor').innerText = s.value || '(Belum diisi)';
+                if (m && document.getElementById('lbl_sync_manager')) document.getElementById('lbl_sync_manager').innerText = m.value || '(Belum diisi)';
+                if (l && document.getElementById('lbl_sync_lead')) document.getElementById('lbl_sync_lead').innerText = l.value || '(Belum diisi)';
+            }
+            document.addEventListener('input', function(e) {
+                if (['aud_counter', 'aud_supervisor', 'aud_manager', 'aud_lead'].includes(e.target.id)) {
+                    syncAllAuditNames();
+                }
+            });
+            setTimeout(syncAllAuditNames, 300);
+
             function initSignCanvases() {
                 ['canvas_sign_counter', 'canvas_sign_spv', 'canvas_sign_mgr', 'canvas_sign_lead'].forEach(function(id) {
                     let canvas = document.getElementById(id);
@@ -1562,7 +1563,6 @@ def auditor_view(state: AppState):
         """),
         style="padding: 0.5rem 0;"
     )
-
     # --------------------------------------------------------------------------
     # TAB 5: AUDIT HISTORY & DOWNLOAD PDF RESMI (POIN 5)
     # --------------------------------------------------------------------------
