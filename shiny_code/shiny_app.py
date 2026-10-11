@@ -3660,76 +3660,76 @@ def server(input: Inputs, output: Outputs, session: Session):
         ui.notification_show("Data riwayat audit telah dimuat ulang dari Supabase.", type="message", duration=3)
 
     # --------------------------------------------------------------------------
-    # RENDER RIWAYAT AUDIT (KARTU HISTORY DENGAN 3 TOMBOL: LIHAT, PDF, HAPUS)
+    # RENDER RIWAYAT AUDIT (KARTU HISTORY DENGAN DIRECT DOWNLOAD PDF)
     # --------------------------------------------------------------------------
     @render.ui
-    def auditor_history_cards_ui_rendered(histories):
+    def auditor_history_cards_ui():
+        histories = state.auditor_history_list()
         if not histories:
-        return ui.div(
-            ui.p("Belum ada riwayat audit tersimpan di database Supabase.", style="color: #718096; font-style: italic; text-align: center; padding: 2rem;"),
-            style="background: #F8FAFC; border-radius: 10px; border: 1px dashed #CBD5E0;"
-        )
+            return ui.div(
+                ui.p("Belum ada riwayat audit tersimpan di database Supabase. Selesaikan sesi audit pada Tab 4 untuk menyimpan dokumen.", style="color: #718096; font-style: italic; text-align: center; padding: 2rem;"),
+                style="background: #F8FAFC; border-radius: 10px; border: 1px dashed #CBD5E0;"
+            )
 
-    cards = []
-    for h in histories:
-        h_id = h.get("id", "-")
-        dt = h.get("count_date", "-")
-        br = h.get("branch", "-")
-        lead = h.get("lead_auditor", "-")
-        sku_cnt = h.get("total_sku", 0)
-        sys_cnt = h.get("total_qty_system", 0)
-        phys_cnt = h.get("total_qty_physical", 0)
-        var_cnt = h.get("total_variance_qty", 0)
-        open_findings = sum(1 for f in h.get("findings", []) if f.get("status") == "Open")
-        var_color = "#E53E3E" if var_cnt != 0 else "#10B981"
+        cards = []
+        for h in histories:
+            h_id = h.get("id", "-")
+            dt = h.get("count_date", "-")
+            br = h.get("branch", "-")
+            lead = h.get("lead_auditor", "-")
+            sku_cnt = h.get("total_sku", 0)
+            sys_cnt = h.get("total_qty_system", 0)
+            phys_cnt = h.get("total_qty_physical", 0)
+            var_cnt = h.get("total_variance_qty", 0)
+            open_findings = sum(1 for f in h.get("findings", []) if f.get("status") == "Open")
+            var_color = "#E53E3E" if var_cnt != 0 else "#10B981"
 
-        cards.append(ui.div(
-            ui.div(
+            cards.append(ui.div(
                 ui.div(
                     ui.div(
-                        ui.span(h_id, style="font-weight: 800; font-size: 15px; color: #1A202C; margin-right: 8px;"),
-                        ui.span(f"Tanggal: {dt}", style="background: #EDF2F7; color: #2D3748; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 4px; margin-right: 6px;"),
-                        ui.span(f"⚠️ {open_findings} Open Findings", style="background: #FED7D7; color: #9B2C2C; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 4px;") if open_findings > 0 else ui.span("✅ All Closed", style="background: #C6F6D5; color: #22543D; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 4px;"),
-                        style="display: flex; align-items: center; margin-bottom: 4px; flex-wrap: wrap; gap: 4px;"
+                        ui.div(
+                            ui.span(h_id, style="font-weight: 800; font-size: 15px; color: #1A202C; margin-right: 8px;"),
+                            ui.span(f"Tanggal: {dt}", style="background: #EDF2F7; color: #2D3748; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 4px; margin-right: 6px;"),
+                            ui.span(f"⚠️ {open_findings} Open Findings", style="background: #FED7D7; color: #9B2C2C; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 4px;") if open_findings > 0 else ui.span("✅ All Closed", style="background: #C6F6D5; color: #22543D; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 4px;"),
+                            style="display: flex; align-items: center; margin-bottom: 4px; flex-wrap: wrap; gap: 4px;"
+                        ),
+                        ui.p(f"Cabang: {br} • Lead Auditor: {lead}", style="margin: 0; font-size: 12px; color: #718096;")
                     ),
-                    ui.p(f"Cabang: {br} • Lead Auditor: {lead}", style="margin: 0; font-size: 12px; color: #718096;")
+                    ui.div(
+                        # 1. Tombol Buka Hasil di Web
+                        ui.tags.button(
+                            ui.tags.i(class_="fa-solid fa-eye", style="margin-right: 6px;"), "BUKA",
+                            onclick=f"Shiny.setInputValue('btn_open_audit_detail_modal', '{h_id}', {{priority: 'event'}})",
+                            style="background: #3182CE; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer; margin-right: 6px;"
+                        ),
+                        # 2. Tombol Direct Download PDF (Langsung unduh tanpa kotak tambahan di bawah)
+                        ui.tags.button(
+                            ui.tags.i(class_="fa-solid fa-file-pdf", style="margin-right: 6px;"), "DOWNLOAD PDF",
+                            onclick=f"Shiny.setInputValue('btn_prepare_audit_pdf', '{h_id}', {{priority: 'event'}}); setTimeout(function() {{ document.getElementById('btn_dl_audit_pdf_file_hidden').click(); }}, 300);",
+                            style="background: linear-gradient(135deg, #E50914 0%, #B20710 100%); color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer; margin-right: 6px;"
+                        ),
+                        # 3. Tombol Hapus Sesi Audit
+                        ui.tags.button(
+                            ui.tags.i(class_="fa-solid fa-trash", style="margin-right: 4px;"), "Hapus",
+                            onclick=f"Shiny.setInputValue('btn_open_del_audit_modal', '{h_id}', {{priority: 'event'}})",
+                            style="background: #FFF5F5; color: #E53E3E; border: 1.5px solid #FEB2B2; padding: 7px 12px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer;"
+                        ),
+                        style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px;"
+                    ),
+                    style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;"
                 ),
                 ui.div(
-                    # 1. Tombol Buka Hasil di Web
-                    ui.tags.button(
-                        ui.tags.i(class_="fa-solid fa-eye", style="margin-right: 6px;"), "BUKA",
-                        onclick=f"Shiny.setInputValue('btn_open_audit_detail_modal', '{h_id}', {{priority: 'event'}})",
-                        style="background: #3182CE; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer; margin-right: 6px;"
-                    ),
-                    # 2. Tombol Direct Download PDF (Langsung memicu unduhan)
-                    ui.tags.button(
-                        ui.tags.i(class_="fa-solid fa-file-pdf", style="margin-right: 6px;"), "DOWNLOAD PDF",
-                        onclick=f"Shiny.setInputValue('btn_prepare_audit_pdf', '{h_id}', {{priority: 'event'}}); setTimeout(function() {{ document.getElementById('btn_dl_audit_pdf_file_hidden').click(); }}, 300);",
-                        style="background: linear-gradient(135deg, #E50914 0%, #B20710 100%); color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer; margin-right: 6px;"
-                    ),
-                    # 3. Tombol Hapus
-                    ui.tags.button(
-                        ui.tags.i(class_="fa-solid fa-trash", style="margin-right: 4px;"), "Hapus",
-                        onclick=f"Shiny.setInputValue('btn_open_del_audit_modal', '{h_id}', {{priority: 'event'}})",
-                        style="background: #FFF5F5; color: #E53E3E; border: 1.5px solid #FEB2B2; padding: 7px 12px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer;"
-                    ),
-                    style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px;"
+                    ui.span(f"📦 Total SKU: {sku_cnt:,} | 💻 Qty System: {sys_cnt:,} | 🎯 Physical Count: {phys_cnt:,} | ", style="font-size: 12px; color: #4A5568;"),
+                    ui.span(f"Net Variance: {var_cnt:,} PCS", style=f"font-size: 12px; font-weight: 800; color: {var_color};"),
+                    style="border-top: 1px dashed #E2E8F0; padding-top: 8px; margin-top: 8px;"
                 ),
-                style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;"
-            ),
-            ui.div(
-                ui.span(f"📦 Total SKU: {sku_cnt:,} | 💻 Qty System: {sys_cnt:,} | 🎯 Physical Count: {phys_cnt:,} | ", style="font-size: 12px; color: #4A5568;"),
-                ui.span(f"Net Variance: {var_cnt:,} PCS", style=f"font-size: 12px; font-weight: 800; color: {var_color};"),
-                style="border-top: 1px dashed #E2E8F0; padding-top: 8px; margin-top: 8px;"
-            ),
-            style="background: white; border: 1.5px solid #CBD5E0; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 0.85rem;"
-        ))
+                style="background: white; border: 1.5px solid #CBD5E0; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 0.85rem;"
+            ))
 
-    return ui.div(
-        *cards,
-        # Tombol download tersembunyi untuk memicu direct download PDF
-        ui.download_button("btn_dl_audit_pdf_file_hidden", "", style="display: none;")
-    )
+        return ui.div(
+            *cards,
+            ui.download_button("btn_dl_audit_pdf_file_hidden", "", style="display: none;")
+        )
 
     # --------------------------------------------------------------------------
     # POP-UP DETAIL HASIL AUDIT DI WEB
