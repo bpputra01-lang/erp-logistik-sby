@@ -3473,11 +3473,32 @@ def server(input: Inputs, output: Outputs, session: Session):
         # Terapkan filter ke tabel data dan metrik
         state.apply_auditor_filters(valid_brands, valid_subs, valid_bins)
     
+# RENDER REAKTIF KOTAK DOWNLOAD PDF AUDIT
+    @render.ui
+    def auditor_pdf_downloader_container_ui():
+        sel = state.auditor_selected_for_pdf()
+        if not sel:
+            return ui.div()
+        return ui.div(
+            ui.div(
+                ui.span(f"📄 Dokumen Audit {sel.get('id')} Siap Diunduh:", style="font-weight: 700; font-size: 13px; color: #065F46;"),
+                ui.download_button(
+                    "btn_dl_audit_pdf_file_hidden",
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px;"), f"DOWNLOAD {str(sel.get('id')).replace('/', '_')}.PDF"),
+                    style="background: #10B981; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer;"
+                ),
+                style="display: flex; justify-content: space-between; align-items: center; width: 100%;"
+            ),
+            style="background: #D1FAE5; border: 1.5px solid #6EE7B7; border-radius: 8px; padding: 12px 16px; margin-top: 1rem;"
+        )
+
+    # PEMBERSIH STATE PDF AUDIT SETELAH DIKLIK
     @reactive.Effect
     @reactive.event(input.btn_clear_audit_pdf_state)
     def _clear_audit_pdf():
         state.auditor_selected_for_pdf.set(None)
 
+    # PEMBERSIH STATE PDF MEMO SETELAH DIKLIK
     @reactive.Effect
     @reactive.event(input.btn_clear_memo_pdf_state)
     def _clear_memo_pdf():
@@ -3672,6 +3693,7 @@ def server(input: Inputs, output: Outputs, session: Session):
     # --------------------------------------------------------------------------
     # RENDER RIWAYAT AUDIT (KARTU HISTORY DENGAN DIRECT DOWNLOAD PDF)
     # --------------------------------------------------------------------------
+    # RENDER KARTU RIWAYAT (HAPUS DOWNLOAD BAR STATIS DARI DALAM KARTU)
     @render.ui
     def auditor_history_cards_ui():
         histories = state.auditor_history_list()
@@ -3712,7 +3734,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                             onclick=f"Shiny.setInputValue('btn_open_audit_detail_modal', '{h_id}', {{priority: 'event'}})",
                             style="background: #3182CE; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer; margin-right: 6px;"
                         ),
-                        # 2. Tombol Persiapan PDF (Langsung set state di server)
+                        # 2. Tombol Persiapan PDF
                         ui.tags.button(
                             ui.tags.i(class_="fa-solid fa-file-pdf", style="margin-right: 6px;"), "SIAPKAN PDF",
                             onclick=f"Shiny.setInputValue('btn_prepare_audit_pdf', '{h_id}', {{priority: 'event'}});",
@@ -3736,21 +3758,26 @@ def server(input: Inputs, output: Outputs, session: Session):
                 style="background: white; border: 1.5px solid #CBD5E0; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 0.85rem;"
             ))
 
-        # Tombol download resmi yang akan aktif setelah tombol "SIAPKAN PDF" diklik
-        download_action_bar = ui.div(
-            ui.span("📥 Dokumen PDF Telah Disiapkan. Klik tombol hijau untuk mengunduh:", style="font-weight: 700; font-size: 13px; color: #065F46;"),
-            ui.download_button(
-                "btn_dl_audit_pdf_file_hidden",
-                ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px;"), "DOWNLOAD FILE PDF SEKARANG"),
-                style="background: #10B981; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer;"
-            ),
-            style="background: #D1FAE5; border: 1.5px solid #6EE7B7; border-radius: 8px; padding: 12px 16px; margin-top: 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;"
-        )
+        return ui.div(*cards)
 
-        return ui.div(
-            *cards,
-            download_action_bar
-        )
+    # TAB 5: PASTIKAN MEMANGGIL OUTPUT UI REAKTIF
+    tab5_history = ui.div(
+        ui.div(
+            ui.div(
+                ui.h4("📂 Riwayat & Arsip Audit Pack (Tersimpan di Supabase)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
+                ui.p("Auditor dapat meninjau hasil stock opname terdahulu dan mengunduh laporan PDF resmi.", style="color: #718096; font-size: 13px; margin: 0;"),
+            ),
+            ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-arrows-rotate", style="margin-right: 6px;"), "Refresh History",
+                onclick="Shiny.setInputValue('btn_refresh_audit_history', Math.random(), {priority: 'event'})",
+                style="background: #EDF2F7; color: #2D3748; border: 1.5px solid #CBD5E0; padding: 6px 14px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer;"
+            ),
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 8px;"
+        ),
+        ui.output_ui("auditor_history_cards_ui"),
+        ui.output_ui("auditor_pdf_downloader_container_ui"),  # <-- Kotak hijau ini sekarang reaktif & bisa hilang otomatis
+        style="padding: 0.5rem 0;"
+    )
     # --------------------------------------------------------------------------
     # POP-UP DETAIL HASIL AUDIT DI WEB
     # --------------------------------------------------------------------------
