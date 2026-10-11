@@ -3702,10 +3702,10 @@ def server(input: Inputs, output: Outputs, session: Session):
                             onclick=f"Shiny.setInputValue('btn_open_audit_detail_modal', '{h_id}', {{priority: 'event'}})",
                             style="background: #3182CE; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer; margin-right: 6px;"
                         ),
-                        # 2. Tombol Direct Download PDF (Langsung unduh tanpa kotak tambahan di bawah)
+                        # 2. Tombol Persiapan PDF (Langsung set state di server)
                         ui.tags.button(
-                            ui.tags.i(class_="fa-solid fa-file-pdf", style="margin-right: 6px;"), "DOWNLOAD PDF",
-                            onclick=f"Shiny.setInputValue('btn_prepare_audit_pdf', '{h_id}', {{priority: 'event'}}); setTimeout(function() {{ document.getElementById('btn_dl_audit_pdf_file_hidden').click(); }}, 300);",
+                            ui.tags.i(class_="fa-solid fa-file-pdf", style="margin-right: 6px;"), "SIAPKAN PDF",
+                            onclick=f"Shiny.setInputValue('btn_prepare_audit_pdf', '{h_id}', {{priority: 'event'}});",
                             style="background: linear-gradient(135deg, #E50914 0%, #B20710 100%); color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer; margin-right: 6px;"
                         ),
                         # 3. Tombol Hapus Sesi Audit
@@ -3726,11 +3726,21 @@ def server(input: Inputs, output: Outputs, session: Session):
                 style="background: white; border: 1.5px solid #CBD5E0; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 0.85rem;"
             ))
 
-        return ui.div(
-            *cards,
-            ui.download_button("btn_dl_audit_pdf_file_hidden", "", style="display: none;")
+        # Tombol download resmi yang akan aktif setelah tombol "SIAPKAN PDF" diklik
+        download_action_bar = ui.div(
+            ui.span("📥 Dokumen PDF Telah Disiapkan. Klik tombol hijau untuk mengunduh:", style="font-weight: 700; font-size: 13px; color: #065F46;"),
+            ui.download_button(
+                "btn_dl_audit_pdf_file_hidden",
+                ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px;"), "DOWNLOAD FILE PDF SEKARANG"),
+                style="background: #10B981; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer;"
+            ),
+            style="background: #D1FAE5; border: 1.5px solid #6EE7B7; border-radius: 8px; padding: 12px 16px; margin-top: 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;"
         )
 
+        return ui.div(
+            *cards,
+            download_action_bar
+        )
     # --------------------------------------------------------------------------
     # POP-UP DETAIL HASIL AUDIT DI WEB
     # --------------------------------------------------------------------------
@@ -4004,7 +4014,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         val = input.change_auditor_counter_name()
         state.update_auditor_counter(val)
 
-    # DIRECT DOWNLOAD PDF (TANPA KOTAK NOTIFIKASI DI BAWAH)
+    # HANDLER PERSIAPAN DOWNLOAD PDF AUDIT
     @reactive.Effect
     @reactive.event(input.btn_prepare_audit_pdf)
     def _prep_audit_pdf():
@@ -4012,6 +4022,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         matches = [h for h in state.auditor_history_list() if h.get("id") == a_id]
         if matches:
             state.auditor_selected_for_pdf.set(matches[0])
+            ui.notification_show(f"File PDF untuk {a_id} siap diunduh!", type="message", duration=3)
 
     @render.download(filename=lambda: f"{str(state.auditor_selected_for_pdf().get('id', 'AUDIT')).replace('/', '_')}.pdf" if state.auditor_selected_for_pdf() else "AUDIT_REPORT.pdf")
     def btn_dl_audit_pdf_file_hidden():
@@ -4020,7 +4031,8 @@ def server(input: Inputs, output: Outputs, session: Session):
         if not sel:
             yield b""
         else:
-            yield generate_audit_pack_pdf_bytes(sel)# ==========================================================================
+            yield generate_audit_pack_pdf_bytes(sel)
+    # ==========================================================================
     # MEMO PENGAJUAN CONTROLLER & HANDLERS (FULL FIX ANTI-GLITCH)
     # ==========================================================================
 
