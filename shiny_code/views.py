@@ -1746,7 +1746,7 @@ def show_audit_detail_modal(target: dict):
     a_id = target.get("id", "-")
     
     # 1. Tabel Findings / Temuan
-    findings = target.get("findings", [])
+        findings = target.get("findings", [])
         if findings:
             finding_rows = []
             for f_idx, fd in enumerate(findings, start=1):
