@@ -313,53 +313,135 @@ def generate_memo_pdf_bytes(memo_dict: dict) -> bytes:
 
 
 # ==============================================================================
-# HELPER: KONVERSI SIGNATURE CANVAS (BASE64) MENJADI JPEG OBJECT
+# DEKODER TANDA TANGAN CANVAS (PURE PYTHON - TANPA PERLU DEPENDENSI EKSTERNAL)
 # ==============================================================================
-def get_signature_jpeg_data(base64_str):
+def process_signature_canvas(base64_str):
     """
-    Mengubah base64 canvas PNG (transparan) menjadi JPEG (latar putih)
-    Returns: (jpeg_bytes, width, height) atau None jika tidak ada TTD
+    Mendekode canvas PNG transparan menjadi stream Flate/RGB murni untuk PDF.
+    Mendeteksi coretan pena secara otomatis dan meratakannya ke latar putih.
+    Returns: (compressed_bytes, width, height) jika ada coretan, atau None jika kosong.
     """
-    if not base64_str or not isinstance(base64_str, str) or len(base64_str) < 150:
+    if not base64_str or not isinstance(base64_str, str) or len(base64_str) < 100:
         return None
     try:
-        raw_b64 = base64_str.split("base64,")[1] if "base64," in base64_str else base64_str
-        raw_bytes = base64.b64decode(raw_b64)
-        if len(raw_bytes) < 100:
-            return None
+        import zlib
+        import struct
         
-        # Gunakan Pillow (PIL) jika tersedia untuk meratakan transparansi canvas
-        try:
-            from PIL import Image as PILImage
-            im = PILImage.open(io.BytesIO(raw_bytes))
-            if im.mode in ('RGBA', 'LA') or (im.mode == 'P' and 'transparency' in im.info):
-                bg = PILImage.new('RGB', im.size, (255, 255, 255))
-                if im.mode != 'RGBA':
-                    im = im.convert('RGBA')
-                bg.paste(im, mask=im.split()[3])
-                im = bg
+        raw_b64 = base64_str.split("base64,")[1] if "base64," in base64_str else base64_str
+        png_bytes = base64.b64decode(raw_b64)
+        if len(png_bytes) < 30 or png_bytes[:8] != b'\x89PNG\r\n\x1a\n':
+            return None
+
+        # 1. Parse Chunk PNG
+        idx = 8
+        idat_list = []
+        w, h = 0, 0
+        color_type = 6
+
+        while idx < len(png_bytes):
+            if idx + 8 > len(png_bytes): break
+            length = struct.unpack(">I", png_bytes[idx:idx+4])[0]
+            ctype = png_bytes[idx+4:idx+8]
+            data = png_bytes[idx+8:idx+8+length]
+            idx += 12 + length
+
+            if ctype == b'IHDR':
+                w, h = struct.unpack(">II", data[:8])
+                color_type = data[9]
+            elif ctype == b'IDAT':
+                idat_list.append(data)
+            elif ctype == b'IEND':
+                break
+
+        if not idat_list or w == 0 or h == 0:
+            return None
+
+        # 2. Dekompresi IDAT
+        raw_decomp = zlib.decompress(b"".join(idat_list))
+        bpp = 4 if color_type == 6 else (3 if color_type == 2 else 1)
+        stride = 1 + w * bpp
+        if len(raw_decomp) < h * stride:
+            return None
+
+        # 3. Un-filtering PNG & Deteksi Coretan TTD
+        out_rgb = bytearray(w * h * 3)
+        prior_row = bytearray(w * bpp)
+        has_ink = False
+
+        def paeth_predict(a, b, c):
+            p = a + b - c
+            pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
+            if pa <= pb and pa <= pc: return a
+            elif pb <= pc: return b
+            return c
+
+        for y_i in range(h):
+            offset = y_i * stride
+            ftype = raw_decomp[offset]
+            row_raw = raw_decomp[offset+1:offset+stride]
+            curr_row = bytearray(w * bpp)
+
+            if ftype == 0:
+                curr_row[:] = row_raw
+            elif ftype == 1:
+                for x in range(len(row_raw)):
+                    left = curr_row[x - bpp] if x >= bpp else 0
+                    curr_row[x] = (row_raw[x] + left) & 0xFF
+            elif ftype == 2:
+                for x in range(len(row_raw)):
+                    curr_row[x] = (row_raw[x] + prior_row[x]) & 0xFF
+            elif ftype == 3:
+                for x in range(len(row_raw)):
+                    left = curr_row[x - bpp] if x >= bpp else 0
+                    curr_row[x] = (row_raw[x] + (left + prior_row[x]) // 2) & 0xFF
+            elif ftype == 4:
+                for x in range(len(row_raw)):
+                    left = curr_row[x - bpp] if x >= bpp else 0
+                    up = prior_row[x]
+                    up_left = prior_row[x - bpp] if x >= bpp else 0
+                    curr_row[x] = (row_raw[x] + paeth_predict(left, up, up_left)) & 0xFF
             else:
-                im = im.convert('RGB')
-            
-            w, h = im.size
-            out_buf = io.BytesIO()
-            im.save(out_buf, format='JPEG', quality=95)
-            return (out_buf.getvalue(), w, h)
-        except Exception:
-            # Fallback jika PIL tidak tersedia
-            return (raw_bytes, 200, 80)
+                curr_row[:] = row_raw
+
+            prior_row = curr_row
+            row_out_off = y_i * w * 3
+
+            for x_i in range(w):
+                if color_type == 6:
+                    r, g, b, a = curr_row[x_i*4], curr_row[x_i*4+1], curr_row[x_i*4+2], curr_row[x_i*4+3]
+                elif color_type == 2:
+                    r, g, b, a = curr_row[x_i*3], curr_row[x_i*3+1], curr_row[x_i*3+2], 255
+                else:
+                    v = curr_row[x_i]
+                    r, g, b, a = v, v, v, 255
+
+                # Jika ada piksel gelap / goresan pena
+                if a > 30 and (r < 235 or g < 235 or b < 235):
+                    has_ink = True
+
+                alpha = a / 255.0
+                out_rgb[row_out_off + x_i*3]     = int(r * alpha + 255 * (1.0 - alpha))
+                out_rgb[row_out_off + x_i*3 + 1] = int(g * alpha + 255 * (1.0 - alpha))
+                out_rgb[row_out_off + x_i*3 + 2] = int(b * alpha + 255 * (1.0 - alpha))
+
+        if not has_ink:
+            return None
+
+        # Return data terkompresi FlateDecode untuk PDF
+        return (zlib.compress(bytes(out_rgb)), w, h)
+
     except Exception as e:
-        print("Error helper signature:", e)
+        print("Signature decoder notice:", e)
         return None
 
 
 # ==============================================================================
-# GENERATOR RESMI AUDIT PACK (DENGAN DETAIL NILAI SELISIH & GAMBAR TTD DIGITAL)
+# GENERATOR RESMI AUDIT PACK (DENGAN TAMPILAN ASLI GAMBAR TTD)
 # ==============================================================================
 def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
     """
     Menghasilkan Dokumen PDF Portrait A4 Resmi ZKN:
-    Kop Surat, Summary Box, Tabel Count Sheet (Lengkap Nilai Selisih), Findings, & Gambar TTD Digital.
+    Kop Surat, Summary Box, Tabel Count Sheet (Selisih Saja), Findings, dan TTD Digital Asli.
     """
     
     # --------------------------------------------------------------------------
@@ -379,17 +461,13 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
         p_q = safe_int(p_str)
         d_q = p_q - s_q
 
-        # Ambil harga / COGS untuk menghitung nilai selisih
         cogs_val = safe_int(it.get("Harga Beli", it.get("cogs", it.get("COGS", it.get("price", it.get("harga", 0))))))
-        
-        # Ambil Variance Value jika ada, atau hitung: d_q * cogs_val
         var_raw = it.get("Variance Value", it.get("variance_value", it.get("Nilai Selisih", it.get("nilai_selisih", None))))
         if var_raw is not None and str(var_raw).strip() not in ["", "none", "nan"]:
             v_val = safe_int(var_raw)
         else:
             v_val = d_q * cogs_val
 
-        # Hanya sertakan jika ada perbedaan fisik vs sistem
         if d_q != 0 or v_val != 0:
             diff_items.append({
                 "sku": str(it.get("SKU", it.get("sku", "-"))),
@@ -402,15 +480,26 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
             tot_diff_qty += d_q
             tot_diff_val += v_val
 
+    # Helper pencarian key TTD
+    def get_sig_val(prefix):
+        for k in [f"sign_{prefix}_img", f"sign_{prefix}", f"signature_{prefix}", f"ttd_{prefix}", f"{prefix}_signature", f"{prefix}_sign"]:
+            val = audit_data.get(k)
+            if val and isinstance(val, str) and len(val) > 100:
+                return val
+        return None
+
+    sig_counter_data = get_sig_val("counter")
+    sig_spv_data     = get_sig_val("supervisor")
+    sig_mgr_data     = get_sig_val("manager")
+    sig_lead_data    = get_sig_val("lead")
+
     # --------------------------------------------------------------------------
-    # 2. ENGINE REPORTLAB (JIKA TERSEDIA)
+    # 2. REPORTLAB ENGINE (JIKA TERSEDIA DI ENVIRONMENT)
     # --------------------------------------------------------------------------
     try:
         from reportlab.lib.pagesizes import A4
         from reportlab.lib import colors
-        from reportlab.platypus import (
-            SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether, Image
-        )
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether, Image
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         
         def esc_pdf(text):
@@ -418,25 +507,22 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
             return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
         buf = io.BytesIO()
-        doc = SimpleDocTemplate(
-            buf, pagesize=A4,
-            rightMargin=30, leftMargin=30, topMargin=26, bottomMargin=26
-        )
-
+        doc = SimpleDocTemplate(buf, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=26, bottomMargin=26)
         styles = getSampleStyleSheet()
+
         COLOR_PRIMARY_RED = colors.HexColor('#C5161D')
         COLOR_NAVY_DARK   = colors.HexColor('#1A365D')
         COLOR_BOX_BG      = colors.HexColor('#EBF3F8')
         COLOR_BORDER      = colors.HexColor('#B8D0E0')
         COLOR_TEXT_MUTED  = colors.HexColor('#4A5568')
 
-        h_left_title  = ParagraphStyle('HLeftTitle', fontName='Helvetica-Bold', fontSize=15, leading=17, textColor=COLOR_PRIMARY_RED)
-        h_left_sub    = ParagraphStyle('HLeftSub', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.HexColor('#2D3748'))
-        h_right_title = ParagraphStyle('HRightTitle', fontName='Helvetica-Bold', fontSize=11, leading=13, textColor=COLOR_NAVY_DARK, alignment=2)
-        h_right_sub   = ParagraphStyle('HRightSub', fontName='Helvetica', fontSize=7.5, leading=10, textColor=COLOR_TEXT_MUTED, alignment=2)
+        h_left_title  = ParagraphStyle('HLTitle', fontName='Helvetica-Bold', fontSize=15, leading=17, textColor=COLOR_PRIMARY_RED)
+        h_left_sub    = ParagraphStyle('HLSub', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.HexColor('#2D3748'))
+        h_right_title = ParagraphStyle('HRTitle', fontName='Helvetica-Bold', fontSize=11, leading=13, textColor=COLOR_NAVY_DARK, alignment=2)
+        h_right_sub   = ParagraphStyle('HRSub', fontName='Helvetica', fontSize=7.5, leading=10, textColor=COLOR_TEXT_MUTED, alignment=2)
         
-        meta_label = ParagraphStyle('MetaLabel', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.black)
-        meta_val   = ParagraphStyle('MetaVal', fontName='Helvetica', fontSize=7.5, leading=10, textColor=colors.black)
+        meta_label = ParagraphStyle('MLabel', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.black)
+        meta_val   = ParagraphStyle('MVal', fontName='Helvetica', fontSize=7.5, leading=10, textColor=colors.black)
         
         section_h = ParagraphStyle('SecHead', fontName='Helvetica-Bold', fontSize=8.5, leading=11, textColor=colors.black, spaceBefore=4, spaceAfter=4)
         th_style  = ParagraphStyle('TH', fontName='Helvetica-Bold', fontSize=7, leading=8.5, textColor=colors.white, alignment=1)
@@ -450,7 +536,6 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
 
         elements = []
 
-        # Header Kop
         comp_str = str(audit_data.get('company', 'PT ZONA KARYA NUSANTARA')).upper()
         branch_str = str(audit_data.get('branch', 'SZ SURABAYA')).upper()
         audit_id = str(audit_data.get('id', 'AUD/SZ /20261011/178'))
@@ -469,7 +554,6 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
         elements.append(red_bar)
         elements.append(Spacer(1, 6))
 
-        # Meta Data
         count_date = str(audit_data.get('count_date', '11 OCTOBER 2026')).upper()
         count_method = str(audit_data.get('count_method', 'Full count (wall-to-wall)'))
         counter_name = str(audit_data.get('sign_counter_name') or audit_data.get('counter_name') or 'RAMITA').upper()
@@ -490,7 +574,6 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
         elements.append(t_meta)
         elements.append(Spacer(1, 8))
 
-        # Summary Metric
         tot_sku = safe_int(audit_data.get('total_sku', 0))
         tot_sys = safe_int(audit_data.get('total_qty_system', 0))
         tot_phys = safe_int(audit_data.get('total_qty_physical', 0))
@@ -510,7 +593,6 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
         elements.append(t_metric)
         elements.append(Spacer(1, 9))
 
-        # Tabel Count Sheet (Selisih Saja)
         elements.append(Paragraph("<b>DAFTAR ITEM SELISIH (VARIANCE COUNT SHEET)</b>", section_h))
         col_w_diff = [20, 95, 175, 45, 45, 55, 100]
         t_diff_data = [[Paragraph(h, th_style) for h in ["NO", "SKU", "DESCRIPTION", "SYS", "PHYS", "DIFF", "NILAI SELISIH"]]]
@@ -520,15 +602,10 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
             d_val_style = tb_right_green if d_row["val"] > 0 else tb_right_red
             diff_str = f"{d_row['diff']:+d}"
             val_str = (f"+Rp {d_row['val']:,}" if d_row['val'] > 0 else f"-Rp {abs(d_row['val']):,}") if d_row['val'] != 0 else "Rp 0"
-            
             t_diff_data.append([
-                Paragraph(str(idx_d), tb_center),
-                Paragraph(esc_pdf(d_row["sku"]), tb_bold),
-                Paragraph(esc_pdf(d_row["desc"][:40]), tb_style),
-                Paragraph(str(d_row["sys"]), tb_center),
-                Paragraph(str(d_row["phys"]), tb_center),
-                Paragraph(diff_str, d_color),
-                Paragraph(val_str, d_val_style)
+                Paragraph(str(idx_d), tb_center), Paragraph(esc_pdf(d_row["sku"]), tb_bold),
+                Paragraph(esc_pdf(d_row["desc"][:40]), tb_style), Paragraph(str(d_row["sys"]), tb_center),
+                Paragraph(str(d_row["phys"]), tb_center), Paragraph(diff_str, d_color), Paragraph(val_str, d_val_style)
             ])
 
         tot_val_text = (f"+Rp {tot_diff_val:,}" if tot_diff_val > 0 else f"-Rp {abs(tot_diff_val):,}") if tot_diff_val != 0 else "Rp 0"
@@ -548,7 +625,6 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
         elements.append(t_diff)
         elements.append(Spacer(1, 10))
 
-        # Auditor Observations & Findings
         elements.append(Paragraph("<b>AUDITOR OBSERVATIONS & FINDINGS</b>", section_h))
         findings = audit_data.get("findings", [])
         f_cols = [20, 75, 185, 45, 145, 65]
@@ -575,22 +651,24 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
         elements.append(t_find)
         elements.append(Spacer(1, 10))
 
-        # Kotak Tanda Tangan (Dengan Gambar Canvas Asli)
         elements.append(Paragraph("<b>STOCK COUNT SIGN-OFF</b>", section_h))
 
-        def make_sig_cell_reportlab(base64_data):
-            sig_res = get_signature_jpeg_data(base64_data)
-            if sig_res:
-                jpg_b, _, _ = sig_res
-                img = Image(io.BytesIO(jpg_b), width=105, height=36)
-                img.hAlign = 'CENTER'
-                return img
-            return Paragraph("<i>[Signed via System]</i>", ParagraphStyle('SignM', fontName='Helvetica-Oblique', fontSize=7, textColor=COLOR_TEXT_MUTED, alignment=1))
+        def make_sig_cell_rl(base64_data):
+            if base64_data:
+                try:
+                    raw_b64 = base64_data.split("base64,")[1] if "base64," in base64_data else base64_data
+                    img_bytes = base64.b64decode(raw_b64)
+                    img = Image(io.BytesIO(img_bytes), width=105, height=36)
+                    img.hAlign = 'CENTER'
+                    return img
+                except Exception:
+                    pass
+            return Paragraph("<i>[Signed via System]</i>", ParagraphStyle('SM', fontName='Helvetica-Oblique', fontSize=7, textColor=COLOR_TEXT_MUTED, alignment=1))
 
         col_w_sign = [133.75, 133.75, 133.75, 133.75]
         sign_table_data = [
             [Paragraph("<b>Counter</b>", tb_bold), Paragraph("<b>Supervisor</b>", tb_bold), Paragraph("<b>Manager Ops</b>", tb_bold), Paragraph("<b>Lead Auditor</b>", tb_bold)],
-            [make_sig_cell_reportlab(audit_data.get("sign_counter_img")), make_sig_cell_reportlab(audit_data.get("sign_supervisor_img")), make_sig_cell_reportlab(audit_data.get("sign_manager_img")), make_sig_cell_reportlab(audit_data.get("sign_lead_img"))],
+            [make_sig_cell_rl(sig_counter_data), make_sig_cell_rl(sig_spv_data), make_sig_cell_rl(sig_mgr_data), make_sig_cell_rl(sig_lead_data)],
             [Paragraph(f"<b>{esc_pdf(counter_name)}</b>", tb_bold), Paragraph(f"<b>{esc_pdf(supervisor)}</b>", tb_bold), Paragraph(f"<b>{esc_pdf(ops_manager)}</b>", tb_bold), Paragraph(f"<b>{esc_pdf(lead_auditor)}</b>", tb_bold)]
         ]
 
@@ -610,11 +688,11 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
         if len(res_bytes) > 200:
             return res_bytes
 
-    except Exception as e:
-        print(f"⚠️ ReportLab info: {e}. Beralih ke Native Binary Fallback.")
+    except Exception:
+        pass
 
     # --------------------------------------------------------------------------
-    # 3. ENGINE CADANGAN NATIVE BINARY PDF (MENDUKUNG SEMUA FITUR + GAMBAR TTD)
+    # 3. NATIVE BINARY PDF ENGINE (MENAMPILKAN GAMBAR TTD MURNI DENGAN FLATEDECODE)
     # --------------------------------------------------------------------------
     comp = str(audit_data.get('company', 'PT ZONA KARYA NUSANTARA')).upper()
     br = str(audit_data.get('branch', 'SZ SURABAYA')).upper()
@@ -637,14 +715,14 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
         return s.encode('latin-1', 'replace').decode('latin-1')
 
     ops = []
-    # Header KOP
+    # Kop Surat
     ops.append("BT /F2 16 Tf 0.77 0.08 0.11 rg 40 805 Td (ZKN WAREHOUSE AUDIT) Tj ET")
     ops.append("BT /F2 11 Tf 0.1 0.2 0.35 rg 380 805 Td (AUDIT SIGN-OFF REPORT) Tj ET")
     ops.append(f"BT /F2 8 Tf 0.2 0.2 0.2 rg 40 792 Td ({esc_native(comp)} - {esc_native(br)}) Tj ET")
     ops.append(f"BT /F1 8 Tf 0.3 0.3 0.3 rg 380 792 Td (No: {esc_native(audit_id_str)}) Tj ET")
     ops.append("0.77 0.08 0.11 RG 1.5 w 40 782 m 555 782 l S")
 
-    # Meta Data 2 Kolom
+    # Meta Data
     y = 765
     meta_pairs = [
         ("Tanggal Pelaksanaan", dt, "Lead Auditor", lead),
@@ -669,7 +747,7 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
     ops.append(f"BT /F2 8 Tf 0.77 0.08 0.11 rg 420 {y-11} Td (NET VARIANCE: {tot_var_n:+,}) Tj ET")
     y -= 25
 
-    # Count Sheet (Detail Selisih & Nilai Rupiah Lengkap)
+    # Count Sheet (Detail Selisih & Nilai Rupiah)
     y -= 12
     ops.append(f"BT /F2 9 Tf 0 0 0 rg 40 {y} Td (DAFTAR ITEM SELISIH (VARIANCE COUNT SHEET)) Tj ET")
     y -= 18
@@ -698,11 +776,9 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
             
             d_col = "0 0.5 0.2" if itm['diff'] > 0 else "0.8 0.1 0.1"
             ops.append(f"BT /F2 7.5 Tf {d_col} rg 405 {y+4} Td ({itm['diff']:+d}) Tj ET")
-            
             v_str = (f"+Rp {itm['val']:,}" if itm['val'] > 0 else f"-Rp {abs(itm['val']):,}") if itm['val'] != 0 else "Rp 0"
             ops.append(f"BT /F2 7.5 Tf {d_col} rg 455 {y+4} Td ({v_str}) Tj ET")
 
-        # Baris TOTAL Count Sheet
         y -= 15
         ops.append(f"0.94 0.95 0.96 rg 40 {y} 515 15 re f")
         ops.append(f"0.7 0.7 0.7 RG 0.5 w 40 {y} 515 15 re S")
@@ -713,7 +789,7 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
         tot_val_s = (f"+Rp {tot_diff_val:,}" if tot_diff_val > 0 else f"-Rp {abs(tot_diff_val):,}") if tot_diff_val != 0 else "Rp 0"
         ops.append(f"BT /F2 7.5 Tf {tot_d_col} rg 455 {y+4} Td ({tot_val_s}) Tj ET")
 
-    # Auditor Findings
+    # Temuan Auditor
     y -= 25
     ops.append(f"BT /F2 9 Tf 0 0 0 rg 40 {y} Td (AUDITOR OBSERVATIONS & FINDINGS) Tj ET")
     y -= 18
@@ -735,47 +811,48 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
         ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 400 {y+4} Td ({esc_native(str(fd.get('recom','-'))[:18])}) Tj ET")
         ops.append(f"BT /F2 7.5 Tf 0.1 0.5 0.2 rg 505 {y+4} Td ({esc_native(str(fd.get('status','Closed')))}) Tj ET")
 
-    # Kotak Sign-Off (Mendukung Rendering Gambar TTD Native)
+    # --------------------------------------------------------------------------
+    # KOTAK SIGN-OFF DENGAN DUKUNGAN RENDERING GAMBAR TTD ASLI
+    # --------------------------------------------------------------------------
     y -= 25
     ops.append(f"BT /F2 9 Tf 0 0 0 rg 40 {y} Td (STOCK COUNT SIGN-OFF) Tj ET")
     y -= 62
     sign_w = 515 / 4
     sign_boxes = [
-        ("Counter", ctr, audit_data.get("sign_counter_img")),
-        ("Supervisor", spv, audit_data.get("sign_supervisor_img")),
-        ("Manager Ops", mgr, audit_data.get("sign_manager_img")),
-        ("Lead Auditor", lead, audit_data.get("sign_lead_img"))
+        ("Counter", ctr, sig_counter_data),
+        ("Supervisor", spv, sig_spv_data),
+        ("Manager Ops", mgr, sig_mgr_data),
+        ("Lead Auditor", lead, sig_lead_data)
     ]
 
-    # Persiapkan Objek Gambar Native
     native_img_objects = {}
     xobj_entries = []
 
-    for s_i, (s_title, s_name, s_img_b64) in enumerate(sign_boxes, start=1):
+    for s_i, (s_title, s_name, s_b64) in enumerate(sign_boxes, start=1):
         bx = 40 + (s_i - 1) * sign_w
         ops.append(f"0.5 0.5 0.5 RG 0.5 w {bx} {y} {sign_w} 56 re S")
         ops.append(f"BT /F2 8 Tf 0 0 0 rg {bx+8} {y+45} Td ({esc_native(s_title)}) Tj ET")
         ops.append(f"BT /F2 8 Tf 0 0 0 rg {bx+8} {y+7} Td ({esc_native(s_name)}) Tj ET")
-        
-        # Coba pasang gambar tanda tangan
-        sig_tuple = get_signature_jpeg_data(s_img_b64)
-        if sig_tuple:
-            jpg_bytes, iw, ih = sig_tuple
-            obj_id = 6 + len(native_img_objects) + 1
-            native_img_objects[obj_id] = (jpg_bytes, iw, ih)
-            img_ref = f"/Im{s_i}"
-            xobj_entries.append(f"{img_ref} {obj_id} 0 R")
-            
-            # Gambar TTD di dalam kotak
-            img_draw_w = sign_w - 20
-            img_draw_h = 24
-            img_pos_x = bx + 10
-            img_pos_y = y + 17
-            ops.append(f"q {img_draw_w} 0 0 {img_draw_h} {img_pos_x} {img_pos_y} cm {img_ref} Do Q")
-        else:
-            ops.append(f"BT /F1 7.5 Tf 0.4 0.4 0.4 rg {bx+8} {y+25} Td ([Signed via System]) Tj ET")
 
-    # Rakit Stream Dokumen
+        # Proses data coretan canvas
+        sig_parsed = process_signature_canvas(s_b64)
+        if sig_parsed:
+            comp_flate, iw, ih = sig_parsed
+            obj_id = 6 + len(native_img_objects) + 1
+            native_img_objects[obj_id] = (comp_flate, iw, ih)
+            img_ref = f"/Sig{s_i}"
+            xobj_entries.append(f"{img_ref} {obj_id} 0 R")
+
+            # Posisi & ukuran penempatan gambar TTD di tengah kotak
+            img_w = sign_w - 20
+            img_h = 28
+            img_x = bx + 10
+            img_y = y + 16
+            ops.append(f"q {img_w} 0 0 {img_h} {img_x} {img_y} cm {img_ref} Do Q")
+        else:
+            ops.append(f"BT /F1 7.5 Tf 0.45 0.45 0.45 rg {bx+10} {y+25} Td ([Signed via System]) Tj ET")
+
+    # Gabungkan Stream & XObject
     content_stream = "\n".join(ops).encode('latin-1')
     stream_len = len(content_stream)
 
@@ -791,10 +868,10 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
         6: b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>"
     }
 
-    # Tambahkan gambar-gambar TTD ke objek PDF biner
-    for o_id, (j_bytes, iw, ih) in native_img_objects.items():
-        header_img = f"<< /Type /XObject /Subtype /Image /Width {iw} /Height {ih} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length {len(j_bytes)} >>\nstream\n".encode('latin-1')
-        objects[o_id] = header_img + j_bytes + b"\nendstream"
+    # Sematkan Image Stream FlateDecode Asli
+    for o_id, (comp_bytes, iw, ih) in native_img_objects.items():
+        header_img = f"<< /Type /XObject /Subtype /Image /Width {iw} /Height {ih} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length {len(comp_bytes)} >>\nstream\n".encode('latin-1')
+        objects[o_id] = header_img + comp_bytes + b"\nendstream"
 
     buf_native = bytearray()
     buf_native.extend(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
