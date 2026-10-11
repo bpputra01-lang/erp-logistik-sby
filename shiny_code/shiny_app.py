@@ -3944,18 +3944,20 @@ def server(input: Inputs, output: Outputs, session: Session):
         from views import show_audit_detail_modal
         show_audit_detail_modal(target)
 
+    # Handler Ubah Status Temuan Audit (Open <-> Closed)
     @reactive.Effect
     @reactive.event(input.btn_toggle_audit_finding_status)
     def _on_toggle_finding():
         data = input.btn_toggle_audit_finding_status() or {}
         a_id = data.get("id")
         idx = data.get("idx")
-        succ, msg = state.toggle_audit_finding_status(a_id, idx)
-        if succ:
-            ui.notification_show(f"✅ {msg}", type="message", duration=4)
-            _render_and_show_detail_modal(a_id)
-        else:
-            ui.notification_show(f"⚠️ {msg}", type="warning", duration=4)
+        
+        if a_id is not None and idx is not None:
+            succ, msg = state.toggle_audit_finding_status(a_id, int(idx))
+            if succ:
+                ui.notification_show(f"✅ {msg}", type="message", duration=2)
+            else:
+                ui.notification_show(f"⚠️ {msg}", type="warning", duration=3)
 
     # --------------------------------------------------------------------------
     # MODAL & HANDLER HAPUS SESI AUDIT (POIN 2)
