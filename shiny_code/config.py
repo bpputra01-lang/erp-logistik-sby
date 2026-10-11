@@ -346,8 +346,7 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
         )
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     except ImportError as e:
-        print("⚠️ ReportLab belum terpasang di runtime:", e)
-        return b""
+        raise Exception(f"Library ReportLab belum terpasang di server/runtime Python: {str(e)}")
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
