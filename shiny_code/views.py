@@ -1939,15 +1939,13 @@ def show_audit_detail_modal(target: dict):
 # ==============================================================================
 def memo_pengajuan_view(state: AppState):
     divisi_choices = [
-        "MARKOM", "RETAIL / STORE", "OPERASIONAL", "PURCHASING", 
-        "FINANCE & ACCOUNTING", "HRD & GA", "LOGISTIK DC", "IT SUPPORT"
+        "MARKOM", "TOKO", "LOGISTIK", "PURCHASING"
     ]
     jenis_choices = [
-        "Peminjaman Barang Display / Event",
-        "Pengeluaran Sample Promosi & Endorsement",
-        "Pengadaan Alat & Perlengkapan Kerja",
-        "Mutasi Barang Antar Divisi / Cabang",
-        "Penggantian Barang Rusak / Defect",
+        "Pengajuan Adjustment untuk Hadiah",
+        "Pengajuan Adjustment untuk Operasional",
+        "Pengajuan Adjustment untuk SSR",
+        "Pengajuan Adjustment untuk BA",
         "Lainnya"
     ]
 
