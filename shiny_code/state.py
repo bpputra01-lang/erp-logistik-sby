@@ -488,6 +488,7 @@ class AppState:
         self.auditor_total_qty = reactive.Value(0)
         self.auditor_total_phys = reactive.Value(0)
         self.auditor_total_var = reactive.Value(0)
+        
 
         # Engagement Details
         self.auditor_company = reactive.Value("PT ZONA KARYA NUSANTARA")
@@ -508,6 +509,7 @@ class AppState:
         # Tab 5: History Audit Supabase
         self.auditor_history_list = reactive.Value([])
         self.auditor_selected_for_pdf = reactive.Value(None)
+        self.auditor_selected_detail = reactive.Value(None)
 
         self.df_auditor_headers = reactive.Value([])
         self.df_auditor_rows = reactive.Value([])
@@ -4274,14 +4276,17 @@ class AppState:
             if df.empty or df.shape[1] < 10:
                 return False, "File minimal harus 10 kolom (Format Multiple Adjustment Jezpro)!"
 
+            # ✅ DEFINISIKAN df_clean DULU SEBELUM DIGUNAKAN
+            df_clean = df.copy()
+
             # Standarisasi Kolom Indeks
-            # Col 1: BIN, Col 2: SKU, Col 3: BRAND, Col 4: ITEM NAME, Col 5: VARIANT/SIZE, Col 6: SUB KAT, Col 9: QTY
             col_b = df_clean.columns[1]   # BIN
             col_s = df_clean.columns[2]   # SKU
             col_d = df_clean.columns[3]   # BRAND
             col_e = df_clean.columns[4]   # ITEM NAME
+            col_f = df_clean.columns[5]   # VARIANT/SIZE
             col_g = df_clean.columns[6]   # SUB KATEGORI
-            col_h = df_clean.columns[7]   # HARGA BELI (Kolom H)
+            col_h = df_clean.columns[7]   # HARGA BELI
             col_j = df_clean.columns[9]   # QTY SYSTEM
 
             df_clean['BIN_CLEAN'] = df_clean[col_b].fillna('').astype(str).str.strip().str.upper()
@@ -4289,8 +4294,15 @@ class AppState:
             df_clean['BRAND_CLEAN'] = df_clean[col_d].fillna('UNKNOWN').astype(str).str.strip().str.upper()
             df_clean['DESC_CLEAN'] = df_clean[col_e].fillna('-').astype(str).str.strip()
             df_clean['CAT_CLEAN'] = df_clean[col_g].fillna('UNKNOWN').astype(str).str.strip().str.upper()
-            df_clean['HARGA_BELI'] = pd.to_numeric(df_clean[col_h], errors='coerce').fillna(0).astype(int)  # <-- TAMBAHKAN INI
+            df_clean['HARGA_BELI'] = pd.to_numeric(df_clean[col_h], errors='coerce').fillna(0).astype(int)
             df_clean['QTY_SYS'] = pd.to_numeric(df_clean[col_j], errors='coerce').fillna(0).astype(int)
+            df_clean['ARTICLE'] = df_clean['SKU_CLEAN'].str.split('-').str[0].str.strip()
+            df_clean['QTY_NUM'] = df_clean['QTY_SYS']
+            col_desc = 'DESC_CLEAN'
+            col_size = col_f
+            col_br = 'BRAND_CLEAN'
+            df_clean['SUB_CLEAN'] = df_clean['CAT_CLEAN']
+            df = df_clean
             # ------------------------------------------------------------------
             # 1. LOGIKA MODUL A: PERCENTAGE DISPLAY CONTROL (ARTICLE BASE)
             # ------------------------------------------------------------------
@@ -5484,7 +5496,7 @@ class AppState:
         ws_eng.column_dimensions['D'].width = 35
 
         # ======================================================================
-        # SHEET 2: STOCK COUNT SHEET (DENGAN HASIL INPUT FISIK & COUNTER AKTIF)
+        # SHEET 2: STOCK COUNT SHEET (SINKRON 13 KOLOM DENGAN HARGA BELI)
         # ======================================================================
         ws_cnt = wb.create_sheet(title="STOCK COUNT SHEET")
         ws_cnt.sheet_view.showGridLines = True
@@ -5499,7 +5511,7 @@ class AppState:
 
         headers_cnt = [
             "No.", "Bin Location", "SKU", "Description", "Category", 
-            "UoM (PAIR / PCS)", "Qty System", "Physical Count", "Variance Value", 
+            "UoM (PAIR / PCS)", "Harga Beli", "Qty System", "Physical Count", "Variance Value", 
             "Counter", "Auditor Verified", "Remarks"
         ]
 
@@ -5512,36 +5524,41 @@ class AppState:
         df_out = self._raw_df_auditor_filtered
         for r_idx, row in enumerate(df_out.itertuples(index=False), start=7):
             ws_cnt.cell(row=r_idx, column=1, value=r_idx - 6).alignment = Alignment(horizontal="center")
-            ws_cnt.cell(row=r_idx, column=2, value=str(row[1])).font = font_blue
-            ws_cnt.cell(row=r_idx, column=3, value=str(row[2])).font = font_blue
-            ws_cnt.cell(row=r_idx, column=4, value=str(row[3])).font = font_blue
-            ws_cnt.cell(row=r_idx, column=5, value=str(row[4])).font = font_blue
-            ws_cnt.cell(row=r_idx, column=6, value=str(row[5])).font = font_blue
+            ws_cnt.cell(row=r_idx, column=2, value=str(row[1])).font = font_blue   # Bin Location
+            ws_cnt.cell(row=r_idx, column=3, value=str(row[2])).font = font_blue   # SKU
+            ws_cnt.cell(row=r_idx, column=4, value=str(row[3])).font = font_blue   # Description
+            ws_cnt.cell(row=r_idx, column=5, value=str(row[4])).font = font_blue   # Category
+            ws_cnt.cell(row=r_idx, column=6, value=str(row[5])).font = font_blue   # UoM
             ws_cnt.cell(row=r_idx, column=6).alignment = Alignment(horizontal="center")
             
-            # Qty System
-            ws_cnt.cell(row=r_idx, column=7, value=int(row[6])).alignment = Alignment(horizontal="right")
+            # Harga Beli (Kolom G / 7)
+            ws_cnt.cell(row=r_idx, column=7, value=int(row[6] or 0)).number_format = '"Rp "#,##0'
             
-            # Physical Count (Jika sudah diisi di web, tetap tercetak rapi)
-            phys_val = row[7] if str(row[7]).strip() != "" else ""
-            c_phys = ws_cnt.cell(row=r_idx, column=8, value=phys_val)
+            # Qty System (Kolom H / 8)
+            ws_cnt.cell(row=r_idx, column=8, value=int(row[7] or 0)).alignment = Alignment(horizontal="right")
+            
+            # Physical Count (Kolom I / 9)
+            phys_val = row[8] if str(row[8]).strip() != "" else ""
+            c_phys = ws_cnt.cell(row=r_idx, column=9, value=phys_val)
             c_phys.fill = yellow_fill
             c_phys.alignment = Alignment(horizontal="right")
             
-            # Rumus Variance
-            ws_cnt.cell(row=r_idx, column=9, value=f'=IF(H{r_idx}="","",H{r_idx}-G{r_idx})').alignment = Alignment(horizontal="right")
+            # Rumus Variance Value = (Physical - System) * Harga Beli (Kolom J / 10)
+            ws_cnt.cell(row=r_idx, column=10, value=f'=IF(I{r_idx}="","",(I{r_idx}-H{r_idx})*G{r_idx})').number_format = '"Rp "#,##0'
             
-            # Counter & Status Verified
-            ctr_val = str(row[9]) if str(row[9]).strip() != "" else form_meta.get("counter_name", "Counter A")
-            c_ctr = ws_cnt.cell(row=r_idx, column=10, value=ctr_val); c_ctr.font = font_blue; c_ctr.alignment = Alignment(horizontal="center")
-            ver_val = str(row[10]) if str(row[10]).strip() != "" else "No"
-            c_ver = ws_cnt.cell(row=r_idx, column=11, value=ver_val); c_ver.font = font_blue; c_ver.alignment = Alignment(horizontal="center")
-            ws_cnt.cell(row=r_idx, column=12, value=str(row[11]))
+            # Counter (Kolom K / 11) & Status Verified (Kolom L / 12)
+            ctr_val = str(row[10]) if str(row[10]).strip() != "" else form_meta.get("counter_name", "Counter A")
+            c_ctr = ws_cnt.cell(row=r_idx, column=11, value=ctr_val); c_ctr.font = font_blue; c_ctr.alignment = Alignment(horizontal="center")
+            ver_val = str(row[11]) if str(row[11]).strip() != "" else "No"
+            c_ver = ws_cnt.cell(row=r_idx, column=12, value=ver_val); c_ver.font = font_blue; c_ver.alignment = Alignment(horizontal="center")
+            
+            # Remarks (Kolom M / 13)
+            ws_cnt.cell(row=r_idx, column=13, value=str(row[12] if len(row) > 12 else ""))
 
-            for c in range(1, 13):
+            for c in range(1, 14):
                 ws_cnt.cell(row=r_idx, column=c).border = thin_border
 
-        col_widths_cnt = {'A': 6, 'B': 18, 'C': 22, 'D': 35, 'E': 20, 'F': 18, 'G': 14, 'H': 16, 'I': 16, 'J': 15, 'K': 18, 'L': 25}
+        col_widths_cnt = {'A': 6, 'B': 18, 'C': 22, 'D': 35, 'E': 20, 'F': 16, 'G': 16, 'H': 14, 'I': 16, 'J': 18, 'K': 15, 'L': 18, 'M': 25}
         for col_letter, width in col_widths_cnt.items():
             ws_cnt.column_dimensions[col_letter].width = width
 
@@ -5758,6 +5775,54 @@ class AppState:
         if 0 <= index < len(cur):
             cur.pop(index)
             self.auditor_findings_list.set(cur)
+
+    # ==============================================================================
+# TAMBAHKAN METODE-METODE BERIKUT DI DALAM class AppState DI state.py:
+# ==============================================================================
+
+    def delete_audit_session(self, audit_id: str):
+        """Menghapus sesi audit permanen dari Supabase dan state lokal"""
+        try:
+            client = get_supabase()
+            if client:
+                client.table("audit_sessions").delete().in_("id", [audit_id]).execute()
+            self.load_auditor_history()
+            return True, f"Sesi audit {audit_id} berhasil dihapus dari database!"
+        except Exception as e:
+            print("Gagal hapus audit dari Supabase:", e)
+            cur = [h for h in self.auditor_history_list() if h.get("id") != audit_id]
+            self.auditor_history_list.set(cur)
+            return True, f"Sesi audit {audit_id} berhasil dihapus!"
+
+    def toggle_audit_finding_status(self, audit_id: str, finding_idx: int):
+        """Mengubah status finding (Open <-> Closed) dan menyimpannya ke Supabase"""
+        try:
+            histories = list(self.auditor_history_list())
+            target_hist = next((h for h in histories if h.get("id") == audit_id), None)
+            if not target_hist:
+                return False, "Sesi audit tidak ditemukan!"
+
+            findings = list(target_hist.get("findings", []))
+            if 0 <= finding_idx < len(findings):
+                cur_status = findings[finding_idx].get("status", "Open")
+                new_status = "Closed" if cur_status == "Open" else "Open"
+                findings[finding_idx]["status"] = new_status
+                target_hist["findings"] = findings
+
+                # Update ke Supabase
+                client = get_supabase()
+                if client:
+                    client.table("audit_sessions").update({"findings": findings}).in_("id", [audit_id]).execute()
+
+                # Refresh state lokal
+                self.auditor_history_list.set(histories)
+                if self.auditor_selected_detail() and self.auditor_selected_detail().get("id") == audit_id:
+                    self.auditor_selected_detail.set(target_hist)
+
+                return True, f"Status temuan berhasil diubah menjadi '{new_status}'!"
+            return False, "Indeks temuan tidak valid!"
+        except Exception as e:
+            return False, f"Gagal update status temuan: {str(e)}"
 
     # -------------------------------------------------------------------------
     # METODE TAB 5 & SUPABASE: SIMPAN LENGKAP AUDIT SESSION

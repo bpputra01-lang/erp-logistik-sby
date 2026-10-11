@@ -3659,6 +3659,9 @@ def server(input: Inputs, output: Outputs, session: Session):
         state.load_auditor_history()
         ui.notification_show("Data riwayat audit telah dimuat ulang dari Supabase.", type="message", duration=3)
 
+    # --------------------------------------------------------------------------
+    # RENDER RIWAYAT AUDIT (KARTU HISTORY DENGAN 3 TOMBOL: LIHAT, PDF, HAPUS)
+    # --------------------------------------------------------------------------
     @render.ui
     def auditor_history_cards_ui():
         histories = state.auditor_history_list()
@@ -3678,6 +3681,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             sys_cnt = h.get("total_qty_system", 0)
             phys_cnt = h.get("total_qty_physical", 0)
             var_cnt = h.get("total_variance_qty", 0)
+            open_findings = sum(1 for f in h.get("findings", []) if f.get("status") == "Open")
             var_color = "#E53E3E" if var_cnt != 0 else "#10B981"
 
             cards.append(ui.div(
@@ -3685,18 +3689,32 @@ def server(input: Inputs, output: Outputs, session: Session):
                     ui.div(
                         ui.div(
                             ui.span(h_id, style="font-weight: 800; font-size: 15px; color: #1A202C; margin-right: 8px;"),
-                            ui.span(f"Tanggal: {dt}", style="background: #EDF2F7; color: #2D3748; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 4px;"),
-                            style="display: flex; align-items: center; margin-bottom: 4px;"
+                            ui.span(f"Tanggal: {dt}", style="background: #EDF2F7; color: #2D3748; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 4px; margin-right: 6px;"),
+                            ui.span(f"⚠️ {open_findings} Open Findings", style="background: #FED7D7; color: #9B2C2C; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 4px;") if open_findings > 0 else ui.span("✅ All Closed", style="background: #C6F6D5; color: #22543D; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 4px;"),
+                            style="display: flex; align-items: center; margin-bottom: 4px; flex-wrap: wrap; gap: 4px;"
                         ),
                         ui.p(f"Cabang: {br} • Lead Auditor: {lead} • Metode: {h.get('count_method', '-')}", style="margin: 0; font-size: 12px; color: #718096;")
                     ),
                     ui.div(
+                        # 1. Tombol Buka Hasil di Web
                         ui.tags.button(
-                            ui.tags.i(class_="fa-solid fa-file-pdf", style="margin-right: 6px;"), "DOWNLOAD PDF RESMI",
-                            onclick=f"Shiny.setInputValue('btn_prepare_audit_pdf', '{h_id}', {{priority: 'event'}})",
-                            style="background: linear-gradient(135deg, #E50914 0%, #B20710 100%); color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer; box-shadow: 0 4px 10px rgba(229,9,20,0.3);"
+                            ui.tags.i(class_="fa-solid fa-eye", style="margin-right: 6px;"), "BUKA HASIL DI WEB",
+                            onclick=f"Shiny.setInputValue('btn_open_audit_detail_modal', '{h_id}', {{priority: 'event'}})",
+                            style="background: #3182CE; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer; margin-right: 6px;"
                         ),
-                        style="display: flex; align-items: center;"
+                        # 2. Tombol Download PDF
+                        ui.tags.button(
+                            ui.tags.i(class_="fa-solid fa-file-pdf", style="margin-right: 6px;"), "DOWNLOAD PDF",
+                            onclick=f"Shiny.setInputValue('btn_prepare_audit_pdf', '{h_id}', {{priority: 'event'}})",
+                            style="background: linear-gradient(135deg, #E50914 0%, #B20710 100%); color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer; box-shadow: 0 4px 10px rgba(229,9,20,0.25); margin-right: 6px;"
+                        ),
+                        # 3. Tombol Hapus Sesi Audit
+                        ui.tags.button(
+                            ui.tags.i(class_="fa-solid fa-trash", style="margin-right: 4px;"), "Hapus",
+                            onclick=f"Shiny.setInputValue('btn_open_del_audit_modal', '{h_id}', {{priority: 'event'}})",
+                            style="background: #FFF5F5; color: #E53E3E; border: 1.5px solid #FEB2B2; padding: 7px 12px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer;"
+                        ),
+                        style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px;"
                     ),
                     style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;"
                 ),
@@ -3710,6 +3728,232 @@ def server(input: Inputs, output: Outputs, session: Session):
 
         return ui.div(*cards)
 
+    # --------------------------------------------------------------------------
+    # POP-UP DETAIL HASIL AUDIT DI WEB
+    # --------------------------------------------------------------------------
+    def _render_and_show_detail_modal(a_id):
+        target = next((h for h in state.auditor_history_list() if h.get("id") == a_id), None)
+        if not target:
+            ui.notification_show("Data sesi audit tidak ditemukan!", type="error")
+            return
+
+        state.auditor_selected_detail.set(target)
+
+        # 1. Tabel Findings / Temuan dengan Tombol Close
+        findings = target.get("findings", [])
+        if findings:
+            finding_rows = []
+            for f_idx, fd in enumerate(findings, start=1):
+                cur_stat = fd.get("status", "Open")
+                is_closed = (cur_stat == "Closed")
+                stat_badge = ui.span("Closed", style="background: #C6F6D5; color: #22543D; font-weight: 800; padding: 3px 8px; border-radius: 4px; font-size: 11px;") if is_closed else ui.span("Open", style="background: #FED7D7; color: #9B2C2C; font-weight: 800; padding: 3px 8px; border-radius: 4px; font-size: 11px;")
+                
+                btn_action = ui.tags.button(
+                    ui.tags.i(class_="fa-solid fa-arrow-rotate-left", style="margin-right: 4px;"), "Buka Kembali",
+                    onclick=f"Shiny.setInputValue('btn_toggle_audit_finding_status', {{id: '{a_id}', idx: {f_idx-1}}}, {{priority: 'event'}})",
+                    style="background: #EDF2F7; color: #4A5568; border: 1px solid #CBD5E0; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; cursor: pointer;"
+                ) if is_closed else ui.tags.button(
+                    ui.tags.i(class_="fa-solid fa-check", style="margin-right: 4px;"), "Selesaikan (Close)",
+                    onclick=f"Shiny.setInputValue('btn_toggle_audit_finding_status', {{id: '{a_id}', idx: {f_idx-1}}}, {{priority: 'event'}})",
+                    style="background: #10B981; color: white; border: none; padding: 5px 12px; border-radius: 4px; font-size: 11px; font-weight: 800; cursor: pointer;"
+                )
+
+                risk_color = "#E53E3E" if fd.get("risk") == "High" else ("#DD6B20" if fd.get("risk") == "Medium" else "#3182CE")
+
+                finding_rows.append(ui.tags.tr(
+                    ui.tags.td(str(f_idx), style="text-align: center; font-weight: bold;"),
+                    ui.tags.td(str(fd.get("area", "-"))),
+                    ui.tags.td(str(fd.get("case", "-"))),
+                    ui.tags.td(str(fd.get("risk", "-")), style=f"font-weight: 800; color: {risk_color}; text-align: center;"),
+                    ui.tags.td(str(fd.get("recom", "-"))),
+                    ui.tags.td(stat_badge, style="text-align: center;"),
+                    ui.tags.td(btn_action, style="text-align: center;")
+                ))
+
+            tbl_findings = ui.tags.table(
+                ui.tags.thead(ui.tags.tr(
+                    ui.tags.th("No", style="text-align: center;"),
+                    ui.tags.th("Area"), ui.tags.th("Temuan / Case"),
+                    ui.tags.th("Risk", style="text-align: center;"),
+                    ui.tags.th("Rekomendasi Auditor"),
+                    ui.tags.th("Status", style="text-align: center;"),
+                    ui.tags.th("Aksi Tindak Lanjut", style="text-align: center;")
+                )),
+                ui.tags.tbody(*finding_rows),
+                class_="custom-clean-table", style="width: 100%; border: 1px solid #CBD5E0; border-radius: 8px;"
+            )
+        else:
+            tbl_findings = ui.p("Tidak ada temuan pengecualian yang dicatat pada sesi audit ini.", style="color: #718096; font-style: italic; padding: 1rem; text-align: center;")
+
+        # 2. Tabel Item Count Sheet
+        items = target.get("items", [])
+        if items:
+            item_rows = []
+            for i_idx, it in enumerate(items[:200], start=1):
+                q_sys = safe_int(it.get("Qty System", 0))
+                q_phys = safe_int(it.get("Physical Count", 0)) if str(it.get("Physical Count", "")).strip() != "" else "-"
+                v_val = it.get("Variance Value", "-")
+                v_str = f"Rp {safe_int(v_val):,}" if v_val != "-" and str(v_val).strip() != "" else "-"
+
+                item_rows.append(ui.tags.tr(
+                    ui.tags.td(str(i_idx), style="text-align: center;"),
+                    ui.tags.td(str(it.get("Bin Location", "-"))),
+                    ui.tags.td(str(it.get("SKU", "-")), style="font-weight: 700; color: #2B6CB0;"),
+                    ui.tags.td(str(it.get("Description", "-"))),
+                    ui.tags.td(str(it.get("UoM (PAIR / PCS)", "PCS")), style="text-align: center;"),
+                    ui.tags.td(str(q_sys), style="text-align: right; font-weight: 700;"),
+                    ui.tags.td(str(q_phys), style="text-align: right; font-weight: 700; color: #22543D;"),
+                    ui.tags.td(v_str, style="text-align: right; font-weight: 800;"),
+                    ui.tags.td(str(it.get("Counter", "-")), style="text-align: center;"),
+                    ui.tags.td(str(it.get("Auditor Verified", "No")), style="text-align: center;"),
+                    ui.tags.td(str(it.get("Remarks", "")))
+                ))
+
+            tbl_items = ui.div(
+                ui.tags.table(
+                    ui.tags.thead(ui.tags.tr(
+                        ui.tags.th("No", style="text-align: center;"),
+                        ui.tags.th("Bin Location"), ui.tags.th("SKU"), ui.tags.th("Description"),
+                        ui.tags.th("UoM", style="text-align: center;"),
+                        ui.tags.th("Qty System", style="text-align: right;"),
+                        ui.tags.th("Physical Count", style="text-align: right;"),
+                        ui.tags.th("Variance Value", style="text-align: right;"),
+                        ui.tags.th("Counter", style="text-align: center;"),
+                        ui.tags.th("Verified", style="text-align: center;"),
+                        ui.tags.th("Remarks")
+                    )),
+                    ui.tags.tbody(*item_rows),
+                    class_="custom-clean-table", style="width: 100%;"
+                ),
+                style="max-height: 400px; overflow-y: auto; border: 1px solid #CBD5E0; border-radius: 8px;"
+            )
+        else:
+            tbl_items = ui.p("Data count sheet kosong.", style="color: #718096; font-style: italic; padding: 1rem; text-align: center;")
+
+        # 3. Preview Tanda Tangan Digital
+        def sign_box(role_title, name_val, img_data):
+            img_tag = ui.tags.img(src=img_data, style="max-height: 60px; max-width: 150px; display: block; margin: 4px auto;") if (img_data and len(img_data) > 50) else ui.span("(Belum ada goresan TTD)", style="color: #A0AEC0; font-size: 11px; font-style: italic;")
+            return ui.div(
+                ui.strong(role_title, style="font-size: 12px; color: #1A202C; display: block; margin-bottom: 2px;"),
+                ui.span(name_val if name_val else "-", style="font-size: 12px; color: #4A5568; display: block; margin-bottom: 6px; font-weight: 600;"),
+                ui.div(img_tag, style="height: 65px; display: flex; align-items: center; justify-content: center; background: #FFF; border: 1px dashed #CBD5E0; border-radius: 6px;"),
+                style="flex: 1; min-width: 170px; background: #F8FAFC; padding: 10px; border-radius: 8px; border: 1px solid #E2E8F0; text-align: center;"
+            )
+
+        signatures_ui = ui.div(
+            sign_box("Counter", target.get("sign_counter_name"), target.get("sign_counter_img")),
+            sign_box("Supervisor", target.get("sign_supervisor_name"), target.get("sign_supervisor_img")),
+            sign_box("Ops. Manager", target.get("sign_manager_name"), target.get("sign_manager_img")),
+            sign_box("Lead Auditor", target.get("sign_lead_name"), target.get("sign_lead_img")),
+            style="display: flex; gap: 10px; flex-wrap: wrap; width: 100%; margin-top: 1rem;"
+        )
+
+        modal_body = ui.div(
+            ui.div(
+                ui.div(
+                    ui.span(f"🏢 Perusahaan: {target.get('company')}", style="font-size: 13px; font-weight: 700; color: #1A202C; display: block;"),
+                    ui.span(f"🏬 Cabang: {target.get('branch')} | 📅 Tanggal Hitung: {target.get('count_date')} ({target.get('start_time')} - {target.get('end_time')})", style="font-size: 12px; color: #4A5568; display: block; margin-top: 2px;"),
+                    ui.span(f"👤 Tim: Lead Auditor: {target.get('lead_auditor')} • Manager: {target.get('manager')} • SPV: {target.get('supervisor')}", style="font-size: 12px; color: #718096; display: block; margin-top: 2px;"),
+                ),
+                style="background: #EDF2F7; padding: 12px 16px; border-radius: 8px; margin-bottom: 1.25rem;"
+            ),
+            ui.navset_card_tab(
+                ui.nav_panel(
+                    "🔍 OBSERVASI & TEMUAN AUDITOR",
+                    ui.div(
+                        ui.p("Daftar temuan fisik yang dicatat auditor. Klik tombol 'Selesaikan (Close)' jika tindak lanjut sudah rampung:", style="font-size: 12px; color: #718096; margin-bottom: 8px;"),
+                        tbl_findings,
+                        style="padding: 10px 0;"
+                    )
+                ),
+                ui.nav_panel(
+                    "📦 DETAIL STOCK COUNT SHEET",
+                    ui.div(
+                        ui.p(f"Menampilkan total {len(items):,} item yang diperiksa secara fisik:", style="font-size: 12px; color: #718096; margin-bottom: 8px;"),
+                        tbl_items,
+                        style="padding: 10px 0;"
+                    )
+                ),
+                ui.nav_panel(
+                    "✍️ TANDA TANGAN DIGITAL RESMI",
+                    ui.div(
+                        ui.p("Tanda tangan para penanggung jawab yang tercatat dalam sistem:", style="font-size: 12px; color: #718096; margin-bottom: 4px;"),
+                        signatures_ui,
+                        style="padding: 10px 0;"
+                    )
+                )
+            ),
+            style="width: 100%;"
+        )
+
+        ui.modal_show(ui.modal(
+            modal_body,
+            title=ui.div(ui.tags.i(class_="fa-solid fa-file-invoice", style="color: #3182CE; margin-right: 8px;"), f"Detail Hasil Audit: {a_id}"),
+            size="xl",
+            easy_close=True,
+            footer=ui.div(
+                ui.modal_button("Tutup", class_="btn-page-nav"),
+                style="display: flex; justify-content: flex-end;"
+            )
+        ))
+
+    @reactive.Effect
+    @reactive.event(input.btn_open_audit_detail_modal)
+    def _open_audit_detail():
+        a_id = input.btn_open_audit_detail_modal()
+        _render_and_show_detail_modal(a_id)
+
+    @reactive.Effect
+    @reactive.event(input.btn_toggle_audit_finding_status)
+    def _on_toggle_finding():
+        data = input.btn_toggle_audit_finding_status() or {}
+        a_id = data.get("id")
+        idx = data.get("idx")
+        succ, msg = state.toggle_audit_finding_status(a_id, idx)
+        if succ:
+            ui.notification_show(f"✅ {msg}", type="message", duration=4)
+            _render_and_show_detail_modal(a_id)
+        else:
+            ui.notification_show(f"⚠️ {msg}", type="warning", duration=4)
+
+    # --------------------------------------------------------------------------
+    # MODAL & HANDLER HAPUS SESI AUDIT (POIN 2)
+    # --------------------------------------------------------------------------
+    @reactive.Effect
+    @reactive.event(input.btn_open_del_audit_modal)
+    def _open_del_audit_modal():
+        a_id = input.btn_open_del_audit_modal()
+        ui.modal_show(ui.modal(
+            ui.div(
+                ui.tags.i(class_="fa-solid fa-triangle-exclamation", style="font-size: 40px; color: #E53E3E; margin-bottom: 8px;"),
+                ui.h4(f"Hapus Sesi Audit {a_id}?", style="font-weight: 800; color: #1A202C; margin: 0 0 6px 0;"),
+                ui.p("Apakah Anda yakin ingin menghapus data audit ini secara permanen dari database Supabase? Data yang dihapus tidak dapat dipulihkan.", style="color: #718096; font-size: 13px; margin: 0;"),
+                style="text-align: center; padding: 1rem 0;"
+            ),
+            title="🗑️ Konfirmasi Hapus Sesi Audit",
+            easy_close=True,
+            footer=ui.div(
+                ui.modal_button("Batal"),
+                ui.tags.button(
+                    "Ya, Hapus Permanen",
+                    onclick=f"Shiny.setInputValue('btn_confirm_del_audit', '{a_id}', {{priority: 'event'}})",
+                    style="background: #E53E3E; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-left: 8px;"
+                ),
+                style="display: flex; justify-content: flex-end;"
+            )
+        ))
+
+    @reactive.Effect
+    @reactive.event(input.btn_confirm_del_audit)
+    def _confirm_del_audit():
+        a_id = input.btn_confirm_del_audit()
+        ui.modal_remove()
+        succ, msg = state.delete_audit_session(a_id)
+        ui.notification_show(f"🗑️ {msg}", type="message", duration=4)
+
+    # --------------------------------------------------------------------------
+    # HANDLER DOWNLOAD PDF AUDIT
+    # --------------------------------------------------------------------------
     @reactive.Effect
     @reactive.event(input.btn_prepare_audit_pdf)
     def _prep_audit_pdf():

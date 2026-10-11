@@ -1,477 +1,330 @@
 import io
-import json
-import pandas as pd
+import base64
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib import colors
+from reportlab.platypus import (
+    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, KeepTogether
+)
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
-# ==============================================================================
-# Konfigurasi Supabase
-# ==============================================================================
-SUPABASE_URL = "https://fanzsmghhbefhhaicrok.supabase.co"
-
-# Gunakan JWT Anon Key resmi
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhbnpzbWdoaGJlZmhoYWljcm9rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxNTQzNDgsImV4cCI6MjEwMzczMDM0OH0.brCSOO9nHAUK8CxDWPperpJ--_NA_nwy5cO9OqGv3I0"
-
-# Deteksi apakah kode berjalan di browser (Shinylive / Pyodide)
-IS_PYODIDE = False
-try:
-    import pyodide.http
-    IS_PYODIDE = True
-except ImportError:
-    import urllib.request
-    import urllib.error
-    IS_PYODIDE = False
-
-
-class SimpleSupabaseTable:
-    def __init__(self, base_url, key, table_name):
-        self.url = f"{base_url}/rest/v1/{table_name}"
-        self.headers = {
-            "apikey": key,
-            "Authorization": f"Bearer {key}",
-            "Content-Type": "application/json",
-            "Prefer": "return=representation"
-        }
-        self.params = []
-        self.method = "GET"
-        self.body = None
-
-    def select(self, columns="*"):
-        self.params.append(f"select={columns}")
-        return self
-
-    def insert(self, payload):
-        self.method = "POST"
-        self.body = payload if isinstance(payload, list) else [payload]
-        self.headers["Prefer"] = "return=representation"
-        return self
-    # 👇 TAMBAHKAN DUA FUNGSI INI 👇
-    def update(self, payload):
-        self.method = "PATCH"
-        self.body = payload
-        return self
-
-    def order(self, column, desc=False):
-        direction = "desc" if desc else "asc"
-        self.params.append(f"order={column}.{direction}")
-        return self
-
-    def delete(self):
-        self.method = "DELETE"
-        return self
-
-    def in_(self, column, values):
-        val_str = ",".join(map(str, values))
-        self.params.append(f"{column}=in.({val_str})")
-        return self
-
-    def execute(self):
-        full_url = self.url
-        if self.params:
-            full_url += "?" + "&".join(self.params)
-
-        body_str = json.dumps(self.body) if self.body else None
-
-        # ----------------------------------------------------------------------
-        # Jalur 1: Jika berjalan di Shinylive / Hugging Face Static (Browser WASM)
-        # ----------------------------------------------------------------------
-        if IS_PYODIDE:
-            try:
-                import pyodide.http
-                # Menggunakan synchronous open_url yang didukung Web Worker Pyodide
-                data_bytes = body_str.encode("utf-8") if body_str else None
-                
-                # Gunakan urllib open_url bawaan Pyodide yang sudah dipatch
-                import urllib.request
-                req = urllib.request.Request(full_url, data=data_bytes, headers=self.headers, method=self.method)
-                with urllib.request.urlopen(req) as resp:
-                    res_text = resp.read().decode("utf-8")
-                    res_json = json.loads(res_text) if res_text else []
-                    return type("Response", (), {"data": res_json})()
-            except Exception as e:
-                print(f"❌ [Shinylive Error] Gagal eksekusi ke Supabase: {e}")
-                raise Exception(f"Gagal koneksi ke database di browser: {str(e)}")
-
-        # ----------------------------------------------------------------------
-        # Jalur 2: Jika berjalan di Python biasa (Local Laptop / Server)
-        # ----------------------------------------------------------------------
-        else:
-            import urllib.request
-            import urllib.error
-
-            data_bytes = body_str.encode("utf-8") if body_str else None
-            req = urllib.request.Request(full_url, data=data_bytes, headers=self.headers, method=self.method)
-
-            try:
-                with urllib.request.urlopen(req) as resp:
-                    res_data = resp.read().decode("utf-8")
-                    return type("Response", (), {"data": json.loads(res_data) if res_data else []})()
-            except urllib.error.HTTPError as e:
-                err_msg = e.read().decode("utf-8") if e.fp else ""
-                print(f"❌ Supabase REST HTTPError [{e.code}]: {err_msg}")
-                raise Exception(f"Ditolak Supabase [{e.code}]: {err_msg}")
-            except Exception as e:
-                print(f"❌ Supabase REST error: {e}")
-                raise e
-
-
-class SimpleSupabaseClient:
-    def __init__(self, url, key):
-        self.url = url
-        self.key = key
-
-    def table(self, table_name):
-        return SimpleSupabaseTable(self.url, self.key, table_name)
-
-
-def get_supabase():
-    return SimpleSupabaseClient(SUPABASE_URL, SUPABASE_KEY)
-
-
-def safe_int(val, default=0) -> int:
+def get_reportlab_image_from_base64(data_url, width=120, height=45):
+    """Mengubah base64 canvas URL menjadi Image Flowable ReportLab"""
     try:
-        if pd.isna(val) or val is None:
-            return default
-        cleaned = str(val).replace("Rp", "").replace(".", "").replace(",", "").strip()
-        return int(float(cleaned))
-    except Exception:
-        return default
-
-
-def load_data_from_info(file_info) -> pd.DataFrame:
-    if not file_info or len(file_info) == 0:
-        return pd.DataFrame()
-    path = file_info[0]["datapath"]
-    name = str(file_info[0]["name"]).lower()
-    try:
-        if name.endswith('.csv'):
-            df = pd.read_csv(path)
-            return df if not df.empty else pd.DataFrame()
-        else:
-            return pd.read_excel(path, engine="openpyxl")
+        if not data_url or not isinstance(data_url, str):
+            return ""
+        if "base64," in data_url:
+            data_url = data_url.split("base64,")[1]
+        img_bytes = base64.b64decode(data_url)
+        if len(img_bytes) < 300:
+            return ""
+        buf = io.BytesIO(img_bytes)
+        return Image(buf, width=width, height=height)
     except Exception as e:
-        print(f"Error loading {name}: {e}")
-        return pd.DataFrame()
+        print("Error parsing signature image for PDF:", e)
+        return ""
 
+def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
+    """Menghasilkan PDF resmi External Audit Pack lengkap dengan tabel selisih & TTD digital"""
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=landscape(A4),
+        rightMargin=25, leftMargin=25,
+        topMargin=25, bottomMargin=25
+    )
 
-# ==============================================================================
-# Helper Format Tanggal WIB
-# ==============================================================================
-def format_datetime_wib(df: pd.DataFrame, kolom: str, format_tampilan: str = "%d-%m-%Y %H:%M") -> pd.DataFrame:
-    if df is not None and not df.empty and kolom in df.columns:
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'DocTitle',
+        parent=styles['Heading1'],
+        fontName='Helvetica-Bold',
+        fontSize=14,
+        textColor=colors.HexColor('#1A365D'),
+        spaceAfter=4
+    )
+    subtitle_style = ParagraphStyle(
+        'DocSubtitle',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=8.5,
+        textColor=colors.HexColor('#4A5568'),
+        spaceAfter=10
+    )
+    th_style = ParagraphStyle(
+        'TableHeader',
+        fontName='Helvetica-Bold',
+        fontSize=7.5,
+        textColor=colors.white,
+        alignment=1
+    )
+    tb_style = ParagraphStyle(
+        'TableCell',
+        fontName='Helvetica',
+        fontSize=7.5,
+        textColor=colors.HexColor('#1A202C')
+    )
+    tb_bold = ParagraphStyle(
+        'TableCellBold',
+        fontName='Helvetica-Bold',
+        fontSize=7.5,
+        textColor=colors.HexColor('#1A202C')
+    )
+    tb_red = ParagraphStyle(
+        'TableCellRed',
+        fontName='Helvetica-Bold',
+        fontSize=7.5,
+        textColor=colors.HexColor('#E53E3E'),
+        alignment=2
+    )
+    tb_green = ParagraphStyle(
+        'TableCellGreen',
+        fontName='Helvetica-Bold',
+        fontSize=7.5,
+        textColor=colors.HexColor('#22543D'),
+        alignment=2
+    )
+
+    elements = []
+
+    # 1. Judul Dokumen & Identitas
+    elements.append(Paragraph(f"STOCK OPNAME OFFICIAL AUDIT REPORT – {audit_data.get('id', 'AUDIT')}", title_style))
+    elements.append(Paragraph(
+        f"Company: {audit_data.get('company')} | Branch: {audit_data.get('branch')} | Count Date: {audit_data.get('count_date')} ({audit_data.get('start_time')} - {audit_data.get('end_time')}) | Method: {audit_data.get('count_method')} | Standard: ISA 501 / PSAK 14",
+        subtitle_style
+    ))
+
+    # 2. Ringkasan Metrik Utama
+    tot_var_rp = audit_data.get('total_variance_qty', 0)
+    summary_data = [
+        ["Total SKU Checked", "Total Qty System", "Total Physical Count", "Net Variance Qty", "Lead Auditor"],
+        [
+            f"{audit_data.get('total_sku', 0):,} SKU",
+            f"{audit_data.get('total_qty_system', 0):,} PCS",
+            f"{audit_data.get('total_qty_physical', 0):,} PCS",
+            f"{audit_data.get('total_variance_qty', 0):,} PCS",
+            str(audit_data.get('lead_auditor', '-'))
+        ]
+    ]
+    t_sum = Table(summary_data, colWidths=[150, 150, 150, 150, 191])
+    t_sum.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1A365D')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 8.5),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#CBD5E0')),
+        ('BACKGROUND', (0, 1), (-1, 1), colors.HexColor('#F8FAFC')),
+    ]))
+    elements.append(t_sum)
+    elements.append(Spacer(1, 12))
+
+    # =========================================================================
+    # 3. TABEL COUNT SHEET YANG SELISIH SAJA (VARIANCE / DISCREPANCY ITEMS)
+    # =========================================================================
+    elements.append(Paragraph("<b>DAFTAR ITEM SELISIH FISIK VS SISTEM (VARIANCE DISCREPANCIES):</b>", styles['Heading4']))
+
+    diff_items = []
+    total_qty_diff = 0
+    total_val_diff = 0
+
+    for it in audit_data.get("items", []):
+        phys_raw = str(it.get("Physical Count", "")).strip()
+        # Lewati item yang sama sekali belum diisi fisik
+        if phys_raw == "" or phys_raw.lower() in ["none", "nan"]:
+            continue
+
         try:
-            converted = pd.to_datetime(df[kolom], errors="coerce")
-            if converted.dt.tz is not None:
-                converted = converted.dt.tz_convert("Asia/Jakarta")
-            else:
-                converted = converted.dt.tz_localize("UTC").dt.tz_convert("Asia/Jakarta")
-            df[kolom] = converted.dt.strftime(format_tampilan)
-        except Exception as e:
-            print(f"Error saat memformat tanggal kolom '{kolom}': {e}")
-    return df
+            sys_q = int(float(it.get("Qty System", 0)))
+        except:
+            sys_q = 0
 
+        try:
+            phys_q = int(float(phys_raw))
+        except:
+            phys_q = 0
 
-# ==============================================================================
-# GENERATOR RESMI PDF BINER %PDF-1.4 (ANTI-CORRUPT & MURNI TANPA ERROR)
-# ==============================================================================
-def generate_memo_pdf_bytes(memo_dict: dict) -> bytes:
-    """Menghasilkan file biner PDF-1.4 asli dengan Kop JEZ, Tabel, & 3 Kotak TTD"""
-    nom_val = safe_int(memo_dict.get('nominal', 0))
-    items = memo_dict.get("items", [])
-    memo_no = str(memo_dict.get('id', '-'))
-    tgl_val = str(memo_dict.get('tanggal', '-'))
-    div_val = str(memo_dict.get('divisi', '-'))
-    jen_val = str(memo_dict.get('jenis', '-'))
-    tuj_val = str(memo_dict.get('tujuan', '-'))
-    pemohon = str(memo_dict.get('diajukan_oleh', 'Tim Pemohon'))
-    logistik = str(memo_dict.get('diproses_oleh', 'Tim Logistik'))
-    spv = str(memo_dict.get('diperiksa_oleh', 'SPV Warehouse'))
-    st_log = str(memo_dict.get('status_logistik', 'Belum Diproses'))
-    st_spv = str(memo_dict.get('status_spv', 'Belum Diperiksa'))
+        diff_q = phys_q - sys_q
 
-    def esc(text):
-        if not text: return ""
-        s = str(text).replace('\\', '\\\\').replace('(', '\\(').replace(')', '\\)')
-        return s.encode('latin-1', 'replace').decode('latin-1')
+        try:
+            hb = int(float(it.get("Harga Beli", 0)))
+        except:
+            hb = 0
 
-    ops = []
-    # 1. KOP SURAT (JEZ Merah & MEMO PENGAJUAN)
-    ops.append("BT /F2 26 Tf 0.898 0.035 0.078 rg 40 790 Td (JEZ) Tj ET")
-    ops.append("BT /F2 8.5 Tf 0 0 0 rg 40 776 Td (PT. ZONA KARYA NUSANTARA) Tj ET")
-    ops.append("BT /F2 20 Tf 0.898 0.035 0.078 rg 370 788 Td (MEMO PENGAJUAN) Tj ET")
-    ops.append("0.898 0.035 0.078 RG 1.5 w 370 782 m 555 782 l S")
-    ops.append("0 0 0 RG 1.5 w 40 762 m 555 762 l S")
+        # Variance Value dihitung dari selisih Qty x Harga Beli
+        var_val_raw = it.get("Variance Value", "")
+        if str(var_val_raw).strip() not in ["", "-", "None", "nan"]:
+            try:
+                var_val = int(float(var_val_raw))
+            except:
+                var_val = diff_q * hb
+        else:
+            var_val = diff_q * hb
 
-    # 2. DETAIL INFORMASI MEMO
-    y = 742
-    metadata = [
-        ("Tanggal", tgl_val),
-        ("Divisi", div_val),
-        ("Jenis Pengajuan", jen_val),
-        ("Tujuan", tuj_val),
-        ("Nominal Pengajuan", f"Rp {nom_val:,}"),
-        ("List Item Barang", "Terlampir pada tabel berikut :"),
-    ]
-    for lbl, val in metadata:
-        ops.append(f"BT /F2 9.5 Tf 0 0 0 rg 40 {y} Td ({esc(lbl)}) Tj ET")
-        ops.append(f"BT /F2 9.5 Tf 0 0 0 rg 140 {y} Td (:) Tj ET")
-        f_val = "/F2" if "Nominal" in lbl else "/F1"
-        ops.append(f"BT {f_val} 9.5 Tf 0 0 0 rg 150 {y} Td ({esc(val)}) Tj ET")
-        y -= 15
+        # Filter HANYA yang mengalami selisih
+        if diff_q != 0 or var_val != 0:
+            diff_items.append({
+                "bin": str(it.get("Bin Location", "-")),
+                "sku": str(it.get("SKU", "-")),
+                "desc": str(it.get("Description", "-")),
+                "uom": str(it.get("UoM (PAIR / PCS)", it.get("UoM", "PCS"))),
+                "sys": sys_q,
+                "phys": phys_q,
+                "diff": diff_q,
+                "val": var_val,
+                "remarks": str(it.get("Remarks", "")) if str(it.get("Remarks", "")).lower() not in ["none", "nan"] else ""
+            })
+            total_qty_diff += diff_q
+            total_val_diff += var_val
 
-    # 3. TABEL BARANG
-    y -= 10
-    tbl_top = y
-    row_h = 18
-    header_h = 20
-    header_y = tbl_top - header_h
+    if diff_items:
+        # Lebar Kolom Landscape A4 total = ~791 pt
+        col_w_diff = [25, 75, 105, 185, 36, 50, 50, 50, 85, 130]
+        t_diff_data = [[
+            Paragraph("<b>No</b>", th_style),
+            Paragraph("<b>Bin Location</b>", th_style),
+            Paragraph("<b>SKU</b>", th_style),
+            Paragraph("<b>Description</b>", th_style),
+            Paragraph("<b>UoM</b>", th_style),
+            Paragraph("<b>Qty Sys</b>", th_style),
+            Paragraph("<b>Physical</b>", th_style),
+            Paragraph("<b>Diff Qty</b>", th_style),
+            Paragraph("<b>Nilai Selisih (Rp)</b>", th_style),
+            Paragraph("<b>Catatan / Remarks</b>", th_style)
+        ]]
 
-    # Header Background & Border
-    ops.append(f"0.945 0.96 0.976 rg 40 {header_y} 515 {header_h} re f")
-    ops.append(f"0 0 0 RG 0.75 w 40 {header_y} 515 {header_h} re S")
+        for d_i, d_row in enumerate(diff_items, start=1):
+            diff_str = f"{d_row['diff']:+d}"
+            diff_style = tb_green if d_row['diff'] > 0 else tb_red
+            val_formatted = (f"+Rp {d_row['val']:,}" if d_row['val'] > 0 else f"-Rp {abs(d_row['val']):,}") if d_row['val'] != 0 else "Rp 0"
 
-    cols = [
-        ("NO", 40, 30),
-        ("SKU", 70, 110),
-        ("ITEM NAME", 180, 185),
-        ("COGS (RP)", 365, 75),
-        ("QTY", 440, 40),
-        ("TOTAL (RP)", 480, 75)
-    ]
-    for name, cx, _ in cols:
-        ops.append(f"0 0 0 RG 0.75 w {cx} {header_y} m {cx} {tbl_top} l S")
-        ops.append(f"BT /F2 8.5 Tf 0 0 0 rg {cx + 4} {header_y + 6} Td ({esc(name)}) Tj ET")
-    ops.append(f"0 0 0 RG 0.75 w 555 {header_y} m 555 {tbl_top} l S")
+            t_diff_data.append([
+                Paragraph(str(d_i), tb_style),
+                Paragraph(d_row["bin"], tb_bold),
+                Paragraph(d_row["sku"], tb_bold),
+                Paragraph(d_row["desc"], tb_style),
+                Paragraph(d_row["uom"], tb_style),
+                Paragraph(str(d_row["sys"]), tb_style),
+                Paragraph(str(d_row["phys"]), tb_style),
+                Paragraph(diff_str, diff_style),
+                Paragraph(val_formatted, diff_style),
+                Paragraph(d_row["remarks"], tb_style)
+            ])
 
-    # Baris Data Barang
-    curr_y = header_y
-    tot_qty = 0
-    for idx, it in enumerate(items, start=1):
-        curr_y -= row_h
-        c_val = safe_int(it.get('cogs', 0))
-        q_val = safe_int(it.get('qty', 0))
-        sub_val = c_val * q_val
-        tot_qty += q_val
+        # Baris Grand Total Selisih
+        total_val_str = (f"+Rp {total_val_diff:,}" if total_val_diff > 0 else f"-Rp {abs(total_val_diff):,}") if total_val_diff != 0 else "Rp 0"
+        t_diff_data.append([
+            Paragraph("<b>TOTAL</b>", tb_bold),
+            Paragraph("", tb_style),
+            Paragraph(f"<b>{len(diff_items)} SKU Selisih</b>", tb_bold),
+            Paragraph("", tb_style),
+            Paragraph("", tb_style),
+            Paragraph("", tb_style),
+            Paragraph("", tb_style),
+            Paragraph(f"<b>{total_qty_diff:+d}</b>", tb_bold),
+            Paragraph(f"<b>{total_val_str}</b>", tb_bold),
+            Paragraph("", tb_style)
+        ])
 
-        ops.append(f"0 0 0 RG 0.5 w 40 {curr_y} 515 {row_h} re S")
-        for _, cx, _ in cols:
-            ops.append(f"0 0 0 RG 0.5 w {cx} {curr_y} m {cx} {curr_y + row_h} l S")
-        ops.append(f"0 0 0 RG 0.5 w 555 {curr_y} m 555 {curr_y + row_h} l S")
-
-        ops.append(f"BT /F1 8 Tf 0 0 0 rg 50 {curr_y + 5} Td ({idx}) Tj ET")
-        ops.append(f"BT /F2 8 Tf 0 0 0 rg 74 {curr_y + 5} Td ({esc(it.get('sku', '-'))}) Tj ET")
-        name_txt = esc(it.get('item_name', '-'))
-        if len(name_txt) > 35: name_txt = name_txt[:32] + "..."
-        ops.append(f"BT /F1 8 Tf 0 0 0 rg 184 {curr_y + 5} Td ({name_txt}) Tj ET")
-        ops.append(f"BT /F1 8 Tf 0 0 0 rg 370 {curr_y + 5} Td ({c_val:,}) Tj ET")
-        ops.append(f"BT /F2 8 Tf 0 0 0 rg 450 {curr_y + 5} Td ({q_val}) Tj ET")
-        ops.append(f"BT /F2 8 Tf 0 0 0 rg 485 {curr_y + 5} Td ({sub_val:,}) Tj ET")
-
-    # Baris Total
-    curr_y -= row_h
-    ops.append(f"0.97 0.98 0.99 rg 40 {curr_y} 515 {row_h} re f")
-    ops.append(f"0 0 0 RG 0.75 w 40 {curr_y} 515 {row_h} re S")
-    ops.append(f"BT /F2 8.5 Tf 0 0 0 rg 180 {curr_y + 5} Td (TOTAL) Tj ET")
-    ops.append(f"0 0 0 RG 0.5 w 440 {curr_y} m 440 {curr_y + row_h} l S")
-    ops.append(f"BT /F2 8.5 Tf 0 0 0 rg 448 {curr_y + 5} Td ({tot_qty:,}) Tj ET")
-    ops.append(f"0 0 0 RG 0.5 w 480 {curr_y} m 480 {curr_y + row_h} l S")
-    ops.append(f"BT /F2 8.5 Tf 0.898 0.035 0.078 rg 485 {curr_y + 5} Td (Rp {nom_val:,}) Tj ET")
-
-    # 4. KOTAK TANDA TANGAN (3 KOLOM PERSIS TEMPLATE)
-    curr_y -= 30
-    sign_w = 515 / 3
-    sign_h = 75
-    header_sign_h = 18
-    sign_box_top = curr_y
-
-    sign_headers = [("Diajukan oleh,", 40), ("Diproses oleh,", 40 + sign_w), ("Diperiksa oleh,", 40 + 2 * sign_w)]
-    sign_bodies = [
-        (f"({pemohon})", f"Tgl: {tgl_val}", 40),
-        (f"({logistik})", f"Status: {st_log}", 40 + sign_w),
-        (f"({spv})", f"Status: {st_spv}", 40 + 2 * sign_w)
-    ]
-
-    for idx, (sh, bx) in enumerate(sign_headers):
-        ops.append(f"0.95 0.96 0.97 rg {bx} {sign_box_top - header_sign_h} {sign_w} {header_sign_h} re f")
-        ops.append(f"0 0 0 RG 0.75 w {bx} {sign_box_top - header_sign_h} {sign_w} {header_sign_h} re S")
-        ops.append(f"BT /F2 8.5 Tf 0 0 0 rg {bx + 40} {sign_box_top - 13} Td ({esc(sh)}) Tj ET")
-
-        body_y = sign_box_top - sign_h
-        ops.append(f"0 0 0 RG 0.75 w {bx} {body_y} {sign_w} {sign_h - header_sign_h} re S")
-        nm, nt, _ = sign_bodies[idx]
-        ops.append(f"BT /F2 8.5 Tf 0 0 0 rg {bx + 20} {body_y + 18} Td ({esc(nm)}) Tj ET")
-        ops.append(f"BT /F1 7.5 Tf 0.3 0.3 0.3 rg {bx + 20} {body_y + 6} Td ({esc(nt)}) Tj ET")
-
-    # 5. RAKIT BINARY PDF 1.4 RESMI
-    content_stream = "\n".join(ops).encode('latin-1')
-    stream_len = len(content_stream)
-
-    objects = {
-        1: b"<< /Type /Catalog /Pages 2 0 R >>",
-        2: b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-        3: b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Contents 4 0 R /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> >>",
-        4: f"<< /Length {stream_len} >>\nstream\n".encode('latin-1') + content_stream + b"\nendstream",
-        5: b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>",
-        6: b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>"
-    }
-
-    buf = bytearray()
-    buf.extend(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
-    offsets = {}
-
-    for obj_id in sorted(objects.keys()):
-        offsets[obj_id] = len(buf)
-        buf.extend(f"{obj_id} 0 obj\n".encode('latin-1'))
-        buf.extend(objects[obj_id])
-        buf.extend(b"\nendobj\n")
-
-    xref_offset = len(buf)
-    buf.extend(f"xref\n0 {len(objects) + 1}\n".encode('latin-1'))
-    buf.extend(b"0000000000 65535 f \n")
-    for obj_id in sorted(objects.keys()):
-        buf.extend(f"{offsets[obj_id]:010d} 00000 n \n".encode('latin-1'))
-
-    buf.extend(f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_offset}\n%%EOF\n".encode('latin-1'))
-    return bytes(buf)
-
-# ==============================================================================
-# GENERATOR RESMI AUDIT PACK PDF BINER %PDF-1.4 (MULTI-PAGE & TANDA TANGAN)
-# ==============================================================================
-def generate_audit_pack_pdf_bytes(audit_dict: dict) -> bytes:
-    """Menghasilkan file PDF resmi ringkasan audit lengkap beserta findings & sign-off"""
-    comp = str(audit_dict.get('company', 'PT ZONA KARYA NUSANTARA'))
-    br = str(audit_dict.get('branch', 'SZ SURABAYA'))
-    dt = str(audit_dict.get('count_date', '-'))
-    audit_id = str(audit_dict.get('id', '-'))
-    lead = str(audit_dict.get('lead_auditor', '-'))
-    mgr = str(audit_dict.get('manager', '-'))
-    spv = str(audit_dict.get('supervisor', '-'))
-    ctr = str(audit_dict.get('counter_name', '-'))
-    
-    tot_sku = safe_int(audit_dict.get('total_sku', 0))
-    tot_sys = safe_int(audit_dict.get('total_qty_system', 0))
-    tot_phys = safe_int(audit_dict.get('total_qty_physical', 0))
-    tot_var = safe_int(audit_dict.get('total_variance_qty', 0))
-    
-    findings = audit_dict.get('findings', [])
-    items = audit_dict.get('items', [])
-
-    def esc(text):
-        if not text: return ""
-        s = str(text).replace('\\', '\\\\').replace('(', '\\(').replace(')', '\\)')
-        return s.encode('latin-1', 'replace').decode('latin-1')
-
-    ops = []
-    # KOP SURAT
-    ops.append("BT /F2 22 Tf 0.898 0.035 0.078 rg 40 795 Td (ZKN WAREHOUSE AUDIT) Tj ET")
-    ops.append(f"BT /F1 9 Tf 0 0 0 rg 40 782 Td ({esc(comp)} - {esc(br)}) Tj ET")
-    ops.append(f"BT /F2 14 Tf 0.1 0.2 0.35 rg 360 795 Td (AUDIT SIGN-OFF REPORT) Tj ET")
-    ops.append(f"BT /F1 8.5 Tf 0.4 0.4 0.4 rg 360 782 Td (No: {esc(audit_id)}) Tj ET")
-    ops.append("0.898 0.035 0.078 RG 1.5 w 40 770 m 555 770 l S")
-
-    # METADATA & ENGAGEMENT
-    y = 750
-    metas = [
-        ("Tanggal Pelaksanaan", dt, "Lead Auditor", lead),
-        ("Metode Perhitungan", str(audit_dict.get('count_method', 'Full count')), "Ops Manager", mgr),
-        ("Team Counter", ctr, "Supervisor", spv),
-        ("Jam Pelaksanaan", f"{audit_dict.get('start_time','08:00')} - {audit_dict.get('end_time','17:00')}", "Mata Uang", str(audit_dict.get('currency', 'IDR'))),
-    ]
-    for l1, v1, l2, v2 in metas:
-        ops.append(f"BT /F2 8.5 Tf 0 0 0 rg 40 {y} Td ({esc(l1)}:) Tj ET")
-        ops.append(f"BT /F1 8.5 Tf 0 0 0 rg 140 {y} Td ({esc(v1)}) Tj ET")
-        ops.append(f"BT /F2 8.5 Tf 0 0 0 rg 330 {y} Td ({esc(l2)}:) Tj ET")
-        ops.append(f"BT /F1 8.5 Tf 0 0 0 rg 420 {y} Td ({esc(v2)}) Tj ET")
-        y -= 14
-
-    # RINGKASAN METRIK PERHITUNGAN FISIK
-    y -= 8
-    ops.append(f"0.94 0.96 0.98 rg 40 {y-35} 515 35 re f")
-    ops.append(f"0.1 0.2 0.35 RG 1 w 40 {y-35} 515 35 re S")
-    ops.append(f"BT /F2 9 Tf 0.1 0.2 0.35 rg 50 {y-15} Td (TOTAL SKU: {tot_sku:,}) Tj ET")
-    ops.append(f"BT /F2 9 Tf 0 0.5 0.2 rg 170 {y-15} Td (QTY SYSTEM: {tot_sys:,}) Tj ET")
-    ops.append(f"BT /F2 9 Tf 0.1 0.4 0.8 rg 310 {y-15} Td (PHYSICAL COUNT: {tot_phys:,}) Tj ET")
-    col_var = "0.8 0.1 0.1" if tot_var != 0 else "0 0.5 0.2"
-    ops.append(f"BT /F2 9 Tf {col_var} rg 440 {y-15} Td (NET VARIANCE: {tot_var:,}) Tj ET")
-    y -= 50
-
-    # DAFTAR TEMUAN / OBSERVATIONS & FINDINGS
-    ops.append(f"BT /F2 11 Tf 0 0 0 rg 40 {y} Td (AUDITOR OBSERVATIONS & FINDINGS) Tj ET")
-    y -= 14
-    ops.append(f"0.1 0.2 0.35 rg 40 {y-15} 515 15 re f")
-    ops.append(f"BT /F2 8 Tf 1 1 1 rg 45 {y-11} Td (NO) Tj ET")
-    ops.append(f"BT /F2 8 Tf 1 1 1 rg 65 {y-11} Td (AREA) Tj ET")
-    ops.append(f"BT /F2 8 Tf 1 1 1 rg 160 {y-11} Td (TEMUAN / CASE) Tj ET")
-    ops.append(f"BT /F2 8 Tf 1 1 1 rg 340 {y-11} Td (RISK) Tj ET")
-    ops.append(f"BT /F2 8 Tf 1 1 1 rg 390 {y-11} Td (REKOMENDASI) Tj ET")
-    ops.append(f"BT /F2 8 Tf 1 1 1 rg 505 {y-11} Td (STATUS) Tj ET")
-    y -= 15
-
-    if not findings:
-        y -= 15
-        ops.append(f"0.98 0.98 0.98 rg 40 {y} 515 15 re f")
-        ops.append(f"0.8 0.8 0.8 RG 0.5 w 40 {y} 515 15 re S")
-        ops.append(f"BT /F1 8 Tf 0.4 0.4 0.4 rg 200 {y+4} Td (Tidak ada temuan pengecualian fisik / Open finding.) Tj ET")
+        t_diff = Table(t_diff_data, colWidths=col_w_diff, repeatRows=1)
+        t_diff.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#C53030')), # Header Merah untuk Discrepancy
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E0')),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('ALIGN', (0, 0), (0, -1), 'CENTER'),
+            ('ALIGN', (4, 0), (4, -1), 'CENTER'),
+            ('ALIGN', (5, 0), (7, -1), 'CENTER'),
+            ('ALIGN', (8, 0), (8, -1), 'RIGHT'),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#EDF2F7')), # Background baris Total
+            ('SPAN', (0, -1), (1, -1)),
+        ]))
+        elements.append(t_diff)
     else:
-        for f_idx, fd in enumerate(findings[:6], start=1):
-            y -= 18
-            ops.append(f"0.8 0.8 0.8 RG 0.5 w 40 {y} 515 18 re S")
-            ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 45 {y+5} Td ({f_idx}) Tj ET")
-            ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 65 {y+5} Td ({esc(str(fd.get('area','-'))[:18])}) Tj ET")
-            ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 160 {y+5} Td ({esc(str(fd.get('case','-'))[:35])}) Tj ET")
-            ops.append(f"BT /F2 7.5 Tf 0.8 0.2 0.2 rg 340 {y+5} Td ({esc(str(fd.get('risk','Medium')))}) Tj ET")
-            ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 390 {y+5} Td ({esc(str(fd.get('recom','-'))[:22])}) Tj ET")
-            ops.append(f"BT /F2 7.5 Tf 0 0.5 0.2 rg 505 {y+5} Td ({esc(str(fd.get('status','Open')))}) Tj ET")
+        elements.append(Paragraph(
+            "<i>✅ Tidak ada perbedaan kuantitas (0 Selisih). Seluruh hasil hitung fisik cocok 100% dengan data sistem.</i>",
+            subtitle_style
+        ))
 
-    # KOTAK TANDA TANGAN (SIGN-OFF)
-    y -= 30
-    ops.append(f"BT /F2 11 Tf 0 0 0 rg 40 {y} Td (STOCK COUNT SIGN-OFF) Tj ET")
-    y -= 12
-    sign_w = 515 / 4
-    sign_h = 70
-    signers = [
-        ("Counter", ctr, str(audit_dict.get('sign_counter_name', ctr))),
-        ("Supervisor", spv, str(audit_dict.get('sign_supervisor_name', spv))),
-        ("Manager Ops", mgr, str(audit_dict.get('sign_manager_name', mgr))),
-        ("Lead Auditor", lead, str(audit_dict.get('sign_lead_name', lead)))
+    elements.append(Spacer(1, 14))
+
+    # =========================================================================
+    # 4. OBSERVASI & TEMUAN AUDITOR
+    # =========================================================================
+    findings = audit_data.get("findings", [])
+    if findings:
+        elements.append(Paragraph("<b>AUDITOR OBSERVATIONS & FINDINGS:</b>", styles['Heading4']))
+        f_table_data = [[
+            Paragraph("<b>No</b>", th_style),
+            Paragraph("<b>Area</b>", th_style),
+            Paragraph("<b>Temuan / Case</b>", th_style),
+            Paragraph("<b>Risk</b>", th_style),
+            Paragraph("<b>Rekomendasi Auditor</b>", th_style),
+            Paragraph("<b>Status</b>", th_style)
+        ]]
+        for f_i, fd in enumerate(findings, start=1):
+            risk_color = colors.HexColor('#E53E3E') if fd.get("risk") == "High" else colors.HexColor('#DD6B20')
+            f_table_data.append([
+                Paragraph(str(f_i), tb_style),
+                Paragraph(str(fd.get("area", "-")), tb_style),
+                Paragraph(str(fd.get("case", "-")), tb_style),
+                Paragraph(f"<b>{fd.get('risk', '-')}</b>", ParagraphStyle('Rk', parent=tb_style, textColor=risk_color, alignment=1)),
+                Paragraph(str(fd.get("recom", "-")), tb_style),
+                Paragraph(f"<b>{fd.get('status', 'Open')}</b>", tb_style)
+            ])
+        t_find = Table(f_table_data, colWidths=[25, 120, 225, 55, 290, 76], repeatRows=1)
+        t_find.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2D3748')),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E0')),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('ALIGN', (0, 0), (0, -1), 'CENTER'),
+            ('ALIGN', (5, 0), (5, -1), 'CENTER'),
+        ]))
+        elements.append(t_find)
+        elements.append(Spacer(1, 14))
+
+    # =========================================================================
+    # 5. TABEL TANDA TANGAN DIGITAL (MEMUAT GORESAN TTD KANVAS)
+    # =========================================================================
+    elements.append(Paragraph("<b>STOCK COUNT SIGN-OFF (DIGITAL SIGNATURES):</b>", styles['Heading4']))
+
+    img_counter = get_reportlab_image_from_base64(audit_data.get("sign_counter_img"), width=130, height=45)
+    img_spv = get_reportlab_image_from_base64(audit_data.get("sign_supervisor_img"), width=130, height=45)
+    img_mgr = get_reportlab_image_from_base64(audit_data.get("sign_manager_img"), width=130, height=45)
+    img_lead = get_reportlab_image_from_base64(audit_data.get("sign_lead_img"), width=130, height=45)
+
+    sign_table_data = [
+        [
+            Paragraph("<b>Count Team (Counter)</b>", tb_style),
+            Paragraph("<b>Count Team Supervisor</b>", tb_style),
+            Paragraph("<b>Warehouse/Ops. Manager</b>", tb_style),
+            Paragraph("<b>Lead External Auditor</b>", tb_style)
+        ],
+        [
+            img_counter if img_counter != "" else Paragraph("<br/><br/><i>(Tanda Tangan)</i>", tb_style),
+            img_spv if img_spv != "" else Paragraph("<br/><br/><i>(Tanda Tangan)</i>", tb_style),
+            img_mgr if img_mgr != "" else Paragraph("<br/><br/><i>(Tanda Tangan)</i>", tb_style),
+            img_lead if img_lead != "" else Paragraph("<br/><br/><i>(Tanda Tangan)</i>", tb_style)
+        ],
+        [
+            Paragraph(f"Nama: {audit_data.get('sign_counter_name') or '-'}", tb_style),
+            Paragraph(f"Nama: {audit_data.get('sign_supervisor_name') or '-'}", tb_style),
+            Paragraph(f"Nama: {audit_data.get('sign_manager_name') or '-'}", tb_style),
+            Paragraph(f"Nama: {audit_data.get('sign_lead_name') or '-'}", tb_style)
+        ]
     ]
 
-    for idx, (role_h, nominal_nm, actual_sign) in enumerate(signers):
-        bx = 40 + idx * sign_w
-        ops.append(f"0.92 0.94 0.97 rg {bx} {y - 15} {sign_w} 15 re f")
-        ops.append(f"0 0 0 RG 0.5 w {bx} {y - 15} {sign_w} 15 re S")
-        ops.append(f"BT /F2 8 Tf 0 0 0 rg {bx + 10} {y - 11} Td ({esc(role_h)}) Tj ET")
+    t_sign = Table(sign_table_data, colWidths=[197, 197, 197, 200])
+    t_sign.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#EDF2F7')),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#CBD5E0')),
+        ('BOTTOMPADDING', (0, 1), (-1, 1), 6),
+        ('TOPPADDING', (0, 1), (-1, 1), 6),
+    ]))
 
-        # Body TTD
-        ops.append(f"0 0 0 RG 0.5 w {bx} {y - sign_h} {sign_w} {sign_h - 15} re S")
-        ops.append(f"BT /F1 7.5 Tf 0.3 0.3 0.3 rg {bx + 8} {y - 30} Td ([Signed via System]) Tj ET")
-        ops.append(f"BT /F2 8 Tf 0 0 0 rg {bx + 8} {y - sign_h + 8} Td ({esc(actual_sign[:18])}) Tj ET")
+    # KeepTogether memastikan blok tanda tangan tidak terpotong ke halaman baru sendirian
+    elements.append(KeepTogether([t_sign]))
 
-    content_stream = "\n".join(ops).encode('latin-1')
-    stream_len = len(content_stream)
-
-    objects = {
-        1: b"<< /Type /Catalog /Pages 2 0 R >>",
-        2: b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-        3: b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Contents 4 0 R /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> >>",
-        4: f"<< /Length {stream_len} >>\nstream\n".encode('latin-1') + content_stream + b"\nendstream",
-        5: b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>",
-        6: b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>"
-    }
-
-    buf = bytearray()
-    buf.extend(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
-    offsets = {}
-
-    for obj_id in sorted(objects.keys()):
-        offsets[obj_id] = len(buf)
-        buf.extend(f"{obj_id} 0 obj\n".encode('latin-1'))
-        buf.extend(objects[obj_id])
-        buf.extend(b"\nendobj\n")
-
-    xref_offset = len(buf)
-    buf.extend(f"xref\n0 {len(objects) + 1}\n".encode('latin-1'))
-    buf.extend(b"0000000000 65535 f \n")
-    for obj_id in sorted(objects.keys()):
-        buf.extend(f"{offsets[obj_id]:010d} 00000 n \n".encode('latin-1'))
-
-    buf.extend(f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_offset}\n%%EOF\n".encode('latin-1'))
-    return bytes(buf)
+    doc.build(elements)
+    buf.seek(0)
+    return buf.getvalue()
