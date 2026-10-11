@@ -5334,13 +5334,15 @@ class AppState:
 
             # Mapping Kolom Jezpro:
             # Col 1 (B) = BIN | Col 2 (C) = SKU | Col 3 (D) = BRAND
-            # Col 4 (E) = ITEM NAME | Col 6 (G) = SUB KATEGORI | Col 9 (J) = QTY SYSTEM
+            # Col 4 (E) = ITEM NAME | Col 6 (G) = SUB KATEGORI 
+            # Col 7 (H) = HARGA BELI | Col 9 (J) = QTY SYSTEM
             df_clean = df_raw.copy()
             col_b = df_clean.columns[1]   # BIN
             col_s = df_clean.columns[2]   # SKU
             col_d = df_clean.columns[3]   # BRAND
             col_e = df_clean.columns[4]   # ITEM NAME
             col_g = df_clean.columns[6]   # SUB KATEGORI
+            col_h = next((c for c in df_clean.columns if any(k in str(c).upper() for k in ['HARGA BELI', 'BELI', 'COGS'])), df_clean.columns[7]) # HARGA BELI
             col_j = df_clean.columns[9]   # QTY SYSTEM
 
             df_clean['BIN_CLEAN'] = df_clean[col_b].fillna('').astype(str).str.strip().str.upper()
@@ -5348,6 +5350,7 @@ class AppState:
             df_clean['BRAND_CLEAN'] = df_clean[col_d].fillna('UNKNOWN').astype(str).str.strip().str.upper()
             df_clean['DESC_CLEAN'] = df_clean[col_e].fillna('-').astype(str).str.strip()
             df_clean['CAT_CLEAN'] = df_clean[col_g].fillna('UNKNOWN').astype(str).str.strip().str.upper()
+            df_clean['HARGA_BELI'] = pd.to_numeric(df_clean[col_h], errors='coerce').fillna(0).astype(int)  # <-- INI YANG SEBELUMNYA HILANG
             df_clean['QTY_SYS'] = pd.to_numeric(df_clean[col_j], errors='coerce').fillna(0).astype(int)
 
             # Otomatis tentukan UoM: Kategori sepatu/footwear = PAIR, lainnya = PCS
