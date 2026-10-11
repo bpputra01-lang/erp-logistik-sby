@@ -334,25 +334,22 @@ def get_reportlab_image_from_base64(data_url, width=120, height=45):
 
 
 # ==============================================================================
-# GENERATOR RESMI AUDIT PACK (LENGKAP: TABEL SELISIH + TTD DIGITAL CANVAS)
-# ==============================================================================
-# ==============================================================================
-# GENERATOR RESMI AUDIT PACK (LAYOUT PORTRAIT SESUAI REFERENSI ZKN)
+# GENERATOR RESMI AUDIT PACK (DILENGKAPI COUNT SHEET SELISIH & TTD DIGITAL)
 # ==============================================================================
 def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
     """
-    Menghasilkan PDF Stock Opname Resmi berorientasi Portrait A4
-    sesuai format ZKN Warehouse Audit (Kop, Summary Box, Tabel Selisih, Findings, & TTD Digital).
+    Menghasilkan Dokumen PDF Portrait A4 Resmi ZKN:
+    Kop Surat, Summary Metric, Tabel Count Sheet (Selisih Saja), Findings, dan TTD Digital.
     """
     
     # --------------------------------------------------------------------------
-    # 1. ENGINE UTAMA: REPORTLAB (PORTRAIT A4)
+    # 1. ENGINE UTAMA: REPORTLAB (PORTRAIT A4 RAPI & JERNIH)
     # --------------------------------------------------------------------------
     try:
         from reportlab.lib.pagesizes import A4
         from reportlab.lib import colors
         from reportlab.platypus import (
-            SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether, Image, HRFlowable
+            SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether, Image
         )
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         
@@ -361,56 +358,52 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
             return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
         buf = io.BytesIO()
-        # A4 Portrait: lebar 595.28 pt, margin 30 pt kiri-kanan -> lebar efektif tabel = 535.28 pt
+        # A4 Portrait: 595 x 842 pt | Margin 30 pt | Lebar Efektif = 535 pt
         doc = SimpleDocTemplate(
             buf, pagesize=A4,
-            rightMargin=30, leftMargin=30, topMargin=28, bottomMargin=28
+            rightMargin=30, leftMargin=30, topMargin=26, bottomMargin=26
         )
 
         styles = getSampleStyleSheet()
         
         # Palet Warna Sesuai Referensi Gambar
-        COLOR_PRIMARY_RED = colors.HexColor('#C5161D')    # Merah judul ZKN
-        COLOR_NAVY_DARK   = colors.HexColor('#1A365D')    # Navy heading
-        COLOR_BOX_BG      = colors.HexColor('#EBF3F8')    # Biru muda kotak metrik
-        COLOR_BORDER      = colors.HexColor('#B8D0E0')    # Garis tepi metrik
+        COLOR_PRIMARY_RED = colors.HexColor('#C5161D')
+        COLOR_NAVY_DARK   = colors.HexColor('#1A365D')
+        COLOR_BOX_BG      = colors.HexColor('#EBF3F8')
+        COLOR_BORDER      = colors.HexColor('#B8D0E0')
         COLOR_TEXT_MUTED  = colors.HexColor('#4A5568')
 
-        # Gaya Teks
-        h_left_title = ParagraphStyle('HLeftTitle', fontName='Helvetica-Bold', fontSize=15, leading=17, textColor=COLOR_PRIMARY_RED)
-        h_left_sub   = ParagraphStyle('HLeftSub', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.HexColor('#2D3748'))
+        # Gaya Tipografi
+        h_left_title  = ParagraphStyle('HLeftTitle', fontName='Helvetica-Bold', fontSize=15, leading=17, textColor=COLOR_PRIMARY_RED)
+        h_left_sub    = ParagraphStyle('HLeftSub', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.HexColor('#2D3748'))
         h_right_title = ParagraphStyle('HRightTitle', fontName='Helvetica-Bold', fontSize=11, leading=13, textColor=COLOR_NAVY_DARK, alignment=2)
         h_right_sub   = ParagraphStyle('HRightSub', fontName='Helvetica', fontSize=7.5, leading=10, textColor=COLOR_TEXT_MUTED, alignment=2)
         
         meta_label = ParagraphStyle('MetaLabel', fontName='Helvetica-Bold', fontSize=7.5, leading=10, textColor=colors.black)
         meta_val   = ParagraphStyle('MetaVal', fontName='Helvetica', fontSize=7.5, leading=10, textColor=colors.black)
         
-        section_h = ParagraphStyle('SecHead', fontName='Helvetica-Bold', fontSize=8.5, leading=11, textColor=colors.black, spaceBefore=4, spaceAfter=3)
+        section_h = ParagraphStyle('SecHead', fontName='Helvetica-Bold', fontSize=8.5, leading=11, textColor=colors.black, spaceBefore=4, spaceAfter=4)
         th_style  = ParagraphStyle('TH', fontName='Helvetica-Bold', fontSize=7, leading=8.5, textColor=colors.white, alignment=1)
         tb_style  = ParagraphStyle('TB', fontName='Helvetica', fontSize=7, leading=8.5, textColor=colors.HexColor('#1A202C'))
         tb_bold   = ParagraphStyle('TBBold', fontName='Helvetica-Bold', fontSize=7, leading=8.5, textColor=colors.HexColor('#1A202C'))
         tb_center = ParagraphStyle('TBCenter', fontName='Helvetica', fontSize=7, leading=8.5, textColor=colors.HexColor('#1A202C'), alignment=1)
         tb_red    = ParagraphStyle('TBRed', fontName='Helvetica-Bold', fontSize=7, leading=8.5, textColor=COLOR_PRIMARY_RED, alignment=1)
         tb_green  = ParagraphStyle('TBGreen', fontName='Helvetica-Bold', fontSize=7, leading=8.5, textColor=colors.HexColor('#2F855A'), alignment=1)
+        tb_right_red = ParagraphStyle('TRed', fontName='Helvetica-Bold', fontSize=7, leading=8.5, textColor=COLOR_PRIMARY_RED, alignment=2)
+        tb_right_green = ParagraphStyle('TGrn', fontName='Helvetica-Bold', fontSize=7, leading=8.5, textColor=colors.HexColor('#2F855A'), alignment=2)
 
         elements = []
 
         # ----------------------------------------------------------------------
-        # A. KOP SURAT (HEADER ATAS)
+        # A. KOP SURAT
         # ----------------------------------------------------------------------
         comp_str = str(audit_data.get('company', 'PT ZONA KARYA NUSANTARA')).upper()
         branch_str = str(audit_data.get('branch', 'SZ SURABAYA')).upper()
-        audit_id = str(audit_data.get('id', 'AUD/SZ /20261011/814'))
+        audit_id = str(audit_data.get('id', 'AUD/SZ /20261011/178'))
 
         header_table_data = [
-            [
-                Paragraph("<b>ZKN WAREHOUSE AUDIT</b>", h_left_title),
-                Paragraph("<b>AUDIT SIGN-OFF REPORT</b>", h_right_title)
-            ],
-            [
-                Paragraph(f"<b>{esc_pdf(comp_str)} - {esc_pdf(branch_str)}</b>", h_left_sub),
-                Paragraph(f"No: {esc_pdf(audit_id)}", h_right_sub)
-            ]
+            [Paragraph("<b>ZKN WAREHOUSE AUDIT</b>", h_left_title), Paragraph("<b>AUDIT SIGN-OFF REPORT</b>", h_right_title)],
+            [Paragraph(f"<b>{esc_pdf(comp_str)} - {esc_pdf(branch_str)}</b>", h_left_sub), Paragraph(f"No: {esc_pdf(audit_id)}", h_right_sub)]
         ]
         t_header = Table(header_table_data, colWidths=[315, 220])
         t_header.setStyle(TableStyle([
@@ -420,11 +413,19 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
         ]))
         elements.append(t_header)
         elements.append(Spacer(1, 4))
-        # Garis horizontal merah persis gambar referensi
-        elements.append(HRFlowable(width="100%", thickness=1.8, color=COLOR_PRIMARY_RED, spaceAfter=6, spaceBefore=2))
+
+        # Garis Merah Pembatas (Aman tanpa library tambahan)
+        red_bar = Table([[""]], colWidths=[535], rowHeights=[1.6])
+        red_bar.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,-1), COLOR_PRIMARY_RED),
+            ('TOPPADDING', (0,0), (-1,-1), 0),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 0),
+        ]))
+        elements.append(red_bar)
+        elements.append(Spacer(1, 6))
 
         # ----------------------------------------------------------------------
-        # B. TABEL META INFORMASI (2 KOLOM RAPI)
+        # B. TABEL META INFORMASI
         # ----------------------------------------------------------------------
         count_date = str(audit_data.get('count_date', '11 OCTOBER 2026')).upper()
         count_method = str(audit_data.get('count_method', 'Full count (wall-to-wall)'))
@@ -452,10 +453,10 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
             ('BOTTOMPADDING', (0, 0), (-1, -1), 1.2),
         ]))
         elements.append(t_meta)
-        elements.append(Spacer(1, 7))
+        elements.append(Spacer(1, 8))
 
         # ----------------------------------------------------------------------
-        # C. KOTAK METRIK UTAMA (BACKGROUND BIRU MUDA SESUAI GAMBAR)
+        # C. KOTAK METRIK UTAMA
         # ----------------------------------------------------------------------
         tot_sku = safe_int(audit_data.get('total_sku', 0))
         tot_sys = safe_int(audit_data.get('total_qty_system', 0))
@@ -473,8 +474,8 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
             ('BACKGROUND', (0, 0), (-1, -1), COLOR_BOX_BG),
             ('BOX', (0, 0), (-1, -1), 1, COLOR_BORDER),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
         ]))
         elements.append(t_metric)
         elements.append(Spacer(1, 9))
@@ -489,19 +490,21 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
         tot_diff_val = 0
 
         for it in audit_data.get("items", []):
-            phys_raw = str(it.get("Physical Count", it.get("qty_physical", ""))).strip()
-            if phys_raw == "" or phys_raw.lower() in ["none", "nan"]: continue
-            sys_q = safe_int(it.get("Qty System", it.get("qty_system", 0)))
-            phys_q = safe_int(phys_raw)
+            phys_raw = it.get("Physical Count", it.get("qty_physical", it.get("physical", "")))
+            phys_str = str(phys_raw).strip() if phys_raw is not None else ""
+            if phys_str == "" or phys_str.lower() in ["none", "nan"]: continue
+            
+            sys_q = safe_int(it.get("Qty System", it.get("qty_system", it.get("system", 0))))
+            phys_q = safe_int(phys_str)
             diff_q = phys_q - sys_q
-            hb = safe_int(it.get("Harga Beli", it.get("cogs", 0)))
+            hb = safe_int(it.get("Harga Beli", it.get("cogs", it.get("price", 0))))
             var_val = safe_int(it.get("Variance Value", it.get("variance_value", diff_q * hb)))
 
             # Filter hanya item yang ada selisih
             if diff_q != 0 or var_val != 0:
                 diff_items.append({
                     "sku": str(it.get("SKU", it.get("sku", "-"))),
-                    "desc": str(it.get("Description", it.get("item_name", "-"))),
+                    "desc": str(it.get("Description", it.get("item_name", it.get("description", "-")))),
                     "sys": sys_q,
                     "phys": phys_q,
                     "diff": diff_q,
@@ -511,8 +514,8 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
                 tot_diff_val += var_val
 
         if diff_items:
-            # Lebar total = 20 + 95 + 170 + 55 + 55 + 60 + 80 = 535 pt
-            col_w_diff = [20, 95, 170, 55, 55, 60, 80]
+            # Lebar total = 20 + 95 + 175 + 50 + 50 + 55 + 90 = 535 pt
+            col_w_diff = [20, 95, 175, 50, 50, 55, 90]
             t_diff_data = [[
                 Paragraph("NO", th_style), Paragraph("SKU", th_style), Paragraph("DESCRIPTION", th_style),
                 Paragraph("SYS", th_style), Paragraph("PHYS", th_style), Paragraph("DIFF", th_style), Paragraph("NILAI SELISIH", th_style)
@@ -520,6 +523,7 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
 
             for idx_d, d_row in enumerate(diff_items, start=1):
                 d_color = tb_green if d_row["diff"] > 0 else tb_red
+                d_val_style = tb_right_green if d_row["val"] > 0 else tb_right_red
                 diff_str = f"{d_row['diff']:+d}"
                 val_str = (f"+Rp {d_row['val']:,}" if d_row['val'] > 0 else f"-Rp {abs(d_row['val']):,}") if d_row['val'] != 0 else "Rp 0"
                 
@@ -530,7 +534,7 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
                     Paragraph(str(d_row["sys"]), tb_center),
                     Paragraph(str(d_row["phys"]), tb_center),
                     Paragraph(diff_str, d_color),
-                    Paragraph(val_str, d_color)
+                    Paragraph(val_str, d_val_style)
                 ])
 
             tot_val_text = (f"+Rp {tot_diff_val:,}" if tot_diff_val > 0 else f"-Rp {abs(tot_diff_val):,}") if tot_diff_val != 0 else "Rp 0"
@@ -540,8 +544,8 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
                 Paragraph("", tb_style),
                 Paragraph("", tb_style),
                 Paragraph("", tb_style),
-                Paragraph(f"<b>{tot_diff_qty:+d}</b>", tb_bold),
-                Paragraph(f"<b>{tot_val_text}</b>", tb_bold)
+                Paragraph(f"<b>{tot_diff_qty:+d}</b>", tb_red if tot_diff_qty < 0 else tb_green),
+                Paragraph(f"<b>{tot_val_text}</b>", tb_right_red if tot_diff_val < 0 else tb_right_green)
             ])
 
             t_diff = Table(t_diff_data, colWidths=col_w_diff, repeatRows=1)
@@ -552,13 +556,12 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
                 ('TOPPADDING', (0, 0), (-1, -1), 2.5),
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 2.5),
                 ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#F7FAFC')),
-                ('ALIGN', (-1, 1), (-1, -1), 'RIGHT'),
             ]))
             elements.append(t_diff)
         else:
             elements.append(Paragraph("<i>✅ Tidak ada selisih kuantitas. Seluruh stok fisik 100% cocok dengan data sistem.</i>", meta_val))
 
-        elements.append(Spacer(1, 9))
+        elements.append(Spacer(1, 10))
 
         # ----------------------------------------------------------------------
         # E. TABEL TEMUAN AUDITOR (AUDITOR OBSERVATIONS & FINDINGS)
@@ -576,14 +579,15 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
         if findings:
             for f_i, fd in enumerate(findings, start=1):
                 risk_txt = str(fd.get("risk", "Low")).strip()
-                r_col = tb_red if risk_txt.lower() == "high" else (tb_green if risk_txt.lower() == "low" else tb_center)
+                r_col = tb_red if risk_txt.lower() == "high" else (tb_right_red if risk_txt.lower() == "medium" else tb_green)
+                st_val = str(fd.get('status', 'Open')).strip()
                 t_find_data.append([
                     Paragraph(str(f_i), tb_center),
                     Paragraph(esc_pdf(fd.get("area", "-")), tb_style),
                     Paragraph(esc_pdf(fd.get("case", "-")), tb_style),
                     Paragraph(f"<b>{esc_pdf(risk_txt)}</b>", r_col),
                     Paragraph(esc_pdf(fd.get("recom", "-")), tb_style),
-                    Paragraph(f"<b>{esc_pdf(fd.get('status', 'Open'))}</b>", tb_green if str(fd.get('status','')).lower() == 'open' else tb_style)
+                    Paragraph(f"<b>{esc_pdf(st_val)}</b>", tb_green if st_val.lower() == 'closed' else tb_red)
                 ])
         else:
             t_find_data.append([
@@ -604,34 +608,36 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
         elements.append(Spacer(1, 10))
 
         # ----------------------------------------------------------------------
-        # F. STOCK COUNT SIGN-OFF (4 KOTAK DENGAN TTD DIGITAL GAMBAR ASLI)
+        # F. STOCK COUNT SIGN-OFF (DENGAN TAMPILAN GAMBAR TTD CANVAS ASLI)
         # ----------------------------------------------------------------------
         elements.append(Paragraph("<b>STOCK COUNT SIGN-OFF</b>", section_h))
 
         def make_signature_cell(data_url):
             """Mengekstrak gambar base64 canvas; jika kosong kembalikan teks [Signed via System]"""
             try:
-                if data_url and isinstance(data_url, str) and len(data_url) > 200:
+                if data_url and isinstance(data_url, str) and len(data_url) > 100:
                     raw_b64 = data_url.split("base64,")[1] if "base64," in data_url else data_url
                     img_bytes = base64.b64decode(raw_b64)
-                    if len(img_bytes) > 200:
-                        return Image(io.BytesIO(img_bytes), width=105, height=35)
+                    if len(img_bytes) > 100:
+                        img_io = io.BytesIO(img_bytes)
+                        img_obj = Image(img_io, width=105, height=36)
+                        img_obj.hAlign = 'CENTER'
+                        return img_obj
             except Exception as e:
-                print("Gagal render gambar TTD:", e)
-            return Paragraph("<i>[Signed via System]</i>", ParagraphStyle('SignedSys', fontName='Helvetica-Oblique', fontSize=7, textColor=COLOR_TEXT_MUTED, alignment=1))
+                print("Catatan decode TTD:", e)
+            return Paragraph("<i>[Signed via System]</i>", ParagraphStyle('SignMuted', fontName='Helvetica-Oblique', fontSize=7, textColor=COLOR_TEXT_MUTED, alignment=1))
 
-        # Kolom TTD: 535 / 4 = 133.75 pt masing-masing
         col_w_sign = [133.75, 133.75, 133.75, 133.75]
         sign_table_data = [
-            # Baris 1: Jabatan / Role
+            # Baris 1: Judul Role
             [Paragraph("<b>Counter</b>", tb_bold), Paragraph("<b>Supervisor</b>", tb_bold),
              Paragraph("<b>Manager Ops</b>", tb_bold), Paragraph("<b>Lead Auditor</b>", tb_bold)],
-            # Baris 2: Canvas TTD Digital
+            # Baris 2: Gambar TTD Asli
             [make_signature_cell(audit_data.get("sign_counter_img")),
              make_signature_cell(audit_data.get("sign_supervisor_img")),
              make_signature_cell(audit_data.get("sign_manager_img")),
              make_signature_cell(audit_data.get("sign_lead_img"))],
-            # Baris 3: Nama Lengkap
+            # Baris 3: Nama Tertera
             [Paragraph(f"<b>{esc_pdf(counter_name)}</b>", tb_bold),
              Paragraph(f"<b>{esc_pdf(supervisor)}</b>", tb_bold),
              Paragraph(f"<b>{esc_pdf(ops_manager)}</b>", tb_bold),
@@ -642,15 +648,19 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
         t_sign.setStyle(TableStyle([
             ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#718096')),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('TOPPADDING', (0, 0), (-1, -1), 3),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-            ('BOTTOMPADDING', (0, 1), (-1, 1), 1),
-            ('TOPPADDING', (0, 1), (-1, 1), 1),
+            ('ALIGN', (0, 0), (-1, 0), 'LEFT'),
+            ('ALIGN', (0, 2), (-1, 2), 'LEFT'),
+            ('ALIGN', (0, 1), (-1, 1), 'CENTER'),
+            ('TOPPADDING', (0, 0), (-1, 0), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 2),
+            ('TOPPADDING', (0, 1), (-1, 1), 2),
+            ('BOTTOMPADDING', (0, 1), (-1, 1), 2),
+            ('TOPPADDING', (0, 2), (-1, 2), 2),
+            ('BOTTOMPADDING', (0, 2), (-1, 2), 3),
         ]))
         elements.append(KeepTogether([t_sign]))
 
-        # Render file PDF
+        # Render Dokumen
         doc.build(elements)
         buf.seek(0)
         res_bytes = buf.getvalue()
@@ -658,15 +668,15 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
             return res_bytes
 
     except Exception as e:
-        print(f"⚠️ ReportLab Error, beralih ke Native PDF Portrait Fallback: {e}")
+        print(f"⚠️ ReportLab Notice: {e}. Beralih ke Native Binary Fallback.")
 
     # --------------------------------------------------------------------------
-    # 2. ENGINE CADANGAN: NATIVE PDF BINER (PORTRAIT A4 TAHAN BANTING)
+    # 2. ENGINE CADANGAN: NATIVE BINARY PDF (KOORDINAT BERSIH & TIDAK TUMPUK)
     # --------------------------------------------------------------------------
     comp = str(audit_data.get('company', 'PT ZONA KARYA NUSANTARA')).upper()
     br = str(audit_data.get('branch', 'SZ SURABAYA')).upper()
     dt = str(audit_data.get('count_date', '11 OCTOBER 2026')).upper()
-    audit_id_str = str(audit_data.get('id', 'AUD/SZ /20261011/814'))
+    audit_id_str = str(audit_data.get('id', 'AUD/SZ /20261011/178'))
     lead = str(audit_data.get('sign_lead_name') or audit_data.get('lead_auditor') or 'EKO').upper()
     mgr = str(audit_data.get('sign_manager_name') or audit_data.get('manager') or 'ZAKKI').upper()
     spv = str(audit_data.get('sign_supervisor_name') or audit_data.get('supervisor') or 'BARA').upper()
@@ -684,7 +694,7 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
         return s.encode('latin-1', 'replace').decode('latin-1')
 
     ops = []
-    # KOP PORTRAIT A4 (Mulai dari Y = 800)
+    # Header KOP
     ops.append("BT /F2 16 Tf 0.77 0.08 0.11 rg 40 805 Td (ZKN WAREHOUSE AUDIT) Tj ET")
     ops.append("BT /F2 11 Tf 0.1 0.2 0.35 rg 380 805 Td (AUDIT SIGN-OFF REPORT) Tj ET")
     ops.append(f"BT /F2 8 Tf 0.2 0.2 0.2 rg 40 792 Td ({esc_native(comp)} - {esc_native(br)}) Tj ET")
@@ -706,7 +716,7 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
         ops.append(f"BT /F1 8 Tf 0 0 0 rg 410 {y} Td ({esc_native(v2)}) Tj ET")
         y -= 13
 
-    # Kotak Ringkasan Metrik Biru Muda
+    # Kotak Ringkasan Metrik
     y -= 5
     ops.append(f"0.92 0.95 0.97 rg 40 {y-18} 515 22 re f")
     ops.append(f"0.72 0.81 0.88 RG 0.75 w 40 {y-18} 515 22 re S")
@@ -714,11 +724,51 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
     ops.append(f"BT /F2 8 Tf 0 0.47 0.47 rg 170 {y-11} Td (QTY SYSTEM: {tot_sys_n:,}) Tj ET")
     ops.append(f"BT /F2 8 Tf 0.17 0.42 0.69 rg 295 {y-11} Td (PHYSICAL COUNT: {tot_phys_n:,}) Tj ET")
     ops.append(f"BT /F2 8 Tf 0.77 0.08 0.11 rg 420 {y-11} Td (NET VARIANCE: {tot_var_n:+,}) Tj ET")
+    y -= 25
 
-    # Temuan Auditor
-    y -= 38
+    # Count Sheet (Item Selisih) di Native PDF
+    y -= 12
+    ops.append(f"BT /F2 9 Tf 0 0 0 rg 40 {y} Td (DAFTAR ITEM SELISIH (VARIANCE COUNT SHEET)) Tj ET")
+    y -= 18
+    ops.append(f"0.1 0.2 0.35 rg 40 {y} 515 15 re f")
+    ops.append(f"BT /F2 7.5 Tf 1 1 1 rg 45 {y+4} Td (NO) Tj ET")
+    ops.append(f"BT /F2 7.5 Tf 1 1 1 rg 70 {y+4} Td (SKU) Tj ET")
+    ops.append(f"BT /F2 7.5 Tf 1 1 1 rg 180 {y+4} Td (DESCRIPTION) Tj ET")
+    ops.append(f"BT /F2 7.5 Tf 1 1 1 rg 340 {y+4} Td (SYS) Tj ET")
+    ops.append(f"BT /F2 7.5 Tf 1 1 1 rg 380 {y+4} Td (PHYS) Tj ET")
+    ops.append(f"BT /F2 7.5 Tf 1 1 1 rg 420 {y+4} Td (DIFF) Tj ET")
+    ops.append(f"BT /F2 7.5 Tf 1 1 1 rg 470 {y+4} Td (NILAI SELISIH) Tj ET")
+
+    # Filter item selisih
+    diff_native = []
+    for it in audit_data.get("items", []):
+        p_val = it.get("Physical Count", it.get("qty_physical", it.get("physical", "")))
+        if str(p_val).strip() in ["", "none", "nan"]: continue
+        s_q = safe_int(it.get("Qty System", it.get("qty_system", 0)))
+        p_q = safe_int(p_val)
+        d_q = p_q - s_q
+        if d_q != 0:
+            diff_native.append((str(it.get("SKU", it.get("sku","-"))), str(it.get("Description", it.get("item_name","-"))), s_q, p_q, d_q))
+
+    if not diff_native:
+        y -= 15
+        ops.append(f"0.98 0.98 0.98 rg 40 {y} 515 15 re f")
+        ops.append(f"BT /F1 7.5 Tf 0.3 0.3 0.3 rg 45 {y+4} Td (Tidak ada selisih stok / 100% Cocok.) Tj ET")
+    else:
+        for idx_dn, (d_sku, d_desc, s_q, p_q, d_q) in enumerate(diff_native[:4], start=1):
+            y -= 15
+            ops.append(f"0.85 0.85 0.85 RG 0.5 w 40 {y} 515 15 re S")
+            ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 45 {y+4} Td ({idx_dn}) Tj ET")
+            ops.append(f"BT /F2 7.5 Tf 0 0 0 rg 70 {y+4} Td ({esc_native(d_sku[:16])}) Tj ET")
+            ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 180 {y+4} Td ({esc_native(d_desc[:24])}) Tj ET")
+            ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 345 {y+4} Td ({s_q}) Tj ET")
+            ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 385 {y+4} Td ({p_q}) Tj ET")
+            ops.append(f"BT /F2 7.5 Tf 0.8 0.1 0.1 rg 425 {y+4} Td ({d_q:+d}) Tj ET")
+
+    # Auditor Findings (Dengan Jarak Aman Tanpa Tumpuk Teks)
+    y -= 25
     ops.append(f"BT /F2 9 Tf 0 0 0 rg 40 {y} Td (AUDITOR OBSERVATIONS & FINDINGS) Tj ET")
-    y -= 14
+    y -= 18
     ops.append(f"0.1 0.2 0.35 rg 40 {y} 515 15 re f")
     ops.append(f"BT /F2 7.5 Tf 1 1 1 rg 45 {y+4} Td (NO) Tj ET")
     ops.append(f"BT /F2 7.5 Tf 1 1 1 rg 70 {y+4} Td (AREA) Tj ET")
@@ -727,17 +777,17 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
     ops.append(f"BT /F2 7.5 Tf 1 1 1 rg 400 {y+4} Td (REKOMENDASI) Tj ET")
     ops.append(f"BT /F2 7.5 Tf 1 1 1 rg 505 {y+4} Td (STATUS) Tj ET")
 
-    for f_idx, fd in enumerate(findings_list[:4], start=1):
+    for f_idx, fd in enumerate(findings_list[:3], start=1):
         y -= 15
         ops.append(f"0.85 0.85 0.85 RG 0.5 w 40 {y} 515 15 re S")
         ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 45 {y+4} Td ({f_idx}) Tj ET")
         ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 70 {y+4} Td ({esc_native(str(fd.get('area','-'))[:12])}) Tj ET")
-        ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 150 {y+4} Td ({esc_native(str(fd.get('case','-'))[:32])}) Tj ET")
+        ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 150 {y+4} Td ({esc_native(str(fd.get('case','-'))[:30])}) Tj ET")
         ops.append(f"BT /F2 7.5 Tf 0.8 0.1 0.1 rg 340 {y+4} Td ({esc_native(str(fd.get('risk','Low')))}) Tj ET")
-        ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 400 {y+4} Td ({esc_native(str(fd.get('recom','-'))[:20])}) Tj ET")
-        ops.append(f"BT /F2 7.5 Tf 0.1 0.5 0.2 rg 505 {y+4} Td ({esc_native(str(fd.get('status','Open')))}) Tj ET")
+        ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 400 {y+4} Td ({esc_native(str(fd.get('recom','-'))[:18])}) Tj ET")
+        ops.append(f"BT /F2 7.5 Tf 0.1 0.5 0.2 rg 505 {y+4} Td ({esc_native(str(fd.get('status','Closed')))}) Tj ET")
 
-    # Kotak Sign-Off (4 Kotak TTD)
+    # Kotak Sign-Off
     y -= 25
     ops.append(f"BT /F2 9 Tf 0 0 0 rg 40 {y} Td (STOCK COUNT SIGN-OFF) Tj ET")
     y -= 58
@@ -753,7 +803,6 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
     content_stream = "\n".join(ops).encode('latin-1')
     stream_len = len(content_stream)
 
-    # Portrait A4: MediaBox [0 0 595.28 841.89]
     objects = {
         1: b"<< /Type /Catalog /Pages 2 0 R >>",
         2: b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
