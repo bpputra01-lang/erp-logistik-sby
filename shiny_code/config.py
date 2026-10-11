@@ -692,7 +692,27 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
         pass
 
     # --------------------------------------------------------------------------
-    # 3. NATIVE BINARY PDF ENGINE (MENAMPILKAN GAMBAR TTD MURNI DENGAN FLATEDECODE)
+    # HELPER: WRAP TEXT UNTUK PDF NATIVE (MENCEGAH POTONGAN TEKS)
+    # --------------------------------------------------------------------------
+    def wrap_text(text, max_chars=30):
+        if not text: return [""]
+        words = str(text).split(' ')
+        lines = []
+        current_line = ""
+        for word in words:
+            if current_line == "":
+                current_line = word
+            elif len(current_line) + 1 + len(word) <= max_chars:
+                current_line += " " + word
+            else:
+                lines.append(current_line)
+                current_line = word
+        if current_line:
+            lines.append(current_line)
+        return lines if lines else [""]
+
+    # --------------------------------------------------------------------------
+    # 3. NATIVE BINARY PDF ENGINE (DENGAN AUTO-WRAP TEKS & MULTI-LINE)
     # --------------------------------------------------------------------------
     comp = str(audit_data.get('company', 'PT ZONA KARYA NUSANTARA')).upper()
     br = str(audit_data.get('branch', 'SZ SURABAYA')).upper()
@@ -765,19 +785,28 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
         ops.append(f"0.98 0.98 0.98 rg 40 {y} 515 15 re f")
         ops.append(f"BT /F1 7.5 Tf 0.3 0.3 0.3 rg 45 {y+4} Td (Tidak ada selisih stok / 100% Cocok.) Tj ET")
     else:
-        for idx_dn, itm in enumerate(diff_items[:5], start=1):
-            y -= 15
-            ops.append(f"0.85 0.85 0.85 RG 0.5 w 40 {y} 515 15 re S")
-            ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 45 {y+4} Td ({idx_dn}) Tj ET")
-            ops.append(f"BT /F2 7.5 Tf 0 0 0 rg 70 {y+4} Td ({esc_native(itm['sku'][:16])}) Tj ET")
-            ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 170 {y+4} Td ({esc_native(itm['desc'][:24])}) Tj ET")
-            ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 335 {y+4} Td ({itm['sys']}) Tj ET")
-            ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 370 {y+4} Td ({itm['phys']}) Tj ET")
+        for idx_dn, itm in enumerate(diff_items, start=1):
+            desc_lines = wrap_text(itm['desc'], 26)
+            num_l = len(desc_lines)
+            r_h = max(15, num_l * 10)
+            y -= r_h
+
+            ops.append(f"0.85 0.85 0.85 RG 0.5 w 40 {y} 515 {r_h} re S")
+            ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 45 {y + r_h - 10} Td ({idx_dn}) Tj ET")
+            ops.append(f"BT /F2 7.5 Tf 0 0 0 rg 70 {y + r_h - 10} Td ({esc_native(itm['sku'][:16])}) Tj ET")
+            
+            line_y = y + r_h - 10
+            for l_txt in desc_lines:
+                ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 170 {line_y} Td ({esc_native(l_txt)}) Tj ET")
+                line_y -= 9
+
+            ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 335 {y + r_h - 10} Td ({itm['sys']}) Tj ET")
+            ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 370 {y + r_h - 10} Td ({itm['phys']}) Tj ET")
             
             d_col = "0 0.5 0.2" if itm['diff'] > 0 else "0.8 0.1 0.1"
-            ops.append(f"BT /F2 7.5 Tf {d_col} rg 405 {y+4} Td ({itm['diff']:+d}) Tj ET")
+            ops.append(f"BT /F2 7.5 Tf {d_col} rg 405 {y + r_h - 10} Td ({itm['diff']:+d}) Tj ET")
             v_str = (f"+Rp {itm['val']:,}" if itm['val'] > 0 else f"-Rp {abs(itm['val']):,}") if itm['val'] != 0 else "Rp 0"
-            ops.append(f"BT /F2 7.5 Tf {d_col} rg 455 {y+4} Td ({v_str}) Tj ET")
+            ops.append(f"BT /F2 7.5 Tf {d_col} rg 455 {y + r_h - 10} Td ({v_str}) Tj ET")
 
         y -= 15
         ops.append(f"0.94 0.95 0.96 rg 40 {y} 515 15 re f")
@@ -789,7 +818,7 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
         tot_val_s = (f"+Rp {tot_diff_val:,}" if tot_diff_val > 0 else f"-Rp {abs(tot_diff_val):,}") if tot_diff_val != 0 else "Rp 0"
         ops.append(f"BT /F2 7.5 Tf {tot_d_col} rg 455 {y+4} Td ({tot_val_s}) Tj ET")
 
-    # Temuan Auditor
+    # Temuan Auditor (Observations & Findings dengan Auto-Wrap)
     y -= 25
     ops.append(f"BT /F2 9 Tf 0 0 0 rg 40 {y} Td (AUDITOR OBSERVATIONS & FINDINGS) Tj ET")
     y -= 18
@@ -801,15 +830,43 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
     ops.append(f"BT /F2 7.5 Tf 1 1 1 rg 400 {y+4} Td (REKOMENDASI) Tj ET")
     ops.append(f"BT /F2 7.5 Tf 1 1 1 rg 505 {y+4} Td (STATUS) Tj ET")
 
-    for f_idx, fd in enumerate(findings_list[:3], start=1):
+    if findings_list:
+        for f_idx, fd in enumerate(findings_list, start=1):
+            area_lines = wrap_text(str(fd.get('area', '-')), 12)
+            case_lines = wrap_text(str(fd.get('case', '-')), 28)
+            recom_lines = wrap_text(str(fd.get('recom', '-')), 20)
+            num_l = max(len(area_lines), len(case_lines), len(recom_lines), 1)
+            r_h = max(15, num_l * 10)
+            y -= r_h
+
+            ops.append(f"0.85 0.85 0.85 RG 0.5 w 40 {y} 515 {r_h} re S")
+            ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 45 {y + r_h - 10} Td ({f_idx}) Tj ET")
+
+            line_y = y + r_h - 10
+            for l_txt in area_lines:
+                ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 70 {line_y} Td ({esc_native(l_txt)}) Tj ET")
+                line_y -= 9
+
+            line_y = y + r_h - 10
+            for l_txt in case_lines:
+                ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 150 {line_y} Td ({esc_native(l_txt)}) Tj ET")
+                line_y -= 9
+
+            risk_txt = str(fd.get('risk', 'Low'))
+            ops.append(f"BT /F2 7.5 Tf 0.8 0.1 0.1 rg 340 {y + r_h - 10} Td ({esc_native(risk_txt)}) Tj ET")
+
+            line_y = y + r_h - 10
+            for l_txt in recom_lines:
+                ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 400 {line_y} Td ({esc_native(l_txt)}) Tj ET")
+                line_y -= 9
+
+            st_val = str(fd.get('status', 'Closed'))
+            st_col = "0.1 0.5 0.2" if st_val.lower() == 'closed' else "0.8 0.1 0.1"
+            ops.append(f"BT /F2 7.5 Tf {st_col} rg 505 {y + r_h - 10} Td ({esc_native(st_val)}) Tj ET")
+    else:
         y -= 15
         ops.append(f"0.85 0.85 0.85 RG 0.5 w 40 {y} 515 15 re S")
-        ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 45 {y+4} Td ({f_idx}) Tj ET")
-        ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 70 {y+4} Td ({esc_native(str(fd.get('area','-'))[:12])}) Tj ET")
-        ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 150 {y+4} Td ({esc_native(str(fd.get('case','-'))[:30])}) Tj ET")
-        ops.append(f"BT /F2 7.5 Tf 0.8 0.1 0.1 rg 340 {y+4} Td ({esc_native(str(fd.get('risk','Low')))}) Tj ET")
-        ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 400 {y+4} Td ({esc_native(str(fd.get('recom','-'))[:18])}) Tj ET")
-        ops.append(f"BT /F2 7.5 Tf 0.1 0.5 0.2 rg 505 {y+4} Td ({esc_native(str(fd.get('status','Closed')))}) Tj ET")
+        ops.append(f"BT /F1 7.5 Tf 0.3 0.3 0.3 rg 45 {y+4} Td (Tidak ada catatan temuan fisik khusus.) Tj ET")
 
     # --------------------------------------------------------------------------
     # KOTAK SIGN-OFF DENGAN DUKUNGAN RENDERING GAMBAR TTD ASLI
@@ -834,7 +891,6 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
         ops.append(f"BT /F2 8 Tf 0 0 0 rg {bx+8} {y+45} Td ({esc_native(s_title)}) Tj ET")
         ops.append(f"BT /F2 8 Tf 0 0 0 rg {bx+8} {y+7} Td ({esc_native(s_name)}) Tj ET")
 
-        # Proses data coretan canvas
         sig_parsed = process_signature_canvas(s_b64)
         if sig_parsed:
             comp_flate, iw, ih = sig_parsed
@@ -843,7 +899,6 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
             img_ref = f"/Sig{s_i}"
             xobj_entries.append(f"{img_ref} {obj_id} 0 R")
 
-            # Posisi & ukuran penempatan gambar TTD di tengah kotak
             img_w = sign_w - 20
             img_h = 28
             img_x = bx + 10
@@ -868,7 +923,6 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
         6: b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>"
     }
 
-    # Sematkan Image Stream FlateDecode Asli
     for o_id, (comp_bytes, iw, ih) in native_img_objects.items():
         header_img = f"<< /Type /XObject /Subtype /Image /Width {iw} /Height {ih} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length {len(comp_bytes)} >>\nstream\n".encode('latin-1')
         objects[o_id] = header_img + comp_bytes + b"\nendstream"
