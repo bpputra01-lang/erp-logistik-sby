@@ -1,15 +1,16 @@
+import os
 import io
 import base64
-from reportlab.lib.pagesizes import A4, landscape
-from reportlab.lib import colors
-from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, KeepTogether
-)
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from datetime import datetime
+import pandas as pd
+
+# (PENTING: Jangan hapus fungsi bawaan config.py Anda yang lain seperti:
+# get_supabase, safe_int, load_data_from_info, format_datetime_wib!)
 
 def get_reportlab_image_from_base64(data_url, width=120, height=45):
     """Mengubah base64 canvas URL menjadi Image Flowable ReportLab"""
     try:
+        from reportlab.platypus import Image  # ✅ WAJIB DIIMPORT DI SINI
         if not data_url or not isinstance(data_url, str):
             return ""
         if "base64," in data_url:
@@ -25,6 +26,18 @@ def get_reportlab_image_from_base64(data_url, width=120, height=45):
 
 def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
     """Menghasilkan PDF resmi External Audit Pack lengkap dengan tabel selisih & TTD digital"""
+    try:
+        # ✅ WAJIB DIIMPORT DI SINI AGAR TIDAK 'NameError: SimpleDocTemplate is not defined'
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib import colors
+        from reportlab.platypus import (
+            SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether
+        )
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    except ImportError as e:
+        print("⚠️ ReportLab / Pillow belum terpasang:", e)
+        return b""
+
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
         buf,
@@ -94,7 +107,6 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
     ))
 
     # 2. Ringkasan Metrik Utama
-    tot_var_rp = audit_data.get('total_variance_qty', 0)
     summary_data = [
         ["Total SKU Checked", "Total Qty System", "Total Physical Count", "Net Variance Qty", "Lead Auditor"],
         [
@@ -129,7 +141,6 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
 
     for it in audit_data.get("items", []):
         phys_raw = str(it.get("Physical Count", "")).strip()
-        # Lewati item yang sama sekali belum diisi fisik
         if phys_raw == "" or phys_raw.lower() in ["none", "nan"]:
             continue
 
@@ -150,7 +161,6 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
         except:
             hb = 0
 
-        # Variance Value dihitung dari selisih Qty x Harga Beli
         var_val_raw = it.get("Variance Value", "")
         if str(var_val_raw).strip() not in ["", "-", "None", "nan"]:
             try:
@@ -177,7 +187,6 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
             total_val_diff += var_val
 
     if diff_items:
-        # Lebar Kolom Landscape A4 total = ~791 pt
         col_w_diff = [25, 75, 105, 185, 36, 50, 50, 50, 85, 130]
         t_diff_data = [[
             Paragraph("<b>No</b>", th_style),
@@ -210,7 +219,6 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
                 Paragraph(d_row["remarks"], tb_style)
             ])
 
-        # Baris Grand Total Selisih
         total_val_str = (f"+Rp {total_val_diff:,}" if total_val_diff > 0 else f"-Rp {abs(total_val_diff):,}") if total_val_diff != 0 else "Rp 0"
         t_diff_data.append([
             Paragraph("<b>TOTAL</b>", tb_bold),
@@ -227,14 +235,14 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
 
         t_diff = Table(t_diff_data, colWidths=col_w_diff, repeatRows=1)
         t_diff.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#C53030')), # Header Merah untuk Discrepancy
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#C53030')),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E0')),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('ALIGN', (0, 0), (0, -1), 'CENTER'),
             ('ALIGN', (4, 0), (4, -1), 'CENTER'),
             ('ALIGN', (5, 0), (7, -1), 'CENTER'),
             ('ALIGN', (8, 0), (8, -1), 'RIGHT'),
-            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#EDF2F7')), # Background baris Total
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#EDF2F7')),
             ('SPAN', (0, -1), (1, -1)),
         ]))
         elements.append(t_diff)
@@ -246,9 +254,7 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
 
     elements.append(Spacer(1, 14))
 
-    # =========================================================================
     # 4. OBSERVASI & TEMUAN AUDITOR
-    # =========================================================================
     findings = audit_data.get("findings", [])
     if findings:
         elements.append(Paragraph("<b>AUDITOR OBSERVATIONS & FINDINGS:</b>", styles['Heading4']))
@@ -281,9 +287,7 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
         elements.append(t_find)
         elements.append(Spacer(1, 14))
 
-    # =========================================================================
-    # 5. TABEL TANDA TANGAN DIGITAL (MEMUAT GORESAN TTD KANVAS)
-    # =========================================================================
+    # 5. TABEL TANDA TANGAN DIGITAL
     elements.append(Paragraph("<b>STOCK COUNT SIGN-OFF (DIGITAL SIGNATURES):</b>", styles['Heading4']))
 
     img_counter = get_reportlab_image_from_base64(audit_data.get("sign_counter_img"), width=130, height=45)
@@ -322,7 +326,6 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
         ('TOPPADDING', (0, 1), (-1, 1), 6),
     ]))
 
-    # KeepTogether memastikan blok tanda tangan tidak terpotong ke halaman baru sendirian
     elements.append(KeepTogether([t_sign]))
 
     doc.build(elements)

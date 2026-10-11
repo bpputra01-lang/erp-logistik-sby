@@ -3,3 +3,4 @@ numpy
 openpyxl
 shiny
 reportlab
+pillow
