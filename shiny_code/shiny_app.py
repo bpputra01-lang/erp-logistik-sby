@@ -3472,6 +3472,16 @@ def server(input: Inputs, output: Outputs, session: Session):
 
         # Terapkan filter ke tabel data dan metrik
         state.apply_auditor_filters(valid_brands, valid_subs, valid_bins)
+    
+    @reactive.Effect
+    @reactive.event(input.btn_clear_audit_pdf_state)
+    def _clear_audit_pdf():
+        state.auditor_selected_for_pdf.set(None)
+
+    @reactive.Effect
+    @reactive.event(input.btn_clear_memo_pdf_state)
+    def _clear_memo_pdf():
+        state.memo_selected_for_pdf.set(None)
 # --------------------------------------------------------------------------
     # CONTROLLER AUDITOR (LANGSUNG KETIK DI TABEL - POP-UP HILANG TOTAL)
     # --------------------------------------------------------------------------

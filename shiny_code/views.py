@@ -436,6 +436,22 @@ CUSTOM_HEAD = ui.head_content(
         .accordion-content { padding: 14px; font-size: 13px; color: #4A5568; background: #F7FAFC; }
     """),
 
+ui.tags.script("""
+        document.addEventListener('click', function(e) {
+            let target = e.target.closest('#btn_dl_audit_pdf_file_hidden, #btn_dl_memo_pdf_file');
+            if (target) {
+                setTimeout(function() {
+                    if (window.Shiny && window.Shiny.setInputValue) {
+                        if (target.id === 'btn_dl_audit_pdf_file_hidden') {
+                            Shiny.setInputValue('btn_clear_audit_pdf_state', Math.random(), {priority: 'event'});
+                        } else if (target.id === 'btn_dl_memo_pdf_file') {
+                            Shiny.setInputValue('btn_clear_memo_pdf_state', Math.random(), {priority: 'event'});
+                        }
+                    }
+                }, 600);
+            }
+        });
+    """),
     # --- 5. SCRIPT LIVE TIMER ---
     ui.tags.script("""
         setInterval(function() {
@@ -455,6 +471,8 @@ CUSTOM_HEAD = ui.head_content(
         }, 1000);
     """)
 )
+
+
 # ==============================================================================
 # MAPPING CABANG & BIN
 # ==============================================================================
