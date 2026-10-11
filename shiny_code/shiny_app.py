@@ -3664,7 +3664,7 @@ def server(input: Inputs, output: Outputs, session: Session):
     # --------------------------------------------------------------------------
     @render.ui
     def auditor_history_cards_ui_rendered(histories):
-    if not histories:
+        if not histories:
         return ui.div(
             ui.p("Belum ada riwayat audit tersimpan di database Supabase.", style="color: #718096; font-style: italic; text-align: center; padding: 2rem;"),
             style="background: #F8FAFC; border-radius: 10px; border: 1px dashed #CBD5E0;"
