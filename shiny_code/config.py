@@ -525,7 +525,7 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
         print(f"⚠️ ReportLab gagal merender PDF, beralih ke Native PDF Fallback: {e}")
 
     # ==========================================================================
-    # 2. FALLBACK NATIVE PDF STREAM (DIJAMIN 100% BERHASIL TANPA DEPENDENSI)
+    # 2. FALLBACK NATIVE PDF STREAM (KOORDINAT LANDSCAPE A4 DIPERBAIKI)
     # ==========================================================================
     comp = str(audit_data.get('company', 'PT ZONA KARYA NUSANTARA'))
     br = str(audit_data.get('branch', 'SZ SURABAYA'))
@@ -548,22 +548,23 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
         return s.encode('latin-1', 'replace').decode('latin-1')
 
     ops = []
-    ops.append("BT /F2 20 Tf 0.1 0.2 0.35 rg 40 795 Td (STOCK OPNAME OFFICIAL AUDIT REPORT) Tj ET")
-    ops.append(f"BT /F1 9 Tf 0 0 0 rg 40 780 Td (Company: {esc_native(comp)} | Branch: {esc_native(br)} | Date: {esc_native(dt)}) Tj ET")
-    ops.append(f"BT /F2 10 Tf 0.898 0.035 0.078 rg 450 795 Td (ID: {esc_native(audit_id_str)}) Tj ET")
-    ops.append("0.1 0.2 0.35 RG 1.5 w 40 770 m 555 770 l S")
+    # Tinggi Landscape A4 = 595 pt, mulai dari Y = 555 agar aman dari margin atas
+    ops.append("BT /F2 18 Tf 0.1 0.2 0.35 rg 40 555 Td (STOCK OPNAME OFFICIAL AUDIT REPORT) Tj ET")
+    ops.append(f"BT /F1 9 Tf 0.3 0.3 0.3 rg 40 540 Td (Company: {esc_native(comp)} | Branch: {esc_native(br)} | Date: {esc_native(dt)}) Tj ET")
+    ops.append(f"BT /F2 10 Tf 0.898 0.035 0.078 rg 650 555 Td (ID: {esc_native(audit_id_str)}) Tj ET")
+    ops.append("0.1 0.2 0.35 RG 1.5 w 40 532 m 800 532 l S")
 
-    # Metrik Kotak Ringkasan
-    y = 745
-    ops.append(f"0.94 0.96 0.98 rg 40 {y-30} 515 30 re f")
-    ops.append(f"0.1 0.2 0.35 RG 0.5 w 40 {y-30} 515 30 re S")
-    ops.append(f"BT /F2 8.5 Tf 0.1 0.2 0.35 rg 48 {y-18} Td (TOTAL SKU: {tot_sku_n:,}) Tj ET")
-    ops.append(f"BT /F2 8.5 Tf 0 0.5 0.2 rg 165 {y-18} Td (QTY SYSTEM: {tot_sys_n:,}) Tj ET")
-    ops.append(f"BT /F2 8.5 Tf 0.1 0.4 0.8 rg 295 {y-18} Td (PHYSICAL: {tot_phys_n:,}) Tj ET")
-    ops.append(f"BT /F2 8.5 Tf 0.8 0.1 0.1 rg 420 {y-18} Td (NET VARIANCE: {tot_var_n:,}) Tj ET")
-    y -= 50
+    # Metrik Kotak Ringkasan (Lebar 760 pt mengikuti Landscape)
+    y = 495
+    ops.append(f"0.94 0.96 0.98 rg 40 {y} 760 28 re f")
+    ops.append(f"0.1 0.2 0.35 RG 0.5 w 40 {y} 760 28 re S")
+    ops.append(f"BT /F2 9 Tf 0.1 0.2 0.35 rg 60 {y+10} Td (TOTAL SKU: {tot_sku_n:,}) Tj ET")
+    ops.append(f"BT /F2 9 Tf 0 0.5 0.2 rg 230 {y+10} Td (QTY SYSTEM: {tot_sys_n:,}) Tj ET")
+    ops.append(f"BT /F2 9 Tf 0.1 0.4 0.8 rg 430 {y+10} Td (PHYSICAL: {tot_phys_n:,}) Tj ET")
+    ops.append(f"BT /F2 9 Tf 0.8 0.1 0.1 rg 630 {y+10} Td (NET VARIANCE: {tot_var_n:,}) Tj ET")
 
     # Ringkasan Tim
+    y -= 30
     ops.append(f"BT /F2 9.5 Tf 0 0 0 rg 40 {y} Td (ENGAGEMENT TEAM & SIGN-OFF SUMMARY) Tj ET")
     y -= 16
     team_metas = [
@@ -572,36 +573,35 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
     ]
     for l1, v1, l2, v2 in team_metas:
         ops.append(f"BT /F2 8.5 Tf 0 0 0 rg 40 {y} Td ({esc_native(l1)}:) Tj ET")
-        ops.append(f"BT /F1 8.5 Tf 0 0 0 rg 130 {y} Td ({esc_native(v1)}) Tj ET")
-        ops.append(f"BT /F2 8.5 Tf 0 0 0 rg 310 {y} Td ({esc_native(l2)}:) Tj ET")
-        ops.append(f"BT /F1 8.5 Tf 0 0 0 rg 400 {y} Td ({esc_native(v2)}) Tj ET")
+        ops.append(f"BT /F1 8.5 Tf 0 0 0 rg 140 {y} Td ({esc_native(v1)}) Tj ET")
+        ops.append(f"BT /F2 8.5 Tf 0 0 0 rg 430 {y} Td ({esc_native(l2)}:) Tj ET")
+        ops.append(f"BT /F1 8.5 Tf 0 0 0 rg 530 {y} Td ({esc_native(v2)}) Tj ET")
         y -= 14
 
     # Temuan Auditor
     y -= 15
     ops.append(f"BT /F2 9.5 Tf 0 0 0 rg 40 {y} Td (AUDITOR OBSERVATIONS & FINDINGS) Tj ET")
-    y -= 14
-    ops.append(f"0.1 0.2 0.35 rg 40 {y-14} 515 14 re f")
-    ops.append(f"BT /F2 7.5 Tf 1 1 1 rg 45 {y-10} Td (NO) Tj ET")
-    ops.append(f"BT /F2 7.5 Tf 1 1 1 rg 70 {y-10} Td (AREA) Tj ET")
-    ops.append(f"BT /F2 7.5 Tf 1 1 1 rg 170 {y-10} Td (TEMUAN / CASE) Tj ET")
-    ops.append(f"BT /F2 7.5 Tf 1 1 1 rg 370 {y-10} Td (RISK) Tj ET")
-    ops.append(f"BT /F2 7.5 Tf 1 1 1 rg 430 {y-10} Td (STATUS) Tj ET")
-    y -= 14
+    y -= 16
+    ops.append(f"0.1 0.2 0.35 rg 40 {y-3} 760 16 re f")
+    ops.append(f"BT /F2 8 Tf 1 1 1 rg 45 {y+2} Td (NO) Tj ET")
+    ops.append(f"BT /F2 8 Tf 1 1 1 rg 80 {y+2} Td (AREA) Tj ET")
+    ops.append(f"BT /F2 8 Tf 1 1 1 rg 230 {y+2} Td (TEMUAN / CASE) Tj ET")
+    ops.append(f"BT /F2 8 Tf 1 1 1 rg 580 {y+2} Td (RISK) Tj ET")
+    ops.append(f"BT /F2 8 Tf 1 1 1 rg 690 {y+2} Td (STATUS) Tj ET")
 
     if not findings_list:
-        y -= 15
-        ops.append(f"0.98 0.98 0.98 rg 40 {y} 515 14 re f")
-        ops.append(f"BT /F1 8 Tf 0.4 0.4 0.4 rg 45 {y+4} Td (Tidak ada temuan pengecualian fisik / Open finding.) Tj ET")
+        y -= 18
+        ops.append(f"0.98 0.98 0.98 rg 40 {y-3} 760 16 re f")
+        ops.append(f"BT /F1 8 Tf 0.4 0.4 0.4 rg 45 {y+2} Td (Tidak ada temuan pengecualian fisik / Open finding.) Tj ET")
     else:
-        for f_idx, fd in enumerate(findings_list[:8], start=1):
-            y -= 15
-            ops.append(f"0.8 0.8 0.8 RG 0.5 w 40 {y} 515 15 re S")
-            ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 45 {y+4} Td ({f_idx}) Tj ET")
-            ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 70 {y+4} Td ({esc_native(str(fd.get('area','-'))[:18])}) Tj ET")
-            ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 170 {y+4} Td ({esc_native(str(fd.get('case','-'))[:42])}) Tj ET")
-            ops.append(f"BT /F2 7.5 Tf 0.8 0.2 0.2 rg 370 {y+4} Td ({esc_native(str(fd.get('risk','Medium')))}) Tj ET")
-            ops.append(f"BT /F2 7.5 Tf 0 0.5 0.2 rg 430 {y+4} Td ({esc_native(str(fd.get('status','Open')))}) Tj ET")
+        for f_idx, fd in enumerate(findings_list[:12], start=1):
+            y -= 18
+            ops.append(f"0.85 0.85 0.85 RG 0.5 w 40 {y-3} 760 16 re S")
+            ops.append(f"BT /F1 8 Tf 0 0 0 rg 45 {y+2} Td ({f_idx}) Tj ET")
+            ops.append(f"BT /F1 8 Tf 0 0 0 rg 80 {y+2} Td ({esc_native(str(fd.get('area','-'))[:25])}) Tj ET")
+            ops.append(f"BT /F1 8 Tf 0 0 0 rg 230 {y+2} Td ({esc_native(str(fd.get('case','-'))[:60])}) Tj ET")
+            ops.append(f"BT /F2 8 Tf 0.8 0.2 0.2 rg 580 {y+2} Td ({esc_native(str(fd.get('risk','Medium')))}) Tj ET")
+            ops.append(f"BT /F2 8 Tf 0 0.5 0.2 rg 690 {y+2} Td ({esc_native(str(fd.get('status','Open')))}) Tj ET")
 
     # Rakit Binary PDF 1.4 Native
     content_stream = "\n".join(ops).encode('latin-1')
