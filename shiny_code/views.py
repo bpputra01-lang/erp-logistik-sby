@@ -410,7 +410,7 @@ CUSTOM_HEAD = ui.head_content(
 
         .custom-clean-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
         .custom-clean-table th { background: #EDF2F7; color: #1A202C; font-weight: bold; font-size: 12px; padding: 10px; white-space: nowrap; border-bottom: 1px solid #CBD5E0; }
-        .custom-clean-table td { color: #2D3748; padding: 8px 10px; white-space: normal !important; word-break: break-word !important; border-bottom: 1px solid #EDF2F7; }
+        .custom-clean-table td { color: #2D3748; padding: 8px 10px; white-space: nowrap; border-bottom: 1px solid #EDF2F7; }
         .custom-clean-table tr:hover { background-color: #F8FAFC; }
         
         .btn-red-gradient {
