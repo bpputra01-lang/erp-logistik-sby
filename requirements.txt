@@ -14,5 +14,4 @@ psycopg2-binary
 st-supabase-connection
 xlrd
 shiny
-calamine
 reportlab
