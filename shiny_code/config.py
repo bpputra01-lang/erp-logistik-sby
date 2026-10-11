@@ -653,4 +653,7 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
     try:
         doc.build(elements)
         buf.seek(0)
-        return buf.g
+        return buf.getvalue()
+    except Exception as e:
+        print(f"❌ Gagal Build PDF ReportLab: {e}")
+        return b""
