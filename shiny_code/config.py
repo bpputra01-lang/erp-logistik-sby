@@ -337,7 +337,7 @@ def get_reportlab_image_from_base64(data_url, width=120, height=45):
 # GENERATOR RESMI AUDIT PACK (LENGKAP: TABEL SELISIH + TTD DIGITAL CANVAS)
 # ==============================================================================
 def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
-    """Menghasilkan PDF resmi External Audit Pack dengan proteksi anti-blank & anti-0 bytes"""
+    """Menghasilkan PDF resmi External Audit Pack dengan lebar tabel valid & anti-XML error"""
     try:
         from reportlab.lib.pagesizes import A4, landscape
         from reportlab.lib import colors
@@ -346,10 +346,16 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
         )
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     except ImportError as e:
-        print(f"⚠️ ReportLab error: {e}")
+        print(f"⚠️ ReportLab belum terpasang: {e}")
         return b""
 
+    # Helper escape XML khusus untuk Paragraph ReportLab
+    def esc_pdf(text):
+        if not text: return ""
+        return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
     buf = io.BytesIO()
+    # Lebar A4 Landscape = 841.89 pt. Dengan margin kiri/kanan 30 pt, sisa lebar efektif = 781.89 pt (kita pakai 780 pt)
     doc = SimpleDocTemplate(
         buf,
         pagesize=landscape(A4),
@@ -359,69 +365,50 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
 
     styles = getSampleStyleSheet()
     
-    # Kustomisasi Style agar aman dari error teks meluber
     title_style = ParagraphStyle(
-        'DocTitle',
-        parent=styles['Heading1'],
-        fontName='Helvetica-Bold',
-        fontSize=13,
-        textColor=colors.HexColor('#1A365D'),
-        spaceAfter=4
+        'DocTitle', parent=styles['Heading1'],
+        fontName='Helvetica-Bold', fontSize=13,
+        textColor=colors.HexColor('#1A365D'), spaceAfter=4
     )
     subtitle_style = ParagraphStyle(
-        'DocSubtitle',
-        parent=styles['Normal'],
-        fontName='Helvetica',
-        fontSize=8,
-        textColor=colors.HexColor('#4A5568'),
-        spaceAfter=8
+        'DocSubtitle', parent=styles['Normal'],
+        fontName='Helvetica', fontSize=8,
+        textColor=colors.HexColor('#4A5568'), spaceAfter=8
     )
     th_style = ParagraphStyle(
-        'TableHeader',
-        fontName='Helvetica-Bold',
-        fontSize=7,
-        textColor=colors.white,
-        alignment=1
+        'TableHeader', fontName='Helvetica-Bold',
+        fontSize=7, textColor=colors.white, alignment=1
     )
     tb_style = ParagraphStyle(
-        'TableCell',
-        fontName='Helvetica',
-        fontSize=7,
-        textColor=colors.HexColor('#1A202C')
+        'TableCell', fontName='Helvetica',
+        fontSize=7, textColor=colors.HexColor('#1A202C')
     )
     tb_bold = ParagraphStyle(
-        'TableCellBold',
-        fontName='Helvetica-Bold',
-        fontSize=7,
-        textColor=colors.HexColor('#1A202C')
+        'TableCellBold', fontName='Helvetica-Bold',
+        fontSize=7, textColor=colors.HexColor('#1A202C')
     )
     tb_red = ParagraphStyle(
-        'TableCellRed',
-        fontName='Helvetica-Bold',
-        fontSize=7,
-        textColor=colors.HexColor('#E53E3E'),
-        alignment=2
+        'TableCellRed', fontName='Helvetica-Bold',
+        fontSize=7, textColor=colors.HexColor('#E53E3E'), alignment=2
     )
     tb_green = ParagraphStyle(
-        'TableCellGreen',
-        fontName='Helvetica-Bold',
-        fontSize=7,
-        textColor=colors.HexColor('#22543D'),
-        alignment=2
+        'TableCellGreen', fontName='Helvetica-Bold',
+        fontSize=7, textColor=colors.HexColor('#22543D'), alignment=2
     )
 
     elements = []
 
     # 1. Judul Dokumen & Identitas
-    elements.append(Paragraph(f"<b>STOCK OPNAME OFFICIAL AUDIT REPORT – {audit_data.get('id', 'AUDIT')}</b>", title_style))
+    audit_id = esc_pdf(audit_data.get('id', 'AUDIT'))
+    elements.append(Paragraph(f"<b>STOCK OPNAME OFFICIAL AUDIT REPORT – {audit_id}</b>", title_style))
     elements.append(Paragraph(
-        f"Company: {audit_data.get('company', '-')} | Branch: {audit_data.get('branch', '-')} | "
-        f"Count Date: {audit_data.get('count_date', '-')} ({audit_data.get('start_time', '08:00')} - {audit_data.get('end_time', '17:00')}) | "
-        f"Method: {audit_data.get('count_method', 'Full Count')} | Standard: ISA 501 / PSAK 14",
+        f"Company: {esc_pdf(audit_data.get('company', '-'))} | Branch: {esc_pdf(audit_data.get('branch', '-'))} | "
+        f"Count Date: {esc_pdf(audit_data.get('count_date', '-'))} ({esc_pdf(audit_data.get('start_time', '08:00'))} - {esc_pdf(audit_data.get('end_time', '17:00'))}) | "
+        f"Method: {esc_pdf(audit_data.get('count_method', 'Full Count'))} | Standard: ISA 501 / PSAK 14",
         subtitle_style
     ))
 
-    # 2. Ringkasan Metrik Utama
+    # 2. Ringkasan Metrik Utama (Total lebar = 780 pt)
     tot_sku = safe_int(audit_data.get('total_sku', 0))
     tot_sys = safe_int(audit_data.get('total_qty_system', 0))
     tot_phys = safe_int(audit_data.get('total_qty_physical', 0))
@@ -434,10 +421,10 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
             f"{tot_sys:,} PCS",
             f"{tot_phys:,} PCS",
             f"{tot_var:,} PCS",
-            str(audit_data.get('lead_auditor', '-'))
+            esc_pdf(audit_data.get('lead_auditor', '-'))
         ]
     ]
-    t_sum = Table(summary_data, colWidths=[155, 155, 155, 155, 215])
+    t_sum = Table(summary_data, colWidths=[140, 140, 140, 140, 220])
     t_sum.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1A365D')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
@@ -450,7 +437,7 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
     elements.append(t_sum)
     elements.append(Spacer(1, 10))
 
-    # 3. TABEL ITEM SELISIH (VARIANCE DISCREPANCIES)
+    # 3. TABEL ITEM SELISIH (Total lebar kolom = 780 pt)
     elements.append(Paragraph("<b>DAFTAR ITEM SELISIH FISIK VS SISTEM (VARIANCE DISCREPANCIES):</b>", styles['Heading4']))
 
     diff_items = []
@@ -501,7 +488,7 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
             total_val_diff += var_val
 
     if diff_items:
-        col_w_diff = [25, 80, 110, 200, 36, 50, 50, 50, 90, 144]
+        col_w_diff = [25, 80, 110, 185, 36, 50, 50, 50, 90, 104] # Total = 780 pt
         t_diff_data = [[
             Paragraph("<b>No</b>", th_style),
             Paragraph("<b>Bin Location</b>", th_style),
@@ -522,15 +509,15 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
 
             t_diff_data.append([
                 Paragraph(str(d_i), tb_style),
-                Paragraph(d_row["bin"], tb_bold),
-                Paragraph(d_row["sku"], tb_bold),
-                Paragraph(d_row["desc"], tb_style),
-                Paragraph(d_row["uom"], tb_style),
+                Paragraph(esc_pdf(d_row["bin"]), tb_bold),
+                Paragraph(esc_pdf(d_row["sku"]), tb_bold),
+                Paragraph(esc_pdf(d_row["desc"]), tb_style),
+                Paragraph(esc_pdf(d_row["uom"]), tb_style),
                 Paragraph(str(d_row["sys"]), tb_style),
                 Paragraph(str(d_row["phys"]), tb_style),
                 Paragraph(diff_str, diff_style),
                 Paragraph(val_formatted, diff_style),
-                Paragraph(d_row["remarks"], tb_style)
+                Paragraph(esc_pdf(d_row["remarks"]), tb_style)
             ])
 
         total_val_str = (f"+Rp {total_val_diff:,}" if total_val_diff > 0 else f"-Rp {abs(total_val_diff):,}") if total_val_diff != 0 else "Rp 0"
@@ -563,7 +550,7 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
 
     elements.append(Spacer(1, 10))
 
-    # 4. OBSERVASI & TEMUAN AUDITOR
+    # 4. OBSERVASI & TEMUAN AUDITOR (Total lebar = 780 pt)
     findings = audit_data.get("findings", [])
     if findings:
         elements.append(Paragraph("<b>AUDITOR OBSERVATIONS & FINDINGS:</b>", styles['Heading4']))
@@ -579,13 +566,13 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
             risk_color = colors.HexColor('#E53E3E') if fd.get("risk") == "High" else colors.HexColor('#DD6B20')
             f_table_data.append([
                 Paragraph(str(f_i), tb_style),
-                Paragraph(str(fd.get("area", "-")), tb_style),
-                Paragraph(str(fd.get("case", "-")), tb_style),
-                Paragraph(f"<b>{fd.get('risk', '-')}</b>", ParagraphStyle('Rk', parent=tb_style, textColor=risk_color, alignment=1)),
-                Paragraph(str(fd.get("recom", "-")), tb_style),
-                Paragraph(f"<b>{fd.get('status', 'Open')}</b>", tb_style)
+                Paragraph(esc_pdf(fd.get("area", "-")), tb_style),
+                Paragraph(esc_pdf(fd.get("case", "-")), tb_style),
+                Paragraph(f"<b>{esc_pdf(fd.get('risk', '-'))}</b>", ParagraphStyle('Rk', parent=tb_style, textColor=risk_color, alignment=1)),
+                Paragraph(esc_pdf(fd.get("recom", "-")), tb_style),
+                Paragraph(f"<b>{esc_pdf(fd.get('status', 'Open'))}</b>", tb_style)
             ])
-        t_find = Table(f_table_data, colWidths=[25, 120, 265, 55, 335, 95], repeatRows=1)
+        t_find = Table(f_table_data, colWidths=[25, 115, 230, 50, 260, 100], repeatRows=1) # Total = 780 pt
         t_find.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2D3748')),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E0')),
@@ -595,7 +582,7 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
         elements.append(t_find)
         elements.append(Spacer(1, 10))
 
-    # 5. TANDA TANGAN DIGITAL (AMAN DARI CRASH BASE64)
+    # 5. TANDA TANGAN DIGITAL (Total lebar = 780 pt)
     elements.append(Paragraph("<b>STOCK COUNT SIGN-OFF (DIGITAL SIGNATURES):</b>", styles['Heading4']))
 
     def safe_img_flowable(data_url):
@@ -607,7 +594,7 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
             img_bytes = base64.b64decode(data_url)
             if len(img_bytes) < 100:
                 return Paragraph("<i>(Belum TTD)</i>", tb_style)
-            return Image(io.BytesIO(img_bytes), width=110, height=35)
+            return Image(io.BytesIO(img_bytes), width=100, height=32)
         except:
             return Paragraph("<i>(Belum TTD)</i>", tb_style)
 
@@ -616,10 +603,10 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
     img_mgr = safe_img_flowable(audit_data.get("sign_manager_img"))
     img_lead = safe_img_flowable(audit_data.get("sign_lead_img"))
 
-    ctr_name = str(audit_data.get('sign_counter_name') or audit_data.get('counter_name') or '-')
-    spv_name = str(audit_data.get('sign_supervisor_name') or audit_data.get('supervisor') or '-')
-    mgr_name = str(audit_data.get('sign_manager_name') or audit_data.get('manager') or '-')
-    lead_name = str(audit_data.get('sign_lead_name') or audit_data.get('lead_auditor') or '-')
+    ctr_name = esc_pdf(audit_data.get('sign_counter_name') or audit_data.get('counter_name') or '-')
+    spv_name = esc_pdf(audit_data.get('sign_supervisor_name') or audit_data.get('supervisor') or '-')
+    mgr_name = esc_pdf(audit_data.get('sign_manager_name') or audit_data.get('manager') or '-')
+    lead_name = esc_pdf(audit_data.get('sign_lead_name') or audit_data.get('lead_auditor') or '-')
 
     sign_table_data = [
         [
@@ -637,7 +624,7 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
         ]
     ]
 
-    t_sign = Table(sign_table_data, colWidths=[223, 223, 223, 224])
+    t_sign = Table(sign_table_data, colWidths=[195, 195, 195, 195]) # Total = 780 pt
     t_sign.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2D3748')),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
@@ -649,11 +636,16 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
 
     elements.append(KeepTogether([t_sign]))
 
-    # Eksekusi Build Document ReportLab
+    # Eksekusi Build Document ReportLab dengan penangkap error terminal
     try:
         doc.build(elements)
         buf.seek(0)
-        return buf.getvalue()
+        pdf_bytes = buf.getvalue()
+        if len(pdf_bytes) < 100:
+            print("⚠️ Peringatan: Byte PDF yang dihasilkan terlalu kecil (< 100 bytes).")
+        return pdf_bytes
     except Exception as e:
-        print(f"❌ Gagal Build PDF ReportLab: {e}")
+        import traceback
+        print(f"❌ Gagal Build PDF ReportLab secara fatal: {e}")
+        traceback.print_exc()
         return b""
