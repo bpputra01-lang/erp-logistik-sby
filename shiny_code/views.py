@@ -1738,6 +1738,172 @@ def render_auditor_editable_table(df_data, counter_name="Counter A"):
         """),
         style="width: 100%; margin-top: 0.5rem;"
     )
+
+# ==============================================================================
+# MODAL DETAIL HASIL AUDIT (AMAN DARI LAYAR GELAP / GLITCH)
+# ==============================================================================
+def show_audit_detail_modal(target: dict):
+    a_id = target.get("id", "-")
+    
+    # 1. Tabel Findings / Temuan
+    findings = target.get("findings", [])
+    if findings:
+        finding_rows = []
+        for f_idx, fd in enumerate(findings, start=1):
+            cur_stat = fd.get("status", "Open")
+            is_closed = (cur_stat == "Closed")
+            stat_badge = ui.span("Closed", style="background: #C6F6D5; color: #22543D; font-weight: 800; padding: 3px 8px; border-radius: 4px; font-size: 11px;") if is_closed else ui.span("Open", style="background: #FED7D7; color: #9B2C2C; font-weight: 800; padding: 3px 8px; border-radius: 4px; font-size: 11px;")
+            
+            btn_action = ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-arrow-rotate-left", style="margin-right: 4px;"), "Buka Kembali",
+                onclick=f"Shiny.setInputValue('btn_toggle_audit_finding_status', {{id: '{a_id}', idx: {f_idx-1}}}, {{priority: 'event'}})",
+                style="background: #EDF2F7; color: #4A5568; border: 1px solid #CBD5E0; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; cursor: pointer;"
+            ) if is_closed else ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-check", style="margin-right: 4px;"), "Selesaikan (Close)",
+                onclick=f"Shiny.setInputValue('btn_toggle_audit_finding_status', {{id: '{a_id}', idx: {f_idx-1}}}, {{priority: 'event'}})",
+                style="background: #10B981; color: white; border: none; padding: 5px 12px; border-radius: 4px; font-size: 11px; font-weight: 800; cursor: pointer;"
+            )
+
+            risk_color = "#E53E3E" if fd.get("risk") == "High" else ("#DD6B20" if fd.get("risk") == "Medium" else "#3182CE")
+
+            finding_rows.append(ui.tags.tr(
+                ui.tags.td(str(f_idx), style="text-align: center; font-weight: bold;"),
+                ui.tags.td(str(fd.get("area", "-"))),
+                ui.tags.td(str(fd.get("case", "-"))),
+                ui.tags.td(str(fd.get("risk", "-")), style=f"font-weight: 800; color: {risk_color}; text-align: center;"),
+                ui.tags.td(str(fd.get("recom", "-"))),
+                ui.tags.td(stat_badge, style="text-align: center;"),
+                ui.tags.td(btn_action, style="text-align: center;")
+            ))
+
+        tbl_findings = ui.tags.table(
+            ui.tags.thead(ui.tags.tr(
+                ui.tags.th("No", style="text-align: center;"),
+                ui.tags.th("Area"), ui.tags.th("Temuan / Case"),
+                ui.tags.th("Risk", style="text-align: center;"),
+                ui.tags.th("Rekomendasi Auditor"),
+                ui.tags.th("Status", style="text-align: center;"),
+                ui.tags.th("Aksi Tindak Lanjut", style="text-align: center;")
+            )),
+            ui.tags.tbody(*finding_rows),
+            class_="custom-clean-table", style="width: 100%; border: 1px solid #CBD5E0; border-radius: 8px;"
+        )
+    else:
+        tbl_findings = ui.p("Tidak ada temuan pengecualian yang dicatat pada sesi audit ini.", style="color: #718096; font-style: italic; padding: 1rem; text-align: center;")
+
+    # 2. Tabel Item Count Sheet
+    items = target.get("items", [])
+    if items:
+        item_rows = []
+        for i_idx, it in enumerate(items[:300], start=1):
+            q_sys = safe_int(it.get("Qty System", 0))
+            q_phys = safe_int(it.get("Physical Count", 0)) if str(it.get("Physical Count", "")).strip() != "" else "-"
+            v_val = it.get("Variance Value", "-")
+            v_str = f"Rp {safe_int(v_val):,}" if v_val != "-" and str(v_val).strip() != "" else "-"
+
+            item_rows.append(ui.tags.tr(
+                ui.tags.td(str(i_idx), style="text-align: center;"),
+                ui.tags.td(str(it.get("Bin Location", "-"))),
+                ui.tags.td(str(it.get("SKU", "-")), style="font-weight: 700; color: #2B6CB0;"),
+                ui.tags.td(str(it.get("Description", "-"))),
+                ui.tags.td(str(it.get("UoM (PAIR / PCS)", "PCS")), style="text-align: center;"),
+                ui.tags.td(str(q_sys), style="text-align: right; font-weight: 700;"),
+                ui.tags.td(str(q_phys), style="text-align: right; font-weight: 700; color: #22543D;"),
+                ui.tags.td(v_str, style="text-align: right; font-weight: 800;"),
+                ui.tags.td(str(it.get("Counter", "-")), style="text-align: center;"),
+                ui.tags.td(str(it.get("Auditor Verified", "No")), style="text-align: center;"),
+                ui.tags.td(str(it.get("Remarks", "")))
+            ))
+
+        tbl_items = ui.div(
+            ui.tags.table(
+                ui.tags.thead(ui.tags.tr(
+                    ui.tags.th("No", style="text-align: center;"),
+                    ui.tags.th("Bin Location"), ui.tags.th("SKU"), ui.tags.th("Description"),
+                    ui.tags.th("UoM", style="text-align: center;"),
+                    ui.tags.th("Qty System", style="text-align: right;"),
+                    ui.tags.th("Physical Count", style="text-align: right;"),
+                    ui.tags.th("Variance Value", style="text-align: right;"),
+                    ui.tags.th("Counter", style="text-align: center;"),
+                    ui.tags.th("Verified", style="text-align: center;"),
+                    ui.tags.th("Remarks")
+                )),
+                ui.tags.tbody(*item_rows),
+                class_="custom-clean-table", style="width: 100%;"
+            ),
+            style="max-height: 400px; overflow-y: auto; border: 1px solid #CBD5E0; border-radius: 8px;"
+        )
+    else:
+        tbl_items = ui.p("Data count sheet kosong.", style="color: #718096; font-style: italic; padding: 1rem; text-align: center;")
+
+    # 3. Preview Tanda Tangan Digital
+    def sign_box(role_title, name_val, img_data):
+        img_tag = ui.tags.img(src=img_data, style="max-height: 60px; max-width: 150px; display: block; margin: 4px auto;") if (img_data and len(img_data) > 50) else ui.span("(Belum ada goresan TTD)", style="color: #A0AEC0; font-size: 11px; font-style: italic;")
+        return ui.div(
+            ui.strong(role_title, style="font-size: 12px; color: #1A202C; display: block; margin-bottom: 2px;"),
+            ui.span(name_val if name_val else "-", style="font-size: 12px; color: #4A5568; display: block; margin-bottom: 6px; font-weight: 600;"),
+            ui.div(img_tag, style="height: 65px; display: flex; align-items: center; justify-content: center; background: #FFF; border: 1px dashed #CBD5E0; border-radius: 6px;"),
+            style="flex: 1; min-width: 170px; background: #F8FAFC; padding: 10px; border-radius: 8px; border: 1px solid #E2E8F0; text-align: center;"
+        )
+
+    signatures_ui = ui.div(
+        sign_box("Counter", target.get("sign_counter_name"), target.get("sign_counter_img")),
+        sign_box("Supervisor", target.get("sign_supervisor_name"), target.get("sign_supervisor_img")),
+        sign_box("Ops. Manager", target.get("sign_manager_name"), target.get("sign_manager_img")),
+        sign_box("Lead Auditor", target.get("sign_lead_name"), target.get("sign_lead_img")),
+        style="display: flex; gap: 10px; flex-wrap: wrap; width: 100%; margin-top: 1rem;"
+    )
+
+    modal_body = ui.div(
+        ui.div(
+            ui.div(
+                ui.span(f"🏢 Perusahaan: {target.get('company')}", style="font-size: 13px; font-weight: 700; color: #1A202C; display: block;"),
+                ui.span(f"🏬 Cabang: {target.get('branch')} | 📅 Tanggal Hitung: {target.get('count_date')} ({target.get('start_time')} - {target.get('end_time')})", style="font-size: 12px; color: #4A5568; display: block; margin-top: 2px;"),
+                ui.span(f"👤 Tim: Lead Auditor: {target.get('lead_auditor')} • Manager: {target.get('manager')} • SPV: {target.get('supervisor')}", style="font-size: 12px; color: #718096; display: block; margin-top: 2px;"),
+            ),
+            style="background: #EDF2F7; padding: 12px 16px; border-radius: 8px; margin-bottom: 1.25rem;"
+        ),
+        ui.navset_card_tab(
+            ui.nav_panel(
+                "🔍 OBSERVASI & TEMUAN AUDITOR",
+                ui.div(
+                    ui.p("Daftar temuan fisik yang dicatat auditor. Klik tombol 'Selesaikan (Close)' jika tindak lanjut sudah rampung:", style="font-size: 12px; color: #718096; margin-bottom: 8px;"),
+                    tbl_findings,
+                    style="padding: 10px 0;"
+                )
+            ),
+            ui.nav_panel(
+                "📦 DETAIL STOCK COUNT SHEET",
+                ui.div(
+                    ui.p(f"Menampilkan total {len(items):,} item yang diperiksa secara fisik:", style="font-size: 12px; color: #718096; margin-bottom: 8px;"),
+                    tbl_items,
+                    style="padding: 10px 0;"
+                )
+            ),
+            ui.nav_panel(
+                "✍️ TANDA TANGAN DIGITAL RESMI",
+                ui.div(
+                    ui.p("Tanda tangan para penanggung jawab yang tercatat dalam sistem:", style="font-size: 12px; color: #718096; margin-bottom: 4px;"),
+                    signatures_ui,
+                    style="padding: 10px 0;"
+                )
+            )
+        ),
+        style="width: 100%;"
+    )
+
+    ui.modal_show(ui.modal(
+        modal_body,
+        title=ui.div(ui.tags.i(class_="fa-solid fa-file-invoice", style="color: #3182CE; margin-right: 8px;"), f"Detail Hasil Audit: {a_id}"),
+        size="xl",
+        easy_close=True,
+        footer=ui.div(
+            ui.modal_button("Tutup", class_="btn-page-nav"),
+            style="display: flex; justify-content: flex-end;"
+        )
+    ))
+
+    
 # ==============================================================================
 # VIEW: MEMO PENGAJUAN (2 TAB: FORM PENGAJUAN & HISTORY APPROVAL)
 # ==============================================================================

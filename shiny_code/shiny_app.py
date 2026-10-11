@@ -3897,11 +3897,23 @@ def server(input: Inputs, output: Outputs, session: Session):
             )
         ))
 
+    # --------------------------------------------------------------------------
+    # HANDLER BUKA HASIL AUDIT DI WEB (MENYIMPAN STATE DETAIL)
+    # --------------------------------------------------------------------------
     @reactive.Effect
     @reactive.event(input.btn_open_audit_detail_modal)
     def _open_audit_detail():
         a_id = input.btn_open_audit_detail_modal()
-        _render_and_show_detail_modal(a_id)
+        target = next((h for h in state.auditor_history_list() if h.get("id") == a_id), None)
+        if not target:
+            ui.notification_show("Data sesi audit tidak ditemukan!", type="error")
+            return
+        
+        # Set data detail ke state agar UI reaktif merender halaman detail
+        state.auditor_selected_detail.set(target)
+        # Buka modal menggunakan UI interaktif Shiny yang aman
+        from views import show_audit_detail_modal
+        show_audit_detail_modal(target)
 
     @reactive.Effect
     @reactive.event(input.btn_toggle_audit_finding_status)
