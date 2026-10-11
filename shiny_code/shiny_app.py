@@ -3739,24 +3739,54 @@ def server(input: Inputs, output: Outputs, session: Session):
 
         state.auditor_selected_detail.set(target)
 
-        # 1. Tabel Findings / Temuan dengan Tombol Close
         findings = target.get("findings", [])
         if findings:
             finding_rows = []
             for f_idx, fd in enumerate(findings, start=1):
                 cur_stat = fd.get("status", "Open")
                 is_closed = (cur_stat == "Closed")
-                stat_badge = ui.span("Closed", style="background: #C6F6D5; color: #22543D; font-weight: 800; padding: 3px 8px; border-radius: 4px; font-size: 11px;") if is_closed else ui.span("Open", style="background: #FED7D7; color: #9B2C2C; font-weight: 800; padding: 3px 8px; border-radius: 4px; font-size: 11px;")
                 
-                btn_action = ui.tags.button(
-                    ui.tags.i(class_="fa-solid fa-arrow-rotate-left", style="margin-right: 4px;"), "Buka Kembali",
-                    onclick=f"Shiny.setInputValue('btn_toggle_audit_finding_status', {{id: '{a_id}', idx: {f_idx-1}}}, {{priority: 'event'}})",
-                    style="background: #EDF2F7; color: #4A5568; border: 1px solid #CBD5E0; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; cursor: pointer;"
-                ) if is_closed else ui.tags.button(
-                    ui.tags.i(class_="fa-solid fa-check", style="margin-right: 4px;"), "Selesaikan (Close)",
-                    onclick=f"Shiny.setInputValue('btn_toggle_audit_finding_status', {{id: '{a_id}', idx: {f_idx-1}}}, {{priority: 'event'}})",
-                    style="background: #10B981; color: white; border: none; padding: 5px 12px; border-radius: 4px; font-size: 11px; font-weight: 800; cursor: pointer;"
+                # Desain badge status dengan ID unik agar mudah di-update lewat JS
+                stat_badge_id = f"badge_stat_{a_id.replace('/', '_')}_{f_idx-1}"
+                stat_badge_html = (
+                    f'<span id="{stat_badge_id}" style="background: #C6F6D5; color: #22543D; font-weight: 800; padding: 3px 8px; border-radius: 4px; font-size: 11px;">Closed</span>'
+                    if is_closed else 
+                    f'<span id="{stat_badge_id}" style="background: #FED7D7; color: #9B2C2C; font-weight: 800; padding: 3px 8px; border-radius: 4px; font-size: 11px;">Open</span>'
                 )
+                
+                btn_id = f"btn_toggle_f_{a_id.replace('/', '_')}_{f_idx-1}"
+                
+                # Tombol aksi interaktif instan (mengubah UI browser tanpa reload modal)
+                btn_action_html = f"""
+                    <button id="{btn_id}" onclick="
+                        let isCurrentlyClosed = {str(is_closed).lower()};
+                        let badge = document.getElementById('{stat_badge_id}');
+                        let btn = document.getElementById('{btn_id}');
+                        
+                        if (!isCurrentlyClosed) {{
+                            badge.style.background = '#C6F6D5';
+                            badge.style.color = '#22543D';
+                            badge.innerText = 'Closed';
+                            btn.style.background = '#EDF2F7';
+                            btn.style.color = '#4A5568';
+                            btn.style.border = '1px solid #CBD5E0';
+                            btn.innerHTML = '<i class=\\'fa-solid fa-arrow-rotate-left\\'></i> Buka Kembali';
+                        }} else {{
+                            badge.style.background = '#FED7D7';
+                            badge.style.color = '#9B2C2C';
+                            badge.innerText = 'Open';
+                            btn.style.background = '#10B981';
+                            btn.style.color = '#FFFFFF';
+                            btn.style.border = 'none';
+                            btn.innerHTML = '<i class=\\'fa-solid fa-check\\'></i> Selesaikan (Close)';
+                        }}
+                        
+                        // Kirim request ke backend Python secara senyap (silent update) tanpa ganggu modal
+                        Shiny.setInputValue('btn_toggle_audit_finding_status', {{id: '{a_id}', idx: {f_idx-1}}}, {{priority: 'event'}});
+                    " style="background: {'#EDF2F7' if is_closed else '#10B981'}; color: {'#4A5568' if is_closed else '#FFFFFF'}; border: {'1px solid #CBD5E0' if is_closed else 'none'}; padding: {'4px 10px' if is_closed else '5px 12px'}; border-radius: 4px; font-size: 11px; font-weight: 800; cursor: pointer;">
+                        <i class="fa-solid {'fa-arrow-rotate-left' if is_closed else 'fa-check'}"></i> {'Buka Kembali' if is_closed else 'Selesaikan (Close)'}
+                    </button>
+                """
 
                 risk_color = "#E53E3E" if fd.get("risk") == "High" else ("#DD6B20" if fd.get("risk") == "Medium" else "#3182CE")
 
@@ -3766,8 +3796,8 @@ def server(input: Inputs, output: Outputs, session: Session):
                     ui.tags.td(str(fd.get("case", "-"))),
                     ui.tags.td(str(fd.get("risk", "-")), style=f"font-weight: 800; color: {risk_color}; text-align: center;"),
                     ui.tags.td(str(fd.get("recom", "-"))),
-                    ui.tags.td(stat_badge, style="text-align: center;"),
-                    ui.tags.td(btn_action, style="text-align: center;")
+                    ui.tags.td(ui.HTML(stat_badge_html), style="text-align: center;"),
+                    ui.tags.td(ui.HTML(btn_action_html), style="text-align: center;")
                 ))
 
             tbl_findings = ui.tags.table(
@@ -3784,7 +3814,6 @@ def server(input: Inputs, output: Outputs, session: Session):
             )
         else:
             tbl_findings = ui.p("Tidak ada temuan pengecualian yang dicatat pada sesi audit ini.", style="color: #718096; font-style: italic; padding: 1rem; text-align: center;")
-
         # 2. Tabel Item Count Sheet
         items = target.get("items", [])
         if items:

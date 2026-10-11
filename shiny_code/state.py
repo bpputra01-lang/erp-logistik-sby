@@ -5816,8 +5816,7 @@ class AppState:
 
                 # Refresh state lokal
                 self.auditor_history_list.set(histories)
-                if self.auditor_selected_detail() and self.auditor_selected_detail().get("id") == audit_id:
-                    self.auditor_selected_detail.set(target_hist)
+                self.auditor_selected_detail.set(target_hist)
 
                 return True, f"Status temuan berhasil diubah menjadi '{new_status}'!"
             return False, "Indeks temuan tidak valid!"
