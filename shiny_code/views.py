@@ -1237,35 +1237,53 @@ def validation_barcode_sku_view(state: AppState):
 # VIEW: PERCENTAGE DISPLAY CONTROL & REFILL TOKO (DUAL TAB VIEW)
 # ==============================================================================
 def percentage_display_view(state: AppState):
+    branch_choices = [
+        "JEZ SURABAYA", "JEZ MALANG", "JEZ SIDOARJO", 
+        "JEZ KEDIRI", "JEZ JEMBER", "JEZ SEMARANG"
+    ]
+
     upload_section = ui.div(
         ui.div(
-            # HEADER & TOMBOL TARIK CLOUD REALTIME
+            # HEADER & KONTROL CABANG
             ui.div(
                 ui.div(
                     ui.h4("🧥 Percentage Display Control & Refill Toko", style="font-size: 16px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
                     ui.span(
-                        f"🕒 Terakhir Diperbarui: {state.pd_last_sync_time()} • Auto-refresh tiap 1 jam otomatis.",
+                        f"🏬 Cabang: {state.pd_selected_branch()} • 🕒 Terakhir Update: {state.pd_last_sync_time()} (Auto-refresh 1 jam).",
                         style="color: #059669; font-weight: 700; font-size: 12px;"
                     ),
                 ),
-                # Tombol Tarik Data Manual Langsung dari Supabase
-                ui.tags.button(
-                    ui.tags.span(
-                        ui.tags.i(class_="fa-solid fa-cloud-arrow-down", style="margin-right: 8px; font-size: 14px;"),
-                        "TARIK STOK TERBARU (CLOUD)"
+                # DROPDOWN PILIH CABANG + TOMBOL TARIK
+                ui.div(
+                    ui.div(
+                        ui.span("Pilih Cabang:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
+                        ui.input_select(
+                            "pd_branch_selector", None,
+                            choices=branch_choices,
+                            selected=state.pd_selected_branch(),
+                            width="180px"
+                        ),
+                        style="display: flex; flex-direction: column;"
                     ),
-                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_fetch_stock_jezpro_pd', Math.random(), {priority: 'event'});",
-                    style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; font-weight: 800; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 13px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);"
+                    ui.tags.button(
+                        ui.tags.span(
+                            ui.tags.i(class_="fa-solid fa-cloud-arrow-down", style="margin-right: 6px; font-size: 13px;"),
+                            "SYNC CABANG INI"
+                        ),
+                        onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_fetch_stock_jezpro_pd', Math.random(), {priority: 'event'});",
+                        style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; font-weight: 800; border: none; padding: 9px 16px; border-radius: 8px; cursor: pointer; font-size: 12px; height: 38px; margin-top: 16px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);"
+                    ),
+                    style="display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap;"
                 ),
                 style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 10px;"
             ),
             ui.hr(style="margin: 0 0 1.25rem 0; border-color: #CBD5E0;"),
 
-            # FOLDER ACCORDION JIKA SEWAKTU-WAKTU INGIN UPLOAD MANUAL
+            # ACCORDION FALLBACK MANUAL
             ui.tags.details(
                 ui.tags.summary("📁 Atau Upload File Manual (Opsional)"),
                 ui.div(
-                    custom_uploader_box("upload_percentage_display_file", "Pilih File Stock (Excel / CSV)"),
+                    custom_uploader_box("upload_percentage_display_file", "Upload File Stock Manual (.xlsx / .csv)"),
                     ui.output_ui("percentage_display_action_btn_ui"),
                     style="margin-top: 0.75rem;"
                 ),

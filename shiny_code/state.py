@@ -522,6 +522,7 @@ class AppState:
         self.memo_selected_for_pdf = reactive.Value(None)
 
         # Tambahkan 2 baris ini di dalam def __init__(self):
+        self.pd_selected_branch = reactive.Value("JEZ SURABAYA")
         self.pd_last_sync_time = reactive.Value("-")
         self.pd_data_source = reactive.Value("Belum ada data")
 
@@ -4258,25 +4259,37 @@ class AppState:
     # ==========================================================================
     # PENARIKAN STOK CLOUD SUPABASE & KALKULASI PERCENTAGE DISPLAY
     # ==========================================================================
-    def load_stock_from_supabase_for_percentage_display(self, silent=False):
+    def load_stock_from_supabase_for_percentage_display(self, branch_name=None, silent=False):
         try:
             client = get_supabase()
             if not client:
                 return False, "Gagal koneksi ke database Supabase!"
-            
-            # Ambil data snapshot yang barusan dikirim oleh GitHub Actions
-            res = client.table("stock_live_cache").select("*").in_("id", ["SURABAYA_LATEST"]).execute()
+
+            BRANCH_DB_MAP = {
+                "JEZ SURABAYA": "SURABAYA_LATEST",
+                "JEZ MALANG": "MALANG_LATEST",
+                "JEZ SIDOARJO": "SIDOARJO_LATEST",
+                "JEZ KEDIRI": "KEDIRI_LATEST",
+                "JEZ JEMBER": "JEMBER_LATEST",
+                "JEZ SEMARANG": "SEMARANG_LATEST",
+            }
+
+            target_branch = branch_name if branch_name else self.pd_selected_branch()
+            db_id = BRANCH_DB_MAP.get(target_branch, "SURABAYA_LATEST")
+            self.pd_selected_branch.set(target_branch)
+
+            # Tarik baris cabang yang diminta
+            res = client.table("stock_live_cache").select("*").in_("id", [db_id]).execute()
             if not res or not res.data or len(res.data) == 0:
-                return False, "Data stok Jezpro belum tersedia di Supabase. Jalankan GitHub Actions terlebih dahulu!"
+                return False, f"Data stok {target_branch} belum ada di Supabase. Jalankan GitHub Actions terlebih dahulu!"
 
             row = res.data[0]
             stock_list = row.get("stock_data", [])
             updated_at_raw = row.get("updated_at", "")
             
             if not stock_list:
-                return False, "Data stok di Supabase kosong."
+                return False, f"Data stok untuk {target_branch} di Supabase kosong."
 
-            # Format waktu update terakhir ke WIB
             try:
                 dt = pd.to_datetime(updated_at_raw)
                 wib_str = dt.strftime("%d-%m-%Y %H:%M") + " WIB"
@@ -4284,13 +4297,10 @@ class AppState:
                 wib_str = datetime.now().strftime("%d-%m-%Y %H:%M") + " WIB"
 
             self.pd_last_sync_time.set(wib_str)
-            self.pd_data_source.set("Jezpro Cloud (Auto/Manual)")
+            self.pd_data_source.set(f"{target_branch} (Cloud)")
 
-            # Ubah data JSON list dari Supabase menjadi DataFrame Pandas
             df_cloud = pd.DataFrame(stock_list)
-            
-            # Proses kalkulasi display & refill toko
-            return self._process_dataframe_percentage_display(df_cloud, source_label=f"Cloud ({wib_str})")
+            return self._process_dataframe_percentage_display(df_cloud, source_label=f"{target_branch} Cloud ({wib_str})")
         except Exception as e:
             return False, f"Gagal memuat stok dari Cloud: {str(e)}"
 

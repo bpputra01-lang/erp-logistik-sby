@@ -3161,23 +3161,37 @@ def server(input: Inputs, output: Outputs, session: Session):
         else:
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
-# 1. EVENT KLIK TOMBOL: Tarik data dari Cloud saat tombol diklik
+# 1. Event saat User Mengganti Dropdown Cabang
+    @reactive.Effect
+    @reactive.event(input.pd_branch_selector)
+    def _on_pd_branch_change():
+        br = input.pd_branch_selector()
+        if br and br != state.pd_selected_branch():
+            state.pd_selected_branch.set(br)
+            succ, msg = state.load_stock_from_supabase_for_percentage_display(branch_name=br, silent=True)
+            if succ:
+                ui.notification_show(f"🏬 Menampilkan stok {br}", type="message", duration=3)
+            else:
+                ui.notification_show(f"⚠️ {msg}", type="warning", duration=4)
+
+    # 2. Event Tombol Klik Manual
     @reactive.Effect
     @reactive.event(input.btn_fetch_stock_jezpro_pd)
     def _fetch_cloud_stock_pd():
-        succ, msg = state.load_stock_from_supabase_for_percentage_display()
+        current_br = state.pd_selected_branch()
+        succ, msg = state.load_stock_from_supabase_for_percentage_display(branch_name=current_br)
         ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
         if succ:
             state.show_success_modal.set(True)
-            ui.notification_show(f"✅ {msg}", type="message", duration=5)
+            ui.notification_show(f"✅ {msg}", type="message", duration=4)
         else:
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
 
-    # 2. AUTO-REFRESH 1 JAM (3600 DETIK): Refresh otomatis secara senyap jika tidak ditarik manual
+    # 3. Auto Refresh tiap 1 jam
     @reactive.Effect
     def _auto_refresh_pd_hourly():
-        reactive.invalidate_later(3600)  # Re-run otomatis tiap 3600 detik (1 jam)
+        reactive.invalidate_later(3600)
         if state.logged_in() and state.get_active_content_type() in ["percentage_display", "percentage-display"]:
             state.load_stock_from_supabase_for_percentage_display(silent=True)
    # ==========================================================================
