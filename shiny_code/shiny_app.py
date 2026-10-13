@@ -3189,11 +3189,15 @@ def server(input: Inputs, output: Outputs, session: Session):
             state.show_error_modal.set(True)
 
     # 3. Auto Refresh tiap 1 jam
+    # 3. Auto Refresh tiap 1 jam (Pakai reactive.isolate agar TIDAK download saat pindah menu)
     @reactive.Effect
     def _auto_refresh_pd_hourly():
-        reactive.invalidate_later(3600)
-        if state.logged_in() and state.get_active_content_type() in ["percentage_display", "percentage-display"]:
-            state.load_stock_from_supabase_for_percentage_display(silent=True)
+        reactive.invalidate_later(3600)  # Hanya terpicu oleh waktu 1 jam
+        
+        # 'with reactive.isolate():' mencegah efek ini jalan saat Anda mengklik menu
+        with reactive.isolate():
+            if state.logged_in() and state.get_active_content_type() in ["percentage_display", "percentage-display"]:
+                state.load_stock_from_supabase_for_percentage_display(silent=True)
    # ==========================================================================
     # CONTROLLER PERCENTAGE DISPLAY & REFILL TOKO (ANTI-RESET TAB)
     # ==========================================================================
