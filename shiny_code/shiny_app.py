@@ -3161,7 +3161,25 @@ def server(input: Inputs, output: Outputs, session: Session):
         else:
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
+# 1. EVENT KLIK TOMBOL: Tarik data dari Cloud saat tombol diklik
+    @reactive.Effect
+    @reactive.event(input.btn_fetch_stock_jezpro_pd)
+    def _fetch_cloud_stock_pd():
+        succ, msg = state.load_stock_from_supabase_for_percentage_display()
+        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+        if succ:
+            state.show_success_modal.set(True)
+            ui.notification_show(f"✅ {msg}", type="message", duration=5)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
 
+    # 2. AUTO-REFRESH 1 JAM (3600 DETIK): Refresh otomatis secara senyap jika tidak ditarik manual
+    @reactive.Effect
+    def _auto_refresh_pd_hourly():
+        reactive.invalidate_later(3600)  # Re-run otomatis tiap 3600 detik (1 jam)
+        if state.logged_in() and state.get_active_content_type() in ["percentage_display", "percentage-display"]:
+            state.load_stock_from_supabase_for_percentage_display(silent=True)
    # ==========================================================================
     # CONTROLLER PERCENTAGE DISPLAY & REFILL TOKO (ANTI-RESET TAB)
     # ==========================================================================

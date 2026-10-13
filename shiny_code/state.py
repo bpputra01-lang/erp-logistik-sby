@@ -521,6 +521,9 @@ class AppState:
         self.memo_current_items = reactive.Value([])    # List item barang di form draft
         self.memo_selected_for_pdf = reactive.Value(None)
 
+        # Tambahkan 2 baris ini di dalam def __init__(self):
+        self.pd_last_sync_time = reactive.Value("-")
+        self.pd_data_source = reactive.Value("Belum ada data")
 
         # --- PHYSICAL INVENTORY LIST STATE (UNIFIED) ---
         self.pil_mode = reactive.Value("")
@@ -4251,10 +4254,48 @@ class AppState:
             return False, f"Gagal Eksekusi Tahap 2: {e}"
 
     
+    
     # ==========================================================================
-    # METODE LOGIKA PROSES: PERCENTAGE DISPLAY & REFILL TOKO (DUAL ENGINE)
+    # PENARIKAN STOK CLOUD SUPABASE & KALKULASI PERCENTAGE DISPLAY
     # ==========================================================================
+    def load_stock_from_supabase_for_percentage_display(self, silent=False):
+        try:
+            client = get_supabase()
+            if not client:
+                return False, "Gagal koneksi ke database Supabase!"
+            
+            # Ambil data snapshot yang barusan dikirim oleh GitHub Actions
+            res = client.table("stock_live_cache").select("*").in_("id", ["SURABAYA_LATEST"]).execute()
+            if not res or not res.data or len(res.data) == 0:
+                return False, "Data stok Jezpro belum tersedia di Supabase. Jalankan GitHub Actions terlebih dahulu!"
+
+            row = res.data[0]
+            stock_list = row.get("stock_data", [])
+            updated_at_raw = row.get("updated_at", "")
+            
+            if not stock_list:
+                return False, "Data stok di Supabase kosong."
+
+            # Format waktu update terakhir ke WIB
+            try:
+                dt = pd.to_datetime(updated_at_raw)
+                wib_str = dt.strftime("%d-%m-%Y %H:%M") + " WIB"
+            except Exception:
+                wib_str = datetime.now().strftime("%d-%m-%Y %H:%M") + " WIB"
+
+            self.pd_last_sync_time.set(wib_str)
+            self.pd_data_source.set("Jezpro Cloud (Auto/Manual)")
+
+            # Ubah data JSON list dari Supabase menjadi DataFrame Pandas
+            df_cloud = pd.DataFrame(stock_list)
+            
+            # Proses kalkulasi display & refill toko
+            return self._process_dataframe_percentage_display(df_cloud, source_label=f"Cloud ({wib_str})")
+        except Exception as e:
+            return False, f"Gagal memuat stok dari Cloud: {str(e)}"
+
     def process_percentage_display(self, file_info):
+        """Memproses jika user mengunggah file Excel manual"""
         try:
             if not file_info:
                 return False, "File All Stock wajib diupload!"
@@ -4273,20 +4314,26 @@ class AppState:
                 except Exception:
                     df = pd.read_csv(path)
 
-            if df.empty or df.shape[1] < 10:
-                return False, "File minimal harus 10 kolom (Format Multiple Adjustment Jezpro)!"
+            self.pd_last_sync_time.set(datetime.now().strftime("%d-%m-%Y %H:%M") + " WIB (File Manual)")
+            self.pd_data_source.set("File Upload Manual")
+            return self._process_dataframe_percentage_display(df, source_label="File Upload")
+        except Exception as e:
+            return False, f"Gagal membaca file: {str(e)}"
 
-            # ✅ DEFINISIKAN df_clean DULU SEBELUM DIGUNAKAN
+    def _process_dataframe_percentage_display(self, df, source_label=""):
+        try:
+            if df.empty or df.shape[1] < 10:
+                return False, "Format data tidak sesuai (minimal 10 kolom)."
+
             df_clean = df.copy()
 
-            # Standarisasi Kolom Indeks
             col_b = df_clean.columns[1]   # BIN
             col_s = df_clean.columns[2]   # SKU
             col_d = df_clean.columns[3]   # BRAND
             col_e = df_clean.columns[4]   # ITEM NAME
             col_f = df_clean.columns[5]   # VARIANT/SIZE
             col_g = df_clean.columns[6]   # SUB KATEGORI
-            col_h = df_clean.columns[7]   # HARGA BELI
+            col_h = next((c for c in df_clean.columns if any(k in str(c).upper() for k in ['HARGA BELI', 'BELI', 'COGS'])), df_clean.columns[7])
             col_j = df_clean.columns[9]   # QTY SYSTEM
 
             df_clean['BIN_CLEAN'] = df_clean[col_b].fillna('').astype(str).str.strip().str.upper()
@@ -4303,6 +4350,7 @@ class AppState:
             col_br = 'BRAND_CLEAN'
             df_clean['SUB_CLEAN'] = df_clean['CAT_CLEAN']
             df = df_clean
+
             # ------------------------------------------------------------------
             # 1. LOGIKA MODUL A: PERCENTAGE DISPLAY CONTROL (ARTICLE BASE)
             # ------------------------------------------------------------------
@@ -4312,10 +4360,8 @@ class AppState:
             is_toko_disp = df['BIN_CLEAN'].str.contains('TOKO|DISPLAY', na=False)
             is_gudang_src = (~is_toko_disp) & mask_no_excl
 
-            # SKU yang sedang berada di BIN OUT
             skus_in_out = set(df[df['BIN_CLEAN'].str.contains('OUT', na=False) & (df['QTY_NUM'] > 0)]['SKU_CLEAN'].unique())
 
-            # Agregasi per Article
             df['QTY_GUDANG_SRC'] = np.where(is_gudang_src, df['QTY_NUM'], 0)
             df['QTY_TOKO_TGT'] = np.where(is_toko_disp, df['QTY_NUM'], 0)
             df['QTY_BIN_OUT'] = np.where(df['BIN_CLEAN'].str.contains('OUT', na=False), df['QTY_NUM'], 0)
@@ -4328,21 +4374,16 @@ class AppState:
                 KARANTINA_QTY=('QTY_KARANTINA', 'sum')
             )
 
-            # Artikel yang On Display
             art_on_display_set = set(art_agg[art_agg['TOKO_QTY'] > 0]['ARTICLE'])
-
-            # Artikel yang wajib tambah Display: Stok gudang > 0, Toko <= 0, dan tidak ada di OUT
             need_display_articles = set(art_agg[
                 (art_agg['GUDANG_QTY'] > 0) & 
                 (art_agg['TOKO_QTY'] <= 0) & 
                 (art_agg['OUT_QTY'] <= 0)
             ]['ARTICLE'])
 
-            # Karantina Lock
             karantina_articles = art_agg[(art_agg['TOKO_QTY'] <= 0) & (art_agg['KARANTINA_QTY'] > 0)]
             karantina_count = len(karantina_articles)
 
-            # Penarikan Data Detail Prioritas Refill Display
             raw_gudang = df[
                 (df['ARTICLE'].isin(need_display_articles)) & 
                 is_gudang_src & 
@@ -4351,11 +4392,9 @@ class AppState:
             ].copy()
 
             if not raw_gudang.empty:
-                # Prioritas 1: Bin Toko / Store / Gudang Lt. 2
                 raw_gudang['IS_PRIORITY'] = raw_gudang['BIN_CLEAN'].str.contains('GUDANG|STR|STORE', na=False)
                 raw_gudang = raw_gudang.sort_values(by=['IS_PRIORITY', 'QTY_NUM'], ascending=[False, False])
                 
-                # Ambil 1 representatif terbaik per Article
                 detail_disp = raw_gudang.drop_duplicates(subset=['ARTICLE']).copy()
                 detail_disp = detail_disp.sort_values(by='QTY_NUM', ascending=False)
 
@@ -4383,7 +4422,6 @@ class AppState:
             else:
                 need_gudang_cnt, need_dc_cnt = 0, 0
 
-            # Set Reactive Values Modul A
             self.pd_total_art.set(tot_art_cnt)
             self.pd_on_display.set(on_disp_cnt)
             self.pd_perc_display.set(perc_disp)
@@ -4410,7 +4448,6 @@ class AppState:
             df_rt_toko_agg = df_refill[is_rt_toko].groupby('SKU_CLEAN', as_index=False)['QTY_NUM'].sum()
             df_rt_toko_agg.columns = ['SKU_CLEAN', 'QTY_TOKO']
 
-            # Grouping Bin Gudang beserta Lokasi
             gudang_sub = df_refill[is_rt_gudang & (df_refill['QTY_NUM'] > 0)]
             bin_map = gudang_sub.groupby('SKU_CLEAN')['BIN_CLEAN'].apply(lambda x: ", ".join(sorted(set(x)))).to_dict()
 
@@ -4418,7 +4455,6 @@ class AppState:
             df_rt_gudang_agg.columns = ['SKU_CLEAN', 'QTY_GUDANG']
             df_rt_gudang_agg['LOKASI_BIN'] = df_rt_gudang_agg['SKU_CLEAN'].map(bin_map).fillna('-')
 
-            # Master info SKU
             df_rt_master = df_refill.drop_duplicates(subset=['SKU_CLEAN'])[[
                 'SKU_CLEAN', col_br, col_desc, col_size, 'SUB_CLEAN'
             ]].copy()
@@ -4429,10 +4465,6 @@ class AppState:
             df_rt_merged['QTY_GUDANG'] = df_rt_merged['QTY_GUDANG'].fillna(0).astype(int)
             df_rt_merged['LOKASI_BIN'] = df_rt_merged['LOKASI_BIN'].fillna('-')
 
-            # Aturan Refill Toko:
-            # - Gudang wajib > 0
-            # - Lower Body: Qty Toko < 6
-            # - Lainnya: Qty Toko < 2
             def check_need_refill(row):
                 if row['QTY_GUDANG'] <= 0: return False
                 if "LOWER BODY" in str(row['SUB_KATEGORI']):
@@ -4456,19 +4488,17 @@ class AppState:
             else:
                 df_rt_view = pd.DataFrame(columns=["SKU", "BRAND", "ITEM NAME", "VARIANT", "SUB KATEGORI", "QTY TOKO", "QTY GUDANG", "LOKASI BIN"])
 
-            # Opsi Kategori untuk Filter UI
             sub_options = sorted([str(s) for s in df_rt_view['SUB KATEGORI'].unique() if str(s) != ''])
             self.rt_sub_categories.set(sub_options)
             self._raw_df_rt_base = df_rt_view.copy()
 
-            # Terapkan filter awal
             self.apply_refill_filter([])
 
             self.pd_processed.set(True)
-            return True, "Analisis Percentage Display & Refill Toko Berhasil!"
+            return True, f"Data berhasil dimuat dari {source_label}! ({len(df):,} baris stok)"
         except Exception as e:
-            return False, f"Gagal memproses data: {e}"
-
+            return False, f"Gagal kalkulasi data: {e}"
+            
     def apply_refill_filter(self, selected_subs):
         if self._raw_df_rt_base.empty:
             self.rt_total_sku.set(0)
