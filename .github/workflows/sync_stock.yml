@@ -3,7 +3,7 @@ name: Jezpro Stock Sync Worker
 on:
   schedule:
     # Otomatis jalan tiap 30 menit antara jam 06:00 - 22:00 WIB (23:00 - 15:00 UTC)
-    - cron: '*/30 23,0-15 * * *'
+    - cron: '0 23,0-15 * * *'
   workflow_dispatch: # Tombol manual trigger
 
 jobs:
