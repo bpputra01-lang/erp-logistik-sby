@@ -4257,14 +4257,11 @@ class AppState:
     
     
     # ==========================================================================
-    # STANDARDIZER FORMAT KOLOM (100% PERSIS DENGAN FORMAT EXCEL MANUAL JEZPRO)
-    # ==========================================================================
-# ==========================================================================
-    # STANDARDIZER PERSIS 100% SESUAI HEADER EXCEL JEZPRO (KOLOM A - J)
+    # STANDARDIZER PERSIS 100% SESUAI GAMBAR EXCEL JEZPRO ANDA (KOLOM A - K)
     # ==========================================================================
     def _standardize_to_manual_excel_format(self, df_input):
         """
-        Mengunci dan menata ulang kolom agar persis seperti file Excel manual Jezpro:
+        Menata ulang kolom agar persis seperti file Excel manual Jezpro:
         Col A (0): Identify
         Col B (1): BIN
         Col C (2): SKU
@@ -4274,37 +4271,35 @@ class AppState:
         Col G (6): SUB KATEGORI
         Col H (7): Harga Beli
         Col I (8): Harga Jual
-        Col J (9): QTY SYSTEM (PENTING: Tidak boleh tertukar dengan QTY SO!)
+        Col J (9): QTY SYSTEM (PENTING: Ambil Col J, jangan tertukar dengan Col K 'QTY SO')
         """
         if df_input is None or df_input.empty:
             return pd.DataFrame()
 
-        def get_col_by_exact_name(primary_keywords, fallback_keywords, default_val=""):
-            # 1. Cari nama yang persis (Prioritas Utama)
+        def get_col(exact_names, fallback_keywords, default_val=""):
             for col in df_input.columns:
                 c_clean = str(col).strip().upper()
-                for p in primary_keywords:
-                    if c_clean == p.upper():
+                for en in exact_names:
+                    if c_clean == en.upper():
                         return df_input[col]
-            # 2. Cari nama parsial
             for col in df_input.columns:
                 c_clean = str(col).strip().upper()
-                for f in fallback_keywords:
-                    if f.upper() in c_clean:
+                for fb in fallback_keywords:
+                    if fb.upper() in c_clean:
                         return df_input[col]
             return pd.Series(default_val, index=df_input.index)
 
-        s_ident = get_col_by_exact_name(['IDENTIFY', 'NO', 'ID'], ['IDENT'], range(1, len(df_input) + 1))
-        s_bin   = get_col_by_exact_name(['BIN'], ['LOKASI', 'RAK'], "")
-        s_sku   = get_col_by_exact_name(['SKU'], ['BARCODE', 'ITEM CODE'], "")
-        s_brand = get_col_by_exact_name(['BRAND'], ['MERK'], "UNKNOWN")
-        s_name  = get_col_by_exact_name(['ITEM NAME'], ['ARTIKEL', 'DESCRIPTION', 'NAMA BARANG'], "-")
-        s_size  = get_col_by_exact_name(['VARIANT'], ['VARIAN', 'SIZE', 'UKURAN'], "-")
-        s_sub   = get_col_by_exact_name(['SUB KATEGORI'], ['SUB CATEGORY', 'KATEGORI'], "UNKNOWN")
-        s_beli  = get_col_by_exact_name(['HARGA BELI'], ['COGS', 'BELI', 'PRICE'], 0)
-        s_jual  = get_col_by_exact_name(['HARGA JUAL'], ['JUAL', 'SELL'], 0)
-        
-        # KUNCI UTAMA: Wajib 'QTY SYSTEM' atau 'STOK', dan TIDAK BOLEH 'QTY SO'
+        s_ident = get_col(['IDENTIFY', 'NO'], ['IDENT'], range(1, len(df_input) + 1))
+        s_bin   = get_col(['BIN'], ['LOKASI', 'RAK'], "")
+        s_sku   = get_col(['SKU'], ['BARCODE', 'ITEM CODE'], "")
+        s_brand = get_col(['BRAND'], ['MERK'], "UNKNOWN")
+        s_name  = get_col(['ITEM NAME'], ['ARTIKEL', 'DESCRIPTION', 'NAMA BARANG'], "-")
+        s_size  = get_col(['VARIANT'], ['VARIAN', 'SIZE', 'UKURAN'], "-")
+        s_sub   = get_col(['SUB KATEGORI'], ['SUB CATEGORY', 'KATEGORI'], "UNKNOWN")
+        s_beli  = get_col(['HARGA BELI'], ['COGS', 'BELI', 'PRICE'], 0)
+        s_jual  = get_col(['HARGA JUAL'], ['JUAL', 'SELL'], 0)
+
+        # KUNCI UTAMA: Wajib ambil Kolom J (QTY SYSTEM), JANGAN ambil Kolom K (QTY SO yang nilainya 0)
         s_qty = pd.Series(0, index=df_input.index)
         for col in df_input.columns:
             c_clean = str(col).strip().upper()
@@ -4315,7 +4310,7 @@ class AppState:
                 s_qty = df_input[col]
                 break
 
-        # Susun DataFrame 10 kolom persis Kolom A - J di Excel Anda
+        # Susun kembali menjadi 10 kolom persis Excel manual
         df_std = pd.DataFrame({
             "Identify": s_ident,
             "BIN": s_bin,
@@ -4330,6 +4325,79 @@ class AppState:
         })
         return df_std
 
+    def load_stock_from_supabase_for_percentage_display(self, branch_name=None, silent=False):
+        try:
+            client = get_supabase()
+            if not client:
+                return False, "Gagal koneksi ke database Supabase!"
+
+            BRANCH_DB_MAP = {
+                "JEZ SURABAYA": "SURABAYA_LATEST",
+                "JEZ MALANG": "MALANG_LATEST",
+                "JEZ SIDOARJO": "SIDOARJO_LATEST",
+                "JEZ KEDIRI": "KEDIRI_LATEST",
+                "JEZ JEMBER": "JEMBER_LATEST",
+                "JEZ SEMARANG": "SEMARANG_LATEST",
+            }
+
+            target_branch = branch_name if branch_name else self.pd_selected_branch()
+            db_id = BRANCH_DB_MAP.get(target_branch, "SURABAYA_LATEST")
+            self.pd_selected_branch.set(target_branch)
+
+            # Tarik data cabang dari tabel Supabase
+            res = client.table("stock_live_cache").select("*").in_("id", [db_id]).execute()
+            if not res or not res.data or len(res.data) == 0:
+                return False, f"Data stok {target_branch} belum ada di Supabase!"
+
+            row = res.data[0]
+            stock_list = row.get("stock_data", [])
+            updated_at_raw = row.get("updated_at", "")
+            
+            if not stock_list:
+                return False, f"Data stok untuk {target_branch} di Supabase kosong."
+
+            try:
+                dt = pd.to_datetime(updated_at_raw)
+                wib_str = dt.strftime("%d-%m-%Y %H:%M") + " WIB"
+            except Exception:
+                wib_str = datetime.now().strftime("%d-%m-%Y %H:%M") + " WIB"
+
+            self.pd_last_sync_time.set(wib_str)
+            self.pd_data_source.set(f"{target_branch} (Cloud)")
+
+            df_cloud_raw = pd.DataFrame(stock_list)
+            df_standardized = self._standardize_to_manual_excel_format(df_cloud_raw)
+            return self._process_dataframe_percentage_display(df_standardized, source_label=f"{target_branch} Cloud ({wib_str})")
+        except Exception as e:
+            return False, f"Gagal memuat stok: {str(e)}"
+
+    def process_percentage_display(self, file_info):
+        """Memproses jika user mengunggah file Excel manual"""
+        try:
+            if not file_info:
+                return False, "File All Stock wajib diupload!"
+
+            path = file_info[0]["datapath"]
+            name = file_info[0]["name"].lower()
+
+            if name.endswith(('.xlsx', '.xls', '.xlsm')):
+                try:
+                    df = pd.read_excel(path, engine='calamine')
+                except Exception:
+                    df = pd.read_excel(path, engine='openpyxl')
+            else:
+                try:
+                    df = pd.read_csv(path, sep=None, engine='python')
+                except Exception:
+                    df = pd.read_csv(path)
+
+            self.pd_last_sync_time.set(datetime.now().strftime("%d-%m-%Y %H:%M") + " WIB (File Manual)")
+            self.pd_data_source.set("File Upload Manual")
+            df_standardized = self._standardize_to_manual_excel_format(df)
+            return self._process_dataframe_percentage_display(df_standardized, source_label="File Upload")
+        except Exception as e:
+            return False, f"Gagal membaca file: {str(e)}"
+
     def _process_dataframe_percentage_display(self, df, source_label=""):
         try:
             if df.empty or df.shape[1] < 10:
@@ -4337,7 +4405,7 @@ class AppState:
 
             df_clean = df.copy()
 
-            # Kolom dijamin 100% berada pada indeks asli persis file manual Anda:
+            # Indeks kolom dijamin 100% konsisten persis file manual
             col_b = df_clean.columns[1]   # Index 1 = Col B: BIN
             col_s = df_clean.columns[2]   # Index 2 = Col C: SKU
             col_d = df_clean.columns[3]   # Index 3 = Col D: BRAND
@@ -4364,7 +4432,7 @@ class AppState:
             col_desc = 'DESC_CLEAN'
             col_size = col_f
             col_br = 'BRAND_CLEAN'
-            df_clean['SUB_CLEAN']   = df_clean['CAT_CLEAN']
+            df_clean['SUB_CLEAN']   = df_clean[col_cat] if 'col_cat' in locals() else df_clean['CAT_CLEAN']
             df = df_clean
 
             # ------------------------------------------------------------------
@@ -4472,7 +4540,7 @@ class AppState:
             df_rt_gudang_agg['LOKASI_BIN'] = df_rt_gudang_agg['SKU_CLEAN'].map(bin_map).fillna('-')
 
             df_rt_master = df_refill.drop_duplicates(subset=['SKU_CLEAN'])[[
-                'SKU_CLEAN', col_br, col_desc, col_size, 'SUB_CLEAN'
+                'SKU_CLEAN', 'BRAND_CLEAN', 'DESC_CLEAN', col_size, 'SUB_CLEAN'
             ]].copy()
             df_rt_master.columns = ['SKU_CLEAN', 'BRAND', 'ITEM_NAME', 'VARIANT', 'SUB_KATEGORI']
 
