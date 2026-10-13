@@ -4322,19 +4322,27 @@ class AppState:
 
     def _process_dataframe_percentage_display(self, df, source_label=""):
         try:
-            if df.empty or df.shape[1] < 10:
-                return False, "Format data tidak sesuai (minimal 10 kolom)."
+            if df.empty or df.shape[1] < 8:
+                return False, "Format data tidak sesuai (kolom kurang)."
 
             df_clean = df.copy()
 
-            col_b = df_clean.columns[1]   # BIN
-            col_s = df_clean.columns[2]   # SKU
-            col_d = df_clean.columns[3]   # BRAND
-            col_e = df_clean.columns[4]   # ITEM NAME
-            col_f = df_clean.columns[5]   # VARIANT/SIZE
-            col_g = df_clean.columns[6]   # SUB KATEGORI
-            col_h = next((c for c in df_clean.columns if any(k in str(c).upper() for k in ['HARGA BELI', 'BELI', 'COGS'])), df_clean.columns[7])
-            col_j = df_clean.columns[9]   # QTY SYSTEM
+            # DETEKSI CERDAS BERDASARKAN NAMA KOLOM (AMAN DARI URUTAN YANG TERACAK SUPABASE)
+            def find_col(keywords, default_fallback):
+                for col in df_clean.columns:
+                    col_str = str(col).strip().upper()
+                    if any(k == col_str or k in col_str for k in keywords):
+                        return col
+                return default_fallback
+
+            col_b = find_col(['BIN', 'LOKASI', 'RAK'], df_clean.columns[1])
+            col_s = find_col(['SKU', 'BARCODE', 'ITEM CODE'], df_clean.columns[2])
+            col_d = find_col(['BRAND', 'MERK'], df_clean.columns[3])
+            col_e = find_col(['ITEM NAME', 'ARTIKEL', 'DESCRIPTION', 'DESKRIPSI', 'NAMA BARANG'], df_clean.columns[4])
+            col_f = find_col(['VARIANT', 'SIZE', 'UKURAN'], df_clean.columns[5])
+            col_g = find_col(['SUB KATEGORI', 'SUB CATEGORY', 'SUBKAT', 'KATEGORI'], df_clean.columns[6])
+            col_h = find_col(['HARGA BELI', 'COGS', 'BELI', 'PRICE'], df_clean.columns[7])
+            col_j = find_col(['QTY SYSTEM', 'QTY SYS', 'STOK', 'QUANTITY', 'QTY'], df_clean.columns[-1])
 
             df_clean['BIN_CLEAN'] = df_clean[col_b].fillna('').astype(str).str.strip().str.upper()
             df_clean['SKU_CLEAN'] = df_clean[col_s].fillna('').astype(str).str.split('.').str[0].str.strip().str.upper()
@@ -4343,17 +4351,18 @@ class AppState:
             df_clean['CAT_CLEAN'] = df_clean[col_g].fillna('UNKNOWN').astype(str).str.strip().str.upper()
             df_clean['HARGA_BELI'] = pd.to_numeric(df_clean[col_h], errors='coerce').fillna(0).astype(int)
             df_clean['QTY_SYS'] = pd.to_numeric(df_clean[col_j], errors='coerce').fillna(0).astype(int)
-            df_clean['ARTICLE'] = df_clean['SKU_CLEAN'].str.split('-').str[0].str.strip()
+            
+            # Ekstrak Kode Artikel (Ambil bagian sebelum tanda strip '-' jika ada)
+            df_clean['ARTICLE'] = df_clean['SKU_CLEAN'].apply(lambda x: x.split('-')[0].strip() if '-' in x else x)
             df_clean['QTY_NUM'] = df_clean['QTY_SYS']
+            
             col_desc = 'DESC_CLEAN'
             col_size = col_f
             col_br = 'BRAND_CLEAN'
             df_clean['SUB_CLEAN'] = df_clean['CAT_CLEAN']
             df = df_clean
 
-            # ------------------------------------------------------------------
-            # 1. LOGIKA MODUL A: PERCENTAGE DISPLAY CONTROL (ARTICLE BASE)
-            # ------------------------------------------------------------------
+            # --- 1. MODUL A: PERCENTAGE DISPLAY CONTROL ---
             excl_kw = "OFFLINE|ONLINE|AMP|MARKOM|DEFECT|REJECT|STAGING|STAGGING|KARANTINA|EVENT|BANDING|INB|OUT|PUTAWAY"
             mask_no_excl = ~df['BIN_CLEAN'].str.contains(excl_kw, na=False)
 
@@ -4435,9 +4444,7 @@ class AppState:
             self.df_pd_display_headers.set(df_detail_view.columns.tolist() if not df_detail_view.empty else [])
             self.df_pd_display_rows.set(df_detail_view.fillna("").astype(str).values.tolist() if not df_detail_view.empty else [])
 
-            # ------------------------------------------------------------------
-            # 2. LOGIKA MODUL B: REFILL TOKO ANALYZER (SKU BASE)
-            # ------------------------------------------------------------------
+            # --- 2. MODUL B: REFILL TOKO ---
             exclude_kat = ["SHOES", "SANDALS", "FOOTWEAR"]
             df_refill = df[~df['SUB_CLEAN'].isin(exclude_kat)].copy()
 
@@ -4498,7 +4505,7 @@ class AppState:
             return True, f"Data berhasil dimuat dari {source_label}! ({len(df):,} baris stok)"
         except Exception as e:
             return False, f"Gagal kalkulasi data: {e}"
-            
+
     def apply_refill_filter(self, selected_subs):
         if self._raw_df_rt_base.empty:
             self.rt_total_sku.set(0)
