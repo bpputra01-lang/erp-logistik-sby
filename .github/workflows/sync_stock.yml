@@ -1,0 +1,32 @@
+name: Jezpro Stock Sync Worker
+
+on:
+  schedule:
+    # Otomatis jalan tiap 30 menit antara jam 06:00 - 22:00 WIB (23:00 - 15:00 UTC)
+    - cron: '*/30 23,0-15 * * *'
+  workflow_dispatch: # Tombol manual trigger
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: |
+          pip install requests pandas openpyxl beautifulsoup4
+
+      - name: Jalankan Sync Jezpro ke Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          JEZPRO_EMAIL: ${{ secrets.JEZPRO_EMAIL }}
+          JEZPRO_PASSWORD: ${{ secrets.JEZPRO_PASSWORD }}
+        run: |
+          python worker_sync_jezpro.py
