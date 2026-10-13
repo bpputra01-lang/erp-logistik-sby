@@ -4405,7 +4405,7 @@ class AppState:
 
             df_clean = df.copy()
 
-            # Indeks kolom dijamin 100% konsisten persis file manual
+            # Kolom dijamin 100% berada pada indeks asli persis file manual Anda:
             col_b = df_clean.columns[1]   # Index 1 = Col B: BIN
             col_s = df_clean.columns[2]   # Index 2 = Col C: SKU
             col_d = df_clean.columns[3]   # Index 3 = Col D: BRAND
@@ -4419,7 +4419,7 @@ class AppState:
             df_clean['SKU_CLEAN']   = df_clean[col_s].fillna('').astype(str).str.split('.').str[0].str.strip().str.upper()
             df_clean['BRAND_CLEAN'] = df_clean[col_d].fillna('UNKNOWN').astype(str).str.strip().str.upper()
             df_clean['DESC_CLEAN']  = df_clean[col_e].fillna('-').astype(str).str.strip()
-            df_clean['CAT_CLEAN']   = df_clean[col_g].fillna('UNKNOWN').astype(str).str.strip().str.upper()
+            df_clean['CAT_CLEAN']   = df_clean[col_g].fillna('').astype(str).str.strip().str.upper()
             df_clean['HARGA_BELI']  = pd.to_numeric(df_clean[col_h], errors='coerce').fillna(0).astype(int)
             
             # Kuantitas asli dari Kolom J (QTY SYSTEM)
@@ -4429,10 +4429,20 @@ class AppState:
             # Kode Artikel (ambil kode sebelum tanda strip '-')
             df_clean['ARTICLE']     = df_clean['SKU_CLEAN'].apply(lambda x: x.split('-')[0].strip() if '-' in x else x)
             
+            # ==================================================================
+            # 🛑 1. EKSKLUSI SUB KATEGORI BLANK, KOSONG, DAN 'UNKNOWN SC'
+            # ==================================================================
+            invalid_subs = ['', 'NAN', 'NONE', '-', 'UNKNOWN', 'UNKNOWN SC', 'UKNOWN SC']
+            mask_valid_cat = ~df_clean['CAT_CLEAN'].isin(invalid_subs) & (df_clean['CAT_CLEAN'] != '')
+            df_clean = df_clean[mask_valid_cat].copy()
+
+            if df_clean.empty:
+                return False, "Semua data terfilter karena sub kategori kosong/Unknown SC."
+
             col_desc = 'DESC_CLEAN'
             col_size = col_f
             col_br = 'BRAND_CLEAN'
-            df_clean['SUB_CLEAN']   = df_clean[col_cat] if 'col_cat' in locals() else df_clean['CAT_CLEAN']
+            df_clean['SUB_CLEAN']   = df_clean['CAT_CLEAN']
             df = df_clean
 
             # ------------------------------------------------------------------
@@ -4500,9 +4510,19 @@ class AppState:
             perc_disp = (on_disp_cnt / tot_art_cnt * 100) if tot_art_cnt > 0 else 0.0
             perc_need = (need_disp_cnt / tot_art_cnt * 100) if tot_art_cnt > 0 else 0.0
 
+            # ==================================================================
+            # 🎯 2. HITUNG FROM STORE (LT. 2) & FROM DC (BIN 'GL' DAN 'GUDANG')
+            # ==================================================================
             if not df_detail_view.empty:
-                need_gudang_cnt = int(df_detail_view['Bin Lokasi'].str.contains('STR|STORE|GUDANG', na=False).sum())
-                need_dc_cnt = int(df_detail_view['Bin Lokasi'].str.contains('DC', na=False).sum())
+                bin_locs = df_detail_view['Bin Lokasi'].astype(str).str.upper()
+                
+                # FROM STORE (LT. 2): Area Toko / Store Lt. 2 (mengandung STR atau STORE)
+                is_store_lt2 = bin_locs.str.contains('STR|STORE', na=False)
+                need_gudang_cnt = int(is_store_lt2.sum())
+                
+                # FROM DC: Semua BIN yang mengandung kata 'GL' atau 'GUDANG' (dan 'DC') di luar area Store
+                is_dc_bin = bin_locs.str.contains('GL|GUDANG|DC', na=False) & (~is_store_lt2)
+                need_dc_cnt = int(is_dc_bin.sum())
             else:
                 need_gudang_cnt, need_dc_cnt = 0, 0
 
