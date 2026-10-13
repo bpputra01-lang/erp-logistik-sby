@@ -1446,6 +1446,29 @@ def server(input: Inputs, output: Outputs, session: Session):
             df_s.to_excel(writer, sheet_name='SYSTEM_OUTSTANDING', index=False)
         buf.seek(0)
         yield buf.getvalue()
+
+# ==========================================================================
+    # CYCLE COUNT ANALYZER - STEP 4 EVENT HANDLER
+    # ==========================================================================
+    @reactive.Effect
+    @reactive.event(input.btn_run_cca_step4)
+    def _proc_cca_step4():
+        f = input.cca_up_recon_real() if "cca_up_recon_real" in input else None
+        succ, msg = state.run_cca_step4(f)
+        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+        if succ:
+            state.show_success_modal.set(True)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+
+    @render.download(filename="Hasil_Recon_Real_Plus_CCA.xlsx")
+    def btn_dl_cca_step4():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_cca_adj4.to_excel(writer, sheet_name='REAL_PLUS_ADJ', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
     # ==========================================================================
     # CYCLE COUNT ANALYZER CONTROLLER (STEP 4, 5, & 6)
     # ==========================================================================
@@ -2099,6 +2122,23 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         yield buf.getvalue()
 
+    # ==========================================================================
+    # STOCK OPNAME ANALYZER - STEP 4 EVENT HANDLER
+    # ==========================================================================
+    @reactive.Effect
+    @reactive.event(input.btn_run_so_step4)
+    def _proc_so_step4():
+        f_r = input.so_up_r4() if "so_up_r4" in input else None
+        f_s = input.so_up_s4() if "so_up_s4" in input else None
+        f_m = input.so_up_m5() if "so_up_m5" in input else None
+
+        succ, msg = state.run_so_step4(f_r, f_s, f_m)
+        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+        if succ:
+            state.show_success_modal.set(True)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
     # ==========================================================================
     # STOCK OPNAME CONTROLLER (STEP 4, 5, & 6)
     # ==========================================================================
