@@ -152,7 +152,6 @@ def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
             if raw_id:
                 p_id = safe_int_val(raw_id)
             else:
-                # Berikan tambahan random unik agar tidak ada plst_id yang kembar
                 p_id = abs(hash(f"{kategori_label}_{st_id}_{parsed['article']}_{idx_item}_{time.time()}")) % 2147483647
 
             scanned_iso = parse_to_iso_timestamp(item.get("created_at") or item.get("date"))
@@ -208,18 +207,18 @@ def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
                 })
 
     print(f"   -> Ditemukan total {len(clean_records)} baris staging {kategori_label}.")
-        
-        # --- PEMBERSIH DUPLIKAT PLST_ID MURNI PYTHON (TANPA PANDAS) ---
-        seen_ids = set()
-        unique_records = []
-        for rec in clean_records:
-            pid = rec["plst_id"]
-            if pid not in seen_ids:
-                seen_ids.add(pid)
-                unique_records.append(rec)
-                
-        print(f"   -> Setelah dibersihkan (unik), tersisa {len(unique_records)} baris staging {kategori_label}.")
-        return unique_records
+    
+    # --- PEMBERSIH DUPLIKAT PLST_ID MURNI PYTHON (INDENTASI SUDAH BENAR) ---
+    seen_ids = set()
+    unique_records = []
+    for rec in clean_records:
+        pid = rec["plst_id"]
+        if pid not in seen_ids:
+            seen_ids.add(pid)
+            unique_records.append(rec)
+            
+    print(f"   -> Setelah dibersihkan (unik), tersisa {len(unique_records)} baris staging {kategori_label}.")
+    return unique_records
 # ==============================================================================
 # 2. MODUL TRANSFER STOK (ALL AREA LINTAS CABANG)
 # ==============================================================================
