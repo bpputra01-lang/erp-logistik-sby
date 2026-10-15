@@ -5023,5 +5023,57 @@ def server(input: Inputs, output: Outputs, session: Session):
     @reactive.event(input.change_ll01_stock_note)
     def _on_chg_ll01_stk_note():
         state.ll01_stock_filter_note.set(input.change_ll01_stock_note())
+
+    
+    # Event Listeners Tab 2 (Transfer Order Filter)
+    @reactive.Effect
+    @reactive.event(input.change_ll01_tf_store)
+    def _on_chg_tf_st(): state.ll01_tf_filter_store.set(input.change_ll01_tf_store())
+
+    @reactive.Effect
+    @reactive.event(input.change_ll01_tf_tgl_start)
+    def _on_chg_tf_ts(): state.ll01_tf_filter_tgl_start.set(input.change_ll01_tf_tgl_start())
+
+    @reactive.Effect
+    @reactive.event(input.change_ll01_tf_tgl_end)
+    def _on_chg_tf_te(): state.ll01_tf_filter_tgl_end.set(input.change_ll01_tf_tgl_end())
+
+    @reactive.Effect
+    @reactive.event(input.change_ll01_tf_note)
+    def _on_chg_tf_n(): state.ll01_tf_filter_note.set(input.change_ll01_tf_note())
+
+    # Event Listeners Tab 3 (Multiple Adjustment Filter)
+    @reactive.Effect
+    @reactive.event(input.change_ll01_ma_store)
+    def _on_chg_ma_st(): state.ll01_ma_filter_store.set(input.change_ll01_ma_store())
+
+    @reactive.Effect
+    @reactive.event(input.change_ll01_ma_tgl_start)
+    def _on_chg_ma_ts(): state.ll01_ma_filter_tgl_start.set(input.change_ll01_ma_tgl_start())
+
+    @reactive.Effect
+    @reactive.event(input.change_ll01_ma_tgl_end)
+    def _on_chg_ma_te(): state.ll01_ma_filter_tgl_end.set(input.change_ll01_ma_tgl_end())
+
+    @reactive.Effect
+    @reactive.event(input.change_ll01_ma_note)
+    def _on_chg_ma_n(): state.ll01_ma_filter_note.set(input.change_ll01_ma_note())
+
+    # Event Listeners Tab 4 (Outstanding Items Filter)
+    @reactive.Effect
+    @reactive.event(input.change_ll01_stk_store)
+    def _on_chg_stk_st(): state.ll01_stock_filter_branch.set(input.change_ll01_stk_store())
+
+    @reactive.Effect
+    @reactive.event(input.change_ll01_stk_tgl_start)
+    def _on_chg_stk_ts(): state.ll01_stock_filter_tgl_start.set(input.change_ll01_stk_tgl_start())
+
+    @reactive.Effect
+    @reactive.event(input.change_ll01_stk_tgl_end)
+    def _on_chg_stk_te(): state.ll01_stock_filter_tgl_end.set(input.change_ll01_stk_tgl_end())
+
+    @reactive.Effect
+    @reactive.event(input.change_ll01_stk_note)
+    def _on_chg_stk_n(): state.ll01_stock_filter_note.set(input.change_ll01_stk_note())
         
 app = App(app_ui, server)

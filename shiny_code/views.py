@@ -2177,7 +2177,7 @@ def render_sap_ll01_summary_tree(state: AppState):
     c_sa_total = len(sa_items)
 
     buffer_items = state.get_filtered_ll01_special_stock()
-    c_buf_total = len(buffer_items)
+    c_buf_total = len(buffer_itacems)
     c_buf_karan = sum(1 for x in buffer_items if "KARANTINA" in str(x.get("tipe_bin", "")))
     c_buf_inb = sum(1 for x in buffer_items if "INBOUND" in str(x.get("tipe_bin", "")))
     c_buf_out = sum(1 for x in buffer_items if "OUT" in str(x.get("tipe_bin", "")))
@@ -2259,12 +2259,45 @@ def render_sap_ll01_summary_tree(state: AppState):
         ),
         style="background: #EDF2F7; border: 2px solid #CBD5E0; border-radius: 8px; padding: 12px 14px; margin-bottom: 1.25rem;"
     )
-
+    
+# ==============================================================================
+# VIEW: WAREHOUSE ACTIVITY MONITOR (DENGAN SAP LL01 TREE & 4 TAB BERGESER)
+# ==============================================================================
 def warehouse_activity_monitor_view(state: AppState):
-    branch_options = ["SEMUA", "JEZ SURABAYA", "JEZ MALANG", "JEZ SIDOARJO", "JEZ KEDIRI", "JEZ JEMBER", "JEZ SEMARANG"]
+    
+    # 1. KOMPONEN FILTER TANGGAL UNIVERSAL (POSISI DI ATAS TIAP TAB)
+    def date_filter_box(prefix: str):
+        return ui.div(
+            ui.div(
+                ui.span("🏢 Cabang/Store:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
+                ui.tags.select(
+                    *[ui.tags.option(opt, value=opt) for opt in ["SEMUA", "JEZ SURABAYA", "JEZ MALANG", "JEZ SIDOARJO", "JEZ KEDIRI", "JEZ JEMBER", "JEZ SEMARANG"]],
+                    id=f"change_ll01_{prefix}_store",
+                    onchange=f"Shiny.setInputValue('change_ll01_{prefix}_store', this.value, {{priority: 'event'}})",
+                    style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; background: white; cursor: pointer; min-width: 150px;"
+                ),
+                style="display: flex; flex-direction: column;"
+            ),
+            ui.div(
+                ui.span("Tgl Awal:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
+                ui.tags.input(type="date", id=f"change_ll01_{prefix}_tgl_start", onchange=f"Shiny.setInputValue('change_ll01_{prefix}_tgl_start', this.value, {{priority: 'event'}})", style="padding: 5px 8px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; background: white;"),
+                style="display: flex; flex-direction: column;"
+            ),
+            ui.div(
+                ui.span("Tgl Akhir:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
+                ui.tags.input(type="date", id=f"change_ll01_{prefix}_tgl_end", onchange=f"Shiny.setInputValue('change_ll01_{prefix}_tgl_end', this.value, {{priority: 'event'}})", style="padding: 5px 8px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; background: white;"),
+                style="display: flex; flex-direction: column;"
+            ),
+            ui.div(
+                ui.span("Cari Note/Kode:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
+                ui.tags.input(type="text", id=f"change_ll01_{prefix}_note", placeholder="Ketik kata kunci...", oninput=f"Shiny.setInputValue('change_ll01_{prefix}_note', this.value, {{priority: 'event'}})", style="padding: 6px 10px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-size: 12px; background: white;"),
+                style="display: flex; flex-direction: column;"
+            ),
+            style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; background: #F8FAFC; padding: 12px 16px; border-radius: 8px; border: 1px solid #E2E8F0; margin-bottom: 1rem; width: 100%;"
+        )
 
     # ==========================================================================
-    # TAB 1: ALL WAITING + SAP LL01 TREE SUMMARY
+    # TAB 1: ALL WAITING (STAGING TRANSIT MASUK RAK & REFUND)
     # ==========================================================================
     filtered_items = state.get_filtered_ll01()
     table_rows = []
@@ -2277,7 +2310,6 @@ def warehouse_activity_monitor_view(state: AppState):
         )
         kat_label = "MASUK RAK" if r.get("kategori") == "MASUK_RAK" else "REFUND"
         kat_color = "#3182CE" if r.get("kategori") == "MASUK_RAK" else "#D69E2E"
-
         clean_art = clean_jezpro_card_text(r.get("article_name", "-"))
 
         table_rows.append(ui.tags.tr(
@@ -2297,74 +2329,47 @@ def warehouse_activity_monitor_view(state: AppState):
     th_stg = [ui.tags.th(h, style="text-align: center;" if h in ["NO", "STATUS LL01", "QTY", "AGING"] else "") for h in headers_stg]
 
     tab1_staging = ui.div(
-        # 1. SAP LL01 Summary Tree View
-        render_sap_ll01_summary_tree(state),
-
-        # 2. Filter Bar Tab 1: Store, Tanggal, & Note
+        date_filter_box("stg"),
         ui.div(
-            ui.div(
-                ui.div(
-                    ui.span("Filter Store:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
-                    ui.tags.select(
-                        *[ui.tags.option(opt, value=opt, selected=(opt == state.ll01_filter_store())) for opt in branch_options],
-                        onchange="Shiny.setInputValue('change_ll01_store', this.value, {priority: 'event'})",
-                        style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; outline: none; background: white; cursor: pointer; min-width: 150px;"
-                    ),
-                    style="display: flex; flex-direction: column;"
-                ),
-                ui.div(
-                    ui.span("Tgl Awal:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
-                    ui.tags.input(type="date", value=state.ll01_filter_tgl_start(), onchange="Shiny.setInputValue('change_ll01_tgl_start', this.value, {priority: 'event'})", style="padding: 5px 8px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-size: 12px;"),
-                    style="display: flex; flex-direction: column;"
-                ),
-                ui.div(
-                    ui.span("Tgl Akhir:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
-                    ui.tags.input(type="date", value=state.ll01_filter_tgl_end(), onchange="Shiny.setInputValue('change_ll01_tgl_end', this.value, {priority: 'event'})", style="padding: 5px 8px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-size: 12px;"),
-                    style="display: flex; flex-direction: column;"
-                ),
-                ui.div(
-                    ui.span("Cari Note / Artikel:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
-                    ui.tags.input(type="text", placeholder="Ketik kata kunci...", value=state.ll01_filter_note(), oninput="Shiny.setInputValue('change_ll01_note', this.value, {priority: 'event'})", style="padding: 5px 10px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-size: 12px; min-width: 170px;"),
-                    style="display: flex; flex-direction: column;"
-                ),
-                style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;"
-            ),
-            ui.div(
-                ui.download_button("btn_dl_ll01_report", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px;"), "Download Excel"), style="background: #10B981; color: white; border: none; padding: 7px 14px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer;")
-            ),
-            style="display: flex; justify-content: space-between; align-items: flex-end; background: #F8FAFC; padding: 12px 14px; border-radius: 8px; border: 1px solid #E2E8F0; margin-bottom: 1rem; flex-wrap: wrap; gap: 10px;"
+            dark_metric_box("📦 TOTAL WAITING STAGING", f"{state.ll01_metric_total_antrean():,} PCS", "#3182CE"),
+            dark_metric_box("📥 MASUK RAK (PUTAWAY)", f"{state.ll01_metric_masuk_rak():,} PCS", "#C5A059"),
+            dark_metric_box("🔄 REFUND STAGING", f"{state.ll01_metric_refund():,} PCS", "#D69E2E"),
+            dark_metric_box("🚨 CRITICAL STUCK (>2 JAM)", f"{state.ll01_metric_critical():,} PCS", "#E53E3E"),
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
         ),
-
-        # 3. Tabel Staging
         ui.div(
             ui.tags.table(
                 ui.tags.thead(ui.tags.tr(*th_stg)),
                 ui.tags.tbody(*table_rows) if table_rows else ui.tags.tr(
-                    ui.tags.td("Tidak ada antrean barang tertahan di staging sesuai filter.", colspan=10, style="text-align: center; color: #718096; padding: 2rem; font-style: italic;")
+                    ui.tags.td("Tidak ada antrean barang tertahan di staging.", colspan=10, style="text-align: center; color: #718096; padding: 2rem; font-style: italic;")
                 ),
                 class_="custom-clean-table", style="width: 100%;"
             ),
             style="background: white; border-radius: 12px; border: 1px solid #E2E8F0; padding: 1rem; overflow-x: auto;"
         ),
-        style="padding: 0.5rem 0;"
+        style="padding: 1rem 0;"
     )
 
     # ==========================================================================
-    # TAB 2: TRANSFER ORDER (DENGAN FILTER STORE, TANGGAL & NOTE)
+    # TAB 2: TRANSFER ORDER (SESUAIKAN IN / OUT BERDASARKAN SURABAYA)
     # ==========================================================================
     tf_headers = state.get_filtered_tf_headers()
     tf_rows = []
     for idx_tf, tf in enumerate(tf_headers, start=1):
         st = tf.get("stf_status", "")
         code = tf.get("stf_code", "")
+        start_st = str(tf.get("start_store", "")).upper()
+        end_st = str(tf.get("end_store", "")).upper()
         aging = float(tf.get("aging_hours") or 0)
         is_crit = aging >= 24.0
 
-        badge_st = (
-            ui.span("IN PROGRESS", style="background: #FEFCBF; color: #744210; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 4px;")
-            if st == "IN PROGRESS" else
-            ui.span("DRAFT", style="background: #EBF8FF; color: #2B6CB0; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 4px;")
-        )
+        # Logika In / Out Berdasarkan Surabaya
+        if "SURABAYA" in start_st and "SURABAYA" not in end_st:
+            io_badge = ui.span("TF OUT ➔", style="background: #FED7D7; color: #9B2C2C; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 4px;")
+        elif "SURABAYA" in end_st and "SURABAYA" not in start_st:
+            io_badge = ui.span("⬅️ TF IN", style="background: #C6F6D5; color: #22543D; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 4px;")
+        else:
+            io_badge = ui.span("TRANSFER", style="background: #EBF8FF; color: #2B6CB0; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 4px;")
 
         btn_detail = ui.tags.button(
             ui.tags.i(class_="fa-solid fa-list-check", style="margin-right: 4px;"), "Lihat Item",
@@ -2374,69 +2379,43 @@ def warehouse_activity_monitor_view(state: AppState):
 
         tf_rows.append(ui.tags.tr(
             ui.tags.td(str(idx_tf), style="text-align: center; font-weight: bold;"),
-            ui.tags.td(badge_st, style="text-align: center;"),
+            ui.tags.td(io_badge, style="text-align: center;"),
             ui.tags.td(ui.tags.b(code, style="color: #2D3748;")),
-            ui.tags.td(f"{tf.get('start_store', '-')} ➔ {tf.get('end_store', '-')}", style="font-weight: 600;"),
+            ui.tags.td(f"{start_st} ➔ {end_st}", style="font-weight: 600;"),
             ui.tags.td(str(tf.get("u_name", tf.get("user_name", "-")))),
             ui.tags.td(f"{tf.get('qty_send', 0):,} Pcs", style="text-align: right; font-weight: 800; color: #E50914;"),
             ui.tags.td(str(tf.get("stf_created", "-"))[:16]),
             ui.tags.td(f"{aging} Jam ({round(aging/24, 1)} Hari)", style=f"font-weight: 800; text-align: center; color: {'#E53E3E' if is_crit else '#2F855A'};"),
-            ui.tags.td(str(tf.get("stf_notes", "-")), style="max-width: 180px; white-space: normal; font-size: 12px;"),
             ui.tags.td(btn_detail, style="text-align: center;")
         ))
 
-    headers_tf = ["NO", "STATUS", "NOMOR TF", "RUTE TRANSFER", "USER PEMBUAT", "QTY KIRIM", "TANGGAL DIBUAT", "AGING TERTAHAN", "NOTE TF", "RINCIAN BARANG"]
-    th_tf = [ui.tags.th(h, style="text-align: center;" if h in ["NO", "STATUS", "QTY KIRIM", "AGING TERTAHAN", "RINCIAN BARANG"] else "") for h in headers_tf]
+    headers_tf = ["NO", "ARAH (IN/OUT)", "NOMOR TF", "RUTE TRANSFER", "USER PEMBUAT", "QTY KIRIM", "TANGGAL DIBUAT", "AGING TERTAHAN", "RINCIAN BARANG"]
+    th_tf = [ui.tags.th(h, style="text-align: center;" if h in ["NO", "ARAH (IN/OUT)", "QTY KIRIM", "AGING TERTAHAN", "RINCIAN BARANG"] else "") for h in headers_tf]
 
     tab2_transfer = ui.div(
-        # Filter Bar Tab 2: Store, Tanggal, & Note
+        date_filter_box("tf"),
         ui.div(
-            ui.div(
-                ui.div(
-                    ui.span("Filter Store:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
-                    ui.tags.select(
-                        *[ui.tags.option(opt, value=opt, selected=(opt == state.ll01_tf_filter_store())) for opt in branch_options],
-                        onchange="Shiny.setInputValue('change_ll01_tf_store', this.value, {priority: 'event'})",
-                        style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; outline: none; background: white; cursor: pointer; min-width: 150px;"
-                    ),
-                    style="display: flex; flex-direction: column;"
-                ),
-                ui.div(
-                    ui.span("Tgl Awal:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
-                    ui.tags.input(type="date", value=state.ll01_tf_filter_tgl_start(), onchange="Shiny.setInputValue('change_ll01_tf_tgl_start', this.value, {priority: 'event'})", style="padding: 5px 8px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-size: 12px;"),
-                    style="display: flex; flex-direction: column;"
-                ),
-                ui.div(
-                    ui.span("Tgl Akhir:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
-                    ui.tags.input(type="date", value=state.ll01_tf_filter_tgl_end(), onchange="Shiny.setInputValue('change_ll01_tf_tgl_end', this.value, {priority: 'event'})", style="padding: 5px 8px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-size: 12px;"),
-                    style="display: flex; flex-direction: column;"
-                ),
-                ui.div(
-                    ui.span("Cari Note / Kode TF:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
-                    ui.tags.input(type="text", placeholder="Ketik kata kunci note...", value=state.ll01_tf_filter_note(), oninput="Shiny.setInputValue('change_ll01_tf_note', this.value, {priority: 'event'})", style="padding: 5px 10px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-size: 12px; min-width: 170px;"),
-                    style="display: flex; flex-direction: column;"
-                ),
-                style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;"
-            ),
-            style="background: #F8FAFC; padding: 12px 14px; border-radius: 8px; border: 1px solid #E2E8F0; margin-bottom: 1rem;"
+            dark_metric_box("🚚 TOTAL DOKUMEN OPEN TF", f"{len(tf_headers):,} SURAT", "#3182CE"),
+            dark_metric_box("📦 TOTAL QTY KIRIM OPEN", f"{sum([safe_int(x.get('qty_send', 0)) for x in tf_headers]):,} PCS", "#10B981"),
+            dark_metric_box("🚨 STUCK (>24 JAM)", f"{sum([1 for x in tf_headers if float(x.get('aging_hours') or 0) >= 24.0]):,} TF", "#E53E3E"),
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
         ),
         ui.div(
             ui.tags.table(
                 ui.tags.thead(ui.tags.tr(*th_tf)),
                 ui.tags.tbody(*tf_rows) if tf_rows else ui.tags.tr(
-                    ui.tags.td("Tidak ada transfer stok berstatus DRAFT atau IN PROGRESS sesuai filter.", colspan=10, style="text-align: center; color: #718096; padding: 2rem; font-style: italic;")
+                    ui.tags.td("Tidak ada data transfer order sesuai filter.", colspan=9, style="text-align: center; color: #718096; padding: 2rem; font-style: italic;")
                 ),
                 class_="custom-clean-table", style="width: 100%;"
             ),
             style="background: white; border-radius: 12px; border: 1px solid #E2E8F0; padding: 1rem; overflow-x: auto;"
         ),
-        style="padding: 0.5rem 0;"
+        style="padding: 1rem 0;"
     )
 
     # ==========================================================================
-    # TAB 3: ALL ADJUSTMENT (DENGAN FILTER CABANG, TANGGAL & NOTE DI 2 SUB-TAB)
+    # TAB 3: ALL ADJUSTMENT (MULTIPLE ADJUSTMENT DENGAN FILTER STORE)
     # ==========================================================================
-    # 1. SUB-TAB MADJ
     ma_headers = state.get_filtered_ma_data()
     ma_rows = []
     for idx_ma, ma in enumerate(ma_headers, start=1):
@@ -2445,7 +2424,6 @@ def warehouse_activity_monitor_view(state: AppState):
         is_crit = aging >= 24.0
 
         badge_ma = ui.span("MENGGANTUNG", style="background: #FEFCBF; color: #744210; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 4px;")
-
         btn_detail = ui.tags.button(
             ui.tags.i(class_="fa-solid fa-list-check", style="margin-right: 4px;"), "Lihat Item",
             onclick=f"Shiny.setInputValue('btn_open_ma_items_modal', '{ma_id}', {{priority: 'event'}})",
@@ -2459,195 +2437,90 @@ def warehouse_activity_monitor_view(state: AppState):
             ui.tags.td(str(ma.get("store_name", "-")), style="font-weight: 600;"),
             ui.tags.td(str(ma.get("u_name", "-"))),
             ui.tags.td(str(ma.get("approve", "-")), style="font-size: 11.5px; max-width: 200px; white-space: normal;"),
-            ui.tags.td(str(ma.get("note", "-")), style="max-width: 200px; white-space: normal; font-size: 12px;"),
+            ui.tags.td(str(ma.get("note", "-"))),
             ui.tags.td(str(ma.get("created_at", "-"))[:16]),
-            ui.tags.td(f"{aging} Jam ({round(aging/24, 1)} Hari)", style=f"font-weight: 800; text-align: center; color: {'#E53E3E' if is_crit else '#2F855A'};"),
+            ui.tags.td(f"{aging} Jam", style=f"font-weight: 800; text-align: center; color: {'#E53E3E' if is_crit else '#2F855A'};"),
             ui.tags.td(btn_detail, style="text-align: center;")
         ))
 
-    headers_ma = ["NO", "STATUS", "KODE MADJ", "STORE", "DIBUAT OLEH", "APPROVAL", "NOTE", "TANGGAL DIBUAT", "AGING TERTAHAN", "RINCIAN ITEM"]
-    th_ma = [ui.tags.th(h, style="text-align: center;" if h in ["NO", "STATUS", "AGING TERTAHAN", "RINCIAN ITEM"] else "") for h in headers_ma]
+    headers_ma = ["NO", "STATUS", "KODE MADJ", "STORE", "DIBUAT OLEH", "APPROVAL", "NOTE", "TANGGAL", "AGING", "RINCIAN"]
+    th_ma = [ui.tags.th(h, style="text-align: center;" if h in ["NO", "STATUS", "AGING", "RINCIAN"] else "") for h in headers_ma]
 
     sub_madj_ui = ui.div(
-        ui.div(
-            ui.div(
-                ui.div(
-                    ui.span("Filter Cabang:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
-                    ui.tags.select(
-                        *[ui.tags.option(opt, value=opt, selected=(opt == state.ll01_ma_filter_store())) for opt in branch_options],
-                        onchange="Shiny.setInputValue('change_ll01_ma_store', this.value, {priority: 'event'})",
-                        style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; outline: none; background: white; cursor: pointer; min-width: 150px;"
-                    ),
-                    style="display: flex; flex-direction: column;"
-                ),
-                ui.div(
-                    ui.span("Tgl Awal:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
-                    ui.tags.input(type="date", value=state.ll01_ma_filter_tgl_start(), onchange="Shiny.setInputValue('change_ll01_ma_tgl_start', this.value, {priority: 'event'})", style="padding: 5px 8px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-size: 12px;"),
-                    style="display: flex; flex-direction: column;"
-                ),
-                ui.div(
-                    ui.span("Tgl Akhir:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
-                    ui.tags.input(type="date", value=state.ll01_ma_filter_tgl_end(), onchange="Shiny.setInputValue('change_ll01_ma_tgl_end', this.value, {priority: 'event'})", style="padding: 5px 8px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-size: 12px;"),
-                    style="display: flex; flex-direction: column;"
-                ),
-                ui.div(
-                    ui.span("Cari Note / Kode MADJ:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
-                    ui.tags.input(type="text", placeholder="Ketik kata kunci note...", value=state.ll01_ma_filter_note(), oninput="Shiny.setInputValue('change_ll01_ma_note', this.value, {priority: 'event'})", style="padding: 5px 10px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-size: 12px; min-width: 170px;"),
-                    style="display: flex; flex-direction: column;"
-                ),
-                style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;"
+        ui.tags.table(
+            ui.tags.thead(ui.tags.tr(*th_ma)),
+            ui.tags.tbody(*ma_rows) if ma_rows else ui.tags.tr(
+                ui.tags.td("Tidak ada Multiple Adjustment sesuai filter.", colspan=10, style="text-align: center; color: #718096; padding: 2rem; font-style: italic;")
             ),
-            style="background: #F8FAFC; padding: 12px 14px; border-radius: 8px; border: 1px solid #E2E8F0; margin-bottom: 1rem;"
+            class_="custom-clean-table", style="width: 100%;"
+        ),
+        style="background: white; border-radius: 12px; border: 1px solid #E2E8F0; padding: 1rem; overflow-x: auto;"
+    )
+
+    tab3_adjustment = ui.div(
+        date_filter_box("ma"),
+        ui.div(
+            dark_metric_box("⚖️ TOTAL MADJ MENGGANTUNG", f"{len(ma_headers):,} DOK", "#3182CE"),
+            dark_metric_box("🚨 MADJ STUCK (>24 JAM)", f"{sum([1 for x in ma_headers if float(x.get('aging_hours') or 0) >= 24.0]):,} DOK", "#E53E3E"),
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+        ),
+        sub_madj_ui,
+        style="padding: 1rem 0;"
+    )
+
+    # ==========================================================================
+    # TAB 4: OUTSTANDING ITEMS (BUFFER & TRANSIT STOCK SESUAI STORE/LOKASI)
+    # ==========================================================================
+    special_items = state.get_filtered_ll01_special_stock()
+    stk_rows = []
+    for idx_stk, it in enumerate(special_items, start=1):
+        tipe = str(it.get("tipe_bin", "-"))
+        if "KARANTINA" in tipe: badge_color = "#E53E3E"; badge_bg = "#FED7D7"
+        elif "INBOUND" in tipe: badge_color = "#22543D"; badge_bg = "#C6F6D5"
+        elif "PUTAWAY" in tipe: badge_color = "#2B6CB0"; badge_bg = "#EBF8FF"
+        else: badge_color = "#744210"; badge_bg = "#FEFCBF"
+
+        badge_tipe = ui.span(tipe, style=f"background: {badge_bg}; color: {badge_color}; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 4px;")
+
+        stk_rows.append(ui.tags.tr(
+            ui.tags.td(str(idx_stk), style="text-align: center; font-weight: bold;"),
+            ui.tags.td(ui.tags.b(str(it.get("branch", "-"))), style="color: #2D3748; font-size: 12px;"),
+            ui.tags.td(badge_tipe, style="text-align: center;"),
+            ui.tags.td(ui.tags.code(str(it.get("bin", "-")), style="font-weight: bold; color: #2B6CB0;")),
+            ui.tags.td(str(it.get("sku", "-")), style="font-weight: 700; color: #1A202C;"),
+            ui.tags.td(str(it.get("item_name", "-")), style="max-width: 280px; white-space: normal; font-size: 12px;"),
+            ui.tags.td(str(it.get("brand", "-")), style="font-size: 12px;"),
+            ui.tags.td(str(it.get("variant", "-")), style="text-align: center; font-size: 12px;"),
+            ui.tags.td(f"{it.get('qty', 0):,} Pcs", style="text-align: right; font-weight: 800; color: #E50914;")
+        ))
+
+    headers_stk = ["NO", "CABANG / STORE", "TIPE", "BIN LOKASI", "SKU", "NAMA ARTIKEL", "BRAND", "SIZE / VAR", "QTY SYSTEM"]
+    th_stk = [ui.tags.th(h, style="text-align: center;" if h in ["NO", "TIPE", "SIZE / VAR", "QTY SYSTEM"] else "") for h in headers_stk]
+
+    tab4_transit_stock = ui.div(
+        date_filter_box("stk"),
+        ui.div(
+            dark_metric_box("📦 TOTAL QTY OUTSTANDING", f"{state.ll01_stock_metric_total_qty():,} PCS", "#3182CE"),
+            dark_metric_box("☣️ KARANTINA", f"{state.ll01_stock_metric_karantina_qty():,} PCS", "#E53E3E"),
+            dark_metric_box("📥 INBOUND", f"{state.ll01_stock_metric_inbound_qty():,} PCS", "#10B981"),
+            dark_metric_box("🚚 PUTAWAY", f"{state.ll01_stock_metric_putaway_qty():,} PCS", "#38BDF8"),
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
         ),
         ui.div(
             ui.tags.table(
-                ui.tags.thead(ui.tags.tr(*th_ma)),
-                ui.tags.tbody(*ma_rows) if ma_rows else ui.tags.tr(
-                    ui.tags.td("Tidak ada dokumen Multiple Adjustment menggantung sesuai filter.", colspan=10, style="text-align: center; color: #718096; padding: 2rem; font-style: italic;")
+                ui.tags.thead(ui.tags.tr(*th_stk)),
+                ui.tags.tbody(*stk_rows) if stk_rows else ui.tags.tr(
+                    ui.tags.td("Tidak ada data outstanding items sesuai filter.", colspan=9, style="text-align: center; color: #718096; padding: 2rem; font-style: italic;")
                 ),
                 class_="custom-clean-table", style="width: 100%;"
             ),
             style="background: white; border-radius: 12px; border: 1px solid #E2E8F0; padding: 1rem; overflow-x: auto;"
-        )
-    )
-
-    # 2. SUB-TAB SINGLE ADJ
-    single_items = state.get_filtered_single_adj_data()
-    sa_headers = ["NO", "STATUS", "KODE ADJ", "STORE", "BIN", "SKU", "NAMA ARTIKEL", "BRAND / SIZE", "OLD ➔ NEW", "ADJUST", "COGS", "NOTE", "CREATOR", "TANGGAL"]
-    sa_rows_data = []
-
-    for idx_sa, sa in enumerate(single_items, start=1):
-        st_sa = str(sa.get("status", "Menunggu"))
-        adj_qty = safe_int(sa.get("adjust_qty", 0))
-        adj_sign = f"+{adj_qty}" if adj_qty > 0 else str(adj_qty)
-        cogs_val = safe_int(sa.get("cogs", 0))
-        cogs_str = f"Rp {cogs_val:,}" if cogs_val > 0 else "-"
-
-        sa_rows_data.append([
-            str(idx_sa),
-            st_sa,
-            str(sa.get("ba_code", "-")),
-            str(sa.get("store_name", "-")),
-            str(sa.get("bin_code", "-")),
-            str(sa.get("barcode_sku", "-")),
-            str(sa.get("article_name", "-")),
-            f"{sa.get('brand', '-')} / {sa.get('size_variant', '-')}",
-            f"{sa.get('old_qty', 0)} ➔ {sa.get('new_qty', 0)}",
-            adj_sign,
-            cogs_str,
-            str(sa.get("note", "-")),
-            str(sa.get("creator", "-")),
-            str(sa.get("updated_at", "-"))[:16]
-        ])
-
-    sub_single_ui = ui.div(
-        ui.div(
-            ui.div(
-                ui.div(
-                    ui.span("Filter Cabang:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
-                    ui.tags.select(
-                        *[ui.tags.option(opt, value=opt, selected=(opt == state.ll01_single_adj_filter_branch())) for opt in branch_options],
-                        onchange="Shiny.setInputValue('change_ll01_single_branch', this.value, {priority: 'event'})",
-                        style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; outline: none; background: white; cursor: pointer; min-width: 150px;"
-                    ),
-                    style="display: flex; flex-direction: column;"
-                ),
-                ui.div(
-                    ui.span("Tgl Awal:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
-                    ui.tags.input(type="date", value=state.ll01_single_adj_filter_tgl_start(), onchange="Shiny.setInputValue('change_ll01_sa_tgl_start', this.value, {priority: 'event'})", style="padding: 5px 8px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-size: 12px;"),
-                    style="display: flex; flex-direction: column;"
-                ),
-                ui.div(
-                    ui.span("Tgl Akhir:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
-                    ui.tags.input(type="date", value=state.ll01_single_adj_filter_tgl_end(), onchange="Shiny.setInputValue('change_ll01_sa_tgl_end', this.value, {priority: 'event'})", style="padding: 5px 8px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-size: 12px;"),
-                    style="display: flex; flex-direction: column;"
-                ),
-                ui.div(
-                    ui.span("Cari Note / Alasan ADJ:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
-                    ui.tags.input(type="text", placeholder="Ketik kata kunci note...", value=state.ll01_single_adj_filter_note(), oninput="Shiny.setInputValue('change_ll01_sa_note', this.value, {priority: 'event'})", style="padding: 5px 10px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-size: 12px; min-width: 170px;"),
-                    style="display: flex; flex-direction: column;"
-                ),
-                style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;"
-            ),
-            ui.div(
-                ui.download_button("btn_dl_ll01_single_adj", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px;"), "Download Excel"), style="background: #10B981; color: white; border: none; padding: 7px 14px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer;")
-            ),
-            style="display: flex; justify-content: space-between; align-items: flex-end; background: #F8FAFC; padding: 12px 14px; border-radius: 8px; border: 1px solid #E2E8F0; margin-bottom: 1rem; flex-wrap: wrap; gap: 10px;"
         ),
-        render_clean_table(sa_headers, sa_rows_data, "tbl_ll01_single_adj")
-    )
-
-    tab3_adjustment = ui.div(
-        ui.navset_pill(
-            ui.nav_panel("📋 1. MULTIPLE ADJUSTMENT (MADJ)", sub_madj_ui),
-            ui.nav_panel("📄 2. SINGLE ADJUSTMENT (ADJ PER SKU)", sub_single_ui)
-        ),
-        style="padding: 0.5rem 0;"
+        style="padding: 1rem 0;"
     )
 
     # ==========================================================================
-    # TAB 4: OUTSTANDING ITEMS (BUFFER STOCK DENGAN FILTER CABANG & NOTE)
-    # ==========================================================================
-    special_items = state.get_filtered_ll01_special_stock()
-    stk_headers = ["NO", "CABANG", "TIPE", "BIN LOKASI", "SKU", "NAMA ARTIKEL", "BRAND", "SIZE / VAR", "SUB KATEGORI", "QTY SYSTEM"]
-    stk_rows_data = []
-
-    for idx_stk, it in enumerate(special_items, start=1):
-        stk_rows_data.append([
-            str(idx_stk),
-            str(it.get("branch", "-")),
-            str(it.get("tipe_bin", "-")),
-            str(it.get("bin", "-")),
-            str(it.get("sku", "-")),
-            str(it.get("item_name", "-")),
-            str(it.get("brand", "-")),
-            str(it.get("variant", "-")),
-            str(it.get("sub_kategori", "-")),
-            f"{it.get('qty', 0):,} Pcs"
-        ])
-
-    type_options = ["SEMUA", "KARANTINA", "INBOUND", "PUTAWAY", "OUT"]
-
-    tab4_transit_stock = ui.div(
-        # Filter Bar Tab 4
-        ui.div(
-            ui.div(
-                ui.div(
-                    ui.span("Filter Cabang:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
-                    ui.tags.select(
-                        *[ui.tags.option(opt, value=opt, selected=(opt == state.ll01_stock_filter_branch())) for opt in branch_options],
-                        onchange="Shiny.setInputValue('change_ll01_stock_branch', this.value, {priority: 'event'})",
-                        style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; outline: none; background: white; cursor: pointer; min-width: 150px;"
-                    ),
-                    style="display: flex; flex-direction: column;"
-                ),
-                ui.div(
-                    ui.span("Filter Tipe BIN:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
-                    ui.tags.select(
-                        *[ui.tags.option(opt, value=opt, selected=(opt == state.ll01_stock_filter_type())) for opt in type_options],
-                        onchange="Shiny.setInputValue('change_ll01_stock_type', this.value, {priority: 'event'})",
-                        style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; outline: none; background: white; cursor: pointer; min-width: 140px;"
-                    ),
-                    style="display: flex; flex-direction: column;"
-                ),
-                ui.div(
-                    ui.span("Cari Note / SKU / Artikel:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
-                    ui.tags.input(type="text", placeholder="Ketik kata kunci...", value=state.ll01_stock_filter_note(), oninput="Shiny.setInputValue('change_ll01_stock_note', this.value, {priority: 'event'})", style="padding: 5px 10px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-size: 12px; min-width: 180px;"),
-                    style="display: flex; flex-direction: column;"
-                ),
-                style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;"
-            ),
-            ui.div(
-                ui.download_button("btn_dl_ll01_transit_stock", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px;"), "Download Excel"), style="background: #10B981; color: white; border: none; padding: 7px 14px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer;")
-            ),
-            style="display: flex; justify-content: space-between; align-items: flex-end; background: #F8FAFC; padding: 12px 14px; border-radius: 8px; border: 1px solid #E2E8F0; margin-bottom: 1rem; flex-wrap: wrap; gap: 10px;"
-        ),
-        render_clean_table(stk_headers, stk_rows_data, "tbl_ll01_transit_stock"),
-        style="padding: 0.5rem 0;"
-    )
-
-    # ==========================================================================
-    # RETURN 4 TAB UTAMA (TETAP SEJAJAR DALAM 1 BARIS)
+    # RETURN UTAMA: SAP LL01 TREE SUMMARY DI ATAS, DIKUTIP DENGAN 4 TAB DI BAWAHNYA
     # ==========================================================================
     return ui.div(
         ui.div(
@@ -2664,6 +2537,11 @@ def warehouse_activity_monitor_view(state: AppState):
             ),
             style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 1.25rem 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 10px;"
         ),
+        
+        # 🌟 PASANG SAP LL01 SUMMARY TREE DI SINI (SESUAI GAMBAR SAP GUI ANDA)
+        render_sap_ll01_summary_tree(state),
+
+        # 4 Tab Menu Utama (Tab 1 tetap utuh, digeser ke Tab 2, 3, dan 4)
         ui.navset_card_tab(
             ui.nav_panel("📥 1. ALL WAITING", tab1_staging),
             ui.nav_panel("🚚 2. TRANSFER ORDER", tab2_transfer),
@@ -2672,7 +2550,6 @@ def warehouse_activity_monitor_view(state: AppState):
         ),
         style="width: 100%; padding: 1rem;"
     )
-
 def menu_item(label: str, target_menu: str, current_menu: str):
     import re
     is_active = (current_menu == target_menu)
