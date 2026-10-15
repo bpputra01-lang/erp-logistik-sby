@@ -6706,17 +6706,7 @@ class AppState:
             print("❌ Gagal load Single Adjustment Supabase:", e)
             return False, f"Terjadi kesalahan: {str(e)}"
             
-    def get_filtered_single_adj_data(self) -> list[dict]:
-        data = self.ll01_single_adj_list()
-        br_flt = self.ll01_single_adj_filter_branch()
-        st_flt = self.ll01_single_adj_filter_status()
-
-        res = data
-        if br_flt != "SEMUA":
-            res = [x for x in res if br_flt.upper() in str(x.get("store_name", "")).upper()]
-        if st_flt != "SEMUA":
-            res = [x for x in res if st_flt.upper() in str(x.get("status", "")).upper()]
-        return res
+   
 
     # Metrik Single Adjustment
     def ll01_single_adj_metric_total(self) -> int:
