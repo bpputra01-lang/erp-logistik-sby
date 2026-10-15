@@ -107,15 +107,44 @@ def create_jezpro_session():
 def parse_to_iso_timestamp(dt_raw):
     if not dt_raw:
         return datetime.now(timezone(timedelta(hours=7))).isoformat()
+    
+    # Bersihkan spasi dan ubah semua jenis simbol minus/dash aneh menjadi strip biasa (-)
     s = strip_html(str(dt_raw)).strip()
-    for fmt in ("%Y-%m-%d %H:%M:%S", "%d-%m-%Y %H:%M:%S", "%d/%m/%Y %H:%M:%S", "%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y"):
+    s = s.replace('–', '-').replace('—', '-').replace('/', '-')
+    
+    # Daftar format tanggal yang didukung (termasuk bulan bahasa Inggris seperti July/Jul)
+    formats = (
+        "%Y-%m-%d %H:%M:%S", 
+        "%d-%m-%Y %H:%M:%S", 
+        "%d-%b-%Y %H:%M:%S", 
+        "%d-%B-%Y %H:%M:%S",
+        "%Y-%m-%d", 
+        "%d-%m-%Y", 
+        "%d-%b-%Y", 
+        "%d-%B-%Y"
+    )
+    
+    for fmt in formats:
         try:
-            dt = datetime.strptime(s[:19], fmt)
+            # Ambil bagian tanggal dan jam saja (maksimal 19-20 karakter pertama)
+            dt = datetime.strptime(s[:19].strip(), fmt)
             return dt.isoformat()
         except Exception:
             pass
+            
+    # Fallback cerdas berbasis Regex jika format string benar-benar acak
+    try:
+        # Cari angka 4 digit yang berpola tahun (misal: 2026, 2027, dll)
+        years = re.findall(r'\b(20\d{2})\b', s)
+        if years:
+            # Jika ketemu tahunnya, paksa buat objek datetime yang sah agar lolos
+            yr = int(years[0])
+            dt_fallback = datetime(yr, 1, 1, 0, 0, 0)
+            return dt_fallback.isoformat()
+    except Exception:
+        pass
+        
     return datetime.now(timezone(timedelta(hours=7))).isoformat()
-
 def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
     print(f"📥 [2/6] Menarik data staging [{kategori_label}] untuk seluruh cabang...")
     url = f"https://jezpro.id/{endpoint_path}"
