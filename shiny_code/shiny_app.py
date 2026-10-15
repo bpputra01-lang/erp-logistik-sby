@@ -12,7 +12,7 @@ from views import (
     justification_so_view, cycle_count_view, login_page, ppa_audit_view, 
     cycle_count_analyzer_view, global_header, cross_check_real_system_view,
     balancing_stock_view, physical_inventory_list_view, validation_barcode_sku_view, percentage_display_view,excel_practice_view,
-    auditor_view, memo_pengajuan_view
+    auditor_view, memo_pengajuan_view, warehouse_activity_monitor_view
 )
 
 app_ui = ui.page_fluid(
@@ -126,6 +126,8 @@ def server(input: Inputs, output: Outputs, session: Session):
         "form-auditor": "Form Auditor",
         "auditor-pack": "Form Auditor",
         "memo-pengajuan": "Memo Pengajuan",
+        "warehouse-activity-monitor": "Warehouse Activity Monitor",  # <-- TAMBAHKAN INI
+        "ll01-monitor": "Warehouse Activity Monitor"
     }
 
     # 1. Saat menu diklik di sidebar -> URL di browser otomatis berubah
@@ -1016,6 +1018,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         elif content_type in ["excel_practice", "latihan_excel"]: page_content = excel_practice_view(state)
         elif content_type == "form_auditor": page_content = auditor_view(state)
         elif content_type in ["memo_pengajuan", "memo-pengajuan"]: page_content = memo_pengajuan_view(state)
+        elif content_type == "warehouse_activity_monitor": page_content = warehouse_activity_monitor_view(state)
         elif content_type == "access_denied":
             page_content = ui.div(ui.h2("⛔ Akses Ditolak", style="font-size: 28px; color: #E53E3E; font-weight: bold;"), ui.p("Maaf, halaman ini dibatasi hak aksesnya.", style="color: #718096; font-size: 15px;"), style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;")
         else:
@@ -4662,6 +4665,56 @@ def server(input: Inputs, output: Outputs, session: Session):
         ])
         with pd.ExcelWriter(buf, engine='openpyxl') as writer:
             df_tpl.to_excel(writer, sheet_name='ITEMS', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+
+# ==========================================================================
+    # WAREHOUSE ACTIVITY MONITOR (LL01) EVENT HANDLERS
+    # ==========================================================================
+    @reactive.Effect
+    @reactive.event(input.btn_refresh_ll01)
+    def _on_refresh_ll01():
+        succ, msg = state.load_ll01_data_from_supabase()
+        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+        if succ:
+            ui.notification_show(f"✅ {msg}", type="message", duration=4)
+        else:
+            ui.notification_show(f"⚠️ {msg}", type="error", duration=5)
+
+    @reactive.Effect
+    @reactive.event(input.change_ll01_kategori)
+    def _on_change_ll01_kat():
+        state.ll01_filter_kategori.set(input.change_ll01_kategori())
+
+    @reactive.Effect
+    @reactive.event(input.change_ll01_aging)
+    def _on_change_ll01_aging():
+        state.ll01_filter_aging.set(input.change_ll01_aging())
+
+    # Auto Load Saat Masuk Menu Warehouse Activity Monitor
+    @reactive.Effect
+    def _auto_load_ll01_on_menu():
+        if state.logged_in() and state.get_active_content_type() == "warehouse_activity_monitor":
+            with reactive.isolate():
+                if not state.ll01_data_list():
+                    state.load_ll01_data_from_supabase()
+
+    # Download Excel Report
+    @render.download(
+        filename=lambda: f"LL01_WAREHOUSE_MONITOR_{datetime.now().strftime('%d_%m_%Y_%H%M')}.xlsx"
+    )
+    def btn_dl_ll01_report():
+        buf = io.BytesIO()
+        df_export = pd.DataFrame(state.get_filtered_ll01())
+        if not df_export.empty:
+            cols = [c for c in ['kategori', 'waiting_status', 'article_name', 'qty', 'bin_target', 'pic_name', 'waktu_scan_str', 'durasi_aging', 'll01_status'] if c in df_export.columns]
+            df_export = df_export[cols]
+        else:
+            df_export = pd.DataFrame(columns=["kategori", "article_name", "qty", "bin_target", "durasi_aging", "ll01_status"])
+
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            df_export.to_excel(writer, sheet_name='LL01_STAGING_MONITOR', index=False)
         buf.seek(0)
         yield buf.getvalue()
 

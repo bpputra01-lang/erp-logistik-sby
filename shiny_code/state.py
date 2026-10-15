@@ -526,6 +526,13 @@ class AppState:
         self.pd_last_sync_time = reactive.Value("-")
         self.pd_data_source = reactive.Value("Belum ada data")
 
+        # --- WAREHOUSE ACTIVITY MONITOR (LL01) STATE ---
+        self.ll01_data_list = reactive.Value([])
+        self.ll01_filter_kategori = reactive.Value("SEMUA")      # "SEMUA", "MASUK_RAK", "REFUND"
+        self.ll01_filter_aging = reactive.Value("SEMUA")         # "SEMUA", "CRITICAL", "NORMAL"
+        self.ll01_last_sync = reactive.Value("-")
+        self._raw_df_ll01_filtered = pd.DataFrame()
+
         # --- PHYSICAL INVENTORY LIST STATE (UNIFIED) ---
         self.pil_mode = reactive.Value("")
 
@@ -571,7 +578,7 @@ class AppState:
 
     def get_menu_inventory(self) -> list[str]:
         if self.role() == "DC":
-            return ["Stock Opname", "Cycle Count", "Justification SO", "Stock Minus", "Compare System", "Physical Inventory List", "Validation Barcode SKU", "Cross Check Real & System", "List Retur Out", "Reloc Koli to Koli"]
+            return ["Warehouse Activity Monitor", "Stock Opname", "Cycle Count", "Justification SO", "Stock Minus", "Compare System", "Physical Inventory List", "Validation Barcode SKU", "Cross Check Real & System", "List Retur Out", "Reloc Koli to Koli"]
         return ["Stock Minus", "Cycle Count", "Compare System", "Justification SO"]
 
     def get_menu_extras(self) -> list[str]:
@@ -6255,3 +6262,101 @@ class AppState:
             print("Gagal update SPV di Supabase:", e)
 
         return True, f"Memo {memo_id} telah disetujui oleh SPV ({nama})! Dokumen PDF resmi siap diunduh."
+
+# ==========================================================================
+    # LOGIKA WAREHOUSE ACTIVITY MONITOR (SAP LL01)
+    # ==========================================================================
+    def load_ll01_data_from_supabase(self):
+        """Menarik antrean barang transit dari Supabase & menghitung aging secara otomatis"""
+        try:
+            client = get_supabase()
+            if not client:
+                return False, "Koneksi Supabase gagal!"
+
+            res = client.table("jezpro_waiting_staging") \
+                        .select("*") \
+                        .order("scanned_at", desc=True) \
+                        .execute()
+
+            if not res or not res.data:
+                self.ll01_data_list.set([])
+                self.ll01_last_sync.set(datetime.now().strftime("%d-%m-%Y %H:%M:%S") + " WIB")
+                return True, "Data di Supabase masih kosong atau antrean bersih!"
+
+            df = pd.DataFrame(res.data)
+
+            # Hitung Aging Jam & Menit
+            if not df.empty and 'scanned_at' in df.columns:
+                df['dt_scanned'] = pd.to_datetime(df['scanned_at'], errors='coerce')
+                # Lokalisasi Waktu ke WIB
+                now = pd.Timestamp.now(tz='Asia/Jakarta')
+                
+                def calc_aging(scanned_dt):
+                    if pd.isna(scanned_dt):
+                        return 0.0, "0m", "NORMAL"
+                    if scanned_dt.tzinfo is None:
+                        scanned_dt = scanned_dt.tz_localize('UTC').tz_convert('Asia/Jakarta')
+                    else:
+                        scanned_dt = scanned_dt.tz_convert('Asia/Jakarta')
+
+                    diff_sec = (now - scanned_dt).total_seconds()
+                    diff_hours = max(0.0, round(diff_sec / 3600.0, 1))
+                    
+                    # Format teks display durasi
+                    hrs = int(diff_sec // 3600)
+                    mins = int((diff_sec % 3600) // 60)
+                    dur_str = f"{hrs}j {mins}m" if hrs > 0 else f"{mins}m"
+                    
+                    # Flagging Status Kritis LL01 (> 2 jam = CRITICAL)
+                    status = "CRITICAL (>2 JAM)" if diff_hours >= 2.0 else "NORMAL"
+                    return diff_hours, dur_str, status
+
+                res_aging = [calc_aging(t) for t in df['dt_scanned']]
+                df['aging_hours'] = [x[0] for x in res_aging]
+                df['durasi_aging'] = [x[1] for x in res_aging]
+                df['ll01_status'] = [x[2] for x in res_aging]
+
+                # Format string tanggal cantik untuk tabel
+                df['waktu_scan_str'] = df['dt_scanned'].dt.strftime('%d/%m/%Y %H:%M')
+            
+            self.ll01_data_list.set(df.to_dict(orient="records"))
+            self.ll01_last_sync.set(datetime.now().strftime("%d-%m-%Y %H:%M:%S") + " WIB")
+            return True, f"Berhasil memuat {len(df)} item antrean staging dari Supabase."
+        except Exception as e:
+            print("Gagal load LL01 Supabase:", e)
+            return False, f"Terjadi kesalahan: {str(e)}"
+
+    def get_filtered_ll01(self) -> list[dict]:
+        data = self.ll01_data_list()
+        if not data:
+            return []
+
+        kat = self.ll01_filter_kategori()
+        aging = self.ll01_filter_aging()
+
+        filtered = data
+        if kat != "SEMUA":
+            filtered = [x for x in filtered if str(x.get("kategori", "")).upper() == kat.upper()]
+
+        if aging == "CRITICAL":
+            filtered = [x for x in filtered if "CRITICAL" in str(x.get("ll01_status", ""))]
+        elif aging == "NORMAL":
+            filtered = [x for x in filtered if str(x.get("ll01_status", "")) == "NORMAL"]
+
+        return filtered
+
+    # Metrik Ringkasan LL01
+    def ll01_metric_total_antrean(self) -> int:
+        return sum([safe_int(x.get("qty", 1)) for x in self.get_filtered_ll01()])
+
+    def ll01_metric_masuk_rak(self) -> int:
+        data = [x for x in self.get_filtered_ll01() if x.get("kategori") == "MASUK_RAK"]
+        return sum([safe_int(x.get("qty", 1)) for x in data])
+
+    def ll01_metric_refund(self) -> int:
+        data = [x for x in self.get_filtered_ll01() if x.get("kategori") == "REFUND"]
+        return sum([safe_int(x.get("qty", 1)) for x in data])
+
+    def ll01_metric_critical(self) -> int:
+        data = [x for x in self.get_filtered_ll01() if "CRITICAL" in str(x.get("ll01_status", ""))]
+        return sum([safe_int(x.get("qty", 1)) for x in data])
