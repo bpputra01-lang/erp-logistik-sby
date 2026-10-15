@@ -156,8 +156,11 @@ def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
 
     clean_records = []
     
+    # Loop secara mutlak ke 6 cabang yang ada di BRANCH_MAP
     for branch_name, b_info in BRANCH_MAP.items():
         st_id = b_info["st_id"]
+        branch_records_count = 0
+        
         params = {
             "draw": "1", "columns[0][data]": "article", "columns[0][name]": "article",
             "columns[0][searchable]": "true", "columns[0][orderable]": "false",
@@ -170,9 +173,14 @@ def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
 
         res = session.get(url, params=params, headers=headers)
         if res.status_code != 200:
+            print(f"   ⚠️ Gagal tarik data {branch_name} (HTTP {res.status_code})")
             continue
         
-        raw_list = res.json().get("data", [])
+        try:
+            raw_list = res.json().get("data", [])
+        except Exception:
+            raw_list = []
+
         for idx_item, item in enumerate(raw_list):
             raw_art = item.get("article") or item.get("art_name") or "-"
             parsed = clean_html_card(raw_art)
@@ -200,44 +208,14 @@ def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
                 "raw_json": item,
                 "synced_at": datetime.now(timezone(timedelta(hours=7))).isoformat()
             })
+            branch_records_count += 1
 
-    # Fallback global jika per cabang kosong
-    if not clean_records:
-        params_g = {
-            "draw": "1", "columns[0][data]": "article", "columns[0][name]": "article",
-            "order[0][column]": "0", "order[0][dir]": "desc",
-            "start": "0", "length": "5000", "search": "", 
-            "st_id": "", 
-            "waiting": waiting_val
-        }
-        res_g = session.get(url, params=params_g, headers=headers)
-        if res_g.status_code == 200:
-            raw_g = res_g.json().get("data", [])
-            for idx_item, item in enumerate(raw_g):
-                raw_art = item.get("article") or "-"
-                parsed = clean_html_card(raw_art)
-                p_id = abs(hash(f"fallback_{idx_item}_{time.time()}")) % 2147483647
-                scanned_iso = parse_to_iso_timestamp(item.get("created_at") or item.get("date"))
+        if branch_records_count > 0:
+            print(f"   -> {branch_name} (st_id: {st_id}): Ditemukan {branch_records_count} baris {kategori_label}.")
 
-                clean_records.append({
-                    "plst_id": int(p_id),
-                    "pls_id": int(item.get("pls_id") or p_id),
-                    "kategori": kategori_label,
-                    "waiting_status": item.get("waiting") or waiting_val,
-                    "brand": parsed["brand"],
-                    "article_name": parsed["article"],
-                    "qty": safe_int_val(item.get("plst_qty") or 1),
-                    "bin_target": parsed["bin"] if parsed["bin"] != "-" else "-",
-                    "pic_name": strip_html(item.get("user_name") or "Petugas"),
-                    "scanned_at": scanned_iso,
-                    "store_id": 3,
-                    "raw_json": item,
-                    "synced_at": datetime.now(timezone(timedelta(hours=7))).isoformat()
-                })
-
-    print(f"   -> Ditemukan total {len(clean_records)} baris staging {kategori_label}.")
+    print(f"   -> Total keseluruhan sebelum dibersihkan: {len(clean_records)} baris staging {kategori_label}.")
     
-    # --- PEMBERSIH DUPLIKAT PLST_ID MURNI PYTHON (INDENTASI SUDAH BENAR) ---
+    # --- PEMBERSIH DUPLIKAT PLST_ID MURNI PYTHON ---
     seen_ids = set()
     unique_records = []
     for rec in clean_records:
@@ -246,7 +224,7 @@ def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
             seen_ids.add(pid)
             unique_records.append(rec)
             
-    print(f"   -> Setelah dibersihkan (unik), tersisa {len(unique_records)} baris staging {kategori_label}.")
+    print(f"   -> Setelah dibersihkan (unik), tersisa {len(unique_records)} baris staging {kategori_label} dari semua cabang.")
     return unique_records
 # ==============================================================================
 # 2. MODUL TRANSFER STOK (ALL AREA LINTAS CABANG)
