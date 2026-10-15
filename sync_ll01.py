@@ -282,11 +282,12 @@ def push_all_to_supabase(staging_data, tf_headers, tf_items):
         res_stg = requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_waiting_staging", data=json.dumps(staging_data), headers=headers)
         print(f"   Status Staging: {res_stg.status_code}")
     
-    # 2. Transfer Headers
+     # 2. Transfer Headers
     if tf_headers:
         res_tfh = requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_transfer_headers", data=json.dumps(tf_headers), headers=headers)
         print(f"   Status Transfer Headers: {res_tfh.status_code}")
-
+        if res_tfh.status_code not in [200, 201]:
+            print(f"   ⚠️ Detail Alasan Ditolak Supabase: {res_tfh.text}")
     # 3. Transfer Items
     if tf_items:
         requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_transfer_items?id=gt.0", headers=headers)
