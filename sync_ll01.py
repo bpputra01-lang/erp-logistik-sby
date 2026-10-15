@@ -100,7 +100,7 @@ def create_jezpro_session():
     return session
 
 # ==============================================================================
-# 1. MODUL STAGING (ALL AREA VIA BRANCH_MAP)
+# 1. MODUL STAGING (DILENGKAPI FALLBACK JIKA MASUK RAK KOSONG PER CABANG)
 # ==============================================================================
 def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
     print(f"📥 [2/6] Menarik data staging [{kategori_label}] untuk seluruh cabang...")
@@ -113,6 +113,7 @@ def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
 
     clean_records = []
     
+    # Coba tarik per cabang via BRANCH_MAP
     for branch_name, b_info in BRANCH_MAP.items():
         st_id = b_info["st_id"]
         params = {
@@ -134,9 +135,11 @@ def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
             raw_art = item.get("article") or item.get("art_name") or "-"
             parsed = clean_html_card(raw_art)
 
-            p_id = item.get("plst_id") or item.get("pls_id") or item.get("id") or item.get("plstr_id")
+            p_id = item.get("plst_id") or item.get("pls_id") or item.get("plstr_id") or item.get("id")
             if not p_id:
-                p_id = abs(hash(f"{kategori_label}_{st_id}_{parsed['article']}_{idx_item}")) % (10**10)
+                p_id = abs(hash(f"{kategori_label}_{st_id}_{parsed['article']}_{idx_item}")) % 2147483647
+            else:
+                p_id = safe_int_val(p_id)
 
             clean_records.append({
                 "plst_id": int(p_id),
@@ -148,13 +151,43 @@ def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
                 "qty": safe_int_val(item.get("plst_qty") or item.get("qty"), 1),
                 "bin_target": parsed["bin"] if parsed["bin"] != "-" else strip_html(item.get("rack_name") or item.get("bin") or "-"),
                 "pic_name": strip_html(item.get("user_name") or item.get("scanned_by") or "Petugas"),
-                "scanned_at": item.get("created_at") or item.get("date") or datetime.now().isoformat(),
+                "scanned_at": str(item.get("created_at") or item.get("date") or datetime.now().isoformat()),
                 "store_id": st_id,
-                "raw_json": item,
                 "synced_at": datetime.now().isoformat()
             })
 
-    print(f"   -> Ditemukan total {len(clean_records)} baris staging {kategori_label} (Semua Cabang).")
+    # Fallback: jika per cabang kosong, coba query tanpa st_id (global)
+    if not clean_records:
+        params_global = {
+            "draw": "1", "columns[0][data]": "article", "columns[0][name]": "article",
+            "order[0][column]": "0", "order[0][dir]": "desc",
+            "start": "0", "length": "5000", "search": "", 
+            "st_id": "", 
+            "waiting": waiting_val
+        }
+        res_g = session.get(url, params=params_global, headers=headers)
+        if res_g.status_code == 200:
+            raw_g = res_g.json().get("data", [])
+            for idx_item, item in enumerate(raw_g):
+                raw_art = item.get("article") or "-"
+                parsed = clean_html_card(raw_art)
+                p_id = safe_int_val(item.get("plst_id") or item.get("pls_id") or idx_item + 1)
+                clean_records.append({
+                    "plst_id": int(p_id),
+                    "pls_id": int(item.get("pls_id") or p_id),
+                    "kategori": kategori_label,
+                    "waiting_status": item.get("waiting") or waiting_val,
+                    "brand": parsed["brand"],
+                    "article_name": parsed["article"],
+                    "qty": safe_int_val(item.get("plst_qty") or 1),
+                    "bin_target": parsed["bin"] if parsed["bin"] != "-" else "-",
+                    "pic_name": strip_html(item.get("user_name") or "Petugas"),
+                    "scanned_at": str(item.get("created_at") or datetime.now().isoformat()),
+                    "store_id": 3,
+                    "synced_at": datetime.now().isoformat()
+                })
+
+    print(f"   -> Ditemukan total {len(clean_records)} baris staging {kategori_label}.")
     return clean_records
 
 # ==============================================================================
@@ -626,27 +659,33 @@ def fetch_single_adjustment_data(session):
     return clean_single_records
 
 # ==============================================================================
-# 5. PUSH KE SUPABASE (HAPUS BERSIH DATA LAMA -> ISI BARU)
+# 5. PUSH KE SUPABASE (DILENGKAPI MERGE-DUPLICATES & CEK STATUS RESPONSE)
 # ==============================================================================
 def push_all_to_supabase(staging_data, tf_headers, tf_items, ma_headers, ma_items, single_items):
     print("🚀 [6/6] Mengosongkan data lama & mengirim data terbaru ke Supabase...")
     headers = {
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "Prefer": "resolution=merge-duplicates"
     }
 
-    # 1. Staging Waiting
+    # 1. STAGING WAITING (Kosongkan dulu -> Kirim batch 200)
     requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_waiting_staging?plst_id=gt.0", headers=headers)
     if staging_data:
+        sukses_stg = 0
         for i in range(0, len(staging_data), 200):
             batch = staging_data[i:i + 200]
-            requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_waiting_staging", data=json.dumps(batch), headers=headers)
-        print(f"   ✅ Staging: Diperbarui {len(staging_data)} item.")
+            res = requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_waiting_staging", data=json.dumps(batch), headers=headers)
+            if res.status_code in [200, 201]:
+                sukses_stg += len(batch)
+            else:
+                print(f"   ⚠️ Gagal simpan staging batch {i}: Status {res.status_code} - {res.text}")
+        print(f"   ✅ Staging: Berhasil tersimpan {sukses_stg} dari {len(staging_data)} item.")
     else:
         print("   ✅ Staging: Bersih (0 antrean).")
 
-    # 2. Transfer Headers
+    # 2. TRANSFER HEADERS
     requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_transfer_headers?stf_code=neq.", headers=headers)
     if tf_headers:
         for i in range(0, len(tf_headers), 200):
@@ -656,7 +695,7 @@ def push_all_to_supabase(staging_data, tf_headers, tf_items, ma_headers, ma_item
     else:
         print("   ✅ Transfer Headers: Bersih (0 open transfer).")
 
-    # 3. Transfer Items
+    # 3. TRANSFER ITEMS
     requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_transfer_items?id=gt.0", headers=headers)
     if tf_items:
         for i in range(0, len(tf_items), 200):
@@ -664,7 +703,7 @@ def push_all_to_supabase(staging_data, tf_headers, tf_items, ma_headers, ma_item
             requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_transfer_items", data=json.dumps(batch), headers=headers)
         print(f"   ✅ Transfer Items: Diperbarui {len(tf_items)} item.")
 
-    # 4. Mass Adjustment Headers
+    # 4. MASS ADJUSTMENT HEADERS
     requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_adjustment_headers?ma_id=gt.0", headers=headers)
     if ma_headers:
         for i in range(0, len(ma_headers), 200):
@@ -674,7 +713,7 @@ def push_all_to_supabase(staging_data, tf_headers, tf_items, ma_headers, ma_item
     else:
         print("   ✅ MADJ Headers: Bersih (0 MADJ menggantung).")
 
-    # 5. Mass Adjustment Items
+    # 5. MASS ADJUSTMENT ITEMS
     requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_adjustment_items?id=gt.0", headers=headers)
     if ma_items:
         for i in range(0, len(ma_items), 200):
@@ -682,7 +721,7 @@ def push_all_to_supabase(staging_data, tf_headers, tf_items, ma_headers, ma_item
             requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_adjustment_items", data=json.dumps(batch), headers=headers)
         print(f"   ✅ MADJ Items: Diperbarui {len(ma_items)} item.")
 
-    # 6. Single Adjustment
+    # 6. SINGLE ADJUSTMENT
     requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_single_adjustments?id=gt.0", headers=headers)
     if single_items:
         for i in range(0, len(single_items), 200):
@@ -692,8 +731,7 @@ def push_all_to_supabase(staging_data, tf_headers, tf_items, ma_headers, ma_item
     else:
         print("   ✅ Single Adjustment: Bersih (0 transaksi butuh approval).")
 
-    print("🎉 SUKSES! Seluruh data Staging, Transfer, Multiple & Single Adjustment All Area telah tersinkronisasi bersih.")
-
+    print("🎉 SUKSES! Seluruh data telah tersinkronisasi bersih ke Supabase.")
 # ==============================================================================
 # MAIN PIPELINE EKSEKUSI
 # ==============================================================================
