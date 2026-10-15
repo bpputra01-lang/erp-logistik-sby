@@ -130,12 +130,11 @@ def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
         })
     print(f"   -> Ditemukan {len(clean_records)} baris staging {kategori_label}.")
     return clean_records
-
 # ------------------------------------------------------------------------------
-# 2. TARIK DATA TRANSFER STOCK (DENGAN SAFE PARSER ANTI-HTML)
+# 2. TARIK DATA TRANSFER STOCK (HANYA DRAFT & IN PROGRESS TAHUN >= 2026)
 # ------------------------------------------------------------------------------
 def fetch_transfer_data(session):
-    print("🚚 [3/5] Menarik data Transfer Stok (History & Detail)...")
+    print("🚚 [3/5] Menarik data Transfer Stok (Khusus Tahun >= 2026)...")
     url_history = "https://jezpro.id/transfer_history_datatables"
     headers = {
         "Accept": "application/json, text/javascript, */*; q=0.01",
@@ -157,7 +156,7 @@ def fetch_transfer_data(session):
         "columns[9][data]": "stf_created", "columns[9][name]": "stf_created", "columns[9][orderable]": "true",
         "columns[10][data]": "stf_status", "columns[10][name]": "stf_status", "columns[10][orderable]": "true",
         "order[0][column]": "0", "order[0][dir]": "desc",
-        "start": "0", "length": "500", "search": "", "status": ""
+        "start": "0", "length": "1000", "search": "", "status": ""
     }
 
     res = session.get(url_history, params=params, headers=headers)
@@ -172,7 +171,7 @@ def fetch_transfer_data(session):
     for row in raw_history:
         status_txt = strip_html(row.get("stf_status") or row.get("status") or "").upper()
 
-        # Hanya ambil yang DRAFT atau IN PROGRESS
+        # 1. Filter Status: Hanya DRAFT atau IN PROGRESS
         if status_txt not in ["DRAFT", "IN PROGRESS"]:
             continue
 
@@ -180,16 +179,32 @@ def fetch_transfer_data(session):
         if not tf_code:
             continue
 
-        # Format tanggal & hitung aging jam
+        # 2. FILTER TAHUN >= 2026
         tgl_str = strip_html(row.get("stf_created") or row.get("tanggal") or "")
+        doc_year = None
         aging_jam = 0.0
-        try:
-            dt_tf = datetime.strptime(tgl_str[:19], "%Y-%m-%d %H:%M:%S")
-            aging_jam = round((datetime.now() - dt_tf).total_seconds() / 3600.0, 1)
-        except Exception:
-            pass
 
-        # AMAN DARI ERROR VALUEERROR INT DENGAN safe_int_val
+        # Cek dari teks tanggal
+        if tgl_str:
+            for fmt in ("%Y-%m-%d %H:%M:%S", "%d-%m-%Y %H:%M:%S", "%Y-%m-%d", "%d/%m/%Y %H:%M:%S"):
+                try:
+                    dt_tf = datetime.strptime(tgl_str[:19].strip(), fmt)
+                    doc_year = dt_tf.year
+                    aging_jam = round((datetime.now() - dt_tf).total_seconds() / 3600.0, 1)
+                    break
+                except Exception:
+                    pass
+
+        # Cek cadangan dari nomor kode TF (misal: TF2026...)
+        if doc_year is None:
+            m_year = re.search(r'TF(\d{4})', tf_code)
+            if m_year:
+                doc_year = int(m_year.group(1))
+
+        # JIKA TAHUN DI BAWAH 2026 -> LANGSUNG LEWATI (SKIP)
+        if doc_year is not None and doc_year < 2026:
+            continue
+
         open_headers.append({
             "stf_code": tf_code,
             "user_name": strip_html(row.get("u_name") or "-"),
@@ -205,7 +220,7 @@ def fetch_transfer_data(session):
             "synced_at": datetime.now().isoformat()
         })
 
-        # TARIK RINCIAN ITEM BARANG PER NOMOR TF
+        # 3. Tarik Rincian Barang per Dokumen TF Tahun >= 2026
         url_detail = "https://jezpro.id/in_transfer_bin_datatables"
         params_det = {
             "draw": "1",
@@ -237,9 +252,8 @@ def fetch_transfer_data(session):
                     "synced_at": datetime.now().isoformat()
                 })
 
-    print(f"   -> BERHASIL! Didapat {len(open_headers)} Dokumen Terbuka & {len(open_items)} Detail Barang.")
+    print(f"   -> BERHASIL! Didapat {len(open_headers)} Dokumen Terbuka (Tahun >= 2026) & {len(open_items)} Detail Barang.")
     return open_headers, open_items
-
 # ------------------------------------------------------------------------------
 # PUSH KE SUPABASE
 # ------------------------------------------------------------------------------
