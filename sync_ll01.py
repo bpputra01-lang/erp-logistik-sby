@@ -5,7 +5,7 @@ import re
 import time
 from datetime import datetime, timezone, timedelta
 from bs4 import BeautifulSoup
-import pandas as pd
+
 
 # ==============================================================================
 # 1. KREDENSIAL & MAPPING CABANG RESMI JEZPRO
@@ -207,14 +207,19 @@ def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
                     "synced_at": datetime.now(timezone(timedelta(hours=7))).isoformat()
                 })
 
-    # 🛑 PASTIKAN 100% TIDAK ADA PLST_ID KEMBAR DI LIST YANG DIKIRIM
-    df_temp = pd.DataFrame(clean_records)
-    if not df_temp.empty:
-        df_temp = df_temp.drop_duplicates(subset=["plst_id"], keep="first")
-        clean_records = df_temp.to_dict(orient="records")
-
-    print(f"   -> Ditemukan total {len(clean_records)} baris unik staging {kategori_label}.")
-    return clean_records
+print(f"   -> Ditemukan total {len(clean_records)} baris staging {kategori_label}.")
+    
+    # --- PEMBERSIH DUPLIKAT PLST_ID MURNI PYTHON (TANPA PANDAS) ---
+    seen_ids = set()
+    unique_records = []
+    for rec in clean_records:
+        pid = rec["plst_id"]
+        if pid not in seen_ids:
+            seen_ids.add(pid)
+            unique_records.append(rec)
+            
+    print(f"   -> Setelah dibersihkan (unik), tersisa {len(unique_records)} baris staging {kategori_label}.")
+    return unique_records
 # ==============================================================================
 # 2. MODUL TRANSFER STOK (ALL AREA LINTAS CABANG)
 # ==============================================================================
