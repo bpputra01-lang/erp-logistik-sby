@@ -2177,7 +2177,7 @@ def render_sap_ll01_summary_tree(state: AppState):
     c_sa_total = len(sa_items)
 
     buffer_items = state.get_filtered_ll01_special_stock()
-    c_buf_total = len(buffer_itacems)
+    c_buf_total = len(buffer_items)
     c_buf_karan = sum(1 for x in buffer_items if "KARANTINA" in str(x.get("tipe_bin", "")))
     c_buf_inb = sum(1 for x in buffer_items if "INBOUND" in str(x.get("tipe_bin", "")))
     c_buf_out = sum(1 for x in buffer_items if "OUT" in str(x.get("tipe_bin", "")))
