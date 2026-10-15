@@ -4699,6 +4699,8 @@ def server(input: Inputs, output: Outputs, session: Session):
             with reactive.isolate():
                 if not state.ll01_data_list():
                     state.load_ll01_data_from_supabase()
+                if not state.ll01_tf_headers():
+                    state.load_transfer_orders_from_supabase()
 
     # Download Excel Report
     @render.download(
@@ -4727,28 +4729,44 @@ def server(input: Inputs, output: Outputs, session: Session):
         ui.notification_show("✅ Data Staging & Transfer Stok berhasil diperbarui dari Cloud!", type="message", duration=4)
 
     # Pop-Up Modal Detail Item Transfer
+    # Pop-Up Modal Detail Item Transfer (Direct Query Supabase - Bebas Limit)
     @reactive.Effect
     @reactive.event(input.btn_open_tf_items_modal)
     def _open_tf_detail():
-        tf_code = input.btn_open_tf_items_modal()
-        all_items = state.ll01_tf_items()
-        matched_items = [it for it in all_items if it.get("stf_code") == tf_code]
+        raw_code = input.btn_open_tf_items_modal()
+        tf_code = str(raw_code).strip()
 
+        # 1. TEMBAK LANGSUNG KE SUPABASE KHUSUS UNTUK NOMOR TF INI
+        client = get_supabase()
+        res_items = client.table("jezpro_transfer_items") \
+                          .select("*") \
+                          .in_("stf_code", [tf_code]) \
+                          .execute()
+
+        matched_items = res_items.data if res_items and res_items.data else []
+
+        # 2. SUSUN TABEL RINCIAN ITEM
         rows = []
         for idx, it in enumerate(matched_items, start=1):
+            art_clean = str(it.get("article_name", "-"))
+            # Jika nama artikel masih memuat kode HTML, bersihkan otomatis
+            if "<" in art_clean:
+                from bs4 import BeautifulSoup
+                art_clean = BeautifulSoup(art_clean, "html.parser").get_text(" ", strip=True)
+
             rows.append(ui.tags.tr(
                 ui.tags.td(str(idx), style="text-align: center; font-weight: bold;"),
-                ui.tags.td(str(it.get("article_name", "-")), style="font-weight: 700;"),
+                ui.tags.td(art_clean, style="font-weight: 700; color: #1A202C; max-width: 320px; white-space: normal;"),
                 ui.tags.td(ui.tags.code(str(it.get("bin_asal", "-")), style="font-weight: bold; color: #2B6CB0;")),
                 ui.tags.td(f"{it.get('qty_tf', 1)} Pcs", style="text-align: center; font-weight: 800; color: #E50914;"),
                 ui.tags.td(f"{it.get('qty_in_bin', 0)} Pcs", style="text-align: center; color: #718096;"),
-                ui.tags.td(f"{it.get('start_store', '-')} ➔ {it.get('end_store', '-')}")
+                ui.tags.td(f"{it.get('start_store', '-')} ➔ {it.get('end_store', '-')}", style="font-size: 12px;")
             ))
 
         ui.modal_show(ui.modal(
             ui.div(
-                ui.h4(f"📋 Rincian Item Barang: {tf_code}", style="font-weight: 800; color: #1A202C; margin-bottom: 8px; font-size: 15px;"),
-                ui.p(f"Total {len(matched_items)} item barang yang sedang dalam proses transfer.", style="color: #718096; font-size: 12px; margin-bottom: 12px;"),
+                ui.h4(f"📋 Rincian Item Barang: {tf_code}", style="font-weight: 800; color: #1A202C; margin-bottom: 4px; font-size: 15px;"),
+                ui.p(f"Ditemukan total {len(matched_items)} item barang pada dokumen transfer ini.", style="color: #718096; font-size: 12px; margin-bottom: 12px;"),
                 ui.tags.table(
                     ui.tags.thead(ui.tags.tr(
                         ui.tags.th("NO", style="text-align: center;"),
@@ -4759,7 +4777,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                         ui.tags.th("RUTE STORE")
                     )),
                     ui.tags.tbody(*rows) if rows else ui.tags.tr(
-                        ui.tags.td("Rincian barang kosong.", colspan=6, style="text-align: center; padding: 1.5rem; color: #718096;")
+                        ui.tags.td("Rincian barang kosong pada dokumen transfer ini.", colspan=6, style="text-align: center; padding: 1.5rem; color: #718096; font-style: italic;")
                     ),
                     class_="custom-clean-table", style="width: 100%; border: 1px solid #CBD5E0; border-radius: 8px;"
                 ),
