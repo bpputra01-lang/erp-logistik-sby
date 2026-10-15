@@ -557,6 +557,22 @@ def fetch_single_adjustment_data(session):
     clean_single_records = []
 
     for idx, row in enumerate(raw_single):
+        status_raw = strip_html(row.get("ba_status") or "").upper()
+        approve_raw = strip_html(row.get("ba_approve") or "").upper()
+
+        # 🛑 1. ABAIKAN YANG SUDAH DONE / CANCEL
+        if any(x in status_raw for x in ["DONE", "SELESAI", "CANCEL", "BATAL"]):
+            continue
+
+        # ✅ 2. HANYA AMBIL YANG BUTUH APPROVAL (MENUNGGU / PENDING / BELUM ADA APPROVER)
+        is_need_approval = (
+            any(k in status_raw for k in ["MENUNGGU", "PENDING", "NEED", "WAITING", "PROGRESS", "DRAFT"])
+            or approve_raw in ["-", "", "NONE", "NAN"]
+            or "MENUNGGU" in approve_raw
+        )
+        if not is_need_approval:
+            continue
+
         ba_id_val = safe_int_val(row.get("ba_id") or row.get("id"))
         raw_code = strip_html(row.get("ba_code") or "-")
         if not ba_id_val:
@@ -581,7 +597,7 @@ def fetch_single_adjustment_data(session):
             "adjust_qty": safe_int_val(row.get("adjust")),
             "note": strip_html(row.get("ba_note") or "-"),
             "proof_file": strip_html(row.get("ba_proof_file") or "-"),
-            "status": strip_html(row.get("ba_status") or "-"),
+            "status": strip_html(row.get("ba_status") or "Menunggu"),
             "updated_at": strip_html(row.get("ba_updated_at") or ""),
             "synced_at": now_wib.isoformat()
         })
