@@ -2,7 +2,7 @@ import os
 import json
 import requests
 import re
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from bs4 import BeautifulSoup
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
@@ -11,7 +11,6 @@ JEZPRO_EMAIL = os.environ.get("JEZPRO_EMAIL")
 JEZPRO_PASS  = os.environ.get("JEZPRO_PASSWORD")
 
 def strip_html(val):
-    """Membersihkan seluruh tag HTML dan menyisakan teks bersih"""
     if not val:
         return ""
     s = str(val)
@@ -20,7 +19,6 @@ def strip_html(val):
     return s.strip()
 
 def safe_int_val(val, default=0):
-    """Mengekstrak angka integer murni meskipun terbungkus tag HTML span"""
     if not val:
         return default
     s = strip_html(val)
@@ -130,8 +128,9 @@ def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
         })
     print(f"   -> Ditemukan {len(clean_records)} baris staging {kategori_label}.")
     return clean_records
+
 # ------------------------------------------------------------------------------
-# 2. TARIK DATA TRANSFER STOCK (HANYA DRAFT & IN PROGRESS TAHUN >= 2026)
+# 2. TARIK DATA TRANSFER STOCK (WIB TIMEZONE & ANTI-MINUS)
 # ------------------------------------------------------------------------------
 def fetch_transfer_data(session):
     print("🚚 [3/5] Menarik data Transfer Stok (Khusus Tahun >= 2026)...")
@@ -168,10 +167,12 @@ def fetch_transfer_data(session):
     open_headers = []
     open_items = []
 
+    # Waktu acuan saat ini dalam WIB (UTC+7)
+    now_wib = datetime.now(timezone(timedelta(hours=7))).replace(tzinfo=None)
+
     for row in raw_history:
         status_txt = strip_html(row.get("stf_status") or row.get("status") or "").upper()
 
-        # 1. Filter Status: Hanya DRAFT atau IN PROGRESS
         if status_txt not in ["DRAFT", "IN PROGRESS"]:
             continue
 
@@ -179,58 +180,56 @@ def fetch_transfer_data(session):
         if not tf_code:
             continue
 
-        # 2. FILTER TAHUN >= 2026
         tgl_str = strip_html(row.get("stf_created") or row.get("tanggal") or "")
         doc_year = None
         aging_jam = 0.0
 
-        # Cek dari teks tanggal
         if tgl_str:
             for fmt in ("%Y-%m-%d %H:%M:%S", "%d-%m-%Y %H:%M:%S", "%Y-%m-%d", "%d/%m/%Y %H:%M:%S"):
                 try:
                     dt_tf = datetime.strptime(tgl_str[:19].strip(), fmt)
                     doc_year = dt_tf.year
-                    aging_jam = round((datetime.now() - dt_tf).total_seconds() / 3600.0, 1)
+                    # Hitung selisih jam terhadap WIB sekarang (anti-minus)
+                    diff_sec = (now_wib - dt_tf).total_seconds()
+                    aging_jam = max(0.0, round(diff_sec / 3600.0, 1))
                     break
                 except Exception:
                     pass
 
-        # Cek cadangan dari nomor kode TF (misal: TF2026...)
         if doc_year is None:
             m_year = re.search(r'TF(\d{4})', tf_code)
             if m_year:
                 doc_year = int(m_year.group(1))
 
-        # JIKA TAHUN DI BAWAH 2026 -> LANGSUNG LEWATI (SKIP)
         if doc_year is not None and doc_year < 2026:
             continue
 
         open_headers.append({
             "stf_code": tf_code,
-            "user_name": strip_html(row.get("u_name") or "-"),
+            "u_name": strip_html(row.get("u_name") or "-"),
             "stf_notes": strip_html(row.get("stf_notes") or "-"),
             "qty_send": safe_int_val(row.get("qty_send")),
             "qty_receive": safe_int_val(row.get("qty_receive")),
             "start_store": strip_html(row.get("start_store") or "-"),
             "end_store": strip_html(row.get("end_store") or "-"),
             "u_name_receive": strip_html(row.get("u_name_receive") or "-"),
-            "stf_created": tgl_str if tgl_str else datetime.now().isoformat(),
+            "stf_created": tgl_str if tgl_str else now_wib.isoformat(),
             "stf_status": status_txt,
-            "aging_hours": aging_jam,
-            "synced_at": datetime.now().isoformat()
+            "aging_hours": float(aging_jam),
+            "synced_at": now_wib.isoformat()
         })
 
-        # 3. Tarik Rincian Barang per Dokumen TF Tahun >= 2026
+        # TARIK DETAIL BARANG PER DOKUMEN TF
         url_detail = "https://jezpro.id/in_transfer_bin_datatables"
         params_det = {
             "draw": "1",
-            "columns[0][data]": "article", "columns[0][name]": "article",
-            "columns[1][data]": "pl_code", "columns[1][name]": "pl_code",
-            "columns[2][data]": "stfd_qty", "columns[2][name]": "stfd_qty",
-            "columns[3][data]": "pls_qty", "columns[3][name]": "pls_qty",
-            "columns[4][data]": "st_start", "columns[4][name]": "st_start",
-            "columns[5][data]": "st_end", "columns[5][name]": "st_end",
-            "columns[6][data]": "status", "columns[6][name]": "status",
+            "columns[0][data]": "article", "columns[0][name]": "article", "columns[0][searchable]": "true", "columns[0][orderable]": "false", "columns[0][search][value]": "", "columns[0][search][regex]": "false",
+            "columns[1][data]": "pl_code", "columns[1][name]": "pl_code", "columns[1][searchable]": "true", "columns[1][orderable]": "false", "columns[1][search][value]": "", "columns[1][search][regex]": "false",
+            "columns[2][data]": "stfd_qty", "columns[2][name]": "stfd_qty", "columns[2][searchable]": "true", "columns[2][orderable]": "false", "columns[2][search][value]": "", "columns[2][search][regex]": "false",
+            "columns[3][data]": "pls_qty", "columns[3][name]": "pls_qty", "columns[3][searchable]": "true", "columns[3][orderable]": "false", "columns[3][search][value]": "", "columns[3][search][regex]": "false",
+            "columns[4][data]": "st_start", "columns[4][name]": "st_start", "columns[4][searchable]": "true", "columns[4][orderable]": "false", "columns[4][search][value]": "", "columns[4][search][regex]": "false",
+            "columns[5][data]": "st_end", "columns[5][name]": "st_end", "columns[5][searchable]": "true", "columns[5][orderable]": "false", "columns[5][search][value]": "", "columns[5][search][regex]": "false",
+            "columns[6][data]": "status", "columns[6][name]": "status", "columns[6][searchable]": "true", "columns[6][orderable]": "false", "columns[6][search][value]": "", "columns[6][search][regex]": "false",
             "order[0][column]": "0", "order[0][dir]": "desc",
             "start": "0", "length": "1000", "search": "",
             "stf_code": tf_code
@@ -249,11 +248,12 @@ def fetch_transfer_data(session):
                     "start_store": strip_html(it.get("st_start") or "-"),
                     "end_store": strip_html(it.get("st_end") or "-"),
                     "status": status_txt,
-                    "synced_at": datetime.now().isoformat()
+                    "synced_at": now_wib.isoformat()
                 })
 
     print(f"   -> BERHASIL! Didapat {len(open_headers)} Dokumen Terbuka (Tahun >= 2026) & {len(open_items)} Detail Barang.")
     return open_headers, open_items
+
 # ------------------------------------------------------------------------------
 # PUSH KE SUPABASE
 # ------------------------------------------------------------------------------
@@ -275,6 +275,8 @@ def push_all_to_supabase(staging_data, tf_headers, tf_items):
     if tf_headers:
         res_tfh = requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_transfer_headers", data=json.dumps(tf_headers), headers=headers)
         print(f"   Status Transfer Headers: {res_tfh.status_code}")
+        if res_tfh.status_code not in [200, 201]:
+            print(f"   ⚠️ Detail Alasan Ditolak Supabase: {res_tfh.text}")
 
     # 3. Transfer Items
     if tf_items:
