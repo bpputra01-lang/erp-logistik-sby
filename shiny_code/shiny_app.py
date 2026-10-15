@@ -4705,6 +4705,8 @@ def server(input: Inputs, output: Outputs, session: Session):
                     state.load_mass_adjustments_from_supabase()
                 if not state.ll01_special_stock_list():
                     state.load_special_buffer_stock_from_supabase()
+                if not state.ll01_single_adj_list():
+                    state.load_single_adjustments_from_supabase()
 
     # Download Excel Report
     @render.download(
@@ -4729,9 +4731,11 @@ def server(input: Inputs, output: Outputs, session: Session):
     def _on_refresh_ll01_all():
         s1, m1 = state.load_ll01_data_from_supabase()
         s2, m2 = state.load_transfer_orders_from_supabase()
+        s3, m3 = state.load_mass_adjustments_from_supabase()
+        s4, m4 = state.load_single_adjustments_from_supabase()
+        s5, m5 = state.load_special_buffer_stock_from_supabase()
         ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
-        ui.notification_show("✅ Data Staging & Transfer Stok berhasil diperbarui dari Cloud!", type="message", duration=4)
-
+        ui.notification_show("✅ Seluruh data Warehouse Activity Monitor (termasuk Single Adjustment) berhasil diperbarui!", type="message", duration=4)
     # ==========================================================================
     # POP-UP DETAIL ITEM TRANSFER (ANTI-CRASH, NATIVE REGEX, DIRECT QUERY)
     # ==========================================================================
@@ -4906,6 +4910,32 @@ def server(input: Inputs, output: Outputs, session: Session):
 
         with pd.ExcelWriter(buf, engine='openpyxl') as writer:
             df_export.to_excel(writer, sheet_name='BUFFER_TRANSIT_STOCK', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+        @reactive.Effect
+    @reactive.event(input.change_ll01_single_branch)
+    def _on_change_ll01_sa_br():
+        state.ll01_single_adj_filter_branch.set(input.change_ll01_single_branch())
+
+    @reactive.Effect
+    @reactive.event(input.change_ll01_single_status)
+    def _on_change_ll01_sa_st():
+        state.ll01_single_adj_filter_status.set(input.change_ll01_single_status())
+
+    @render.download(
+        filename=lambda: f"SINGLE_ADJUSTMENT_{datetime.now().strftime('%d_%m_%Y_%H%M')}.xlsx"
+    )
+    def btn_dl_ll01_single_adj():
+        buf = io.BytesIO()
+        df_export = pd.DataFrame(state.get_filtered_single_adj_data())
+        if not df_export.empty:
+            cols = [c for c in ['ba_code', 'store_name', 'bin_code', 'barcode_sku', 'article_name', 'brand', 'size_variant', 'old_qty', 'new_qty', 'adjust_qty', 'cogs', 'status', 'note', 'creator', 'updated_at'] if c in df_export.columns]
+            df_export = df_export[cols]
+        else:
+            df_export = pd.DataFrame(columns=["ba_code", "store_name", "bin_code", "barcode_sku", "article_name", "brand", "size_variant", "old_qty", "new_qty", "adjust_qty", "cogs", "status", "note", "creator", "updated_at"])
+
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            df_export.to_excel(writer, sheet_name='SINGLE_ADJUSTMENT', index=False)
         buf.seek(0)
         yield buf.getvalue()
 app = App(app_ui, server)

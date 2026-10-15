@@ -540,6 +540,10 @@ class AppState:
         self.ll01_ma_headers = reactive.Value([])
         self.ll01_ma_filter_status = reactive.Value("SEMUA")
         self.ll01_ma_filter_aging = reactive.Value("SEMUA")
+        # --- SINGLE ADJUSTMENT (TABEL JEZPRO_SINGLE_ADJUSTMENTS) ---
+        self.ll01_single_adj_list = reactive.Value([])
+        self.ll01_single_adj_filter_branch = reactive.Value("SEMUA")
+        self.ll01_single_adj_filter_status = reactive.Value("SEMUA")
         # --- TAB 4: BUFFER & TRANSIT STOCK (KARANTINA, INB, PUTAWAY, OUT) ---
         self.ll01_special_stock_list = reactive.Value([])
         self.ll01_stock_filter_branch = reactive.Value("SEMUA")
@@ -6553,3 +6557,46 @@ class AppState:
 
     def ll01_stock_metric_out_qty(self) -> int:
         return sum([safe_int(x.get("qty", 0)) for x in self.get_filtered_ll01_special_stock() if "OUT" in str(x.get("tipe_bin", ""))])
+
+# ==========================================================================
+    # LOGIKA SINGLE ADJUSTMENT DARI SUPABASE (TABLE: jezpro_single_adjustments)
+    # ==========================================================================
+    def load_single_adjustments_from_supabase(self):
+        """Menarik seluruh transaksi Single Adjustment dari tabel Supabase jezpro_single_adjustments"""
+        try:
+            client = get_supabase()
+            if not client:
+                return False, "Koneksi Supabase gagal!"
+
+            res = client.table("jezpro_single_adjustments").select("*").order("updated_at", desc=True).limit(5000).execute()
+            data = res.data if res and res.data else []
+            self.ll01_single_adj_list.set(data)
+            return True, f"Berhasil memuat {len(data):,} baris Single Adjustment."
+        except Exception as e:
+            print("Gagal load Single Adjustment Supabase:", e)
+            return False, f"Terjadi kesalahan: {str(e)}"
+
+    def get_filtered_single_adj_data(self) -> list[dict]:
+        data = self.ll01_single_adj_list()
+        br_flt = self.ll01_single_adj_filter_branch()
+        st_flt = self.ll01_single_adj_filter_status()
+
+        res = data
+        if br_flt != "SEMUA":
+            res = [x for x in res if br_flt.upper() in str(x.get("store_name", "")).upper()]
+        if st_flt != "SEMUA":
+            res = [x for x in res if st_flt.upper() in str(x.get("status", "")).upper()]
+        return res
+
+    # Metrik Single Adjustment
+    def ll01_single_adj_metric_total(self) -> int:
+        return len(self.get_filtered_single_adj_data())
+
+    def ll01_single_adj_metric_qty(self) -> int:
+        return sum([abs(safe_int(x.get("adjust_qty", 0))) for x in self.get_filtered_single_adj_data()])
+
+    def ll01_single_adj_metric_plus(self) -> int:
+        return sum([safe_int(x.get("adjust_qty", 0)) for x in self.get_filtered_single_adj_data() if safe_int(x.get("adjust_qty", 0)) > 0])
+
+    def ll01_single_adj_metric_minus(self) -> int:
+        return sum([abs(safe_int(x.get("adjust_qty", 0))) for x in self.get_filtered_single_adj_data() if safe_int(x.get("adjust_qty", 0)) < 0])

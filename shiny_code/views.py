@@ -2265,21 +2265,18 @@ def warehouse_activity_monitor_view(state: AppState):
     )
 
     # ==========================================================================
-    # TAB 3: MULTIPLE ADJUSTMENT (MENGGANTUNG & CANCEL)
+    # TAB 3: ALL ADJUSTMENT (MULTIPLE ADJUSTMENT & SINGLE ADJUSTMENT)
     # ==========================================================================
+    # 1. DATA MULTIPLE ADJUSTMENT (MADJ)
     ma_headers = state.get_filtered_ma_data()
     ma_rows = []
     for idx_ma, ma in enumerate(ma_headers, start=1):
-        st_cat = ma.get("status_category", "")
+        st_cat = ma.get("status_category", "MENGGANTUNG")
         ma_id = ma.get("ma_id", "")
         aging = float(ma.get("aging_hours") or 0)
-        is_crit = aging >= 24.0 and st_cat == "MENGGANTUNG"
+        is_crit = aging >= 24.0
 
-        badge_ma = (
-            ui.span("MENGGANTUNG", style="background: #FEFCBF; color: #744210; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 4px;")
-            if st_cat == "MENGGANTUNG" else
-            ui.span("CANCEL", style="background: #FED7D7; color: #9B2C2C; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 4px;")
-        )
+        badge_ma = ui.span("MENGGANTUNG", style="background: #FEFCBF; color: #744210; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 4px;")
 
         btn_detail = ui.tags.button(
             ui.tags.i(class_="fa-solid fa-list-check", style="margin-right: 4px;"), "Lihat Item",
@@ -2290,7 +2287,7 @@ def warehouse_activity_monitor_view(state: AppState):
         ma_rows.append(ui.tags.tr(
             ui.tags.td(str(idx_ma), style="text-align: center; font-weight: bold;"),
             ui.tags.td(badge_ma, style="text-align: center;"),
-            ui.tags.td(ui.tags.b(str(ma.get("ma_code", f"MA-{ma_id}")), style="color: #2D3748;")),
+            ui.tags.td(ui.tags.b(str(ma.get("ma_code", f"MADJ-{ma_id}")), style="color: #2D3748;")),
             ui.tags.td(str(ma.get("store_name", "-")), style="font-weight: 600;"),
             ui.tags.td(str(ma.get("u_name", "-"))),
             ui.tags.td(str(ma.get("approve", "-")), style="font-size: 11.5px; max-width: 200px; white-space: normal;"),
@@ -2300,26 +2297,116 @@ def warehouse_activity_monitor_view(state: AppState):
             ui.tags.td(btn_detail, style="text-align: center;")
         ))
 
-    headers_ma = ["NO", "KATEGORI", "KODE MADJ", "STORE", "DIBUAT OLEH", "APPROVAL / CANCEL", "NOTE", "TANGGAL DIBUAT", "AGING TERTAHAN", "RINCIAN ITEM"]
-    th_ma = [ui.tags.th(h, style="text-align: center;" if h in ["NO", "KATEGORI", "AGING TERTAHAN", "RINCIAN ITEM"] else "") for h in headers_ma]
+    headers_ma = ["NO", "STATUS", "KODE MADJ", "STORE", "DIBUAT OLEH", "APPROVAL", "NOTE", "TANGGAL DIBUAT", "AGING TERTAHAN", "RINCIAN ITEM"]
+    th_ma = [ui.tags.th(h, style="text-align: center;" if h in ["NO", "STATUS", "AGING TERTAHAN", "RINCIAN ITEM"] else "") for h in headers_ma]
 
-    tab3_adjustment = ui.div(
+    sub_madj_ui = ui.div(
+        ui.tags.table(
+            ui.tags.thead(ui.tags.tr(*th_ma)),
+            ui.tags.tbody(*ma_rows) if ma_rows else ui.tags.tr(
+                ui.tags.td("Tidak ada dokumen Multiple Adjustment yang berstatus menggantung.", colspan=10, style="text-align: center; color: #718096; padding: 2rem; font-style: italic;")
+            ),
+            class_="custom-clean-table", style="width: 100%;"
+        ),
+        style="background: white; border-radius: 12px; border: 1px solid #E2E8F0; padding: 1rem; overflow-x: auto;"
+    )
+
+    # 2. DATA SINGLE ADJUSTMENT (ADJ)
+    single_items = state.get_filtered_single_adj_data()
+    sa_rows = []
+    for idx_sa, sa in enumerate(single_items, start=1):
+        st_sa = str(sa.get("status", "Done"))
+        adj_qty = safe_int(sa.get("adjust_qty", 0))
+        adj_color = "#10B981" if adj_qty > 0 else "#E53E3E"
+        adj_sign = f"+{adj_qty}" if adj_qty > 0 else str(adj_qty)
+
+        badge_status = (
+            ui.span(st_sa, style="background: #C6F6D5; color: #22543D; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 4px;")
+            if "DONE" in st_sa.upper() else
+            ui.span(st_sa, style="background: #FEFCBF; color: #744210; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 4px;")
+        )
+
+        cogs_val = safe_int(sa.get("cogs", 0))
+        cogs_str = f"Rp {cogs_val:,}" if cogs_val > 0 else "-"
+
+        sa_rows.append(ui.tags.tr(
+            ui.tags.td(str(idx_sa), style="text-align: center; font-weight: bold;"),
+            ui.tags.td(badge_status, style="text-align: center;"),
+            ui.tags.td(ui.tags.b(str(sa.get("ba_code", "-")), style="color: #2D3748;")),
+            ui.tags.td(str(sa.get("store_name", "-")), style="font-size: 12px;"),
+            ui.tags.td(ui.tags.code(str(sa.get("bin_code", "-")), style="font-weight: bold; color: #2B6CB0;")),
+            ui.tags.td(str(sa.get("barcode_sku", "-")), style="font-weight: 700; color: #1A202C;"),
+            ui.tags.td(str(sa.get("article_name", "-")), style="max-width: 250px; white-space: normal; font-size: 12px;"),
+            ui.tags.td(f"{sa.get('brand', '-')} / {sa.get('size_variant', '-')}", style="font-size: 12px; text-align: center;"),
+            ui.tags.td(f"{sa.get('old_qty', 0)} ➔ {sa.get('new_qty', 0)}", style="text-align: center; font-weight: bold; font-size: 12px; color: #4A5568;"),
+            ui.tags.td(ui.span(adj_sign, style=f"font-weight: 800; color: {adj_color}; font-size: 13px;"), style="text-align: center;"),
+            ui.tags.td(cogs_str, style="text-align: right; font-size: 12px;"),
+            ui.tags.td(str(sa.get("note", "-")), style="font-size: 12px; max-width: 180px; white-space: normal;"),
+            ui.tags.td(str(sa.get("creator", "-")), style="font-size: 12px; color: #4A5568;"),
+            ui.tags.td(str(sa.get("updated_at", "-"))[:16], style="font-size: 11.5px;")
+        ))
+
+    headers_sa = ["NO", "STATUS", "KODE ADJ", "STORE", "BIN", "SKU", "NAMA ARTIKEL", "BRAND / SIZE", "OLD ➔ NEW", "ADJUST", "COGS", "NOTE", "CREATOR", "TANGGAL"]
+    th_sa = [ui.tags.th(h, style="text-align: center;" if h in ["NO", "STATUS", "BRAND / SIZE", "OLD ➔ NEW", "ADJUST", "COGS"] else "") for h in headers_sa]
+
+    sub_single_ui = ui.div(
         ui.div(
-            dark_metric_box("⚖️ TOTAL DOKUMEN MADJ", f"{state.ll01_ma_metric_total():,} DOK", "#3182CE"),
-            dark_metric_box("⏳ STATUS MENGGANTUNG", f"{state.ll01_ma_metric_menggantung():,} DOK", "#C5A059"),
-            dark_metric_box("❌ STATUS CANCEL", f"{state.ll01_ma_metric_cancel():,} DOK", "#E53E3E"),
-            dark_metric_box("🚨 STUCK (>24 JAM)", f"{state.ll01_ma_metric_critical():,} DOK", "#E53E3E"),
-            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+            ui.div(
+                ui.div(
+                    ui.span("Filter Cabang:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
+                    ui.tags.select(
+                        *[ui.tags.option(opt, value=opt, selected=(opt == state.ll01_single_adj_filter_branch())) for opt in ["SEMUA", "JEZ SURABAYA", "JEZ MALANG", "JEZ SIDOARJO", "JEZ KEDIRI", "JEZ JEMBER", "JEZ SEMARANG"]],
+                        onchange="Shiny.setInputValue('change_ll01_single_branch', this.value, {priority: 'event'})",
+                        style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; outline: none; background: white; cursor: pointer; min-width: 160px;"
+                    ),
+                    style="display: flex; flex-direction: column;"
+                ),
+                ui.div(
+                    ui.span("Filter Status:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
+                    ui.tags.select(
+                        *[ui.tags.option(opt, value=opt, selected=(opt == state.ll01_single_adj_filter_status())) for opt in ["SEMUA", "Done", "Menunggu"]],
+                        onchange="Shiny.setInputValue('change_ll01_single_status', this.value, {priority: 'event'})",
+                        style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; outline: none; background: white; cursor: pointer; min-width: 130px;"
+                    ),
+                    style="display: flex; flex-direction: column;"
+                ),
+                style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;"
+            ),
+            ui.div(
+                ui.download_button(
+                    "btn_dl_ll01_single_adj",
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 13px;"), "Download Single Adj (.xlsx)"),
+                    style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer; font-size: 12px;"
+                )
+            ),
+            style="display: flex; justify-content: space-between; align-items: flex-end; width: 100%; margin-bottom: 1rem; flex-wrap: wrap; gap: 10px; background: #F8FAFC; padding: 12px 16px; border-radius: 8px; border: 1px solid #E2E8F0;"
         ),
         ui.div(
             ui.tags.table(
-                ui.tags.thead(ui.tags.tr(*th_ma)),
-                ui.tags.tbody(*ma_rows) if ma_rows else ui.tags.tr(
-                    ui.tags.td("Tidak ada dokumen Multiple Adjustment yang menggantung atau cancel.", colspan=10, style="text-align: center; color: #718096; padding: 2rem; font-style: italic;")
+                ui.tags.thead(ui.tags.tr(*th_sa)),
+                ui.tags.tbody(*sa_rows) if sa_rows else ui.tags.tr(
+                    ui.tags.td("Tidak ada data transaksi Single Adjustment.", colspan=14, style="text-align: center; color: #718096; padding: 2rem; font-style: italic;")
                 ),
                 class_="custom-clean-table", style="width: 100%;"
             ),
             style="background: white; border-radius: 12px; border: 1px solid #E2E8F0; padding: 1rem; overflow-x: auto;"
+        )
+    )
+
+    # 3. KONTEN GABUNGAN TAB 3 (DENGAN 4 METRIK & SUB-PANEL SWITCHER)
+    tab3_adjustment = ui.div(
+        # 4 Kotak Metrik Ringkasan Gabungan
+        ui.div(
+            dark_metric_box("⚖️ TOTAL MADJ MENGGANTUNG", f"{state.ll01_ma_metric_total():,} DOK", "#3182CE"),
+            dark_metric_box("🚨 MADJ STUCK (>24 JAM)", f"{state.ll01_ma_metric_critical():,} DOK", "#E53E3E"),
+            dark_metric_box("📝 TOTAL BARIS SINGLE ADJ", f"{state.ll01_single_adj_metric_total():,} BARIS", "#C5A059"),
+            dark_metric_box("🔄 TOTAL QTY SINGLE ADJ", f"{state.ll01_single_adj_metric_qty():,} PCS", "#10B981"),
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+        ),
+        # Sub-Navset di dalam Tab 3:
+        ui.navset_pill(
+            ui.nav_panel("📋 1. MULTIPLE ADJUSTMENT (MADJ)", sub_madj_ui),
+            ui.nav_panel("📄 2. SINGLE ADJUSTMENT (ADJ PER SKU)", sub_single_ui)
         ),
         style="padding: 1rem 0;"
     )
@@ -2439,10 +2526,10 @@ def warehouse_activity_monitor_view(state: AppState):
             style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 1.25rem 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 10px;"
         ),
         ui.navset_card_tab(
-            ui.nav_panel("📥 1. STAGING TRANSIT (PUTAWAY/REFUND)", tab1_staging),
-            ui.nav_panel("🚚 2. OPEN TRANSFER ORDERS (TF STOCK)", tab2_transfer),
-            ui.nav_panel("⚖️ 3. MULTIPLE ADJUSTMENT (PENDING & CANCEL)", tab3_adjustment),
-            ui.nav_panel("📦 4. STOK BUFFER & TRANSIT (KARANTINA/INB/PUTAWAY/OUT)", tab4_transit_stock)
+            ui.nav_panel("📥 1. ALL WAITING", tab1_staging),
+            ui.nav_panel("🚚 2. TRANSFER ORDER", tab2_transfer),
+            ui.nav_panel("⚖️ 3. ALL ADJUSTMENT", tab3_adjustment),
+            ui.nav_panel("📦 4. OUTSTANDING ITEMS", tab4_transit_stock)
         ),
         style="width: 100%; padding: 1rem;"
     )
