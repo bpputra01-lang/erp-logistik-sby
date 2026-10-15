@@ -145,9 +145,9 @@ def parse_to_iso_timestamp(dt_raw):
         pass
         
     return datetime.now(timezone(timedelta(hours=7))).isoformat()
-def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
-    print(f"📥 [2/6] Menarik data staging [{kategori_label}] untuk seluruh cabang...")
-    url = f"https://jezpro.id/{endpoint_path}"
+def fetch_staging_data(endpoint_path, kategori_label, waiting_val):
+    print(f"📥 [2/6] Menarik data staging [{kategori_label}] untuk SELURUH CABANG...")
+    
     headers = {
         "Accept": "application/json, text/javascript, */*; q=0.01",
         "X-Requested-With": "XMLHttpRequest",
@@ -156,11 +156,37 @@ def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
 
     clean_records = []
     
-    # Loop secara mutlak ke 6 cabang yang ada di BRANCH_MAP
     for branch_name, b_info in BRANCH_MAP.items():
         st_id = b_info["st_id"]
-        branch_records_count = 0
         
+        # Buat sesi login baru khusus untuk cabang ini agar server Jezpro merespons data cabang tersebut
+        try:
+            branch_session = requests.Session()
+            branch_session.headers.update({
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            })
+            
+            res_lp = branch_session.get("https://jezpro.id/")
+            soup = BeautifulSoup(res_lp.text, "html.parser")
+            token_input = soup.find("input", {"name": "_token"})
+            if not token_input:
+                continue
+            
+            payload = {
+                "_token": token_input.get("value"),
+                "u_email": JEZPRO_EMAIL,
+                "password": JEZPRO_PASS,
+                "st_id": str(st_id) # Paksa switch store saat login jika didukung
+            }
+            branch_session.post("https://jezpro.id/user_login", data=payload, headers={"Referer": "https://jezpro.id/"})
+            
+            # Request cookie switch store jika ada endpoint khusus store switcher Jezpro
+            branch_session.get(f"https://jezpro.id/change_store?st_id={st_id}")
+        except Exception as e:
+            print(f"   ⚠️ Gagal switch session untuk {branch_name}: {e}")
+            continue
+
+        url = f"https://jezpro.id/{endpoint_path}"
         params = {
             "draw": "1", "columns[0][data]": "article", "columns[0][name]": "article",
             "columns[0][searchable]": "true", "columns[0][orderable]": "false",
@@ -171,9 +197,8 @@ def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
             "waiting": waiting_val
         }
 
-        res = session.get(url, params=params, headers=headers)
+        res = branch_session.get(url, params=params, headers=headers)
         if res.status_code != 200:
-            print(f"   ⚠️ Gagal tarik data {branch_name} (HTTP {res.status_code})")
             continue
         
         try:
@@ -181,6 +206,7 @@ def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
         except Exception:
             raw_list = []
 
+        branch_found_count = 0
         for idx_item, item in enumerate(raw_list):
             raw_art = item.get("article") or item.get("art_name") or "-"
             parsed = clean_html_card(raw_art)
@@ -205,17 +231,15 @@ def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
                 "pic_name": strip_html(item.get("user_name") or item.get("scanned_by") or "Petugas"),
                 "scanned_at": scanned_iso,
                 "store_id": int(st_id),
-                "raw_json": item,
                 "synced_at": datetime.now(timezone(timedelta(hours=7))).isoformat()
             })
-            branch_records_count += 1
+            branch_found_count += 1
 
-        if branch_records_count > 0:
-            print(f"   -> {branch_name} (st_id: {st_id}): Ditemukan {branch_records_count} baris {kategori_label}.")
+        if branch_found_count > 0:
+            print(f"   -> {branch_name} (st_id: {st_id}): Ditemukan {branch_found_count} baris {kategori_label}.")
+        time.sleep(0.1)
 
-    print(f"   -> Total keseluruhan sebelum dibersihkan: {len(clean_records)} baris staging {kategori_label}.")
-    
-    # --- PEMBERSIH DUPLIKAT PLST_ID MURNI PYTHON ---
+    # PEMBERSIH DUPLIKAT PLST_ID MURNI PYTHON
     seen_ids = set()
     unique_records = []
     for rec in clean_records:
@@ -224,7 +248,7 @@ def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
             seen_ids.add(pid)
             unique_records.append(rec)
             
-    print(f"   -> Setelah dibersihkan (unik), tersisa {len(unique_records)} baris staging {kategori_label} dari semua cabang.")
+    print(f"   -> Total akhir unik staging {kategori_label}: {len(unique_records)} baris.")
     return unique_records
 # ==============================================================================
 # 2. MODUL TRANSFER STOK (ALL AREA LINTAS CABANG)
@@ -779,9 +803,10 @@ if __name__ == "__main__":
     jez = create_jezpro_session()
     
     # 1. Staging (All Area)
+    # 1. Staging (All Area dengan Switch Sesi Cabang)
     all_staging = []
-    all_staging.extend(fetch_staging_data(jez, "scan_product_in_datatables", "MASUK_RAK", "WAITING OFFLINE"))
-    all_staging.extend(fetch_staging_data(jez, "scan_product_in_refund_datatables", "REFUND", "Refund"))
+    all_staging.extend(fetch_staging_data("scan_product_in_datatables", "MASUK_RAK", "WAITING OFFLINE"))
+    all_staging.extend(fetch_staging_data("scan_product_in_refund_datatables", "REFUND", "Refund"))
     
     # 2. Transfer Stok (All Area)
     tf_headers, tf_items = fetch_transfer_data(jez)
