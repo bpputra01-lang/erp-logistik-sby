@@ -2263,9 +2263,6 @@ def render_sap_ll01_summary_tree(state: AppState):
 # ==============================================================================
 # VIEW: WAREHOUSE ACTIVITY MONITOR (DENGAN SAP LL01 TREE & 4 TAB BERGESER)
 # ==============================================================================
-# ==============================================================================
-# VIEW: WAREHOUSE ACTIVITY MONITOR (GLOBAL FILTER DI ATAS SUMMARY + 4 TAB)
-# ==============================================================================
 def warehouse_activity_monitor_view(state: AppState):
     
     # 1. BARIS FILTER GLOBAL TUNGGAL (POSISI DI ATAS SEBELUM SUMMARY)
@@ -2352,24 +2349,52 @@ def warehouse_activity_monitor_view(state: AppState):
     )
 
     # ==========================================================================
-    # TAB 2: TRANSFER ORDER (IN / OUT BERDASARKAN SURABAYA)
+    # TAB 2: TRANSFER ORDER (STATUS SUPABASE & SUMMARY BERDASARKAN BRANCH)
     # ==========================================================================
+    sel_branch_tf = state.ll01_global_store().replace("JEZ ", "").strip().upper()
     tf_headers = state.get_filtered_tf_headers()
+    
+    count_tf_in, count_tf_out, qty_tf_in, qty_tf_out, stuck_tf = 0, 0, 0, 0, 0
     tf_rows = []
+    
     for idx_tf, tf in enumerate(tf_headers, start=1):
-        st = tf.get("stf_status", "")
+        st = str(tf.get("stf_status", "DRAFT")).upper()
         code = tf.get("stf_code", "")
         start_st = str(tf.get("start_store", "")).upper()
         end_st = str(tf.get("end_store", "")).upper()
         aging = float(tf.get("aging_hours") or 0)
         is_crit = aging >= 24.0
+        q_send = safe_int(tf.get("qty_send", 0))
 
-        if "SURABAYA" in start_st and "SURABAYA" not in end_st:
-            io_badge = ui.span("TF OUT ➔", style="background: #FED7D7; color: #9B2C2C; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 4px;")
-        elif "SURABAYA" in end_st and "SURABAYA" not in start_st:
-            io_badge = ui.span("⬅️ TF IN", style="background: #C6F6D5; color: #22543D; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 4px;")
+        if aging >= 24.0:
+            stuck_tf += 1
+
+        # Kalkulasi In/Out berdasarkan branch global yang dipilih
+        if sel_branch_tf != "SEMUA":
+            if sel_branch_tf in end_st and sel_branch_tf not in start_st:
+                count_tf_in += 1
+                qty_tf_in += q_send
+            elif sel_branch_tf in start_st and sel_branch_tf not in end_st:
+                count_tf_out += 1
+                qty_tf_out += q_send
+            else:
+                if sel_branch_tf in start_st:
+                    count_tf_out += 1
+                    qty_tf_out += q_send
+                if sel_branch_tf in end_st:
+                    count_tf_in += 1
+                    qty_tf_in += q_send
         else:
-            io_badge = ui.span("TRANSFER", style="background: #EBF8FF; color: #2B6CB0; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 4px;")
+            count_tf_out += 1
+            qty_tf_out += q_send
+
+        # Badge Status dari Supabase (stf_status)
+        if "PROGRESS" in st or "IN PROGRESS" in st:
+            status_badge = ui.span("IN PROGRESS", style="background: #FEFCBF; color: #744210; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 4px;")
+        elif "DONE" in st or "FINISH" in st:
+            status_badge = ui.span("DONE", style="background: #C6F6D5; color: #22543D; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 4px;")
+        else:
+            status_badge = ui.span(st if st else "DRAFT", style="background: #EDF2F7; color: #4A5568; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 4px;")
 
         btn_detail = ui.tags.button(
             ui.tags.i(class_="fa-solid fa-list-check", style="margin-right: 4px;"), "Lihat Item",
@@ -2379,24 +2404,25 @@ def warehouse_activity_monitor_view(state: AppState):
 
         tf_rows.append(ui.tags.tr(
             ui.tags.td(str(idx_tf), style="text-align: center; font-weight: bold;"),
-            ui.tags.td(io_badge, style="text-align: center;"),
+            ui.tags.td(status_badge, style="text-align: center;"),
             ui.tags.td(ui.tags.b(code, style="color: #2D3748;")),
             ui.tags.td(f"{start_st} ➔ {end_st}", style="font-weight: 600;"),
             ui.tags.td(str(tf.get("u_name", tf.get("user_name", "-")))),
-            ui.tags.td(f"{tf.get('qty_send', 0):,} Pcs", style="text-align: right; font-weight: 800; color: #E50914;"),
+            ui.tags.td(f"{q_send:,} Pcs", style="text-align: right; font-weight: 800; color: #E50914;"),
             ui.tags.td(str(tf.get("stf_created", "-"))[:16]),
             ui.tags.td(f"{aging} Jam ({round(aging/24, 1)} Hari)", style=f"font-weight: 800; text-align: center; color: {'#E53E3E' if is_crit else '#2F855A'};"),
             ui.tags.td(btn_detail, style="text-align: center;")
         ))
 
-    headers_tf = ["NO", "ARAH (IN/OUT)", "NOMOR TF", "RUTE TRANSFER", "USER PEMBUAT", "QTY KIRIM", "TANGGAL DIBUAT", "AGING TERTAHAN", "RINCIAN BARANG"]
-    th_tf = [ui.tags.th(h, style="text-align: center;" if h in ["NO", "ARAH (IN/OUT)", "QTY KIRIM", "AGING TERTAHAN", "RINCIAN BARANG"] else "") for h in headers_tf]
+    headers_tf = ["NO", "STATUS SUPABASE", "NOMOR TF", "RUTE TRANSFER", "USER PEMBUAT", "QTY KIRIM", "TANGGAL DIBUAT", "AGING TERTAHAN", "RINCIAN BARANG"]
+    th_tf = [ui.tags.th(h, style="text-align: center;" if h in ["NO", "STATUS SUPABASE", "QTY KIRIM", "AGING TERTAHAN", "RINCIAN BARANG"] else "") for h in headers_tf]
 
     tab2_transfer = ui.div(
         ui.div(
-            dark_metric_box("🚚 TOTAL DOKUMEN OPEN TF", f"{len(tf_headers):,} SURAT", "#3182CE"),
-            dark_metric_box("📦 TOTAL QTY KIRIM OPEN", f"{sum([safe_int(x.get('qty_send', 0)) for x in tf_headers]):,} PCS", "#10B981"),
-            dark_metric_box("🚨 STUCK (>24 JAM)", f"{sum([1 for x in tf_headers if float(x.get('aging_hours') or 0) >= 24.0]):,} TF", "#E53E3E"),
+            dark_metric_box("📥 OPEN TF IN", f"{count_tf_in} Dok ({qty_tf_in:,} Pcs)", "#10B981"),
+            dark_metric_box("📤 OPEN TF OUT", f"{count_tf_out} Dok ({qty_tf_out:,} Pcs)", "#3182CE"),
+            dark_metric_box("🚚 TOTAL OPEN TF", f"{len(tf_headers):,} DOK", "#C5A059"),
+            dark_metric_box("🚨 STUCK (>24 JAM)", f"{stuck_tf} Dok", "#E53E3E"),
             style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
         ),
         ui.div(
@@ -2413,7 +2439,7 @@ def warehouse_activity_monitor_view(state: AppState):
     )
 
     # ==========================================================================
-    # TAB 3: ALL ADJUSTMENT (MULTIPLE ADJUSTMENT)
+    # TAB 3: ALL ADJUSTMENT (MULTIPLE & SINGLE ADJUSTMENT DIGABUNG)
     # ==========================================================================
     ma_headers = state.get_filtered_ma_data()
     ma_rows = []
@@ -2445,24 +2471,59 @@ def warehouse_activity_monitor_view(state: AppState):
     headers_ma = ["NO", "STATUS", "KODE MADJ", "STORE", "DIBUAT OLEH", "APPROVAL", "NOTE", "TANGGAL", "AGING", "RINCIAN"]
     th_ma = [ui.tags.th(h, style="text-align: center;" if h in ["NO", "STATUS", "AGING", "RINCIAN"] else "") for h in headers_ma]
 
-    sub_madj_ui = ui.div(
-        ui.tags.table(
-            ui.tags.thead(ui.tags.tr(*th_ma)),
-            ui.tags.tbody(*ma_rows) if ma_rows else ui.tags.tr(
-                ui.tags.td("Tidak ada Multiple Adjustment sesuai filter.", colspan=10, style="text-align: center; color: #718096; padding: 2rem; font-style: italic;")
-            ),
-            class_="custom-clean-table", style="width: 100%;"
-        ),
-        style="background: white; border-radius: 12px; border: 1px solid #E2E8F0; padding: 1rem; overflow-x: auto;"
-    )
+    # Single Adjustment Rows
+    sa_headers = state.get_filtered_single_adj_data()
+    sa_rows = []
+    for idx_sa, sa in enumerate(sa_headers, start=1):
+        q_adj = safe_int(sa.get("adjust_qty", 0))
+        col_q = "#10B981" if q_adj > 0 else "#E53E3E"
+        status_sa = str(sa.get("status", "PENDING")).upper()
+        
+        sa_rows.append(ui.tags.tr(
+            ui.tags.td(str(idx_sa), style="text-align: center; font-weight: bold;"),
+            ui.tags.td(ui.tags.b(str(sa.get("ba_code", "-")), style="color: #2D3748;")),
+            ui.tags.td(str(sa.get("store_name", "-")), style="font-weight: 600;"),
+            ui.tags.td(ui.tags.code(str(sa.get("bin_code", "-")), style="color: #2B6CB0;")),
+            ui.tags.td(str(sa.get("barcode_sku", "-")), style="font-weight: 700;"),
+            ui.tags.td(str(sa.get("article_name", "-")), style="max-width: 220px; white-space: normal;"),
+            ui.tags.td(f"{q_adj:+d} Pcs", style=f"text-align: right; font-weight: 800; color: {col_q};"),
+            ui.tags.td(status_sa, style="text-align: center; font-weight: 700;"),
+            ui.tags.td(str(sa.get("note", "-"))),
+            ui.tags.td(str(sa.get("updated_at", "-"))[:16])
+        ))
+
+    headers_sa = ["NO", "KODE BA", "STORE", "BIN", "SKU", "NAMA ARTIKEL", "QTY ADJ", "STATUS", "NOTE", "TANGGAL"]
+    th_sa = [ui.tags.th(h, style="text-align: center;" if h in ["NO", "QTY ADJ", "STATUS"] else "") for h in headers_sa]
 
     tab3_adjustment = ui.div(
         ui.div(
-            dark_metric_box("⚖️ TOTAL MADJ MENGGANTUNG", f"{len(ma_headers):,} DOK", "#3182CE"),
+            dark_metric_box("⚖️ MADJ MENGGANTUNG", f"{len(ma_headers):,} DOK", "#3182CE"),
+            dark_metric_box("📋 SINGLE ADJUSTMENT", f"{len(sa_headers):,} DOK", "#C5A059"),
             dark_metric_box("🚨 MADJ STUCK (>24 JAM)", f"{sum([1 for x in ma_headers if float(x.get('aging_hours') or 0) >= 24.0]):,} DOK", "#E53E3E"),
             style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
         ),
-        sub_madj_ui,
+        ui.h5("1. Multiple Adjustments (MADJ)", style="font-weight: 800; color: #1A202C; margin: 1rem 0 0.5rem 0; font-size: 14px;"),
+        ui.div(
+            ui.tags.table(
+                ui.tags.thead(ui.tags.tr(*th_ma)),
+                ui.tags.tbody(*ma_rows) if ma_rows else ui.tags.tr(
+                    ui.tags.td("Tidak ada Multiple Adjustment sesuai filter.", colspan=10, style="text-align: center; color: #718096; padding: 1.5rem; font-style: italic;")
+                ),
+                class_="custom-clean-table", style="width: 100%;"
+            ),
+            style="background: white; border-radius: 10px; border: 1px solid #E2E8F0; padding: 1rem; overflow-x: auto; margin-bottom: 1.5rem;"
+        ),
+        ui.h5("2. Single Adjustments (ADJ)", style="font-weight: 800; color: #1A202C; margin: 1rem 0 0.5rem 0; font-size: 14px;"),
+        ui.div(
+            ui.tags.table(
+                ui.tags.thead(ui.tags.tr(*th_sa)),
+                ui.tags.tbody(*sa_rows) if sa_rows else ui.tags.tr(
+                    ui.tags.td("Tidak ada Single Adjustment sesuai filter.", colspan=10, style="text-align: center; color: #718096; padding: 1.5rem; font-style: italic;")
+                ),
+                class_="custom-clean-table", style="width: 100%;"
+            ),
+            style="background: white; border-radius: 10px; border: 1px solid #E2E8F0; padding: 1rem; overflow-x: auto;"
+        ),
         style="padding: 1rem 0;"
     )
 
@@ -2517,7 +2578,7 @@ def warehouse_activity_monitor_view(state: AppState):
     )
 
     # ==========================================================================
-    # RETURN UTAMA: 1 GLOBAL FILTER BAR DI ATAS + SAP LL01 TREE + 4 TAB DI BAWAH
+    # RETURN UTAMA
     # ==========================================================================
     return ui.div(
         ui.div(
@@ -2533,13 +2594,9 @@ def warehouse_activity_monitor_view(state: AppState):
             style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 1.25rem 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 10px;"
         ),
         
-        # 🌟 1. GLOBAL FILTER BAR DI POSISI PALING ATAS
         global_filter_bar,
-
-        # 🌟 2. SAP LL01 SUMMARY TREE (OTOMATIS BERUBAH MENGIKUTI FILTER GLOBAL)
         render_sap_ll01_summary_tree(state),
 
-        # 🌟 3. 4 TAB MENU UTAMA DI BAWAHNYA
         ui.navset_card_tab(
             ui.nav_panel("📥 1. ALL WAITING", tab1_staging),
             ui.nav_panel("🚚 2. TRANSFER ORDER", tab2_transfer),
@@ -2549,7 +2606,6 @@ def warehouse_activity_monitor_view(state: AppState):
         style="width: 100%; padding: 1rem;"
     )
 
-    
 def menu_item(label: str, target_menu: str, current_menu: str):
     import re
     is_active = (current_menu == target_menu)
