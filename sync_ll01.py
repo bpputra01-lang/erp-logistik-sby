@@ -10,6 +10,25 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 JEZPRO_EMAIL = os.environ.get("JEZPRO_EMAIL")
 JEZPRO_PASS  = os.environ.get("JEZPRO_PASSWORD")
 
+def strip_html(val):
+    """Membersihkan seluruh tag HTML dan menyisakan teks bersih"""
+    if not val:
+        return ""
+    s = str(val)
+    if "<" in s:
+        s = re.sub(r'<[^>]+>', '', s)
+    return s.strip()
+
+def safe_int_val(val, default=0):
+    """Mengekstrak angka integer murni meskipun terbungkus tag HTML span"""
+    if not val:
+        return default
+    s = strip_html(val)
+    digits = re.findall(r'-?\d+', s)
+    if digits:
+        return int(digits[0])
+    return default
+
 def create_jezpro_session():
     session = requests.Session()
     session.headers.update({
@@ -31,7 +50,6 @@ def create_jezpro_session():
     session.post("https://jezpro.id/user_login", data=payload, headers={"Referer": "https://jezpro.id/"})
     print("✅ Berhasil login ke Jezpro!")
     
-    # Inisialisasi sesi halaman
     session.get("https://jezpro.id/helper_backup")
     session.get("https://jezpro.id/transfer_stok")
     return session
@@ -102,9 +120,9 @@ def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
             "waiting_status": item.get("waiting") or waiting_val,
             "brand": parsed["brand"] if parsed["brand"] != "-" else (item.get("brand") or "-"),
             "article_name": parsed["article"],
-            "qty": int(item.get("plst_qty") or item.get("qty") or 1),
-            "bin_target": parsed["bin"] if parsed["bin"] != "-" else (item.get("rack_name") or item.get("bin") or "-"),
-            "pic_name": item.get("user_name") or item.get("scanned_by") or "Petugas",
+            "qty": safe_int_val(item.get("plst_qty") or item.get("qty"), 1),
+            "bin_target": parsed["bin"] if parsed["bin"] != "-" else strip_html(item.get("rack_name") or item.get("bin") or "-"),
+            "pic_name": strip_html(item.get("user_name") or item.get("scanned_by") or "Petugas"),
             "scanned_at": item.get("created_at") or item.get("date") or datetime.now().isoformat(),
             "store_id": 3,
             "raw_json": item,
@@ -114,7 +132,7 @@ def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
     return clean_records
 
 # ------------------------------------------------------------------------------
-# 2. TARIK DATA TRANSFER STOCK (DRAFT & IN PROGRESS BESERTA DETAILNYA)
+# 2. TARIK DATA TRANSFER STOCK (DENGAN SAFE PARSER ANTI-HTML)
 # ------------------------------------------------------------------------------
 def fetch_transfer_data(session):
     print("🚚 [3/5] Menarik data Transfer Stok (History & Detail)...")
@@ -125,7 +143,6 @@ def fetch_transfer_data(session):
         "Referer": "https://jezpro.id/transfer_stok"
     }
 
-    # Parameter lengkap sesuai DevTools
     params = {
         "draw": "1",
         "columns[0][data]": "DT_RowIndex", "columns[0][name]": "stf_id", "columns[0][orderable]": "true",
@@ -153,20 +170,18 @@ def fetch_transfer_data(session):
     open_items = []
 
     for row in raw_history:
-        status_txt = str(row.get("stf_status") or row.get("status") or "").strip().upper()
-        if "<" in status_txt:
-            status_txt = BeautifulSoup(status_txt, "html.parser").get_text(strip=True).upper()
+        status_txt = strip_html(row.get("stf_status") or row.get("status") or "").upper()
 
         # Hanya ambil yang DRAFT atau IN PROGRESS
         if status_txt not in ["DRAFT", "IN PROGRESS"]:
             continue
 
-        tf_code = str(row.get("stf_code") or row.get("kode") or "").strip()
+        tf_code = strip_html(row.get("stf_code") or row.get("kode") or "")
         if not tf_code:
             continue
 
         # Format tanggal & hitung aging jam
-        tgl_str = str(row.get("stf_created") or row.get("tanggal") or "")
+        tgl_str = strip_html(row.get("stf_created") or row.get("tanggal") or "")
         aging_jam = 0.0
         try:
             dt_tf = datetime.strptime(tgl_str[:19], "%Y-%m-%d %H:%M:%S")
@@ -174,15 +189,16 @@ def fetch_transfer_data(session):
         except Exception:
             pass
 
+        # AMAN DARI ERROR VALUEERROR INT DENGAN safe_int_val
         open_headers.append({
             "stf_code": tf_code,
-            "user_name": str(row.get("u_name") or "-"),
-            "stf_notes": str(row.get("stf_notes") or "-"),
-            "qty_send": int(row.get("qty_send") or 0),
-            "qty_receive": int(row.get("qty_receive") or 0),
-            "start_store": str(row.get("start_store") or "-"),
-            "end_store": str(row.get("end_store") or "-"),
-            "u_name_receive": str(row.get("u_name_receive") or "-"),
+            "user_name": strip_html(row.get("u_name") or "-"),
+            "stf_notes": strip_html(row.get("stf_notes") or "-"),
+            "qty_send": safe_int_val(row.get("qty_send")),
+            "qty_receive": safe_int_val(row.get("qty_receive")),
+            "start_store": strip_html(row.get("start_store") or "-"),
+            "end_store": strip_html(row.get("end_store") or "-"),
+            "u_name_receive": strip_html(row.get("u_name_receive") or "-"),
             "stf_created": tgl_str if tgl_str else datetime.now().isoformat(),
             "stf_status": status_txt,
             "aging_hours": aging_jam,
@@ -208,23 +224,20 @@ def fetch_transfer_data(session):
         if res_det.status_code == 200:
             raw_items = res_det.json().get("data", [])
             for it in raw_items:
-                art_str = str(it.get("article", "-"))
-                if "<" in art_str:
-                    art_str = BeautifulSoup(art_str, "html.parser").get_text(" ", strip=True)
-
+                art_str = strip_html(it.get("article", "-"))
                 open_items.append({
                     "stf_code": tf_code,
                     "article_name": art_str,
-                    "bin_asal": str(it.get("pl_code") or "-"),
-                    "qty_tf": int(it.get("stfd_qty") or 1),
-                    "qty_in_bin": int(it.get("pls_qty") or 0),
-                    "start_store": str(it.get("st_start") or "-"),
-                    "end_store": str(it.get("st_end") or "-"),
+                    "bin_asal": strip_html(it.get("pl_code") or "-"),
+                    "qty_tf": safe_int_val(it.get("stfd_qty"), 1),
+                    "qty_in_bin": safe_int_val(it.get("pls_qty"), 0),
+                    "start_store": strip_html(it.get("st_start") or "-"),
+                    "end_store": strip_html(it.get("st_end") or "-"),
                     "status": status_txt,
                     "synced_at": datetime.now().isoformat()
                 })
 
-    print(f"   -> BERHASIL! Didapat {len(open_headers)} Dokumen Terbuka (DRAFT & IN PROGRESS) & {len(open_items)} Detail Barang.")
+    print(f"   -> BERHASIL! Didapat {len(open_headers)} Dokumen Terbuka & {len(open_items)} Detail Barang.")
     return open_headers, open_items
 
 # ------------------------------------------------------------------------------
@@ -241,31 +254,30 @@ def push_all_to_supabase(staging_data, tf_headers, tf_items):
 
     # 1. Staging Waiting
     if staging_data:
-        requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_waiting_staging", data=json.dumps(staging_data), headers=headers)
+        res_stg = requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_waiting_staging", data=json.dumps(staging_data), headers=headers)
+        print(f"   Status Staging: {res_stg.status_code}")
     
     # 2. Transfer Headers
     if tf_headers:
-        requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_transfer_headers", data=json.dumps(tf_headers), headers=headers)
+        res_tfh = requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_transfer_headers", data=json.dumps(tf_headers), headers=headers)
+        print(f"   Status Transfer Headers: {res_tfh.status_code}")
 
-    # 3. Transfer Items (Hapus yang lama untuk No TF terkait, lalu replace)
+    # 3. Transfer Items
     if tf_items:
-        # Bersihkan tabel items lama agar sinkron
         requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_transfer_items?id=gt.0", headers=headers)
-        requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_transfer_items", data=json.dumps(tf_items), headers=headers)
+        res_tfi = requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_transfer_items", data=json.dumps(tf_items), headers=headers)
+        print(f"   Status Transfer Items: {res_tfi.status_code}")
 
     print("✅ SUKSES! Seluruh data Staging & Transfer Stok tersinkronisasi ke Supabase.")
 
 if __name__ == "__main__":
     jez = create_jezpro_session()
     
-    # Tarik Staging
     all_staging = []
     all_staging.extend(fetch_staging_data(jez, "scan_product_in_datatables", "MASUK_RAK", "WAITING OFFLINE"))
     all_staging.extend(fetch_staging_data(jez, "scan_product_in_refund_datatables", "REFUND", "Refund"))
     
-    # Tarik Transfer Stok
     tf_headers, tf_items = fetch_transfer_data(jez)
     
-    # Simpan ke Supabase
     push_all_to_supabase(all_staging, tf_headers, tf_items)
     print("🎉 [5/5] Selesai sempurna!")
