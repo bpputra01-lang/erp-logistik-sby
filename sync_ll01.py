@@ -69,7 +69,7 @@ def create_jezpro_session():
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     })
     
-    print("🔐 [1/5] Melakukan login ke Jezpro...")
+    print("🔐 [1/6] Melakukan login ke Jezpro...")
     res_login_page = session.get("https://jezpro.id/")
     soup = BeautifulSoup(res_login_page.text, "html.parser")
     token_input = soup.find("input", {"name": "_token"})
@@ -87,13 +87,14 @@ def create_jezpro_session():
     session.get("https://jezpro.id/helper_backup")
     session.get("https://jezpro.id/transfer_stok")
     session.get("https://jezpro.id/mass_adjustment")
+    session.get("https://jezpro.id/adjustment")
     return session
 
 # ==============================================================================
 # 1. MODUL STAGING (MASUK RAK & REFUND)
 # ==============================================================================
 def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
-    print(f"📥 [2/5] Menarik data staging [{kategori_label}]...")
+    print(f"📥 [2/6] Menarik data staging [{kategori_label}]...")
     url = f"https://jezpro.id/{endpoint_path}"
     headers = {
         "Accept": "application/json, text/javascript, */*; q=0.01",
@@ -201,7 +202,7 @@ def fetch_all_items_for_single_tf(session, tf_code, status_txt, headers, now_wib
     return all_items
 
 def fetch_transfer_data(session):
-    print("🚚 [3/5] Menarik SELURUH Riwayat Transfer Stok (Membaca s/d baris terakhir)...")
+    print("🚚 [3/6] Menarik SELURUH Riwayat Transfer Stok (Membaca s/d baris terakhir)...")
     url_history = "https://jezpro.id/transfer_history_datatables"
     headers = {
         "Accept": "application/json, text/javascript, */*; q=0.01",
@@ -309,10 +310,10 @@ def fetch_transfer_data(session):
     return open_headers, open_items
 
 # ==============================================================================
-# 3. MODUL MULTIPLE ADJUSTMENT (MENGGANTUNG & CANCEL TAHUN >= 2026)
+# 3. MODUL MULTIPLE ADJUSTMENT (KHUSUS MENGGANTUNG TAHUN >= 2026)
 # ==============================================================================
 def fetch_mass_adjustment_data(session):
-    print("⚖️ [4/5] Menarik Data Multiple Adjustment (Menggantung & Cancel >= 2026)...")
+    print("⚖️ [4/6] Menarik Data Multiple Adjustment (Khusus Menggantung >= 2026)...")
     url_ma = "https://jezpro.id/mass_adjustment_datatables"
     headers = {
         "Accept": "application/json, text/javascript, */*; q=0.01",
@@ -325,7 +326,6 @@ def fetch_mass_adjustment_data(session):
     batch_size = 500
     total_expected = 999999
 
-    # Menyisir seluruh dokumen adjustment
     while start_row < total_expected:
         params = {
             "draw": "1",
@@ -373,7 +373,7 @@ def fetch_mass_adjustment_data(session):
 
         is_menggantung = any(k in status_raw for k in ["MENUNGGU", "PENDING", "DRAFT", "PROGRESS"]) or "MENUNGGU" in approve_raw.upper()
 
-        if not (is_menggantung or is_cancel):
+        if not is_menggantung:
             continue
 
         raw_code = str(row.get("ma_code_show") or row.get("ma_code") or "")
@@ -411,7 +411,7 @@ def fetch_mass_adjustment_data(session):
         if doc_year is not None and doc_year < 2026:
             continue
 
-        category = "CANCEL" if is_cancel else "MENGGANTUNG"
+        category = "MENGGANTUNG"
 
         open_ma_headers.append({
             "ma_id": ma_id_val,
@@ -428,7 +428,7 @@ def fetch_mass_adjustment_data(session):
             "synced_at": now_wib.isoformat()
         })
 
-        # TARIK RINCIAN DETAIL ITEM BARANG PER MA_ID (FULL SWEEPER)
+        # TARIK RINCIAN DETAIL ITEM BARANG PER MA_ID
         start_item_ma = 0
         chunk_ma = 250
         while True:
@@ -486,14 +486,114 @@ def fetch_mass_adjustment_data(session):
                 break
             time.sleep(0.08)
 
-    print(f"   -> BERHASIL! {len(open_ma_headers)} Dokumen MADJ Terbuka & {len(open_ma_items)} Detail Barang.")
+    print(f"   -> BERHASIL! {len(open_ma_headers)} Dokumen MADJ Menggantung & {len(open_ma_items)} Detail Barang.")
     return open_ma_headers, open_ma_items
 
 # ==============================================================================
-# 4. PUSH KE SUPABASE DALAM BATCH 200 ITEM
+# 4. MODUL SINGLE ADJUSTMENT (PENARIKAN HISTORI TRANSAKSI PENUH TAHUN >= 2026)
 # ==============================================================================
-def push_all_to_supabase(staging_data, tf_headers, tf_items, ma_headers, ma_items):
-    print("🚀 [5/5] Mengirim seluruh data ke Supabase...")
+def fetch_single_adjustment_data(session):
+    print("📝 [5/6] Menarik Data Single Adjustment (Tahun >= 2026)...")
+    url_single = "https://jezpro.id/adjustment_history_datatables"
+    headers = {
+        "Accept": "application/json, text/javascript, */*; q=0.01",
+        "X-Requested-With": "XMLHttpRequest",
+        "Referer": "https://jezpro.id/adjustment"
+    }
+
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    date_range = f"2026-01-01|{today_str}"
+
+    raw_single = []
+    start_row = 0
+    batch_size = 500
+    total_expected = 999999
+
+    while start_row < total_expected:
+        params = {
+            "draw": "1",
+            "columns[0][data]": "DT_RowIndex", "columns[0][name]": "ba_id", "columns[0][orderable]": "true",
+            "columns[1][data]": "ba_code", "columns[1][name]": "ba_code", "columns[1][orderable]": "true",
+            "columns[2][data]": "st_name", "columns[2][name]": "st_name", "columns[2][orderable]": "true",
+            "columns[3][data]": "pl_code", "columns[3][name]": "pl_code", "columns[3][orderable]": "true",
+            "columns[4][data]": "u_name", "columns[4][name]": "u_name", "columns[4][orderable]": "true",
+            "columns[5][data]": "ba_approve", "columns[5][name]": "ba_approve", "columns[5][orderable]": "true",
+            "columns[6][data]": "ba_executor", "columns[6][name]": "ba_executor", "columns[6][orderable]": "true",
+            "columns[7][data]": "br_name", "columns[7][name]": "br_name", "columns[7][orderable]": "true",
+            "columns[8][data]": "p_name", "columns[8][name]": "p_name", "columns[8][orderable]": "true",
+            "columns[9][data]": "ps_barcode", "columns[9][name]": "ps_barcode", "columns[9][orderable]": "true",
+            "columns[10][data]": "p_color", "columns[10][name]": "p_color", "columns[10][orderable]": "true",
+            "columns[11][data]": "sz_name", "columns[11][name]": "sz_name", "columns[11][orderable]": "true",
+            "columns[12][data]": "cogs", "columns[12][name]": "cogs", "columns[12][orderable]": "true",
+            "columns[13][data]": "ba_updated_at", "columns[13][name]": "ba_updated_at", "columns[13][orderable]": "false",
+            "columns[14][data]": "ba_old_qty", "columns[14][name]": "ba_old_qty", "columns[14][orderable]": "false",
+            "columns[15][data]": "ba_new_qty", "columns[15][name]": "ba_new_qty", "columns[15][orderable]": "false",
+            "columns[16][data]": "adjust", "columns[16][name]": "adjust", "columns[16][orderable]": "false",
+            "columns[17][data]": "ba_note", "columns[17][name]": "ba_note", "columns[17][orderable]": "false",
+            "columns[18][data]": "ba_proof_file", "columns[18][name]": "ba_proof_file", "columns[18][orderable]": "false",
+            "columns[19][data]": "ba_status", "columns[19][name]": "ba_status", "columns[19][orderable]": "false",
+            "order[0][column]": "0", "order[0][dir]": "desc",
+            "start": str(start_row), "length": str(batch_size),
+            "search": "", "st_id": "", "adjustment_date": date_range, "status": ""
+        }
+
+        res = session.get(url_single, params=params, headers=headers)
+        if res.status_code != 200:
+            break
+
+        data_json = res.json()
+        data_chunk = data_json.get("data", [])
+        if not data_chunk:
+            break
+
+        total_expected = data_json.get("recordsTotal", total_expected)
+        raw_single.extend(data_chunk)
+        start_row += len(data_chunk)
+        print(f"   -> Mengumpulkan single adjustment: {len(raw_single)} / {total_expected} baris...")
+
+    print(f"✅ Total {len(raw_single)} baris single adjustment berhasil dimuat.")
+
+    now_wib = datetime.now(timezone(timedelta(hours=7))).replace(tzinfo=None)
+    clean_single_records = []
+
+    for idx, row in enumerate(raw_single):
+        ba_id_val = safe_int_val(row.get("ba_id") or row.get("id"))
+        raw_code = strip_html(row.get("ba_code") or "-")
+        if not ba_id_val:
+            ba_id_val = abs(hash(f"{raw_code}_{idx}")) % (10**10)
+
+        clean_single_records.append({
+            "id": ba_id_val,
+            "ba_code": raw_code,
+            "store_name": strip_html(row.get("st_name") or "-"),
+            "bin_code": strip_html(row.get("pl_code") or "-"),
+            "creator": strip_html(row.get("u_name") or "-"),
+            "approval": strip_html(row.get("ba_approve") or "-"),
+            "executor": strip_html(row.get("ba_executor") or "-"),
+            "brand": strip_html(row.get("br_name") or "-"),
+            "article_name": strip_html(row.get("p_name") or "-"),
+            "barcode_sku": strip_html(row.get("ps_barcode") or "-"),
+            "color": strip_html(row.get("p_color") or "-"),
+            "size_variant": strip_html(row.get("sz_name") or "-"),
+            "cogs": safe_int_val(row.get("cogs")),
+            "old_qty": safe_int_val(row.get("ba_old_qty")),
+            "new_qty": safe_int_val(row.get("ba_new_qty")),
+            "adjust_qty": safe_int_val(row.get("adjust")),
+            "note": strip_html(row.get("ba_note") or "-"),
+            "proof_file": strip_html(row.get("ba_proof_file") or "-"),
+            "status": strip_html(row.get("ba_status") or "-"),
+            "updated_at": strip_html(row.get("ba_updated_at") or ""),
+            "synced_at": now_wib.isoformat()
+        })
+
+    print(f"   -> BERHASIL! {len(clean_single_records)} baris Single Adjustment siap dikirim ke Supabase.")
+    return clean_single_records
+
+# ==============================================================================
+# 5. PUSH KE SUPABASE DALAM BATCH 200 ITEM
+# ==============================================================================
+def push_all_to_supabase(staging_data, tf_headers, tf_items, ma_headers, ma_items, single_items):
+    print("🚀 [6/6] Mengirim seluruh data ke Supabase...")
     headers = {
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}",
@@ -532,7 +632,14 @@ def push_all_to_supabase(staging_data, tf_headers, tf_items, ma_headers, ma_item
             requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_adjustment_items", data=json.dumps(batch), headers=headers)
         print(f"   Status Adjustment Items: Sukses kirim {len(ma_items)} item.")
 
-    print("✅ SUKSES! Seluruh data Staging, Transfer Stok, & Multiple Adjustment tersinkronisasi.")
+    # 6. Single Adjustment (Per batch 200 baris, Upsert via merge-duplicates)
+    if single_items:
+        for i in range(0, len(single_items), 200):
+            batch = single_items[i:i + 200]
+            requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_single_adjustments", data=json.dumps(batch), headers=headers)
+        print(f"   Status Single Adjustment: Sukses kirim {len(single_items)} baris.")
+
+    print("✅ SUKSES! Seluruh data Staging, Transfer Stok, Multiple Adjustment, & Single Adjustment tersinkronisasi.")
 
 # ==============================================================================
 # MAIN PIPELINE EKSEKUSI
@@ -551,6 +658,9 @@ if __name__ == "__main__":
     # 3. Multiple Adjustment
     ma_headers, ma_items = fetch_mass_adjustment_data(jez)
     
-    # 4. Push All to Supabase
-    push_all_to_supabase(all_staging, tf_headers, tf_items, ma_headers, ma_items)
-    print("🎉 Pipeline LL01 selesai sempurna 100%!")
+    # 4. Single Adjustment
+    single_items = fetch_single_adjustment_data(jez)
+    
+    # 5. Push All to Supabase
+    push_all_to_supabase(all_staging, tf_headers, tf_items, ma_headers, ma_items, single_items)
+    print("🎉 Pipeline LL01 & Inventory Sync selesai sempurna 100%!")
