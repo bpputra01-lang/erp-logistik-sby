@@ -147,14 +147,13 @@ def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
             raw_art = item.get("article") or item.get("art_name") or "-"
             parsed = clean_html_card(raw_art)
 
-            # Pastikan p_id muat di tipe data int4 (maks 2.147.483.647)
             raw_id = item.get("plst_id") or item.get("pls_id") or item.get("plstr_id") or item.get("id")
             if raw_id:
                 p_id = safe_int_val(raw_id)
             else:
-                p_id = abs(hash(f"{kategori_label}_{st_id}_{parsed['article']}_{idx_item}")) % 2147483647
+                # Berikan tambahan random unik agar tidak ada plst_id yang kembar
+                p_id = abs(hash(f"{kategori_label}_{st_id}_{parsed['article']}_{idx_item}_{time.time()}")) % 2147483647
 
-            # Format tanggal diubah ke ISO standar PostgreSQL
             scanned_iso = parse_to_iso_timestamp(item.get("created_at") or item.get("date"))
 
             clean_records.append({
@@ -173,7 +172,7 @@ def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
                 "synced_at": datetime.now(timezone(timedelta(hours=7))).isoformat()
             })
 
-    # Fallback global jika per cabang kosong (misal Masuk Rak)
+    # Fallback global jika per cabang kosong
     if not clean_records:
         params_g = {
             "draw": "1", "columns[0][data]": "article", "columns[0][name]": "article",
@@ -188,7 +187,7 @@ def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
             for idx_item, item in enumerate(raw_g):
                 raw_art = item.get("article") or "-"
                 parsed = clean_html_card(raw_art)
-                p_id = safe_int_val(item.get("plst_id") or item.get("pls_id") or (idx_item + 1))
+                p_id = abs(hash(f"fallback_{idx_item}_{time.time()}")) % 2147483647
                 scanned_iso = parse_to_iso_timestamp(item.get("created_at") or item.get("date"))
 
                 clean_records.append({
@@ -207,7 +206,13 @@ def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
                     "synced_at": datetime.now(timezone(timedelta(hours=7))).isoformat()
                 })
 
-    print(f"   -> Ditemukan total {len(clean_records)} baris staging {kategori_label}.")
+    # 🛑 PASTIKAN 100% TIDAK ADA PLST_ID KEMBAR DI LIST YANG DIKIRIM
+    df_temp = pd.DataFrame(clean_records)
+    if not df_temp.empty:
+        df_temp = df_temp.drop_duplicates(subset=["plst_id"], keep="first")
+        clean_records = df_temp.to_dict(orient="records")
+
+    print(f"   -> Ditemukan total {len(clean_records)} baris unik staging {kategori_label}.")
     return clean_records
 # ==============================================================================
 # 2. MODUL TRANSFER STOK (ALL AREA LINTAS CABANG)
