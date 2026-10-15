@@ -4882,7 +4882,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             easy_close=True,
             footer=ui.modal_button("Tutup", class_="btn-page-nav")
         ))
-@reactive.Effect
+    @reactive.Effect
     @reactive.event(input.change_ll01_stock_branch)
     def _on_change_ll01_stk_br():
         state.ll01_stock_filter_branch.set(input.change_ll01_stock_branch())
