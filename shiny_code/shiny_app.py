@@ -4937,5 +4937,28 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         yield buf.getvalue()
 
+# ==========================================================================
+    # EVENT HANDLER UNTUK GLOBAL FILTER WAREHOUSE ACTIVITY MONITOR
+    # ==========================================================================
+    @reactive.Effect
+    @reactive.event(input.change_ll01_global_store)
+    def _on_change_ll01_global_store():
+        state.ll01_global_store.set(input.change_ll01_global_store())
+
+    @reactive.Effect
+    @reactive.event(input.change_ll01_global_tgl_start)
+    def _on_change_ll01_global_tgl_start():
+        state.ll01_global_tgl_start.set(input.change_ll01_global_tgl_start())
+
+    @reactive.Effect
+    @reactive.event(input.change_ll01_global_tgl_end)
+    def _on_change_ll01_global_tgl_end():
+        state.ll01_global_tgl_end.set(input.change_ll01_global_tgl_end())
+
+    @reactive.Effect
+    @reactive.event(input.change_ll01_global_note)
+    def _on_change_ll01_global_note():
+        state.ll01_global_note.set(input.change_ll01_global_note())
+
         
 app = App(app_ui, server)
