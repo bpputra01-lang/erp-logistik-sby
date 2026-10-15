@@ -4717,5 +4717,58 @@ def server(input: Inputs, output: Outputs, session: Session):
             df_export.to_excel(writer, sheet_name='LL01_STAGING_MONITOR', index=False)
         buf.seek(0)
         yield buf.getvalue()
+        # Event Refresh Seluruh Data LL01 (Staging + Transfer)
+    @reactive.Effect
+    @reactive.event(input.btn_refresh_ll01_all)
+    def _on_refresh_ll01_all():
+        s1, m1 = state.load_ll01_data_from_supabase()
+        s2, m2 = state.load_transfer_orders_from_supabase()
+        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+        ui.notification_show("✅ Data Staging & Transfer Stok berhasil diperbarui dari Cloud!", type="message", duration=4)
+
+    # Pop-Up Modal Detail Item Transfer
+    @reactive.Effect
+    @reactive.event(input.btn_open_tf_items_modal)
+    def _open_tf_detail():
+        tf_code = input.btn_open_tf_items_modal()
+        all_items = state.ll01_tf_items()
+        matched_items = [it for it in all_items if it.get("stf_code") == tf_code]
+
+        rows = []
+        for idx, it in enumerate(matched_items, start=1):
+            rows.append(ui.tags.tr(
+                ui.tags.td(str(idx), style="text-align: center; font-weight: bold;"),
+                ui.tags.td(str(it.get("article_name", "-")), style="font-weight: 700;"),
+                ui.tags.td(ui.tags.code(str(it.get("bin_asal", "-")), style="font-weight: bold; color: #2B6CB0;")),
+                ui.tags.td(f"{it.get('qty_tf', 1)} Pcs", style="text-align: center; font-weight: 800; color: #E50914;"),
+                ui.tags.td(f"{it.get('qty_in_bin', 0)} Pcs", style="text-align: center; color: #718096;"),
+                ui.tags.td(f"{it.get('start_store', '-')} ➔ {it.get('end_store', '-')}")
+            ))
+
+        ui.modal_show(ui.modal(
+            ui.div(
+                ui.h4(f"📋 Rincian Item Barang: {tf_code}", style="font-weight: 800; color: #1A202C; margin-bottom: 8px; font-size: 15px;"),
+                ui.p(f"Total {len(matched_items)} item barang yang sedang dalam proses transfer.", style="color: #718096; font-size: 12px; margin-bottom: 12px;"),
+                ui.tags.table(
+                    ui.tags.thead(ui.tags.tr(
+                        ui.tags.th("NO", style="text-align: center;"),
+                        ui.tags.th("NAMA ARTIKEL / DESKRIPSI"),
+                        ui.tags.th("BIN ASAL"),
+                        ui.tags.th("QTY TF", style="text-align: center;"),
+                        ui.tags.th("STOK BIN", style="text-align: center;"),
+                        ui.tags.th("RUTE STORE")
+                    )),
+                    ui.tags.tbody(*rows) if rows else ui.tags.tr(
+                        ui.tags.td("Rincian barang kosong.", colspan=6, style="text-align: center; padding: 1.5rem; color: #718096;")
+                    ),
+                    class_="custom-clean-table", style="width: 100%; border: 1px solid #CBD5E0; border-radius: 8px;"
+                ),
+                style="max-height: 480px; overflow-y: auto; padding: 0.5rem 0;"
+            ),
+            title=f"🚚 Transfer Order Detail: {tf_code}",
+            size="l",
+            easy_close=True,
+            footer=ui.modal_button("Tutup", class_="btn-page-nav")
+        ))
 
 app = App(app_ui, server)

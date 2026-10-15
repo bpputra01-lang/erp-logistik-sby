@@ -2122,10 +2122,44 @@ def memo_pengajuan_view(state: AppState):
 # ==============================================================================
 # VIEW: WAREHOUSE ACTIVITY MONITOR (ALA SAP LL01)
 # ==============================================================================
-def warehouse_activity_monitor_view(state: AppState):
-    filtered_items = state.get_filtered_ll01()
+import re
+from bs4 import BeautifulSoup
+
+def clean_jezpro_card_text(raw_text):
+    """Membersihkan kode HTML dari Jezpro menjadi teks artikel bersih"""
+    if not raw_text or "<" not in str(raw_text):
+        return str(raw_text).strip()
     
-    # 1. Baris Tabel Data
+    soup = BeautifulSoup(str(raw_text), "html.parser")
+    
+    # Cari span yang berisi nama artikel & ukuran
+    spans = soup.find_all("span")
+    article_lines = []
+    for s in spans:
+        txt = s.get_text(" ", strip=True)
+        # Abaikan badge status umum
+        if any(ign in txt for ign in ["REFUND", "WAITING", "TUKAR", "INV", "JEZ SURABAYA", "Bin Code"]):
+            continue
+        # Jika memuat nama brand atau artikel
+        if "[" in txt or any(char.isdigit() for char in txt):
+            # Bersihkan tanda [BRAND] - SKU
+            cleaned = re.sub(r'\[.*?\]\s*-\s*\d+', '', txt)
+            article_lines.append(cleaned.strip())
+            
+    if article_lines:
+        clean_name = " ".join([l for l in article_lines if l])
+        return re.sub(r'\s+', ' ', clean_name).strip()
+        
+    # Fallback jika pola tidak ketemu: buang semua tag HTML
+    text_only = soup.get_text(" ", strip=True)
+    text_only = re.sub(r'\b(REFUND|WAITING OFFLINE|JEZ SURABAYA|Jml\s*:\s*\d+)\b', '', text_only)
+    return " ".join(text_only.split())
+    
+def warehouse_activity_monitor_view(state: AppState):
+    # ==========================================================================
+    # TAB 1: STAGING TRANSIT (MASUK RAK & REFUND)
+    # ==========================================================================
+    filtered_items = state.get_filtered_ll01()
     table_rows = []
     for idx, r in enumerate(filtered_items, start=1):
         is_crit = "CRITICAL" in str(r.get("ll01_status", ""))
@@ -2134,7 +2168,6 @@ def warehouse_activity_monitor_view(state: AppState):
             if is_crit else
             ui.span("🟢 NORMAL", style="background: #C6F6D5; color: #22543D; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 4px;")
         )
-        
         kat_label = "MASUK RAK" if r.get("kategori") == "MASUK_RAK" else "REFUND"
         kat_color = "#3182CE" if r.get("kategori") == "MASUK_RAK" else "#D69E2E"
 
@@ -2151,85 +2184,110 @@ def warehouse_activity_monitor_view(state: AppState):
             ui.tags.td(str(r.get("durasi_aging", "-")), style=f"font-weight: 800; text-align: center; color: {'#E53E3E' if is_crit else '#2F855A'};")
         ))
 
-    headers = [
-        "NO", "STATUS LL01", "KATEGORI", "STATUS JEZPRO", "NAMA ARTIKEL", 
-        "QTY", "BIN TUJUAN", "PIC SCAN", "WAKTU SCAN", "AGING (TERTAHAN)"
-    ]
-    th_list = [ui.tags.th(h, style="text-align: center;" if h in ["NO", "STATUS LL01", "QTY", "AGING (TERTAHAN)"] else "") for h in headers]
+    headers_stg = ["NO", "STATUS LL01", "KATEGORI", "STATUS JEZPRO", "NAMA ARTIKEL", "QTY", "BIN TUJUAN", "PIC SCAN", "WAKTU SCAN", "AGING"]
+    th_stg = [ui.tags.th(h, style="text-align: center;" if h in ["NO", "STATUS LL01", "QTY", "AGING"] else "") for h in headers_stg]
 
-    return ui.div(
-        # HEADER KONTROL & REFRESH
+    tab1_staging = ui.div(
         ui.div(
-            ui.div(
-                ui.h4("🏭 Warehouse Activity Monitor (Interim Bin & Staging Aging)", style="font-size: 16px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
-                ui.p(f"🕒 Terakhir disinkronkan: {state.ll01_last_sync()} • Deteksi otomatis item floating yang tertahan di area transit.", style="color: #718096; font-size: 12px; margin: 0;")
-            ),
-            ui.div(
-                ui.tags.button(
-                    ui.tags.i(class_="fa-solid fa-arrows-rotate", style="margin-right: 6px;"), "REFRESH DATA DARI CLOUD",
-                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_refresh_ll01', Math.random(), {priority: 'event'})",
-                    style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer;"
-                )
-            ),
-            style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 1.25rem 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 10px;"
-        ),
-
-        # 4 KARTU METRIK DARK THEME
-        ui.div(
-            dark_metric_box("📦 TOTAL ANTRIAN WAITING", f"{state.ll01_metric_total_antrean():,} PCS", "#3182CE"),
+            dark_metric_box("📦 TOTAL WAITING STAGING", f"{state.ll01_metric_total_antrean():,} PCS", "#3182CE"),
             dark_metric_box("📥 MASUK RAK (PUTAWAY)", f"{state.ll01_metric_masuk_rak():,} PCS", "#C5A059"),
             dark_metric_box("🔄 REFUND STAGING", f"{state.ll01_metric_refund():,} PCS", "#D69E2E"),
             dark_metric_box("🚨 CRITICAL STUCK (>2 JAM)", f"{state.ll01_metric_critical():,} PCS", "#E53E3E"),
             style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
         ),
-
-        # BAR FILTER & DOWNLOAD
-        ui.div(
-            ui.div(
-                ui.div(
-                    ui.span("Filter Kategori:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
-                    ui.tags.select(
-                        ui.tags.option("Semua Kategori", value="SEMUA", selected=(state.ll01_filter_kategori() == "SEMUA")),
-                        ui.tags.option("Masuk Rak (Putaway)", value="MASUK_RAK", selected=(state.ll01_filter_kategori() == "MASUK_RAK")),
-                        ui.tags.option("Refund", value="REFUND", selected=(state.ll01_filter_kategori() == "REFUND")),
-                        onchange="Shiny.setInputValue('change_ll01_kategori', this.value, {priority: 'event'})",
-                        style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: bold; font-size: 12px; background: white; outline: none;"
-                    ),
-                    style="margin-right: 12px;"
-                ),
-                ui.div(
-                    ui.span("Status Aging:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
-                    ui.tags.select(
-                        ui.tags.option("Semua Status", value="SEMUA", selected=(state.ll01_filter_aging() == "SEMUA")),
-                        ui.tags.option("🚨 Critical Stuck (>2 Jam)", value="CRITICAL", selected=(state.ll01_filter_aging() == "CRITICAL")),
-                        ui.tags.option("🟢 Normal (<=2 Jam)", value="NORMAL", selected=(state.ll01_filter_aging() == "NORMAL")),
-                        onchange="Shiny.setInputValue('change_ll01_aging', this.value, {priority: 'event'})",
-                        style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: bold; font-size: 12px; background: white; outline: none;"
-                    )
-                ),
-                style="display: flex; align-items: center;"
-            ),
-            ui.div(
-                ui.download_button(
-                    "btn_dl_ll01_report",
-                    ui.tags.span(ui.tags.i(class_="fa-solid fa-file-excel", style="margin-right: 6px;"), "DOWNLOAD EXCEL (.XLSX)"),
-                    style="background: #10B981; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer;"
-                )
-            ),
-            style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 1rem 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1rem; flex-wrap: wrap; gap: 10px;"
-        ),
-
-        # TABEL MONITORING LL01
         ui.div(
             ui.tags.table(
-                ui.tags.thead(ui.tags.tr(*th_list)),
+                ui.tags.thead(ui.tags.tr(*th_stg)),
                 ui.tags.tbody(*table_rows) if table_rows else ui.tags.tr(
-                    ui.tags.td("Tidak ada antrean barang tertahan / semua staging bersih.", colspan=10, style="text-align: center; color: #718096; padding: 2rem; font-style: italic;")
+                    ui.tags.td("Tidak ada antrean barang tertahan di staging.", colspan=10, style="text-align: center; color: #718096; padding: 2rem; font-style: italic;")
                 ),
-                class_="custom-clean-table",
-                style="width: 100%;"
+                class_="custom-clean-table", style="width: 100%;"
             ),
             style="background: white; border-radius: 12px; border: 1px solid #E2E8F0; padding: 1rem; overflow-x: auto;"
+        ),
+        style="padding: 1rem 0;"
+    )
+
+    # ==========================================================================
+    # TAB 2: OPEN TRANSFER ORDERS (DRAFT & IN PROGRESS DENGAN DRILL-DOWN)
+    # ==========================================================================
+    tf_headers = state.ll01_tf_headers()
+    tf_rows = []
+    for idx_tf, tf in enumerate(tf_headers, start=1):
+        st = tf.get("stf_status", "")
+        code = tf.get("stf_code", "")
+        aging = float(tf.get("aging_hours") or 0)
+        is_crit = aging >= 24.0
+
+        badge_st = (
+            ui.span("IN PROGRESS", style="background: #FEFCBF; color: #744210; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 4px;")
+            if st == "IN PROGRESS" else
+            ui.span("DRAFT", style="background: #EBF8FF; color: #2B6CB0; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 4px;")
+        )
+
+        btn_detail = ui.tags.button(
+            ui.tags.i(class_="fa-solid fa-list-check", style="margin-right: 4px;"), "Lihat Item",
+            onclick=f"Shiny.setInputValue('btn_open_tf_items_modal', '{code}', {{priority: 'event'}})",
+            style="background: #3182CE; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer;"
+        )
+
+        tf_rows.append(ui.tags.tr(
+            ui.tags.td(str(idx_tf), style="text-align: center; font-weight: bold;"),
+            ui.tags.td(badge_st, style="text-align: center;"),
+            ui.tags.td(ui.tags.b(code, style="color: #2D3748;")),
+            ui.tags.td(f"{tf.get('start_store', '-')} ➔ {tf.get('end_store', '-')}", style="font-weight: 600;"),
+            ui.tags.td(str(tf.get("user_name", "-"))),
+            ui.tags.td(f"{tf.get('qty_send', 0):,} Pcs", style="text-align: right; font-weight: 800; color: #E50914;"),
+            ui.tags.td(str(tf.get("stf_created", "-"))[:16]),
+            ui.tags.td(f"{aging} Jam ({round(aging/24, 1)} Hari)", style=f"font-weight: 800; text-align: center; color: {'#E53E3E' if is_crit else '#2F855A'};"),
+            ui.tags.td(btn_detail, style="text-align: center;")
+        ))
+
+    headers_tf = ["NO", "STATUS", "NOMOR TF", "RUTE TRANSFER", "USER PEMBUAT", "QTY KIRIM", "TANGGAL DIBUAT", "AGING TERTAHAN", "RINCIAN BARANG"]
+    th_tf = [ui.tags.th(h, style="text-align: center;" if h in ["NO", "STATUS", "QTY KIRIM", "AGING TERTAHAN", "RINCIAN BARANG"] else "") for h in headers_tf]
+
+    tab2_transfer = ui.div(
+        ui.div(
+            dark_metric_box("🚚 TOTAL DOKUMEN OPEN TF", f"{state.ll01_tf_metric_total():,} SURAT", "#3182CE"),
+            dark_metric_box("📦 TOTAL QTY KIRIM OPEN", f"{state.ll01_tf_metric_qty():,} PCS", "#10B981"),
+            dark_metric_box("⏳ IN PROGRESS", f"{state.ll01_tf_metric_in_progress():,} TF", "#C5A059"),
+            dark_metric_box("📝 STATUS DRAFT", f"{state.ll01_tf_metric_draft():,} TF", "#3182CE"),
+            dark_metric_box("🚨 STUCK (>24 JAM)", f"{state.ll01_tf_metric_critical():,} TF", "#E53E3E"),
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+        ),
+        ui.div(
+            ui.tags.table(
+                ui.tags.thead(ui.tags.tr(*th_tf)),
+                ui.tags.tbody(*tf_rows) if tf_rows else ui.tags.tr(
+                    ui.tags.td("Tidak ada transfer stok berstatus DRAFT atau IN PROGRESS.", colspan=9, style="text-align: center; color: #718096; padding: 2rem; font-style: italic;")
+                ),
+                class_="custom-clean-table", style="width: 100%;"
+            ),
+            style="background: white; border-radius: 12px; border: 1px solid #E2E8F0; padding: 1rem; overflow-x: auto;"
+        ),
+        style="padding: 1rem 0;"
+    )
+
+    return ui.div(
+        # HEADER KONTROL REFRESH
+        ui.div(
+            ui.div(
+                ui.h4("🏭 Warehouse Activity Monitor (SAP LL01 Dashboard)", style="font-size: 16px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
+                ui.p(f"🕒 Terakhir disinkronkan: {state.ll01_last_sync()} • Memantau antrean Staging Putaway/Refund & Open Transfer Orders.", style="color: #718096; font-size: 12px; margin: 0;")
+            ),
+            ui.div(
+                ui.tags.button(
+                    ui.tags.i(class_="fa-solid fa-arrows-rotate", style="margin-right: 6px;"), "REFRESH DATA CLOUD",
+                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_refresh_ll01_all', Math.random(), {priority: 'event'})",
+                    style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer;"
+                )
+            ),
+            style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 1.25rem 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 10px;"
+        ),
+        # 2 TAB NAVSET
+        ui.navset_card_tab(
+            ui.nav_panel("📥 1. STAGING TRANSIT (MASUK RAK & REFUND)", tab1_staging),
+            ui.nav_panel("🚚 2. OPEN TRANSFER ORDERS (DRAFT & IN PROGRESS)", tab2_transfer)
         ),
         style="width: 100%; padding: 1rem;"
     )

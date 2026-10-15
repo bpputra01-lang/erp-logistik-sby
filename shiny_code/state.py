@@ -532,6 +532,10 @@ class AppState:
         self.ll01_filter_aging = reactive.Value("SEMUA")         # "SEMUA", "CRITICAL", "NORMAL"
         self.ll01_last_sync = reactive.Value("-")
         self._raw_df_ll01_filtered = pd.DataFrame()
+        # --- TRANSFER STOK (OPEN ORDERS) STATE ---
+        self.ll01_tf_headers = reactive.Value([])
+        self.ll01_tf_items = reactive.Value([])
+        self.ll01_selected_tf_code = reactive.Value("")
 
         # --- PHYSICAL INVENTORY LIST STATE (UNIFIED) ---
         self.pil_mode = reactive.Value("")
@@ -6361,3 +6365,36 @@ class AppState:
     def ll01_metric_critical(self) -> int:
         data = [x for x in self.get_filtered_ll01() if "CRITICAL" in str(x.get("ll01_status", ""))]
         return sum([safe_int(x.get("qty", 1)) for x in data])
+
+def load_transfer_orders_from_supabase(self):
+        try:
+            client = get_supabase()
+            if not client: return False, "Koneksi Supabase gagal!"
+
+            # 1. Ambil Header Dokumen
+            res_h = client.table("jezpro_transfer_headers").select("*").order("aging_hours", desc=True).execute()
+            # 2. Ambil Detail Item Barang
+            res_i = client.table("jezpro_transfer_items").select("*").execute()
+
+            self.ll01_tf_headers.set(res_h.data if res_h and res_h.data else [])
+            self.ll01_tf_items.set(res_i.data if res_i and res_i.data else [])
+            return True, "Data Transfer Stok berhasil dimuat!"
+        except Exception as e:
+            return False, f"Gagal load transfer: {e}"
+
+    # Metrik Ringkasan Transfer Stok
+    def ll01_tf_metric_total(self) -> int:
+        return len(self.ll01_tf_headers())
+
+    def ll01_tf_metric_qty(self) -> int:
+        return sum([safe_int(x.get("qty_send", 0)) for x in self.ll01_tf_headers()])
+
+    def ll01_tf_metric_in_progress(self) -> int:
+        return len([x for x in self.ll01_tf_headers() if x.get("stf_status") == "IN PROGRESS"])
+
+    def ll01_tf_metric_draft(self) -> int:
+        return len([x for x in self.ll01_tf_headers() if x.get("stf_status") == "DRAFT"])
+
+    def ll01_tf_metric_critical(self) -> int:
+        # Kritis jika transfer tertahan > 24 jam belum selesai
+        return len([x for x in self.ll01_tf_headers() if float(x.get("aging_hours") or 0) >= 24.0])
