@@ -6566,17 +6566,24 @@ class AppState:
         try:
             client = get_supabase()
             if not client:
+                print("❌ [DEBUG] Client Supabase tidak terhubung!")
                 return False, "Koneksi Supabase gagal!"
 
-            # Urutkan berdasarkan id desc agar selalu mengambil transaksi terbaru
-            res = client.table("jezpro_single_adjustments").select("*").order("id", desc=True).limit(5000).execute()
-            data = res.data if res and res.data else []
+            # Hapus .limit(5000) agar tidak crash, coba dengan order 'id'
+            try:
+                res = client.table("jezpro_single_adjustments").select("*").order("id", desc=True).execute()
+            except Exception as e_order:
+                print(f"⚠️ [DEBUG] Order by id gagal ({e_order}), fallback select biasa:")
+                res = client.table("jezpro_single_adjustments").select("*").execute()
+
+            data = res.data if res and hasattr(res, 'data') and res.data else []
+            print(f"✅ [DEBUG] Berhasil memuat {len(data)} baris Single Adjustment dari Supabase.")
             self.ll01_single_adj_list.set(data)
             return True, f"Berhasil memuat {len(data):,} baris Single Adjustment."
         except Exception as e:
-            print("Gagal load Single Adjustment Supabase:", e)
+            print("❌ Gagal load Single Adjustment Supabase:", e)
             return False, f"Terjadi kesalahan: {str(e)}"
-
+            
     def get_filtered_single_adj_data(self) -> list[dict]:
         data = self.ll01_single_adj_list()
         br_flt = self.ll01_single_adj_filter_branch()

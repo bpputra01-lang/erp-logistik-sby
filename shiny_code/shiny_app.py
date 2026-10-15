@@ -4696,17 +4696,12 @@ def server(input: Inputs, output: Outputs, session: Session):
     def _auto_load_ll01_on_menu():
         if state.logged_in() and state.get_active_content_type() == "warehouse_activity_monitor":
             with reactive.isolate():
-                # Cek jika data belum ada sama sekali di memori
-                if not state.ll01_data_list():
+                # Jika data sudah ada di memori, JANGAN query Supabase lagi (agar ganti tab/menu tidak berat)
+                if not state.ll01_data_list() and not state.ll01_single_adj_list():
                     state.load_ll01_data_from_supabase()
-                if not state.ll01_tf_headers():
                     state.load_transfer_orders_from_supabase()
-                if not state.ll01_ma_headers():
                     state.load_mass_adjustments_from_supabase()
-                if not state.ll01_single_adj_list():
                     state.load_single_adjustments_from_supabase()
-                if not state.ll01_special_stock_list():
-                    state.load_special_buffer_stock_from_supabase()
     # Download Excel Report
     @render.download(
         filename=lambda: f"LL01_WAREHOUSE_MONITOR_{datetime.now().strftime('%d_%m_%Y_%H%M')}.xlsx"
@@ -4728,6 +4723,7 @@ def server(input: Inputs, output: Outputs, session: Session):
     @reactive.Effect
     @reactive.event(input.btn_refresh_ll01_all)
     def _on_refresh_ll01_all():
+        # Tarik semua data dari cloud
         state.load_ll01_data_from_supabase()
         state.load_transfer_orders_from_supabase()
         state.load_mass_adjustments_from_supabase()
@@ -4736,7 +4732,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         
         # Hilangkan layar gelap seketika setelah selesai
         ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
-        ui.notification_show("✅ Seluruh data berhasil disinkronkan dari Cloud!", type="message", duration=4)
+        ui.notification_show("✅ Seluruh data Warehouse Activity Monitor berhasil disinkronkan dari Cloud!", type="message", duration=4)
     # ==========================================================================
     # POP-UP DETAIL ITEM TRANSFER (ANTI-CRASH, NATIVE REGEX, DIRECT QUERY)
     # ==========================================================================
