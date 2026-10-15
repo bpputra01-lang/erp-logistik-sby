@@ -2153,10 +2153,10 @@ def clean_jezpro_card_text(raw_text):
 # KOMPONEN TREE MONITOR SAP LL01 (PERSIS SEPERTI GAMBAR SAP GUI)
 # ==============================================================================
 def render_sap_ll01_summary_tree(state: AppState):
-    sel_store = state.ll01_filter_store()
+    sel_store = state.ll01_global_store()
+    sel_branch_tf = sel_store.replace("JEZ ", "").strip().upper()
     now_str = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
 
-    # Hitung data realtime sesuai filter store
     stg_items = state.get_filtered_ll01()
     c_stg_total = len(stg_items)
     c_stg_inb = sum(1 for x in stg_items if x.get("kategori") == "MASUK_RAK")
@@ -2164,10 +2164,28 @@ def render_sap_ll01_summary_tree(state: AppState):
     c_stg_crit = sum(1 for x in stg_items if "CRITICAL" in str(x.get("ll01_status", "")))
 
     tf_headers = state.get_filtered_tf_headers()
+    c_tf_in, c_tf_out, c_tf_draft, c_tf_prog, c_tf_crit = 0, 0, 0, 0, 0
+
+    for x in tf_headers:
+        st = str(x.get("stf_status", "DRAFT")).upper()
+        start_st = str(x.get("start_store", "")).upper()
+        end_st = str(x.get("end_store", "")).upper()
+        aging = float(x.get("aging_hours") or 0)
+
+        if aging >= 24.0: c_tf_crit += 1
+        if "DRAFT" in st: c_tf_draft += 1
+        elif "PROGRESS" in st or "IN PROGRESS" in st: c_tf_prog += 1
+
+        if sel_branch_tf != "SEMUA":
+            if sel_branch_tf in end_st and sel_branch_tf not in start_st: c_tf_in += 1
+            elif sel_branch_tf in start_st and sel_branch_tf not in end_st: c_tf_out += 1
+            else:
+                if sel_branch_tf in start_st: c_tf_out += 1
+                if sel_branch_tf in end_st: c_tf_in += 1
+        else:
+            c_tf_out += 1
+
     c_tf_total = len(tf_headers)
-    c_tf_draft = sum(1 for x in tf_headers if x.get("stf_status") == "DRAFT")
-    c_tf_prog = sum(1 for x in tf_headers if x.get("stf_status") == "IN PROGRESS")
-    c_tf_crit = sum(1 for x in tf_headers if float(x.get("aging_hours") or 0) >= 24.0)
 
     ma_items = state.get_filtered_ma_data()
     c_ma_total = len(ma_items)
@@ -2182,17 +2200,11 @@ def render_sap_ll01_summary_tree(state: AppState):
     c_buf_inb = sum(1 for x in buffer_items if "INBOUND" in str(x.get("tipe_bin", "")))
     c_buf_out = sum(1 for x in buffer_items if "OUT" in str(x.get("tipe_bin", "")))
 
-    # Helper Strip SAP Tree Bar (Biru Muda seperti Gambar)
     def sap_row(level, text, count, time_text, is_critical=False, is_warn=False):
         indent_px = level * 26
-        # Traffic Light Circles: Red - Yellow - Green
-        if is_critical and count > 0:
-            traffic = ui.span("🔴⚪⚪", style="font-size: 11px; margin-right: 6px;")
-        elif is_warn and count > 0:
-            traffic = ui.span("⚪🟡⚪", style="font-size: 11px; margin-right: 6px;")
-        else:
-            traffic = ui.span("⚪⚪🟢", style="font-size: 11px; margin-right: 6px;")
-
+        if is_critical and count > 0: traffic = ui.span("🔴⚪⚪", style="font-size: 11px; margin-right: 6px;")
+        elif is_warn and count > 0: traffic = ui.span("⚪🟡⚪", style="font-size: 11px; margin-right: 6px;")
+        else: traffic = ui.span("⚪⚪🟢", style="font-size: 11px; margin-right: 6px;")
         folder_icon = "📂" if level <= 1 else "↳ 📄"
 
         return ui.div(
@@ -2216,7 +2228,6 @@ def render_sap_ll01_summary_tree(state: AppState):
     store_name_label = f"Whse: {sel_store}" if sel_store != "SEMUA" else "Whse: ALL SITES (SURABAYA & CABANG)"
 
     return ui.div(
-        # SAP Tool Header Bar
         ui.div(
             ui.div(
                 ui.tags.span("🔍 🔄 ➕ ➖ 📑 Line", style="font-family: monospace; font-size: 12px; font-weight: bold; color: #2D3748; background: #E2E8F0; padding: 4px 8px; border-radius: 4px; border: 1px solid #CBD5E0; margin-right: 12px;"),
@@ -2226,14 +2237,13 @@ def render_sap_ll01_summary_tree(state: AppState):
             ui.span(store_name_label, style="background: #FEFCBF; color: #744210; font-weight: 800; font-size: 12px; padding: 4px 10px; border-radius: 4px; border: 1px solid #F6E05E;"),
             style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #CBD5E0; padding-bottom: 6px; margin-bottom: 8px;"
         ),
-
-        # Tree Nodes Hierarchy
         ui.div(
-            # Root Node
             sap_row(0, "Critical Processes Root (SAP LL01)", c_stg_total + c_tf_total + c_ma_total + c_sa_total, now_str, is_critical=(c_stg_crit + c_tf_crit + c_ma_crit > 0)),
             
-            # 1. Unconfirmed Transfer Orders
+            # 1. Unconfirmed Transfer Orders dengan rincian TF IN & TF OUT
             sap_row(1, "1. Unconfirmed Transfer Orders (Open Orders)", c_tf_total, now_str, is_critical=(c_tf_crit > 0), is_warn=(c_tf_total > 0)),
+            sap_row(2, "Open Transfer Orders (TF IN)", c_tf_in, now_str),
+            sap_row(2, "Open Transfer Orders (TF OUT)", c_tf_out, now_str),
             sap_row(2, "Draft Transfer Orders", c_tf_draft, now_str),
             sap_row(2, "In Progress Transfer Orders", c_tf_prog, now_str, is_warn=True),
             sap_row(2, "Critical Stuck Transfers (>24 Hours)", c_tf_crit, now_str, is_critical=True),
@@ -2349,12 +2359,9 @@ def warehouse_activity_monitor_view(state: AppState):
     )
 
     # ==========================================================================
-    # TAB 2: TRANSFER ORDER (STATUS SUPABASE & SUMMARY BERDASARKAN BRANCH)
+    # TAB 2: TRANSFER ORDER (METRIK DIKEMBALIKAN KE AWAL + STATUS SUPABASE)
     # ==========================================================================
-    sel_branch_tf = state.ll01_global_store().replace("JEZ ", "").strip().upper()
     tf_headers = state.get_filtered_tf_headers()
-    
-    count_tf_in, count_tf_out, qty_tf_in, qty_tf_out, stuck_tf = 0, 0, 0, 0, 0
     tf_rows = []
     
     for idx_tf, tf in enumerate(tf_headers, start=1):
@@ -2365,28 +2372,6 @@ def warehouse_activity_monitor_view(state: AppState):
         aging = float(tf.get("aging_hours") or 0)
         is_crit = aging >= 24.0
         q_send = safe_int(tf.get("qty_send", 0))
-
-        if aging >= 24.0:
-            stuck_tf += 1
-
-        # Kalkulasi In/Out berdasarkan branch global yang dipilih
-        if sel_branch_tf != "SEMUA":
-            if sel_branch_tf in end_st and sel_branch_tf not in start_st:
-                count_tf_in += 1
-                qty_tf_in += q_send
-            elif sel_branch_tf in start_st and sel_branch_tf not in end_st:
-                count_tf_out += 1
-                qty_tf_out += q_send
-            else:
-                if sel_branch_tf in start_st:
-                    count_tf_out += 1
-                    qty_tf_out += q_send
-                if sel_branch_tf in end_st:
-                    count_tf_in += 1
-                    qty_tf_in += q_send
-        else:
-            count_tf_out += 1
-            qty_tf_out += q_send
 
         # Badge Status dari Supabase (stf_status)
         if "PROGRESS" in st or "IN PROGRESS" in st:
@@ -2419,10 +2404,9 @@ def warehouse_activity_monitor_view(state: AppState):
 
     tab2_transfer = ui.div(
         ui.div(
-            dark_metric_box("📥 OPEN TF IN", f"{count_tf_in} Dok ({qty_tf_in:,} Pcs)", "#10B981"),
-            dark_metric_box("📤 OPEN TF OUT", f"{count_tf_out} Dok ({qty_tf_out:,} Pcs)", "#3182CE"),
-            dark_metric_box("🚚 TOTAL OPEN TF", f"{len(tf_headers):,} DOK", "#C5A059"),
-            dark_metric_box("🚨 STUCK (>24 JAM)", f"{stuck_tf} Dok", "#E53E3E"),
+            dark_metric_box("🚚 TOTAL DOKUMEN OPEN TF", f"{len(tf_headers):,} DOK", "#3182CE"),
+            dark_metric_box("📦 TOTAL QTY KIRIM OPEN", f"{sum([safe_int(x.get('qty_send', 0)) for x in tf_headers]):,} PCS", "#10B981"),
+            dark_metric_box("🚨 STUCK (>24 JAM)", f"{sum([1 for x in tf_headers if float(x.get('aging_hours') or 0) >= 24.0]):,} DOK", "#E53E3E"),
             style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
         ),
         ui.div(

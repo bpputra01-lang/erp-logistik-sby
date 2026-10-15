@@ -6457,8 +6457,9 @@ class AppState:
         data = [x for x in self.ll01_ma_headers() if x.get("status_category") == "MENGGANTUNG"]
         filtered = []
         for x in data:
+            store_txt = f"{x.get('store_name', '')} {x.get('branch', '')}"
             note_content = f"{x.get('note', '')} {x.get('ma_code', '')} {x.get('u_name', '')}"
-            if self._match_global_filter(x.get("created_at", ""), x.get("store_name", ""), note_content):
+            if self._match_global_filter(x.get("created_at", ""), store_txt, note_content):
                 filtered.append(x)
         return filtered
 
@@ -6468,8 +6469,9 @@ class AppState:
         for x in data:
             if "DONE" in str(x.get("status", "")).upper() or "CANCEL" in str(x.get("status", "")).upper():
                 continue
+            store_txt = f"{x.get('store_name', '')} {x.get('branch', '')}"
             note_content = f"{x.get('note', '')} {x.get('article_name', '')} {x.get('ba_code', '')} {x.get('creator', '')}"
-            if self._match_global_filter(x.get("updated_at", ""), x.get("store_name", ""), note_content):
+            if self._match_global_filter(x.get("updated_at", ""), store_txt, note_content):
                 filtered.append(x)
         return filtered
 

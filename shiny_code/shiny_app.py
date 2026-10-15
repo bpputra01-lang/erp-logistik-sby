@@ -4702,6 +4702,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                     state.load_transfer_orders_from_supabase()
                     state.load_mass_adjustments_from_supabase()
                     state.load_single_adjustments_from_supabase()
+                    state.load_special_buffer_stock_from_supabase()
     # Download Excel Report
     @render.download(
         filename=lambda: f"LL01_WAREHOUSE_MONITOR_{datetime.now().strftime('%d_%m_%Y_%H%M')}.xlsx"
