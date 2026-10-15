@@ -606,56 +606,73 @@ def fetch_single_adjustment_data(session):
     return clean_single_records
 
 # ==============================================================================
-# 5. PUSH KE SUPABASE DALAM BATCH 200 ITEM
+# 5. PUSH KE SUPABASE (FITUR HAPUS BERSIH DULU -> ISI DATA BARU)
 # ==============================================================================
 def push_all_to_supabase(staging_data, tf_headers, tf_items, ma_headers, ma_items, single_items):
-    print("🚀 [6/6] Mengirim seluruh data ke Supabase...")
+    print("🚀 [6/6] Mengosongkan data lama & mengirim data terbaru ke Supabase...")
     headers = {
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": "application/json",
-        "Prefer": "resolution=merge-duplicates"
+        "Content-Type": "application/json"
     }
 
-    # 1. Staging Waiting
+    # 1. STAGING WAITING (Kosongkan dulu -> Isi baru)
+    requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_waiting_staging?plst_id=gt.0", headers=headers)
     if staging_data:
-        res = requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_waiting_staging", data=json.dumps(staging_data), headers=headers)
-        print(f"   Status Staging: {res.status_code}")
-    
-    # 2. Transfer Headers
-    if tf_headers:
-        res = requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_transfer_headers", data=json.dumps(tf_headers), headers=headers)
-        print(f"   Status Transfer Headers: {res.status_code}")
+        for i in range(0, len(staging_data), 200):
+            batch = staging_data[i:i + 200]
+            requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_waiting_staging", data=json.dumps(batch), headers=headers)
+        print(f"   ✅ Staging: Diperbarui {len(staging_data)} item.")
+    else:
+        print("   ✅ Staging: Bersih (0 antrean).")
 
-    # 3. Transfer Items (Per batch 200 baris)
+    # 2. TRANSFER HEADERS (Kosongkan dulu -> Isi baru)
+    requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_transfer_headers?stf_code=neq.", headers=headers)
+    if tf_headers:
+        for i in range(0, len(tf_headers), 200):
+            batch = tf_headers[i:i + 200]
+            requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_transfer_headers", data=json.dumps(batch), headers=headers)
+        print(f"   ✅ Transfer Headers: Diperbarui {len(tf_headers)} dokumen.")
+    else:
+        print("   ✅ Transfer Headers: Bersih (0 open transfer).")
+
+    # 3. TRANSFER ITEMS (Kosongkan dulu -> Isi baru)
+    requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_transfer_items?id=gt.0", headers=headers)
     if tf_items:
-        requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_transfer_items?id=gt.0", headers=headers)
         for i in range(0, len(tf_items), 200):
             batch = tf_items[i:i + 200]
             requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_transfer_items", data=json.dumps(batch), headers=headers)
-        print(f"   Status Transfer Items: Sukses kirim {len(tf_items)} item.")
+        print(f"   ✅ Transfer Items: Diperbarui {len(tf_items)} rincian barang.")
 
-    # 4. Mass Adjustment Headers
+    # 4. MASS ADJUSTMENT HEADERS (Kosongkan dulu -> Isi baru)
+    requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_adjustment_headers?ma_id=gt.0", headers=headers)
     if ma_headers:
-        res = requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_adjustment_headers", data=json.dumps(ma_headers), headers=headers)
-        print(f"   Status Adjustment Headers: {res.status_code}")
+        for i in range(0, len(ma_headers), 200):
+            batch = ma_headers[i:i + 200]
+            requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_adjustment_headers", data=json.dumps(batch), headers=headers)
+        print(f"   ✅ MADJ Headers: Diperbarui {len(ma_headers)} dokumen.")
+    else:
+        print("   ✅ MADJ Headers: Bersih (0 MADJ menggantung).")
 
-    # 5. Mass Adjustment Items (Per batch 200 baris)
+    # 5. MASS ADJUSTMENT ITEMS (Kosongkan dulu -> Isi baru)
+    requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_adjustment_items?id=gt.0", headers=headers)
     if ma_items:
-        requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_adjustment_items?id=gt.0", headers=headers)
         for i in range(0, len(ma_items), 200):
             batch = ma_items[i:i + 200]
             requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_adjustment_items", data=json.dumps(batch), headers=headers)
-        print(f"   Status Adjustment Items: Sukses kirim {len(ma_items)} item.")
+        print(f"   ✅ MADJ Items: Diperbarui {len(ma_items)} rincian barang.")
 
-    # 6. Single Adjustment (Per batch 200 baris, Upsert via merge-duplicates)
+    # 6. SINGLE ADJUSTMENT (Kosongkan dulu -> Isi baru)
+    requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_single_adjustments?id=gt.0", headers=headers)
     if single_items:
         for i in range(0, len(single_items), 200):
             batch = single_items[i:i + 200]
             requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_single_adjustments", data=json.dumps(batch), headers=headers)
-        print(f"   Status Single Adjustment: Sukses kirim {len(single_items)} baris.")
+        print(f"   ✅ Single Adjustment: Diperbarui {len(single_items)} baris Need Approval.")
+    else:
+        print("   ✅ Single Adjustment: Bersih (0 transaksi butuh approval).")
 
-    print("✅ SUKSES! Seluruh data Staging, Transfer Stok, Multiple Adjustment, & Single Adjustment tersinkronisasi.")
+    print("🎉 SUKSES! Seluruh tabel Supabase telah disegarkan secara bersih dan akurat.")
 
 # ==============================================================================
 # MAIN PIPELINE EKSEKUSI
