@@ -536,6 +536,10 @@ class AppState:
         self.ll01_tf_headers = reactive.Value([])
         self.ll01_tf_items = reactive.Value([])
         self.ll01_selected_tf_code = reactive.Value("")
+        # --- MASS ADJUSTMENT STATE ---
+        self.ll01_ma_headers = reactive.Value([])
+        self.ll01_ma_filter_status = reactive.Value("SEMUA")
+        self.ll01_ma_filter_aging = reactive.Value("SEMUA")
 
         # --- PHYSICAL INVENTORY LIST STATE (UNIFIED) ---
         self.pil_mode = reactive.Value("")
@@ -6398,3 +6402,32 @@ class AppState:
     def ll01_tf_metric_critical(self) -> int:
         # Kritis jika transfer tertahan > 24 jam belum selesai
         return len([x for x in self.ll01_tf_headers() if float(x.get("aging_hours") or 0) >= 24.0])
+
+    def load_mass_adjustments_from_supabase(self):
+        try:
+            client = get_supabase()
+            if not client: return False, "Koneksi Supabase gagal!"
+            res_h = client.table("jezpro_adjustment_headers").select("*").order("aging_hours", desc=True).execute()
+            self.ll01_ma_headers.set(res_h.data if res_h and res_h.data else [])
+            return True, "Data Multiple Adjustment berhasil dimuat!"
+        except Exception as e:
+            return False, f"Gagal load adjustment: {e}"
+
+    def get_filtered_ma_data(self) -> list[dict]:
+        data = self.ll01_ma_headers()
+        st_flt = self.ll01_ma_filter_status()
+        ag_flt = self.ll01_ma_filter_aging()
+
+        res = data
+        if st_flt != "SEMUA":
+            res = [x for x in res if x.get("status_category") == st_flt]
+        if ag_flt == "CRITICAL":
+            res = [x for x in res if float(x.get("aging_hours") or 0) >= 24.0 and x.get("status_category") == "MENGGANTUNG"]
+        elif ag_flt == "NORMAL":
+            res = [x for x in res if float(x.get("aging_hours") or 0) < 24.0 or x.get("status_category") == "CANCEL"]
+        return res
+
+    def ll01_ma_metric_total(self) -> int: return len(self.get_filtered_ma_data())
+    def ll01_ma_metric_menggantung(self) -> int: return len([x for x in self.get_filtered_ma_data() if x.get("status_category") == "MENGGANTUNG"])
+    def ll01_ma_metric_cancel(self) -> int: return len([x for x in self.get_filtered_ma_data() if x.get("status_category") == "CANCEL"])
+    def ll01_ma_metric_critical(self) -> int: return len([x for x in self.get_filtered_ma_data() if float(x.get("aging_hours") or 0) >= 24.0 and x.get("status_category") == "MENGGANTUNG"])

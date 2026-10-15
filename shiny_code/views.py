@@ -2291,7 +2291,89 @@ def warehouse_activity_monitor_view(state: AppState):
         ),
         style="width: 100%; padding: 1rem;"
     )
+# ==========================================================================
+    # TAB 3: MULTIPLE ADJUSTMENT (MENGGANTUNG & CANCEL)
+    # ==========================================================================
+    ma_headers = state.get_filtered_ma_data()
+    ma_rows = []
+    for idx_ma, ma in enumerate(ma_headers, start=1):
+        st_cat = ma.get("status_category", "")
+        ma_id = ma.get("ma_id", "")
+        aging = float(ma.get("aging_hours") or 0)
+        is_crit = aging >= 24.0 and st_cat == "MENGGANTUNG"
 
+        badge_ma = (
+            ui.span("MENGGANTUNG", style="background: #FEFCBF; color: #744210; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 4px;")
+            if st_cat == "MENGGANTUNG" else
+            ui.span("CANCEL", style="background: #FED7D7; color: #9B2C2C; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 4px;")
+        )
+
+        btn_detail = ui.tags.button(
+            ui.tags.i(class_="fa-solid fa-list-check", style="margin-right: 4px;"), "Lihat Item",
+            onclick=f"Shiny.setInputValue('btn_open_ma_items_modal', '{ma_id}', {{priority: 'event'}})",
+            style="background: #3182CE; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer;"
+        )
+
+        ma_rows.append(ui.tags.tr(
+            ui.tags.td(str(idx_ma), style="text-align: center; font-weight: bold;"),
+            ui.tags.td(badge_ma, style="text-align: center;"),
+            ui.tags.td(ui.tags.b(str(ma.get("ma_code", f"MA-{ma_id}")), style="color: #2D3748;")),
+            ui.tags.td(str(ma.get("store_name", "-")), style="font-weight: 600;"),
+            ui.tags.td(str(ma.get("u_name", "-"))),
+            ui.tags.td(str(ma.get("approve", "-")), style="font-size: 11.5px; max-width: 200px; white-space: normal;"),
+            ui.tags.td(str(ma.get("note", "-"))),
+            ui.tags.td(str(ma.get("created_at", "-"))[:16]),
+            ui.tags.td(f"{aging} Jam ({round(aging/24, 1)} Hari)", style=f"font-weight: 800; text-align: center; color: {'#E53E3E' if is_crit else '#2F855A'};"),
+            ui.tags.td(btn_detail, style="text-align: center;")
+        ))
+
+    headers_ma = ["NO", "KATEGORI", "KODE MADJ", "STORE", "DIBUAT OLEH", "APPROVAL / CANCEL", "NOTE", "TANGGAL DIBUAT", "AGING TERTAHAN", "RINCIAN ITEM"]
+    th_ma = [ui.tags.th(h, style="text-align: center;" if h in ["NO", "KATEGORI", "AGING TERTAHAN", "RINCIAN ITEM"] else "") for h in headers_ma]
+
+    tab3_adjustment = ui.div(
+        ui.div(
+            dark_metric_box("⚖️ TOTAL DOKUMEN MADJ", f"{state.ll01_ma_metric_total():,} DOK", "#3182CE"),
+            dark_metric_box("⏳ STATUS MENGGANTUNG", f"{state.ll01_ma_metric_menggantung():,} DOK", "#C5A059"),
+            dark_metric_box("❌ STATUS CANCEL", f"{state.ll01_ma_metric_cancel():,} DOK", "#E53E3E"),
+            dark_metric_box("🚨 STUCK (>24 JAM)", f"{state.ll01_ma_metric_critical():,} DOK", "#E53E3E"),
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+        ),
+        ui.div(
+            ui.tags.table(
+                ui.tags.thead(ui.tags.tr(*th_ma)),
+                ui.tags.tbody(*ma_rows) if ma_rows else ui.tags.tr(
+                    ui.tags.td("Tidak ada dokumen Multiple Adjustment yang menggantung atau cancel.", colspan=10, style="text-align: center; color: #718096; padding: 2rem; font-style: italic;")
+                ),
+                class_="custom-clean-table", style="width: 100%;"
+            ),
+            style="background: white; border-radius: 12px; border: 1px solid #E2E8F0; padding: 1rem; overflow-x: auto;"
+        ),
+        style="padding: 1rem 0;"
+    )
+
+    # Gabungkan menjadi 3 TAB:
+    return ui.div(
+        ui.div(
+            ui.div(
+                ui.h4("🏭 Warehouse Activity Monitor (SAP LL01 Full Suite)", style="font-size: 16px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
+                ui.p(f"🕒 Terakhir disinkronkan: {state.ll01_last_sync()} • Staging, Transfer Stok, dan Multiple Adjustment.", style="color: #718096; font-size: 12px; margin: 0;")
+            ),
+            ui.div(
+                ui.tags.button(
+                    ui.tags.i(class_="fa-solid fa-arrows-rotate", style="margin-right: 6px;"), "REFRESH DATA CLOUD",
+                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_refresh_ll01_all', Math.random(), {priority: 'event'})",
+                    style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer;"
+                )
+            ),
+            style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 1.25rem 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 10px;"
+        ),
+        ui.navset_card_tab(
+            ui.nav_panel("📥 1. STAGING TRANSIT (PUTAWAY/REFUND)", tab1_staging),
+            ui.nav_panel("🚚 2. OPEN TRANSFER ORDERS (TF STOCK)", tab2_transfer),
+            ui.nav_panel("⚖️ 3. MULTIPLE ADJUSTMENT (PENDING & CANCEL)", tab3_adjustment)
+        ),
+        style="width: 100%; padding: 1rem;"
+    )
 
 def menu_item(label: str, target_menu: str, current_menu: str):
     import re
