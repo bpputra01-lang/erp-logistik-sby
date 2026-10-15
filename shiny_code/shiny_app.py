@@ -4728,65 +4728,90 @@ def server(input: Inputs, output: Outputs, session: Session):
         ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
         ui.notification_show("✅ Data Staging & Transfer Stok berhasil diperbarui dari Cloud!", type="message", duration=4)
 
-    # Pop-Up Modal Detail Item Transfer
-    # Pop-Up Modal Detail Item Transfer (Direct Query Supabase - Bebas Limit)
+    # ==========================================================================
+    # POP-UP DETAIL ITEM TRANSFER (ANTI-CRASH, NATIVE REGEX, DIRECT QUERY)
+    # ==========================================================================
     @reactive.Effect
     @reactive.event(input.btn_open_tf_items_modal)
     def _open_tf_detail():
+        import re
+        import traceback
+
         raw_code = input.btn_open_tf_items_modal()
         tf_code = str(raw_code).strip()
 
-        # 1. TEMBAK LANGSUNG KE SUPABASE KHUSUS UNTUK NOMOR TF INI
-        client = get_supabase()
-        res_items = client.table("jezpro_transfer_items") \
-                          .select("*") \
-                          .in_("stf_code", [tf_code]) \
-                          .execute()
+        matched_items = []
 
-        matched_items = res_items.data if res_items and res_items.data else []
+        try:
+            # 1. TEMBAK LANGSUNG KE SUPABASE DENGAN QUERY RESMI (stf_code=eq.X)
+            client = get_supabase()
+            tbl = client.table("jezpro_transfer_items").select("*")
+            tbl.params.append(f"stf_code=eq.{tf_code}")
+            res_items = tbl.execute()
 
-        # 2. SUSUN TABEL RINCIAN ITEM
+            if res_items and hasattr(res_items, 'data') and res_items.data:
+                matched_items = res_items.data
+            else:
+                # Fallback: jika tidak ketemu di query spesifik, coba cari di state lokal
+                matched_items = [it for it in state.ll01_tf_items() if str(it.get("stf_code", "")).strip() == tf_code]
+
+        except Exception as e:
+            print(f"⚠️ Kendala load item Supabase: {e}")
+            traceback.print_exc()
+            matched_items = [it for it in state.ll01_tf_items() if str(it.get("stf_code", "")).strip() == tf_code]
+
+        # 2. SUSUN TABEL RINCIAN ITEM (Menggunakan Regex Bawaan - Tanpa bs4 agar tidak freeze)
         rows = []
         for idx, it in enumerate(matched_items, start=1):
-            art_clean = str(it.get("article_name", "-"))
-            # Jika nama artikel masih memuat kode HTML, bersihkan otomatis
-            if "<" in art_clean:
-                from bs4 import BeautifulSoup
-                art_clean = BeautifulSoup(art_clean, "html.parser").get_text(" ", strip=True)
+            art_raw = str(it.get("article_name", "-"))
+            # Bersihkan tag HTML menggunakan regex standar bawaan Python (super aman)
+            art_clean = re.sub(r'<[^>]+>', ' ', art_raw)
+            art_clean = re.sub(r'\s+', ' ', art_clean).strip()
+
+            bin_asal = re.sub(r'<[^>]+>', '', str(it.get("bin_asal", "-"))).strip()
+            start_st = re.sub(r'<[^>]+>', '', str(it.get("start_store", "-"))).strip()
+            end_st = re.sub(r'<[^>]+>', '', str(it.get("end_store", "-"))).strip()
+            qty_tf = it.get('qty_tf', 1)
+            qty_bin = it.get('qty_in_bin', 0)
 
             rows.append(ui.tags.tr(
                 ui.tags.td(str(idx), style="text-align: center; font-weight: bold;"),
                 ui.tags.td(art_clean, style="font-weight: 700; color: #1A202C; max-width: 320px; white-space: normal;"),
-                ui.tags.td(ui.tags.code(str(it.get("bin_asal", "-")), style="font-weight: bold; color: #2B6CB0;")),
-                ui.tags.td(f"{it.get('qty_tf', 1)} Pcs", style="text-align: center; font-weight: 800; color: #E50914;"),
-                ui.tags.td(f"{it.get('qty_in_bin', 0)} Pcs", style="text-align: center; color: #718096;"),
-                ui.tags.td(f"{it.get('start_store', '-')} ➔ {it.get('end_store', '-')}", style="font-size: 12px;")
+                ui.tags.td(ui.tags.code(bin_asal, style="font-weight: bold; color: #2B6CB0;")),
+                ui.tags.td(f"{qty_tf} Pcs", style="text-align: center; font-weight: 800; color: #E50914;"),
+                ui.tags.td(f"{qty_bin} Pcs", style="text-align: center; color: #718096;"),
+                ui.tags.td(f"{start_st} ➔ {end_st}", style="font-size: 12px;")
             ))
 
-        ui.modal_show(ui.modal(
-            ui.div(
-                ui.h4(f"📋 Rincian Item Barang: {tf_code}", style="font-weight: 800; color: #1A202C; margin-bottom: 4px; font-size: 15px;"),
-                ui.p(f"Ditemukan total {len(matched_items)} item barang pada dokumen transfer ini.", style="color: #718096; font-size: 12px; margin-bottom: 12px;"),
-                ui.tags.table(
-                    ui.tags.thead(ui.tags.tr(
-                        ui.tags.th("NO", style="text-align: center;"),
-                        ui.tags.th("NAMA ARTIKEL / DESKRIPSI"),
-                        ui.tags.th("BIN ASAL"),
-                        ui.tags.th("QTY TF", style="text-align: center;"),
-                        ui.tags.th("STOK BIN", style="text-align: center;"),
-                        ui.tags.th("RUTE STORE")
-                    )),
-                    ui.tags.tbody(*rows) if rows else ui.tags.tr(
-                        ui.tags.td("Rincian barang kosong pada dokumen transfer ini.", colspan=6, style="text-align: center; padding: 1.5rem; color: #718096; font-style: italic;")
+        # 3. TAMPILKAN MODAL SECARA AMAN
+        try:
+            ui.modal_show(ui.modal(
+                ui.div(
+                    ui.h4(f"📋 Rincian Item Barang: {tf_code}", style="font-weight: 800; color: #1A202C; margin-bottom: 4px; font-size: 15px;"),
+                    ui.p(f"Ditemukan total {len(matched_items)} item barang pada dokumen transfer ini.", style="color: #718096; font-size: 12px; margin-bottom: 12px;"),
+                    ui.tags.table(
+                        ui.tags.thead(ui.tags.tr(
+                            ui.tags.th("NO", style="text-align: center;"),
+                            ui.tags.th("NAMA ARTIKEL / DESKRIPSI"),
+                            ui.tags.th("BIN ASAL"),
+                            ui.tags.th("QTY TF", style="text-align: center;"),
+                            ui.tags.th("STOK BIN", style="text-align: center;"),
+                            ui.tags.th("RUTE STORE")
+                        )),
+                        ui.tags.tbody(*rows) if rows else ui.tags.tr(
+                            ui.tags.td("Rincian barang kosong pada dokumen transfer ini.", colspan=6, style="text-align: center; padding: 1.5rem; color: #718096; font-style: italic;")
+                        ),
+                        class_="custom-clean-table", style="width: 100%; border: 1px solid #CBD5E0; border-radius: 8px;"
                     ),
-                    class_="custom-clean-table", style="width: 100%; border: 1px solid #CBD5E0; border-radius: 8px;"
+                    style="max-height: 480px; overflow-y: auto; padding: 0.5rem 0;"
                 ),
-                style="max-height: 480px; overflow-y: auto; padding: 0.5rem 0;"
-            ),
-            title=f"🚚 Transfer Order Detail: {tf_code}",
-            size="l",
-            easy_close=True,
-            footer=ui.modal_button("Tutup", class_="btn-page-nav")
-        ))
+                title=f"🚚 Transfer Order Detail: {tf_code}",
+                size="l",
+                easy_close=True,
+                footer=ui.modal_button("Tutup", class_="btn-page-nav")
+            ))
+        except Exception as err_modal:
+            print("Gagal render modal:", err_modal)
+            ui.notification_show(f"Gagal menampilkan pop-up: {err_modal}", type="error")
 
 app = App(app_ui, server)
