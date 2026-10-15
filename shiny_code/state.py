@@ -540,6 +540,10 @@ class AppState:
         self.ll01_ma_headers = reactive.Value([])
         self.ll01_ma_filter_status = reactive.Value("SEMUA")
         self.ll01_ma_filter_aging = reactive.Value("SEMUA")
+        # --- TAB 4: BUFFER & TRANSIT STOCK (KARANTINA, INB, PUTAWAY, OUT) ---
+        self.ll01_special_stock_list = reactive.Value([])
+        self.ll01_stock_filter_branch = reactive.Value("SEMUA")
+        self.ll01_stock_filter_type = reactive.Value("SEMUA")
 
         # --- PHYSICAL INVENTORY LIST STATE (UNIFIED) ---
         self.pil_mode = reactive.Value("")
@@ -6431,3 +6435,121 @@ class AppState:
     def ll01_ma_metric_menggantung(self) -> int: return len([x for x in self.get_filtered_ma_data() if x.get("status_category") == "MENGGANTUNG"])
     def ll01_ma_metric_cancel(self) -> int: return len([x for x in self.get_filtered_ma_data() if x.get("status_category") == "CANCEL"])
     def ll01_ma_metric_critical(self) -> int: return len([x for x in self.get_filtered_ma_data() if float(x.get("aging_hours") or 0) >= 24.0 and x.get("status_category") == "MENGGANTUNG"])
+
+    # ==========================================================================
+    # TAB 4: BUFFER & TRANSIT STOCK (KARANTINA, INB, PUTAWAY, OUT) DARI SUPABASE
+    # ==========================================================================
+    def load_special_buffer_stock_from_supabase(self):
+        """Menarik seluruh data stock dari table 'stock_live_cache' dan memfilter BIN transit/buffer"""
+        try:
+            import json
+            client = get_supabase()
+            if not client:
+                return False, "Koneksi ke Supabase gagal!"
+
+            res = client.table("stock_live_cache").select("*").execute()
+            if not res or not res.data:
+                self.ll01_special_stock_list.set([])
+                return True, "Data stock_live_cache kosong di Supabase."
+
+            def extract_field(item_dict, candidates, default=""):
+                for c in candidates:
+                    if c in item_dict and item_dict[c] is not None:
+                        return item_dict[c]
+                return default
+
+            target_keywords = ["KARANTINA", "INB", "PUTAWAY", "OUT"]
+            matched_records = []
+
+            for row in res.data:
+                branch_name = row.get("branch", "-")
+                stock_raw = row.get("stock_data", [])
+
+                if isinstance(stock_raw, str):
+                    try:
+                        stock_items = json.loads(stock_raw)
+                    except Exception:
+                        stock_items = []
+                elif isinstance(stock_raw, list):
+                    stock_items = stock_raw
+                else:
+                    stock_items = []
+
+                for it in stock_items:
+                    if not isinstance(it, dict):
+                        continue
+
+                    bin_val = str(extract_field(it, ["BIN", "bin", "lokasi", "LOKASI", "Bin Code", "BIN CODE"], "")).strip().upper()
+                    if not bin_val:
+                        continue
+
+                    # Klasifikasi tipe buffer
+                    matched_types = []
+                    if "KARANTINA" in bin_val:
+                        matched_types.append("KARANTINA")
+                    if "INB" in bin_val or "INBOUND" in bin_val:
+                        matched_types.append("INBOUND")
+                    if "PUTAWAY" in bin_val:
+                        matched_types.append("PUTAWAY")
+                    if "OUT" in bin_val or "OUTBOUND" in bin_val:
+                        matched_types.append("OUT")
+
+                    if matched_types:
+                        qty_raw = extract_field(it, ["QTY SYSTEM", "QTY SYS", "QTY", "qty", "STOK", "QUANTITY", "stok", "Jumlah"], 0)
+                        qty_val = safe_int(qty_raw, 0)
+
+                        # Hanya ambil barang yang ada kuantitas fisiknya (> 0)
+                        if qty_val > 0:
+                            matched_records.append({
+                                "branch": branch_name,
+                                "tipe_bin": " / ".join(matched_types),
+                                "bin": bin_val,
+                                "sku": str(extract_field(it, ["SKU", "sku", "BARCODE", "barcode", "item_code", "Item Code"], "-")).strip().upper(),
+                                "item_name": str(extract_field(it, ["ITEM NAME", "item_name", "ARTIKEL", "artikel", "DESCRIPTION", "Description", "NAMA BARANG"], "-")).strip(),
+                                "brand": str(extract_field(it, ["BRAND", "brand", "MERK", "merk"], "-")).strip().upper(),
+                                "variant": str(extract_field(it, ["VARIANT", "variant", "SIZE", "size", "UKURAN"], "-")).strip().upper(),
+                                "sub_kategori": str(extract_field(it, ["SUB KATEGORI", "sub_kategori", "CATEGORY", "category"], "-")).strip().upper(),
+                                "qty": qty_val
+                            })
+
+            self.ll01_special_stock_list.set(matched_records)
+            return True, f"Berhasil memuat {len(matched_records):,} baris stok buffer/transit."
+        except Exception as e:
+            print("Gagal load buffer stock:", e)
+            return False, f"Terjadi kesalahan: {str(e)}"
+
+    def get_filtered_ll01_special_stock(self) -> list[dict]:
+        data = self.ll01_special_stock_list()
+        if not data:
+            return []
+
+        flt_br = self.ll01_stock_filter_branch()
+        flt_tp = self.ll01_stock_filter_type()
+
+        res = data
+        if flt_br != "SEMUA":
+            res = [x for x in res if x.get("branch", "").upper() == flt_br.upper()]
+
+        if flt_tp != "SEMUA":
+            res = [x for x in res if flt_tp.upper() in str(x.get("tipe_bin", "")).upper()]
+
+        return res
+
+    # Metrik Tab 4
+    def ll01_stock_metric_total_qty(self) -> int:
+        return sum([safe_int(x.get("qty", 0)) for x in self.get_filtered_ll01_special_stock()])
+
+    def ll01_stock_metric_total_sku(self) -> int:
+        return len(set([x.get("sku") for x in self.get_filtered_ll01_special_stock() if x.get("sku") and x.get("sku") != "-"]))
+
+    def ll01_stock_metric_karantina_qty(self) -> int:
+        return sum([safe_int(x.get("qty", 0)) for x in self.get_filtered_ll01_special_stock() if "KARANTINA" in str(x.get("tipe_bin", ""))])
+
+    def ll01_stock_metric_inbound_qty(self) -> int:
+        return sum([safe_int(x.get("qty", 0)) for x in self.get_filtered_ll01_special_stock() if "INBOUND" in str(x.get("tipe_bin", ""))])
+
+    def ll01_stock_metric_putaway_qty(self) -> int:
+        return sum([safe_int(x.get("qty", 0)) for x in self.get_filtered_ll01_special_stock() if "PUTAWAY" in str(x.get("tipe_bin", ""))])
+
+    def ll01_stock_metric_out_qty(self) -> int:
+        return sum([safe_int(x.get("qty", 0)) for x in self.get_filtered_ll01_special_stock() if "OUT" in str(x.get("tipe_bin", ""))])

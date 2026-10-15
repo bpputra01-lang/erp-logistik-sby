@@ -4703,6 +4703,8 @@ def server(input: Inputs, output: Outputs, session: Session):
                     state.load_transfer_orders_from_supabase()
                 if not state.ll01_ma_headers():
                     state.load_mass_adjustments_from_supabase()
+                if not state.ll01_special_stock_list():
+                    state.load_special_buffer_stock_from_supabase()
 
     # Download Excel Report
     @render.download(
@@ -4880,5 +4882,30 @@ def server(input: Inputs, output: Outputs, session: Session):
             easy_close=True,
             footer=ui.modal_button("Tutup", class_="btn-page-nav")
         ))
+@reactive.Effect
+    @reactive.event(input.change_ll01_stock_branch)
+    def _on_change_ll01_stk_br():
+        state.ll01_stock_filter_branch.set(input.change_ll01_stock_branch())
 
+    @reactive.Effect
+    @reactive.event(input.change_ll01_stock_type)
+    def _on_change_ll01_stk_tp():
+        state.ll01_stock_filter_type.set(input.change_ll01_stock_type())
+
+    @render.download(
+        filename=lambda: f"STOK_BUFFER_TRANSIT_{datetime.now().strftime('%d_%m_%Y_%H%M')}.xlsx"
+    )
+    def btn_dl_ll01_transit_stock():
+        buf = io.BytesIO()
+        df_export = pd.DataFrame(state.get_filtered_ll01_special_stock())
+        if not df_export.empty:
+            cols = [c for c in ['branch', 'tipe_bin', 'bin', 'sku', 'item_name', 'brand', 'variant', 'sub_kategori', 'qty'] if c in df_export.columns]
+            df_export = df_export[cols]
+        else:
+            df_export = pd.DataFrame(columns=["branch", "tipe_bin", "bin", "sku", "item_name", "brand", "variant", "sub_kategori", "qty"])
+
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            df_export.to_excel(writer, sheet_name='BUFFER_TRANSIT_STOCK', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
 app = App(app_ui, server)

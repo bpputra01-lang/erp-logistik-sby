@@ -2325,6 +2325,102 @@ def warehouse_activity_monitor_view(state: AppState):
     )
 
     # ==========================================================================
+    # TAB 4: STOK BUFFER & TRANSIT (KARANTINA, INB, PUTAWAY, OUT)
+    # ==========================================================================
+    special_items = state.get_filtered_ll01_special_stock()
+    stk_rows = []
+    for idx_stk, it in enumerate(special_items, start=1):
+        tipe = str(it.get("tipe_bin", "-"))
+        
+        # Badge warna tipe BIN
+        if "KARANTINA" in tipe:
+            badge_color = "#E53E3E"; badge_bg = "#FED7D7"
+        elif "INBOUND" in tipe:
+            badge_color = "#22543D"; badge_bg = "#C6F6D5"
+        elif "PUTAWAY" in tipe:
+            badge_color = "#2B6CB0"; badge_bg = "#EBF8FF"
+        else: # OUT
+            badge_color = "#744210"; badge_bg = "#FEFCBF"
+
+        badge_tipe = ui.span(tipe, style=f"background: {badge_bg}; color: {badge_color}; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 4px;")
+
+        stk_rows.append(ui.tags.tr(
+            ui.tags.td(str(idx_stk), style="text-align: center; font-weight: bold;"),
+            ui.tags.td(ui.tags.b(str(it.get("branch", "-"))), style="color: #2D3748; font-size: 12px;"),
+            ui.tags.td(badge_tipe, style="text-align: center;"),
+            ui.tags.td(ui.tags.code(str(it.get("bin", "-")), style="font-weight: bold; color: #2B6CB0;")),
+            ui.tags.td(str(it.get("sku", "-")), style="font-weight: 700; color: #1A202C;"),
+            ui.tags.td(str(it.get("item_name", "-")), style="max-width: 280px; white-space: normal; font-size: 12px;"),
+            ui.tags.td(str(it.get("brand", "-")), style="font-size: 12px;"),
+            ui.tags.td(str(it.get("variant", "-")), style="text-align: center; font-size: 12px;"),
+            ui.tags.td(str(it.get("sub_kategori", "-")), style="font-size: 11.5px; color: #718096;"),
+            ui.tags.td(f"{it.get('qty', 0):,} Pcs", style="text-align: right; font-weight: 800; color: #E50914;")
+        ))
+
+    headers_stk = ["NO", "CABANG", "TIPE", "BIN LOKASI", "SKU", "NAMA ARTIKEL", "BRAND", "SIZE / VAR", "SUB KATEGORI", "QTY SYSTEM"]
+    th_stk = [ui.tags.th(h, style="text-align: center;" if h in ["NO", "TIPE", "SIZE / VAR", "QTY SYSTEM"] else "") for h in headers_stk]
+
+    branch_options = ["SEMUA", "JEZ SURABAYA", "JEZ MALANG", "JEZ SIDOARJO", "JEZ KEDIRI", "JEZ JEMBER", "JEZ SEMARANG"]
+    type_options = ["SEMUA", "KARANTINA", "INBOUND", "PUTAWAY", "OUT"]
+
+    tab4_transit_stock = ui.div(
+        # 6 Kotak Metrik Ringkasan
+        ui.div(
+            dark_metric_box("📦 TOTAL QTY BUFFER", f"{state.ll01_stock_metric_total_qty():,} PCS", "#3182CE"),
+            dark_metric_box("🏷️ TOTAL SKU TERPISAH", f"{state.ll01_stock_metric_total_sku():,} SKU", "#C5A059"),
+            dark_metric_box("☣️ KARANTINA", f"{state.ll01_stock_metric_karantina_qty():,} PCS", "#E53E3E"),
+            dark_metric_box("📥 INBOUND / INB", f"{state.ll01_stock_metric_inbound_qty():,} PCS", "#10B981"),
+            dark_metric_box("🚚 PUTAWAY", f"{state.ll01_stock_metric_putaway_qty():,} PCS", "#38BDF8"),
+            dark_metric_box("📤 OUT / OUTBOUND", f"{state.ll01_stock_metric_out_qty():,} PCS", "#DD6B20"),
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+        ),
+        # Kontrol Filter & Tombol Download Excel
+        ui.div(
+            ui.div(
+                ui.div(
+                    ui.span("Filter Cabang:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
+                    ui.tags.select(
+                        *[ui.tags.option(opt, value=opt, selected=(opt == state.ll01_stock_filter_branch())) for opt in branch_options],
+                        onchange="Shiny.setInputValue('change_ll01_stock_branch', this.value, {priority: 'event'})",
+                        style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; outline: none; background: white; cursor: pointer; min-width: 170px;"
+                    ),
+                    style="display: flex; flex-direction: column;"
+                ),
+                ui.div(
+                    ui.span("Filter Tipe BIN:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
+                    ui.tags.select(
+                        *[ui.tags.option(opt, value=opt, selected=(opt == state.ll01_stock_filter_type())) for opt in type_options],
+                        onchange="Shiny.setInputValue('change_ll01_stock_type', this.value, {priority: 'event'})",
+                        style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; outline: none; background: white; cursor: pointer; min-width: 150px;"
+                    ),
+                    style="display: flex; flex-direction: column;"
+                ),
+                style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;"
+            ),
+            ui.div(
+                ui.download_button(
+                    "btn_dl_ll01_transit_stock",
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 13px;"), "Download Excel (.xlsx)"),
+                    style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer; font-size: 12px;"
+                )
+            ),
+            style="display: flex; justify-content: space-between; align-items: flex-end; width: 100%; margin-bottom: 1rem; flex-wrap: wrap; gap: 10px; background: #F8FAFC; padding: 12px 16px; border-radius: 8px; border: 1px solid #E2E8F0;"
+        ),
+        # Tabel Data
+        ui.div(
+            ui.tags.table(
+                ui.tags.thead(ui.tags.tr(*th_stk)),
+                ui.tags.tbody(*stk_rows) if stk_rows else ui.tags.tr(
+                    ui.tags.td("Tidak ada stok yang berada di BIN Karantina, Inbound, Putaway, atau Out.", colspan=10, style="text-align: center; color: #718096; padding: 2rem; font-style: italic;")
+                ),
+                class_="custom-clean-table", style="width: 100%;"
+            ),
+            style="background: white; border-radius: 12px; border: 1px solid #E2E8F0; padding: 1rem; overflow-x: auto;"
+        ),
+        style="padding: 1rem 0;"
+    )
+
+    # ==========================================================================
     # GABUNGKAN MENJADI 3 TAB DALAM 1 RETURN TUNGGAL
     # ==========================================================================
     return ui.div(
@@ -2345,7 +2441,8 @@ def warehouse_activity_monitor_view(state: AppState):
         ui.navset_card_tab(
             ui.nav_panel("📥 1. STAGING TRANSIT (PUTAWAY/REFUND)", tab1_staging),
             ui.nav_panel("🚚 2. OPEN TRANSFER ORDERS (TF STOCK)", tab2_transfer),
-            ui.nav_panel("⚖️ 3. MULTIPLE ADJUSTMENT (PENDING & CANCEL)", tab3_adjustment)
+            ui.nav_panel("⚖️ 3. MULTIPLE ADJUSTMENT (PENDING & CANCEL)", tab3_adjustment),
+            ui.nav_panel("📦 4. STOK BUFFER & TRANSIT (KARANTINA/INB/PUTAWAY/OUT)", tab4_transit_stock)
         ),
         style="width: 100%; padding: 1rem;"
     )
