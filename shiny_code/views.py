@@ -2263,41 +2263,43 @@ def render_sap_ll01_summary_tree(state: AppState):
 # ==============================================================================
 # VIEW: WAREHOUSE ACTIVITY MONITOR (DENGAN SAP LL01 TREE & 4 TAB BERGESER)
 # ==============================================================================
+# ==============================================================================
+# VIEW: WAREHOUSE ACTIVITY MONITOR (GLOBAL FILTER DI ATAS SUMMARY + 4 TAB)
+# ==============================================================================
 def warehouse_activity_monitor_view(state: AppState):
     
-    # 1. KOMPONEN FILTER TANGGAL UNIVERSAL (POSISI DI ATAS TIAP TAB)
-    def date_filter_box(prefix: str):
-        return ui.div(
-            ui.div(
-                ui.span("🏢 Cabang/Store:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
-                ui.tags.select(
-                    *[ui.tags.option(opt, value=opt) for opt in ["SEMUA", "JEZ SURABAYA", "JEZ MALANG", "JEZ SIDOARJO", "JEZ KEDIRI", "JEZ JEMBER", "JEZ SEMARANG"]],
-                    id=f"change_ll01_{prefix}_store",
-                    onchange=f"Shiny.setInputValue('change_ll01_{prefix}_store', this.value, {{priority: 'event'}})",
-                    style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; background: white; cursor: pointer; min-width: 150px;"
-                ),
-                style="display: flex; flex-direction: column;"
+    # 1. BARIS FILTER GLOBAL TUNGGAL (POSISI DI ATAS SEBELUM SUMMARY)
+    global_filter_bar = ui.div(
+        ui.div(
+            ui.span("🏢 Pilih Cabang / Store Global:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
+            ui.tags.select(
+                *[ui.tags.option(opt, value=opt, selected=(opt == state.ll01_global_store())) for opt in ["SEMUA", "JEZ SURABAYA", "JEZ MALANG", "JEZ SIDOARJO", "JEZ KEDIRI", "JEZ JEMBER", "JEZ SEMARANG"]],
+                id="ll01_global_store",
+                onchange="Shiny.setInputValue('change_ll01_global_store', this.value, {priority: 'event'})",
+                style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; background: white; cursor: pointer; min-width: 180px;"
             ),
-            ui.div(
-                ui.span("Tgl Awal:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
-                ui.tags.input(type="date", id=f"change_ll01_{prefix}_tgl_start", onchange=f"Shiny.setInputValue('change_ll01_{prefix}_tgl_start', this.value, {{priority: 'event'}})", style="padding: 5px 8px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; background: white;"),
-                style="display: flex; flex-direction: column;"
-            ),
-            ui.div(
-                ui.span("Tgl Akhir:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
-                ui.tags.input(type="date", id=f"change_ll01_{prefix}_tgl_end", onchange=f"Shiny.setInputValue('change_ll01_{prefix}_tgl_end', this.value, {{priority: 'event'}})", style="padding: 5px 8px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; background: white;"),
-                style="display: flex; flex-direction: column;"
-            ),
-            ui.div(
-                ui.span("Cari Note/Kode:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
-                ui.tags.input(type="text", id=f"change_ll01_{prefix}_note", placeholder="Ketik kata kunci...", oninput=f"Shiny.setInputValue('change_ll01_{prefix}_note', this.value, {{priority: 'event'}})", style="padding: 6px 10px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-size: 12px; background: white;"),
-                style="display: flex; flex-direction: column;"
-            ),
-            style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; background: #F8FAFC; padding: 12px 16px; border-radius: 8px; border: 1px solid #E2E8F0; margin-bottom: 1rem; width: 100%;"
-        )
+            style="display: flex; flex-direction: column;"
+        ),
+        ui.div(
+            ui.span("Tgl Awal:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
+            ui.tags.input(type="date", id="ll01_global_tgl_start", value=state.ll01_global_tgl_start(), onchange="Shiny.setInputValue('change_ll01_global_tgl_start', this.value, {priority: 'event'})", style="padding: 5px 8px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; background: white;"),
+            style="display: flex; flex-direction: column;"
+        ),
+        ui.div(
+            ui.span("Tgl Akhir:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
+            ui.tags.input(type="date", id="ll01_global_tgl_end", value=state.ll01_global_tgl_end(), onchange="Shiny.setInputValue('change_ll01_global_tgl_end', this.value, {priority: 'event'})", style="padding: 5px 8px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; background: white;"),
+            style="display: flex; flex-direction: column;"
+        ),
+        ui.div(
+            ui.span("Cari Note / Kode / Artikel:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
+            ui.tags.input(type="text", id="ll01_global_note", value=state.ll01_global_note(), placeholder="Ketik kata kunci...", oninput="Shiny.setInputValue('change_ll01_global_note', this.value, {priority: 'event'})", style="padding: 6px 10px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-size: 12px; background: white; width: 220px;"),
+            style="display: flex; flex-direction: column;"
+        ),
+        style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap; background: #FFFFFF; padding: 15px 20px; border-radius: 12px; border: 2px solid #CBD5E0; margin-bottom: 1.25rem; width: 100%; box-shadow: 0 4px 12px rgba(0,0,0,0.03);"
+    )
 
     # ==========================================================================
-    # TAB 1: ALL WAITING (STAGING TRANSIT MASUK RAK & REFUND)
+    # TAB 1: ALL WAITING (STAGING TRANSIT)
     # ==========================================================================
     filtered_items = state.get_filtered_ll01()
     table_rows = []
@@ -2329,7 +2331,6 @@ def warehouse_activity_monitor_view(state: AppState):
     th_stg = [ui.tags.th(h, style="text-align: center;" if h in ["NO", "STATUS LL01", "QTY", "AGING"] else "") for h in headers_stg]
 
     tab1_staging = ui.div(
-        date_filter_box("stg"),
         ui.div(
             dark_metric_box("📦 TOTAL WAITING STAGING", f"{state.ll01_metric_total_antrean():,} PCS", "#3182CE"),
             dark_metric_box("📥 MASUK RAK (PUTAWAY)", f"{state.ll01_metric_masuk_rak():,} PCS", "#C5A059"),
@@ -2351,7 +2352,7 @@ def warehouse_activity_monitor_view(state: AppState):
     )
 
     # ==========================================================================
-    # TAB 2: TRANSFER ORDER (SESUAIKAN IN / OUT BERDASARKAN SURABAYA)
+    # TAB 2: TRANSFER ORDER (IN / OUT BERDASARKAN SURABAYA)
     # ==========================================================================
     tf_headers = state.get_filtered_tf_headers()
     tf_rows = []
@@ -2363,7 +2364,6 @@ def warehouse_activity_monitor_view(state: AppState):
         aging = float(tf.get("aging_hours") or 0)
         is_crit = aging >= 24.0
 
-        # Logika In / Out Berdasarkan Surabaya
         if "SURABAYA" in start_st and "SURABAYA" not in end_st:
             io_badge = ui.span("TF OUT ➔", style="background: #FED7D7; color: #9B2C2C; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 4px;")
         elif "SURABAYA" in end_st and "SURABAYA" not in start_st:
@@ -2393,7 +2393,6 @@ def warehouse_activity_monitor_view(state: AppState):
     th_tf = [ui.tags.th(h, style="text-align: center;" if h in ["NO", "ARAH (IN/OUT)", "QTY KIRIM", "AGING TERTAHAN", "RINCIAN BARANG"] else "") for h in headers_tf]
 
     tab2_transfer = ui.div(
-        date_filter_box("tf"),
         ui.div(
             dark_metric_box("🚚 TOTAL DOKUMEN OPEN TF", f"{len(tf_headers):,} SURAT", "#3182CE"),
             dark_metric_box("📦 TOTAL QTY KIRIM OPEN", f"{sum([safe_int(x.get('qty_send', 0)) for x in tf_headers]):,} PCS", "#10B981"),
@@ -2414,7 +2413,7 @@ def warehouse_activity_monitor_view(state: AppState):
     )
 
     # ==========================================================================
-    # TAB 3: ALL ADJUSTMENT (MULTIPLE ADJUSTMENT DENGAN FILTER STORE)
+    # TAB 3: ALL ADJUSTMENT (MULTIPLE ADJUSTMENT)
     # ==========================================================================
     ma_headers = state.get_filtered_ma_data()
     ma_rows = []
@@ -2458,7 +2457,6 @@ def warehouse_activity_monitor_view(state: AppState):
     )
 
     tab3_adjustment = ui.div(
-        date_filter_box("ma"),
         ui.div(
             dark_metric_box("⚖️ TOTAL MADJ MENGGANTUNG", f"{len(ma_headers):,} DOK", "#3182CE"),
             dark_metric_box("🚨 MADJ STUCK (>24 JAM)", f"{sum([1 for x in ma_headers if float(x.get('aging_hours') or 0) >= 24.0]):,} DOK", "#E53E3E"),
@@ -2469,7 +2467,7 @@ def warehouse_activity_monitor_view(state: AppState):
     )
 
     # ==========================================================================
-    # TAB 4: OUTSTANDING ITEMS (BUFFER & TRANSIT STOCK SESUAI STORE/LOKASI)
+    # TAB 4: OUTSTANDING ITEMS (BUFFER & TRANSIT STOCK)
     # ==========================================================================
     special_items = state.get_filtered_ll01_special_stock()
     stk_rows = []
@@ -2498,12 +2496,11 @@ def warehouse_activity_monitor_view(state: AppState):
     th_stk = [ui.tags.th(h, style="text-align: center;" if h in ["NO", "TIPE", "SIZE / VAR", "QTY SYSTEM"] else "") for h in headers_stk]
 
     tab4_transit_stock = ui.div(
-        date_filter_box("stk"),
         ui.div(
-            dark_metric_box("📦 TOTAL QTY OUTSTANDING", f"{state.ll01_stock_metric_total_qty():,} PCS", "#3182CE"),
-            dark_metric_box("☣️ KARANTINA", f"{state.ll01_stock_metric_karantina_qty():,} PCS", "#E53E3E"),
-            dark_metric_box("📥 INBOUND", f"{state.ll01_stock_metric_inbound_qty():,} PCS", "#10B981"),
-            dark_metric_box("🚚 PUTAWAY", f"{state.ll01_stock_metric_putaway_qty():,} PCS", "#38BDF8"),
+            dark_metric_box("📦 TOTAL QTY OUTSTANDING", f"{sum([safe_int(x.get('qty', 0)) for x in special_items]):,} PCS", "#3182CE"),
+            dark_metric_box("☣️ KARANTINA", f"{sum([safe_int(x.get('qty', 0)) for x in special_items if 'KARANTINA' in str(x.get('tipe_bin', ''))]):,} PCS", "#E53E3E"),
+            dark_metric_box("📥 INBOUND", f"{sum([safe_int(x.get('qty', 0)) for x in special_items if 'INBOUND' in str(x.get('tipe_bin', ''))]):,} PCS", "#10B981"),
+            dark_metric_box("🚚 PUTAWAY", f"{sum([safe_int(x.get('qty', 0)) for x in special_items if 'PUTAWAY' in str(x.get('tipe_bin', ''))]):,} PCS", "#38BDF8"),
             style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
         ),
         ui.div(
@@ -2520,28 +2517,29 @@ def warehouse_activity_monitor_view(state: AppState):
     )
 
     # ==========================================================================
-    # RETURN UTAMA: SAP LL01 TREE SUMMARY DI ATAS, DIKUTIP DENGAN 4 TAB DI BAWAHNYA
+    # RETURN UTAMA: 1 GLOBAL FILTER BAR DI ATAS + SAP LL01 TREE + 4 TAB DI BAWAH
     # ==========================================================================
     return ui.div(
         ui.div(
             ui.div(
                 ui.h4("🏭 Warehouse Activity Monitor (SAP LL01 Full Suite)", style="font-size: 16px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
-                ui.p(f"🕒 Terakhir disinkronkan: {state.ll01_last_sync()} • Staging, Transfer Stok, dan Multiple Adjustment.", style="color: #718096; font-size: 12px; margin: 0;")
+                ui.p(f"🕒 Terakhir disinkronkan: {state.ll01_last_sync()} • Filter global mengontrol ringkasan tree dan seluruh tab.", style="color: #718096; font-size: 12px; margin: 0;")
             ),
-            ui.div(
-                ui.tags.button(
-                    ui.tags.i(class_="fa-solid fa-arrows-rotate", style="margin-right: 6px;"), "REFRESH DATA CLOUD",
-                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_refresh_ll01_all', Math.random(), {priority: 'event'})",
-                    style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer;"
-                )
+            ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-arrows-rotate", style="margin-right: 6px;"), "REFRESH DATA CLOUD",
+                onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_refresh_ll01_all', Math.random(), {priority: 'event'})",
+                style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer;"
             ),
             style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 1.25rem 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 10px;"
         ),
         
-        # 🌟 PASANG SAP LL01 SUMMARY TREE DI SINI (SESUAI GAMBAR SAP GUI ANDA)
+        # 🌟 1. GLOBAL FILTER BAR DI POSISI PALING ATAS
+        global_filter_bar,
+
+        # 🌟 2. SAP LL01 SUMMARY TREE (OTOMATIS BERUBAH MENGIKUTI FILTER GLOBAL)
         render_sap_ll01_summary_tree(state),
 
-        # 4 Tab Menu Utama (Tab 1 tetap utuh, digeser ke Tab 2, 3, dan 4)
+        # 🌟 3. 4 TAB MENU UTAMA DI BAWAHNYA
         ui.navset_card_tab(
             ui.nav_panel("📥 1. ALL WAITING", tab1_staging),
             ui.nav_panel("🚚 2. TRANSFER ORDER", tab2_transfer),
@@ -2550,6 +2548,8 @@ def warehouse_activity_monitor_view(state: AppState):
         ),
         style="width: 100%; padding: 1rem;"
     )
+
+    
 def menu_item(label: str, target_menu: str, current_menu: str):
     import re
     is_active = (current_menu == target_menu)

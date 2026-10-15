@@ -572,6 +572,12 @@ class AppState:
         self.ll01_stock_filter_type = reactive.Value("SEMUA")
         self.ll01_stock_filter_note = reactive.Value("")
 
+        # --- WAREHOUSE ACTIVITY MONITOR GLOBAL FILTER STATE ---
+        self.ll01_global_store = reactive.Value("SEMUA")
+        self.ll01_global_tgl_start = reactive.Value("")
+        self.ll01_global_tgl_end = reactive.Value("")
+        self.ll01_global_note = reactive.Value("")
+
         # --- PHYSICAL INVENTORY LIST STATE (UNIFIED) ---
         self.pil_mode = reactive.Value("")
 
@@ -6392,123 +6398,90 @@ class AppState:
 
         return True
 
+    # Helper Pencocokan Filter Global (Store, Tanggal, & Note)
+    def _match_global_filter(self, row_date, row_store_text, row_note_text):
+        store_f = self.ll01_global_store()
+        t_start = self.ll01_global_tgl_start()
+        t_end = self.ll01_global_tgl_end()
+        note_q = self.ll01_global_note()
+
+        # 1. Filter Store / Cabang
+        if store_f != "SEMUA":
+            sf_clean = store_f.replace("JEZ ", "").strip().upper()
+            rs_clean = str(row_store_text).strip().upper()
+            if sf_clean not in rs_clean and rs_clean not in sf_clean:
+                return False
+
+        # 2. Filter Tanggal
+        if t_start or t_end:
+            try:
+                clean_dt = str(row_date)[:10].replace('/', '-')
+                parts = clean_dt.split('-')
+                if len(parts) == 3 and len(parts[0]) == 2:
+                    clean_dt = f"{parts[2]}-{parts[1]}-{parts[0]}"
+                if t_start and clean_dt < t_start: return False
+                if t_end and clean_dt > t_end: return False
+            except Exception:
+                pass
+
+        # 3. Filter Note / Query Pencarian
+        if note_q and note_q.strip():
+            if note_q.strip().upper() not in str(row_note_text).strip().upper():
+                return False
+
+        return True
+
     def get_filtered_ll01(self) -> list[dict]:
         data = self.ll01_data_list()
         if not data: return []
-        st_flt = self.ll01_filter_store()
-        kat = self.ll01_filter_kategori()
-        aging = self.ll01_filter_aging()
-        t_start = self.ll01_filter_tgl_start()
-        t_end = self.ll01_filter_tgl_end()
-        note_q = self.ll01_filter_note()
-
         filtered = []
         for x in data:
-            # Store
-            if st_flt != "SEMUA":
-                st_id_map = {"JEZ SURABAYA": 3, "JEZ MALANG": 2, "JEZ SIDOARJO": 8, "JEZ KEDIRI": 51, "JEZ JEMBER": 40, "JEZ SEMARANG": 53}
-                if safe_int(x.get("store_id")) != st_id_map.get(st_flt, -1):
-                    continue
-            # Kategori
-            if kat != "SEMUA" and str(x.get("kategori", "")).upper() != kat.upper():
-                continue
-            # Aging
-            if aging == "CRITICAL" and "CRITICAL" not in str(x.get("ll01_status", "")):
-                continue
-            elif aging == "NORMAL" and str(x.get("ll01_status", "")) != "NORMAL":
-                continue
-            # Tanggal & Note
+            store_txt = f"{x.get('store_name', '')} {x.get('branch', '')}"
             note_content = f"{x.get('article_name', '')} {x.get('waiting_status', '')} {x.get('pic_name', '')}"
-            if not self._match_date_and_note(x.get("scanned_at", ""), note_content, t_start, t_end, note_q):
-                continue
-            filtered.append(x)
+            if self._match_global_filter(x.get("scanned_at", ""), store_txt, note_content):
+                filtered.append(x)
         return filtered
 
     def get_filtered_tf_headers(self) -> list[dict]:
         data = self.ll01_tf_headers()
         if not data: return []
-        st_flt = self.ll01_tf_filter_store()
-        t_start = self.ll01_tf_filter_tgl_start()
-        t_end = self.ll01_tf_filter_tgl_end()
-        note_q = self.ll01_tf_filter_note()
-
         filtered = []
         for x in data:
-            if st_flt != "SEMUA":
-                rute = f"{x.get('start_store', '')} {x.get('end_store', '')}".upper()
-                if st_flt.upper() not in rute:
-                    continue
-            note_content = f"{x.get('stf_notes', '')} {x.get('stf_code', '')} {x.get('u_name', '')}"
-            if not self._match_date_and_note(x.get("stf_created", ""), note_content, t_start, t_end, note_q):
-                continue
-            filtered.append(x)
+            route_text = f"{x.get('start_store', '')} {x.get('end_store', '')}"
+            note_content = f"{x.get('stf_notes', '')} {x.get('stf_code', '')} {x.get('u_name', '')} {route_text}"
+            if self._match_global_filter(x.get("stf_created", ""), route_text, note_content):
+                filtered.append(x)
         return filtered
 
     def get_filtered_ma_data(self) -> list[dict]:
         data = [x for x in self.ll01_ma_headers() if x.get("status_category") == "MENGGANTUNG"]
-        st_flt = self.ll01_ma_filter_store()
-        ag_flt = self.ll01_ma_filter_aging()
-        t_start = self.ll01_ma_filter_tgl_start()
-        t_end = self.ll01_ma_filter_tgl_end()
-        note_q = self.ll01_ma_filter_note()
-
         filtered = []
         for x in data:
-            if st_flt != "SEMUA" and st_flt.upper() not in str(x.get("store_name", "")).upper():
-                continue
-            if ag_flt == "CRITICAL" and float(x.get("aging_hours") or 0) < 24.0:
-                continue
-            elif ag_flt == "NORMAL" and float(x.get("aging_hours") or 0) >= 24.0:
-                continue
             note_content = f"{x.get('note', '')} {x.get('ma_code', '')} {x.get('u_name', '')}"
-            if not self._match_date_and_note(x.get("created_at", ""), note_content, t_start, t_end, note_q):
-                continue
-            filtered.append(x)
+            if self._match_global_filter(x.get("created_at", ""), x.get("store_name", ""), note_content):
+                filtered.append(x)
         return filtered
 
     def get_filtered_single_adj_data(self) -> list[dict]:
         data = self.ll01_single_adj_list()
-        br_flt = self.ll01_single_adj_filter_branch()
-        st_flt = self.ll01_single_adj_filter_status()
-        t_start = self.ll01_single_adj_filter_tgl_start()
-        t_end = self.ll01_single_adj_filter_tgl_end()
-        note_q = self.ll01_single_adj_filter_note()
-
         filtered = []
         for x in data:
             if "DONE" in str(x.get("status", "")).upper() or "CANCEL" in str(x.get("status", "")).upper():
                 continue
-            if br_flt != "SEMUA" and br_flt.upper() not in str(x.get("store_name", "")).upper():
-                continue
-            if st_flt != "SEMUA" and st_flt.upper() not in str(x.get("status", "")).upper():
-                continue
             note_content = f"{x.get('note', '')} {x.get('article_name', '')} {x.get('ba_code', '')} {x.get('creator', '')}"
-            if not self._match_date_and_note(x.get("updated_at", ""), note_content, t_start, t_end, note_q):
-                continue
-            filtered.append(x)
+            if self._match_global_filter(x.get("updated_at", ""), x.get("store_name", ""), note_content):
+                filtered.append(x)
         return filtered
 
     def get_filtered_ll01_special_stock(self) -> list[dict]:
         data = self.ll01_special_stock_list()
         if not data: return []
-        flt_br = self.ll01_stock_filter_branch()
-        flt_tp = self.ll01_stock_filter_type()
-        note_q = self.ll01_stock_filter_note()
-
         filtered = []
         for x in data:
-            if flt_br != "SEMUA" and x.get("branch", "").upper() != flt_br.upper():
-                continue
-            if flt_tp != "SEMUA" and flt_tp.upper() not in str(x.get("tipe_bin", "")).upper():
-                continue
-            if note_q and note_q.strip():
-                q = note_q.strip().upper()
-                content = f"{x.get('bin', '')} {x.get('sku', '')} {x.get('item_name', '')} {x.get('brand', '')}".upper()
-                if q not in content:
-                    continue
-            filtered.append(x)
+            note_content = f"{x.get('bin', '')} {x.get('sku', '')} {x.get('item_name', '')} {x.get('brand', '')}"
+            if self._match_global_filter(datetime.now().strftime("%Y-%m-%d"), x.get("branch", ""), note_content):
+                filtered.append(x)
         return filtered
-
     # Metrik Ringkasan LL01
     def ll01_metric_total_antrean(self) -> int:
         return sum([safe_int(x.get("qty", 1)) for x in self.get_filtered_ll01()])
