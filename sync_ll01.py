@@ -2,6 +2,7 @@ import os
 import json
 import requests
 import re
+import time
 from datetime import datetime, timezone, timedelta
 from bs4 import BeautifulSoup
 
@@ -130,10 +131,75 @@ def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
     return clean_records
 
 # ------------------------------------------------------------------------------
-# 2. TARIK TRANSFER STOK: LOOPING SELURUH 2.527 BARIS DATA JEZPRO
+# 2. HELPER: PENYISIR DETAIL ITEM PER NO TF (PAGINATION ESTAFET PENUH)
+# ------------------------------------------------------------------------------
+def fetch_all_items_for_single_tf(session, tf_code, status_txt, headers, now_wib):
+    """Menyisir seluruh halaman detail item dokumen sampai recordsTotal terpenuhi"""
+    all_items = []
+    start_item = 0
+    chunk_size = 250  # Ukuran aman agar tidak di-cut server Jezpro
+
+    while True:
+        params_det = {
+            "draw": "1",
+            "columns[0][data]": "article", "columns[0][name]": "article", "columns[0][searchable]": "true", "columns[0][orderable]": "false", "columns[0][search][value]": "", "columns[0][search][regex]": "false",
+            "columns[1][data]": "pl_code", "columns[1][name]": "pl_code", "columns[1][searchable]": "true", "columns[1][orderable]": "false", "columns[1][search][value]": "", "columns[1][search][regex]": "false",
+            "columns[2][data]": "stfd_qty", "columns[2][name]": "stfd_qty", "columns[2][searchable]": "true", "columns[2][orderable]": "false", "columns[2][search][value]": "", "columns[2][search][regex]": "false",
+            "columns[3][data]": "pls_qty", "columns[3][name]": "pls_qty", "columns[3][searchable]": "true", "columns[3][orderable]": "false", "columns[3][search][value]": "", "columns[3][search][regex]": "false",
+            "columns[4][data]": "st_start", "columns[4][name]": "st_start", "columns[4][searchable]": "true", "columns[4][orderable]": "false", "columns[4][search][value]": "", "columns[4][search][regex]": "false",
+            "columns[5][data]": "st_end", "columns[5][name]": "st_end", "columns[5][searchable]": "true", "columns[5][orderable]": "false", "columns[5][search][value]": "", "columns[5][search][regex]": "false",
+            "columns[6][data]": "status", "columns[6][name]": "status", "columns[6][searchable]": "true", "columns[6][orderable]": "false", "columns[6][search][value]": "", "columns[6][search][regex]": "false",
+            "order[0][column]": "0", "order[0][dir]": "desc",
+            "start": str(start_item), "length": str(chunk_size), "search": "",
+            "stf_code": tf_code
+        }
+
+        # 1. Panggil endpoint utama
+        res_det = session.get("https://jezpro.id/in_transfer_bin_datatables", params=params_det, headers=headers)
+        data_json = res_det.json() if res_det.status_code == 200 else {}
+        raw_chunk = data_json.get("data", [])
+
+        # 2. Fallback ke endpoint alternatif jika kosong pada halaman pertama
+        if not raw_chunk and start_item == 0:
+            res_det2 = session.get("https://jezpro.id/transfer_bin_datatables", params=params_det, headers=headers)
+            data_json = res_det2.json() if res_det2.status_code == 200 else {}
+            raw_chunk = data_json.get("data", [])
+
+        if not raw_chunk:
+            break
+
+        for it in raw_chunk:
+            art_str = strip_html(it.get("article", "-"))
+            all_items.append({
+                "stf_code": tf_code,
+                "article_name": art_str,
+                "bin_asal": strip_html(it.get("pl_code") or it.get("bin") or "-"),
+                "qty_tf": safe_int_val(it.get("stfd_qty") or it.get("qty"), 1),
+                "qty_in_bin": safe_int_val(it.get("pls_qty") or it.get("qty_bin"), 0),
+                "start_store": strip_html(it.get("st_start") or it.get("start_store") or "-"),
+                "end_store": strip_html(it.get("st_end") or it.get("end_store") or "-"),
+                "status": status_txt,
+                "synced_at": now_wib.isoformat()
+            })
+
+        total_records_in_doc = data_json.get("recordsTotal", 0)
+        start_item += len(raw_chunk)
+
+        # Berhenti jika seluruh recordsTotal sudah ditarik
+        if total_records_in_doc > 0 and start_item >= total_records_in_doc:
+            break
+        if len(raw_chunk) < chunk_size:
+            break
+
+        time.sleep(0.08)  # Jeda mikro antar halaman
+
+    return all_items
+
+# ------------------------------------------------------------------------------
+# 3. TARIK TRANSFER STOK LENGKAP (LOOPING SEMUA 2.527 BARIS + FULL ITEMS)
 # ------------------------------------------------------------------------------
 def fetch_transfer_data(session):
-    print("🚚 [3/5] Menarik SELURUH Riwayat Transfer Stok (Membaca seluruh baris s/d selesai)...")
+    print("🚚 [3/5] Menarik SELURUH Riwayat Transfer Stok (Membaca s/d baris terakhir)...")
     url_history = "https://jezpro.id/transfer_history_datatables"
     headers = {
         "Accept": "application/json, text/javascript, */*; q=0.01",
@@ -143,11 +209,11 @@ def fetch_transfer_data(session):
 
     raw_history = []
     start_row = 0
-    batch_size = 1000
+    batch_size = 500
+    total_expected = 999999
 
-    # LOOPING PAGINATION: Tarik bertahap 0-1000, 1000-2000, 2000-2527
-    while True:
-        print(f"   🔄 Membaca baris ke-{start_row} s/d {start_row + batch_size}...")
+    # Menyisir seluruh baris riwayat transfer
+    while start_row < total_expected:
         params = {
             "draw": "1",
             "columns[0][data]": "DT_RowIndex", "columns[0][name]": "stf_id", "columns[0][orderable]": "true",
@@ -167,23 +233,19 @@ def fetch_transfer_data(session):
 
         res = session.get(url_history, params=params, headers=headers)
         if res.status_code != 200:
-            print(f"⚠️ Gagal pada baris {start_row}: HTTP {res.status_code}")
             break
 
-        data_chunk = res.json().get("data", [])
+        data_json = res.json()
+        data_chunk = data_json.get("data", [])
         if not data_chunk:
             break
 
+        total_expected = data_json.get("recordsTotal", total_expected)
         raw_history.extend(data_chunk)
-        print(f"      -> Terkumpul {len(raw_history)} dari total riwayat...")
+        start_row += len(data_chunk)
+        print(f"   -> Mengumpulkan riwayat: {len(raw_history)} / {total_expected} baris...")
 
-        # Jika data yang kembali lebih sedikit dari batch_size, berarti sudah baris terakhir
-        if len(data_chunk) < batch_size:
-            break
-
-        start_row += batch_size
-
-    print(f"✅ Total {len(raw_history)} baris riwayat berhasil dibaca tanpa ada yang terpotong!")
+    print(f"✅ Total {len(raw_history)} baris riwayat berhasil dimuat.")
 
     open_headers = []
     open_items = []
@@ -192,11 +254,12 @@ def fetch_transfer_data(session):
     for row in raw_history:
         status_txt = strip_html(row.get("stf_status") or row.get("status") or "").upper()
 
-        # Hanya ambil yang DRAFT atau IN PROGRESS
         if status_txt not in ["DRAFT", "IN PROGRESS"]:
             continue
 
-        tf_code = strip_html(row.get("stf_code") or row.get("kode") or "")
+        raw_code = str(row.get("stf_code") or row.get("kode") or "")
+        m_code = re.search(r'TF\d+', raw_code)
+        tf_code = m_code.group(0) if m_code else strip_html(raw_code).strip()
         if not tf_code:
             continue
 
@@ -220,7 +283,6 @@ def fetch_transfer_data(session):
             if m_year:
                 doc_year = int(m_year.group(1))
 
-        # Hanya tahun 2026 ke atas
         if doc_year is not None and doc_year < 2026:
             continue
 
@@ -239,43 +301,16 @@ def fetch_transfer_data(session):
             "synced_at": now_wib.isoformat()
         })
 
-        # TARIK RINCIAN DETAIL BARANG PER DOKUMEN TF
-        url_detail = "https://jezpro.id/in_transfer_bin_datatables"
-        params_det = {
-            "draw": "1",
-            "columns[0][data]": "article", "columns[0][name]": "article", "columns[0][searchable]": "true", "columns[0][orderable]": "false", "columns[0][search][value]": "", "columns[0][search][regex]": "false",
-            "columns[1][data]": "pl_code", "columns[1][name]": "pl_code", "columns[1][searchable]": "true", "columns[1][orderable]": "false", "columns[1][search][value]": "", "columns[1][search][regex]": "false",
-            "columns[2][data]": "stfd_qty", "columns[2][name]": "stfd_qty", "columns[2][searchable]": "true", "columns[2][orderable]": "false", "columns[2][search][value]": "", "columns[2][search][regex]": "false",
-            "columns[3][data]": "pls_qty", "columns[3][name]": "pls_qty", "columns[3][searchable]": "true", "columns[3][orderable]": "false", "columns[3][search][value]": "", "columns[3][search][regex]": "false",
-            "columns[4][data]": "st_start", "columns[4][name]": "st_start", "columns[4][searchable]": "true", "columns[4][orderable]": "false", "columns[4][search][value]": "", "columns[4][search][regex]": "false",
-            "columns[5][data]": "st_end", "columns[5][name]": "st_end", "columns[5][searchable]": "true", "columns[5][orderable]": "false", "columns[5][search][value]": "", "columns[5][search][regex]": "false",
-            "columns[6][data]": "status", "columns[6][name]": "status", "columns[6][searchable]": "true", "columns[6][orderable]": "false", "columns[6][search][value]": "", "columns[6][search][regex]": "false",
-            "order[0][column]": "0", "order[0][dir]": "desc",
-            "start": "0", "length": "1000", "search": "",
-            "stf_code": tf_code
-        }
-        res_det = session.get(url_detail, params=params_det, headers=headers)
-        if res_det.status_code == 200:
-            raw_items = res_det.json().get("data", [])
-            for it in raw_items:
-                art_str = strip_html(it.get("article", "-"))
-                open_items.append({
-                    "stf_code": tf_code,
-                    "article_name": art_str,
-                    "bin_asal": strip_html(it.get("pl_code") or "-"),
-                    "qty_tf": safe_int_val(it.get("stfd_qty"), 1),
-                    "qty_in_bin": safe_int_val(it.get("pls_qty"), 0),
-                    "start_store": strip_html(it.get("st_start") or "-"),
-                    "end_store": strip_html(it.get("st_end") or "-"),
-                    "status": status_txt,
-                    "synced_at": now_wib.isoformat()
-                })
+        # TARIK SELURUH ITEM BARANG (FULL SWEEPER TANPA TERPOTONG)
+        doc_items = fetch_all_items_for_single_tf(session, tf_code, status_txt, headers, now_wib)
+        open_items.extend(doc_items)
+        print(f"      -> {tf_code} ({status_txt}): Berhasil ditarik {len(doc_items)} item lengkap.")
 
-    print(f"   -> HASIL AKHIR: Berhasil menyaring {len(open_headers)} Dokumen Terbuka (DRAFT & IN PROGRESS 2026) & {len(open_items)} Detail Barang.")
+    print(f"   -> HASIL AKHIR: {len(open_headers)} Surat Jalan & TOTAL {len(open_items)} Rincian Barang Tersaring!")
     return open_headers, open_items
 
 # ------------------------------------------------------------------------------
-# PUSH KE SUPABASE
+# 4. PUSH KE SUPABASE
 # ------------------------------------------------------------------------------
 def push_all_to_supabase(staging_data, tf_headers, tf_items):
     print("🚀 [4/5] Mengirim seluruh data ke Supabase...")
@@ -286,19 +321,14 @@ def push_all_to_supabase(staging_data, tf_headers, tf_items):
         "Prefer": "resolution=merge-duplicates"
     }
 
-    # 1. Staging Waiting
     if staging_data:
         res_stg = requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_waiting_staging", data=json.dumps(staging_data), headers=headers)
         print(f"   Status Staging: {res_stg.status_code}")
     
-    # 2. Transfer Headers
     if tf_headers:
         res_tfh = requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_transfer_headers", data=json.dumps(tf_headers), headers=headers)
         print(f"   Status Transfer Headers: {res_tfh.status_code}")
-        if res_tfh.status_code not in [200, 201]:
-            print(f"   ⚠️ Detail Alasan Ditolak: {res_tfh.text}")
 
-    # 3. Transfer Items (Kirim per Batch 200 baris agar tidak ditolak Supabase)
     if tf_items:
         requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_transfer_items?id=gt.0", headers=headers)
         for i in range(0, len(tf_items), 200):
