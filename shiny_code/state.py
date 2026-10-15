@@ -529,25 +529,44 @@ class AppState:
         # --- WAREHOUSE ACTIVITY MONITOR (LL01) STATE ---
         self.ll01_data_list = reactive.Value([])
         self.ll01_filter_kategori = reactive.Value("SEMUA")      # "SEMUA", "MASUK_RAK", "REFUND"
-        self.ll01_filter_aging = reactive.Value("SEMUA")         # "SEMUA", "CRITICAL", "NORMAL"
+        self.ll01_filter_aging = reactive.Value("SEMUA")
+        self.ll01_filter_tgl_start = reactive.Value("")
+        self.ll01_filter_tgl_end = reactive.Value("")
+        self.ll01_filter_note = reactive.Value("")        # "SEMUA", "CRITICAL", "NORMAL"
         self.ll01_last_sync = reactive.Value("-")
         self._raw_df_ll01_filtered = pd.DataFrame()
+        
         # --- TRANSFER STOK (OPEN ORDERS) STATE ---
         self.ll01_tf_headers = reactive.Value([])
         self.ll01_tf_items = reactive.Value([])
         self.ll01_selected_tf_code = reactive.Value("")
+        self.ll01_tf_filter_store = reactive.Value("SEMUA")
+        self.ll01_tf_filter_tgl_start = reactive.Value("")
+        self.ll01_tf_filter_tgl_end = reactive.Value("")
+        self.ll01_tf_filter_note = reactive.Value("")
+
         # --- MASS ADJUSTMENT STATE ---
         self.ll01_ma_headers = reactive.Value([])
         self.ll01_ma_filter_status = reactive.Value("SEMUA")
         self.ll01_ma_filter_aging = reactive.Value("SEMUA")
+        self.ll01_ma_filter_store = reactive.Value("SEMUA")
+        self.ll01_ma_filter_tgl_start = reactive.Value("")
+        self.ll01_ma_filter_tgl_end = reactive.Value("")
+        self.ll01_ma_filter_note = reactive.Value("")
+
         # --- SINGLE ADJUSTMENT (TABEL JEZPRO_SINGLE_ADJUSTMENTS) ---
         self.ll01_single_adj_list = reactive.Value([])
         self.ll01_single_adj_filter_branch = reactive.Value("SEMUA")
         self.ll01_single_adj_filter_status = reactive.Value("SEMUA")
+        self.ll01_single_adj_filter_tgl_start = reactive.Value("")
+        self.ll01_single_adj_filter_tgl_end = reactive.Value("")
+        self.ll01_single_adj_filter_note = reactive.Value("")
+
         # --- TAB 4: BUFFER & TRANSIT STOCK (KARANTINA, INB, PUTAWAY, OUT) ---
         self.ll01_special_stock_list = reactive.Value([])
         self.ll01_stock_filter_branch = reactive.Value("SEMUA")
         self.ll01_stock_filter_type = reactive.Value("SEMUA")
+        self.ll01_stock_filter_note = reactive.Value("")
 
         # --- PHYSICAL INVENTORY LIST STATE (UNIFIED) ---
         self.pil_mode = reactive.Value("")
@@ -6343,23 +6362,147 @@ class AppState:
             print("Gagal load LL01 Supabase:", e)
             return False, f"Terjadi kesalahan: {str(e)}"
 
+    # Helper Filter Tanggal & Note Universal
+    def _match_date_and_note(self, dt_str, note_str, tgl_start, tgl_end, note_query):
+        # 1. Filter Tanggal
+        if tgl_start or tgl_end:
+            try:
+                clean_dt = str(dt_str)[:10].replace('/', '-')
+                # Normalisasi format DD-MM-YYYY ke YYYY-MM-DD
+                parts = clean_dt.split('-')
+                if len(parts) == 3 and len(parts[0]) == 2:
+                    clean_dt = f"{parts[2]}-{parts[1]}-{parts[0]}"
+                
+                if tgl_start and clean_dt < tgl_start:
+                    return False
+                if tgl_end and clean_dt > tgl_end:
+                    return False
+            except Exception:
+                pass
+
+        # 2. Filter Note / Keterangan
+        if note_query and note_query.strip():
+            q = note_query.strip().upper()
+            if q not in str(note_str).upper():
+                return False
+
+        return True
+
     def get_filtered_ll01(self) -> list[dict]:
         data = self.ll01_data_list()
-        if not data:
-            return []
-
+        if not data: return []
+        st_flt = self.ll01_filter_store()
         kat = self.ll01_filter_kategori()
         aging = self.ll01_filter_aging()
+        t_start = self.ll01_filter_tgl_start()
+        t_end = self.ll01_filter_tgl_end()
+        note_q = self.ll01_filter_note()
 
-        filtered = data
-        if kat != "SEMUA":
-            filtered = [x for x in filtered if str(x.get("kategori", "")).upper() == kat.upper()]
+        filtered = []
+        for x in data:
+            # Store
+            if st_flt != "SEMUA":
+                st_id_map = {"JEZ SURABAYA": 3, "JEZ MALANG": 2, "JEZ SIDOARJO": 8, "JEZ KEDIRI": 51, "JEZ JEMBER": 40, "JEZ SEMARANG": 53}
+                if safe_int(x.get("store_id")) != st_id_map.get(st_flt, -1):
+                    continue
+            # Kategori
+            if kat != "SEMUA" and str(x.get("kategori", "")).upper() != kat.upper():
+                continue
+            # Aging
+            if aging == "CRITICAL" and "CRITICAL" not in str(x.get("ll01_status", "")):
+                continue
+            elif aging == "NORMAL" and str(x.get("ll01_status", "")) != "NORMAL":
+                continue
+            # Tanggal & Note
+            note_content = f"{x.get('article_name', '')} {x.get('waiting_status', '')} {x.get('pic_name', '')}"
+            if not self._match_date_and_note(x.get("scanned_at", ""), note_content, t_start, t_end, note_q):
+                continue
+            filtered.append(x)
+        return filtered
 
-        if aging == "CRITICAL":
-            filtered = [x for x in filtered if "CRITICAL" in str(x.get("ll01_status", ""))]
-        elif aging == "NORMAL":
-            filtered = [x for x in filtered if str(x.get("ll01_status", "")) == "NORMAL"]
+    def get_filtered_tf_headers(self) -> list[dict]:
+        data = self.ll01_tf_headers()
+        if not data: return []
+        st_flt = self.ll01_tf_filter_store()
+        t_start = self.ll01_tf_filter_tgl_start()
+        t_end = self.ll01_tf_filter_tgl_end()
+        note_q = self.ll01_tf_filter_note()
 
+        filtered = []
+        for x in data:
+            if st_flt != "SEMUA":
+                rute = f"{x.get('start_store', '')} {x.get('end_store', '')}".upper()
+                if st_flt.upper() not in rute:
+                    continue
+            note_content = f"{x.get('stf_notes', '')} {x.get('stf_code', '')} {x.get('u_name', '')}"
+            if not self._match_date_and_note(x.get("stf_created", ""), note_content, t_start, t_end, note_q):
+                continue
+            filtered.append(x)
+        return filtered
+
+    def get_filtered_ma_data(self) -> list[dict]:
+        data = [x for x in self.ll01_ma_headers() if x.get("status_category") == "MENGGANTUNG"]
+        st_flt = self.ll01_ma_filter_store()
+        ag_flt = self.ll01_ma_filter_aging()
+        t_start = self.ll01_ma_filter_tgl_start()
+        t_end = self.ll01_ma_filter_tgl_end()
+        note_q = self.ll01_ma_filter_note()
+
+        filtered = []
+        for x in data:
+            if st_flt != "SEMUA" and st_flt.upper() not in str(x.get("store_name", "")).upper():
+                continue
+            if ag_flt == "CRITICAL" and float(x.get("aging_hours") or 0) < 24.0:
+                continue
+            elif ag_flt == "NORMAL" and float(x.get("aging_hours") or 0) >= 24.0:
+                continue
+            note_content = f"{x.get('note', '')} {x.get('ma_code', '')} {x.get('u_name', '')}"
+            if not self._match_date_and_note(x.get("created_at", ""), note_content, t_start, t_end, note_q):
+                continue
+            filtered.append(x)
+        return filtered
+
+    def get_filtered_single_adj_data(self) -> list[dict]:
+        data = self.ll01_single_adj_list()
+        br_flt = self.ll01_single_adj_filter_branch()
+        st_flt = self.ll01_single_adj_filter_status()
+        t_start = self.ll01_single_adj_filter_tgl_start()
+        t_end = self.ll01_single_adj_filter_tgl_end()
+        note_q = self.ll01_single_adj_filter_note()
+
+        filtered = []
+        for x in data:
+            if "DONE" in str(x.get("status", "")).upper() or "CANCEL" in str(x.get("status", "")).upper():
+                continue
+            if br_flt != "SEMUA" and br_flt.upper() not in str(x.get("store_name", "")).upper():
+                continue
+            if st_flt != "SEMUA" and st_flt.upper() not in str(x.get("status", "")).upper():
+                continue
+            note_content = f"{x.get('note', '')} {x.get('article_name', '')} {x.get('ba_code', '')} {x.get('creator', '')}"
+            if not self._match_date_and_note(x.get("updated_at", ""), note_content, t_start, t_end, note_q):
+                continue
+            filtered.append(x)
+        return filtered
+
+    def get_filtered_ll01_special_stock(self) -> list[dict]:
+        data = self.ll01_special_stock_list()
+        if not data: return []
+        flt_br = self.ll01_stock_filter_branch()
+        flt_tp = self.ll01_stock_filter_type()
+        note_q = self.ll01_stock_filter_note()
+
+        filtered = []
+        for x in data:
+            if flt_br != "SEMUA" and x.get("branch", "").upper() != flt_br.upper():
+                continue
+            if flt_tp != "SEMUA" and flt_tp.upper() not in str(x.get("tipe_bin", "")).upper():
+                continue
+            if note_q and note_q.strip():
+                q = note_q.strip().upper()
+                content = f"{x.get('bin', '')} {x.get('sku', '')} {x.get('item_name', '')} {x.get('brand', '')}".upper()
+                if q not in content:
+                    continue
+            filtered.append(x)
         return filtered
 
     # Metrik Ringkasan LL01
