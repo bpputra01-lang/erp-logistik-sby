@@ -130,10 +130,10 @@ def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
     return clean_records
 
 # ------------------------------------------------------------------------------
-# 2. TARIK DATA TRANSFER STOCK (WIB TIMEZONE & ANTI-MINUS)
+# 2. TARIK TRANSFER STOK: LOOPING SELURUH 2.527 BARIS DATA JEZPRO
 # ------------------------------------------------------------------------------
 def fetch_transfer_data(session):
-    print("🚚 [3/5] Menarik data Transfer Stok (Khusus Tahun >= 2026)...")
+    print("🚚 [3/5] Menarik SELURUH Riwayat Transfer Stok (Membaca seluruh baris s/d selesai)...")
     url_history = "https://jezpro.id/transfer_history_datatables"
     headers = {
         "Accept": "application/json, text/javascript, */*; q=0.01",
@@ -141,38 +141,58 @@ def fetch_transfer_data(session):
         "Referer": "https://jezpro.id/transfer_stok"
     }
 
-    params = {
-        "draw": "1",
-        "columns[0][data]": "DT_RowIndex", "columns[0][name]": "stf_id", "columns[0][orderable]": "true",
-        "columns[1][data]": "stf_code", "columns[1][name]": "stf_code", "columns[1][orderable]": "true",
-        "columns[2][data]": "u_name", "columns[2][name]": "u_name", "columns[2][orderable]": "false",
-        "columns[3][data]": "stf_notes", "columns[3][name]": "stf_notes", "columns[3][orderable]": "false",
-        "columns[4][data]": "qty_send", "columns[4][name]": "qty_send", "columns[4][orderable]": "false",
-        "columns[5][data]": "qty_receive", "columns[5][name]": "qty_receive", "columns[5][orderable]": "false",
-        "columns[6][data]": "start_store", "columns[6][name]": "start_store", "columns[6][orderable]": "false",
-        "columns[7][data]": "end_store", "columns[7][name]": "end_store", "columns[7][orderable]": "false",
-        "columns[8][data]": "u_name_receive", "columns[8][name]": "u_name_receive", "columns[8][orderable]": "false",
-        "columns[9][data]": "stf_created", "columns[9][name]": "stf_created", "columns[9][orderable]": "true",
-        "columns[10][data]": "stf_status", "columns[10][name]": "stf_status", "columns[10][orderable]": "true",
-        "order[0][column]": "0", "order[0][dir]": "desc",
-        "start": "0", "length": "1000", "search": "", "status": ""
-    }
+    raw_history = []
+    start_row = 0
+    batch_size = 1000
 
-    res = session.get(url_history, params=params, headers=headers)
-    if res.status_code != 200:
-        print(f"⚠️ Gagal panggil transfer history: HTTP {res.status_code}")
-        return [], []
+    # LOOPING PAGINATION: Tarik bertahap 0-1000, 1000-2000, 2000-2527
+    while True:
+        print(f"   🔄 Membaca baris ke-{start_row} s/d {start_row + batch_size}...")
+        params = {
+            "draw": "1",
+            "columns[0][data]": "DT_RowIndex", "columns[0][name]": "stf_id", "columns[0][orderable]": "true",
+            "columns[1][data]": "stf_code", "columns[1][name]": "stf_code", "columns[1][orderable]": "true",
+            "columns[2][data]": "u_name", "columns[2][name]": "u_name", "columns[2][orderable]": "false",
+            "columns[3][data]": "stf_notes", "columns[3][name]": "stf_notes", "columns[3][orderable]": "false",
+            "columns[4][data]": "qty_send", "columns[4][name]": "qty_send", "columns[4][orderable]": "false",
+            "columns[5][data]": "qty_receive", "columns[5][name]": "qty_receive", "columns[5][orderable]": "false",
+            "columns[6][data]": "start_store", "columns[6][name]": "start_store", "columns[6][orderable]": "false",
+            "columns[7][data]": "end_store", "columns[7][name]": "end_store", "columns[7][orderable]": "false",
+            "columns[8][data]": "u_name_receive", "columns[8][name]": "u_name_receive", "columns[8][orderable]": "false",
+            "columns[9][data]": "stf_created", "columns[9][name]": "stf_created", "columns[9][orderable]": "true",
+            "columns[10][data]": "stf_status", "columns[10][name]": "stf_status", "columns[10][orderable]": "true",
+            "order[0][column]": "0", "order[0][dir]": "desc",
+            "start": str(start_row), "length": str(batch_size), "search": "", "status": ""
+        }
 
-    raw_history = res.json().get("data", [])
+        res = session.get(url_history, params=params, headers=headers)
+        if res.status_code != 200:
+            print(f"⚠️ Gagal pada baris {start_row}: HTTP {res.status_code}")
+            break
+
+        data_chunk = res.json().get("data", [])
+        if not data_chunk:
+            break
+
+        raw_history.extend(data_chunk)
+        print(f"      -> Terkumpul {len(raw_history)} dari total riwayat...")
+
+        # Jika data yang kembali lebih sedikit dari batch_size, berarti sudah baris terakhir
+        if len(data_chunk) < batch_size:
+            break
+
+        start_row += batch_size
+
+    print(f"✅ Total {len(raw_history)} baris riwayat berhasil dibaca tanpa ada yang terpotong!")
+
     open_headers = []
     open_items = []
-
-    # Waktu acuan saat ini dalam WIB (UTC+7)
     now_wib = datetime.now(timezone(timedelta(hours=7))).replace(tzinfo=None)
 
     for row in raw_history:
         status_txt = strip_html(row.get("stf_status") or row.get("status") or "").upper()
 
+        # Hanya ambil yang DRAFT atau IN PROGRESS
         if status_txt not in ["DRAFT", "IN PROGRESS"]:
             continue
 
@@ -189,7 +209,6 @@ def fetch_transfer_data(session):
                 try:
                     dt_tf = datetime.strptime(tgl_str[:19].strip(), fmt)
                     doc_year = dt_tf.year
-                    # Hitung selisih jam terhadap WIB sekarang (anti-minus)
                     diff_sec = (now_wib - dt_tf).total_seconds()
                     aging_jam = max(0.0, round(diff_sec / 3600.0, 1))
                     break
@@ -201,6 +220,7 @@ def fetch_transfer_data(session):
             if m_year:
                 doc_year = int(m_year.group(1))
 
+        # Hanya tahun 2026 ke atas
         if doc_year is not None and doc_year < 2026:
             continue
 
@@ -219,7 +239,7 @@ def fetch_transfer_data(session):
             "synced_at": now_wib.isoformat()
         })
 
-        # TARIK DETAIL BARANG PER DOKUMEN TF
+        # TARIK RINCIAN DETAIL BARANG PER DOKUMEN TF
         url_detail = "https://jezpro.id/in_transfer_bin_datatables"
         params_det = {
             "draw": "1",
@@ -251,7 +271,7 @@ def fetch_transfer_data(session):
                     "synced_at": now_wib.isoformat()
                 })
 
-    print(f"   -> BERHASIL! Didapat {len(open_headers)} Dokumen Terbuka (Tahun >= 2026) & {len(open_items)} Detail Barang.")
+    print(f"   -> HASIL AKHIR: Berhasil menyaring {len(open_headers)} Dokumen Terbuka (DRAFT & IN PROGRESS 2026) & {len(open_items)} Detail Barang.")
     return open_headers, open_items
 
 # ------------------------------------------------------------------------------
@@ -276,13 +296,15 @@ def push_all_to_supabase(staging_data, tf_headers, tf_items):
         res_tfh = requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_transfer_headers", data=json.dumps(tf_headers), headers=headers)
         print(f"   Status Transfer Headers: {res_tfh.status_code}")
         if res_tfh.status_code not in [200, 201]:
-            print(f"   ⚠️ Detail Alasan Ditolak Supabase: {res_tfh.text}")
+            print(f"   ⚠️ Detail Alasan Ditolak: {res_tfh.text}")
 
-    # 3. Transfer Items
+    # 3. Transfer Items (Kirim per Batch 200 baris agar tidak ditolak Supabase)
     if tf_items:
         requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_transfer_items?id=gt.0", headers=headers)
-        res_tfi = requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_transfer_items", data=json.dumps(tf_items), headers=headers)
-        print(f"   Status Transfer Items: {res_tfi.status_code}")
+        for i in range(0, len(tf_items), 200):
+            batch = tf_items[i:i + 200]
+            res_tfi = requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_transfer_items", data=json.dumps(batch), headers=headers)
+            print(f"   Status Transfer Items Batch {i//200 + 1}: {res_tfi.status_code}")
 
     print("✅ SUKSES! Seluruh data Staging & Transfer Stok tersinkronisasi ke Supabase.")
 
