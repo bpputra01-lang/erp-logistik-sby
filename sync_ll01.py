@@ -12,7 +12,7 @@ JEZPRO_PASS  = os.environ.get("JEZPRO_PASSWORD")
 def create_jezpro_session():
     session = requests.Session()
     session.headers.update({
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     })
     
     print("🔐 [1/4] Melakukan login ke Jezpro...")
@@ -29,10 +29,15 @@ def create_jezpro_session():
     }
     session.post("https://jezpro.id/user_login", data=payload, headers={"Referer": "https://jezpro.id/"})
     print("✅ Berhasil login ke Jezpro!")
+    
+    # BUKA HALAMAN HELPER DULU AGAR SESI TOKO AKTIF DI LARAVEL
+    print("🔄 Mengaktifkan sesi gudang (helper_backup)...")
+    session.get("https://jezpro.id/helper_backup")
+    
     return session
 
 def fetch_data(session, endpoint_path, kategori_label, waiting_val):
-    print(f"📥 [2/4] Menarik data [{kategori_label}] dengan parameter waiting='{waiting_val}'...")
+    print(f"📥 [2/4] Menarik data [{kategori_label}] (waiting='{waiting_val}')...")
     url = f"https://jezpro.id/{endpoint_path}"
     headers = {
         "Accept": "application/json, text/javascript, */*; q=0.01",
@@ -40,20 +45,28 @@ def fetch_data(session, endpoint_path, kategori_label, waiting_val):
         "Referer": "https://jezpro.id/helper_backup"
     }
     
-    # Parameter persis seperti inspect element browser Anda:
+    # PARAMETER LENGKAP PERSIS SEPERTI DEVTOOLS FIREFOX (MENCEGAH HTTP 500)
     params = {
-        "draw": 1,
-        "start": 0,
-        "length": 5000,
-        "st_id": "",                    # Kosongkan seperti URL asli browser
-        "waiting": waiting_val,          # Sesuai dropdown masing-masing modal
-        "order[0][column]": 0,
-        "order[0][dir]": "desc"
+        "draw": "1",
+        "columns[0][data]": "article",
+        "columns[0][name]": "article",
+        "columns[0][searchable]": "true",
+        "columns[0][orderable]": "false",
+        "columns[0][search][value]": "",
+        "columns[0][search][regex]": "false",
+        "order[0][column]": "0",
+        "order[0][dir]": "desc",
+        "start": "0",
+        "length": "5000",
+        "search": "",
+        "st_id": "",
+        "waiting": waiting_val
     }
 
     res = session.get(url, params=params, headers=headers)
     if res.status_code != 200:
         print(f"⚠️ Gagal panggil {kategori_label}: HTTP {res.status_code}")
+        print(f"   Pesan Error Server: {res.text[:300]}")
         return []
     
     try:
@@ -63,11 +76,10 @@ def fetch_data(session, endpoint_path, kategori_label, waiting_val):
         return []
 
     raw_list = res_json.get("data", [])
-    print(f"   -> BERHASIL DITEMUKAN {len(raw_list)} baris data pada {kategori_label}!")
+    print(f"   -> BERHASIL! Ditemukan {len(raw_list)} baris data pada {kategori_label}!")
 
     clean_records = []
     for idx_item, item in enumerate(raw_list):
-        # Cari ID dari berbagai kemungkinan key backend Jezpro
         p_id = (
             item.get("plst_id") or 
             item.get("pls_id") or 
@@ -76,7 +88,7 @@ def fetch_data(session, endpoint_path, kategori_label, waiting_val):
             item.get("retur_id")
         )
         
-        # Jika backend tidak menyediakan ID angka tunggal, buat ID angka unik dari hash datanya
+        # Fallback ID unik angka jika backend tidak menyertakan key plst_id
         if not p_id:
             text_seed = f"{kategori_label}_{item.get('article', '')}_{item.get('date', '')}_{idx_item}"
             p_id = abs(hash(text_seed)) % (10**10)
@@ -124,11 +136,11 @@ if __name__ == "__main__":
     
     semua_data = []
     
-    # 1. Tarik Scan Barang Masuk (Dropdown persis di screenshot Anda: "WAITING OFFLINE")
+    # 1. Tarik Scan Barang Masuk
     data_masuk = fetch_data(jez, "scan_product_in_datatables", "MASUK_RAK", waiting_val="WAITING OFFLINE")
     semua_data.extend(data_masuk)
     
-    # 2. Tarik Scan Barang Masuk Refund (Dropdown persis di screenshot Anda: "Refund")
+    # 2. Tarik Scan Barang Masuk Refund
     data_refund = fetch_data(jez, "scan_product_in_refund_datatables", "REFUND", waiting_val="Refund")
     semua_data.extend(data_refund)
     
