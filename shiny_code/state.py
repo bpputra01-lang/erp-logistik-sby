@@ -6562,13 +6562,14 @@ class AppState:
     # LOGIKA SINGLE ADJUSTMENT DARI SUPABASE (TABLE: jezpro_single_adjustments)
     # ==========================================================================
     def load_single_adjustments_from_supabase(self):
-        """Menarik seluruh transaksi Single Adjustment dari tabel Supabase jezpro_single_adjustments"""
+        """Menarik data Single Adjustment dari tabel Supabase jezpro_single_adjustments"""
         try:
             client = get_supabase()
             if not client:
                 return False, "Koneksi Supabase gagal!"
 
-            res = client.table("jezpro_single_adjustments").select("*").order("updated_at", desc=True).limit(5000).execute()
+            # Urutkan berdasarkan id desc agar selalu mengambil transaksi terbaru
+            res = client.table("jezpro_single_adjustments").select("*").order("id", desc=True).limit(5000).execute()
             data = res.data if res and res.data else []
             self.ll01_single_adj_list.set(data)
             return True, f"Berhasil memuat {len(data):,} baris Single Adjustment."
