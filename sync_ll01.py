@@ -6,6 +6,7 @@ import time
 from datetime import datetime, timezone, timedelta
 from bs4 import BeautifulSoup
 
+
 # ==============================================================================
 # 1. KREDENSIAL & MAPPING CABANG RESMI JEZPRO
 # ==============================================================================
@@ -43,6 +44,9 @@ def safe_int_val(val, default=0):
         return int(digits[0])
     return default
 
+# ==============================================================================
+# HELPER PEMBERSIH DATA & DETEKSI CABANG (SMART SCANNER)
+# ==============================================================================
 def clean_html_card(raw_html):
     if not raw_html or "<" not in str(raw_html):
         return {"article": str(raw_html).strip(), "brand": "-", "bin": "-"}
@@ -58,7 +62,8 @@ def clean_html_card(raw_html):
     art_parts = []
     for s in spans:
         t = s.get_text(" ", strip=True)
-        if any(w in t for w in ["REFUND", "WAITING", "TUKAR", "INV", "JEZ SURABAYA", "Bin Code"]):
+        # Abaikan badge status dan JANGAN MASUKKAN nama cabang ("JEZ ...") ke nama artikel
+        if any(w in t for w in ["REFUND", "WAITING", "TUKAR", "INV", "Bin Code"]) or "JEZ " in t.upper():
             continue
         cleaned = re.sub(r'\[.*?\]\s*-\s*\d+', '', t)
         if cleaned.strip():
@@ -77,14 +82,14 @@ def create_jezpro_session():
     session.headers.update({
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     })
-    
+
     print("🔐 [1/6] Melakukan login ke Jezpro...")
     res_login_page = session.get("https://jezpro.id/")
     soup = BeautifulSoup(res_login_page.text, "html.parser")
     token_input = soup.find("input", {"name": "_token"})
     if not token_input:
         raise Exception("CSRF Token tidak ditemukan di form login Jezpro!")
-    
+
     payload = {
         "_token": token_input.get("value"),
         "u_email": JEZPRO_EMAIL,
@@ -92,18 +97,61 @@ def create_jezpro_session():
     }
     session.post("https://jezpro.id/user_login", data=payload, headers={"Referer": "https://jezpro.id/"})
     print("✅ Berhasil login ke Jezpro!")
-    
+
     session.get("https://jezpro.id/helper_backup")
     session.get("https://jezpro.id/transfer_stok")
     session.get("https://jezpro.id/mass_adjustment")
     session.get("https://jezpro.id/adjustment")
     return session
 
+def detect_store_id_smart(item_dict, raw_html, bin_text):
+    # Gabungkan semua data JSON & HTML lalu cari teks cabangnya (seperti di badge ungu)
+    dump_text = (str(item_dict) + " " + str(raw_html)).upper()
+    
+    if "JEZ KEDIRI" in dump_text: return 51
+    if "JEZ JEMBER" in dump_text: return 40
+    if "JEZ SEMARANG" in dump_text: return 53
+    if "JEZ SIDOARJO" in dump_text: return 8
+    if "JEZ MALANG" in dump_text: return 2
+    if "JEZ SURABAYA" in dump_text: return 3
+    
+    # Fallback terakhir jika tidak ada badge nama cabang, baru nebak dari nama BIN
+    b = str(bin_text).strip().upper()
+    if "KDR" in b: return 51
+    if "JBR" in b: return 40
+    if "SMG" in b: return 53
+    if "SDA" in b: return 8
+    if any(k in b for k in ["DAU", "KAV", "MALANG", "MLG"]): return 2
+    return 3
+
 # ==============================================================================
-# 1. MODUL STAGING (DILENGKAPI FALLBACK JIKA MASUK RAK KOSONG PER CABANG)
+# 1. MODUL STAGING (ALL AREA GLOBAL)
 # ==============================================================================
+def parse_to_iso_timestamp(dt_raw):
+    if not dt_raw:
+        return datetime.now(timezone(timedelta(hours=7))).isoformat()
+    s = strip_html(str(dt_raw)).strip()
+    s = s.replace('–', '-').replace('—', '-').replace('/', '-')
+    formats = (
+        "%Y-%m-%d %H:%M:%S", "%d-%m-%Y %H:%M:%S", "%d-%b-%Y %H:%M:%S", "%d-%B-%Y %H:%M:%S",
+        "%Y-%m-%d", "%d-%m-%Y", "%d-%b-%Y", "%d-%B-%Y"
+    )
+    for fmt in formats:
+        try:
+            dt = datetime.strptime(s[:19].strip(), fmt)
+            return dt.isoformat()
+        except Exception:
+            pass
+    try:
+        years = re.findall(r'\b(20\d{2})\b', s)
+        if years:
+            return datetime(int(years[0]), 1, 1, 0, 0, 0).isoformat()
+    except Exception:
+        pass
+    return datetime.now(timezone(timedelta(hours=7))).isoformat()
+
 def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
-    print(f"📥 [2/6] Menarik data staging [{kategori_label}] untuk seluruh cabang...")
+    print(f"📥 [2/6] Menarik data staging [{kategori_label}] secara Global (Sekali Tarik)...")
     url = f"https://jezpro.id/{endpoint_path}"
     headers = {
         "Accept": "application/json, text/javascript, */*; q=0.01",
@@ -111,85 +159,72 @@ def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
         "Referer": "https://jezpro.id/helper_backup"
     }
 
-    clean_records = []
+    params = {
+        "draw": "1", "columns[0][data]": "article", "columns[0][name]": "article",
+        "columns[0][searchable]": "true", "columns[0][orderable]": "false",
+        "columns[0][search][value]": "", "columns[0][search][regex]": "false",
+        "order[0][column]": "0", "order[0][dir]": "desc",
+        "start": "0", "length": "10000", "search": "", 
+        "st_id": "", 
+        "waiting": waiting_val
+    }
+
+    res = session.get(url, params=params, headers=headers)
+    if res.status_code != 200:
+        print(f"   ⚠️ Gagal tarik data staging {kategori_label} (HTTP {res.status_code})")
+        return []
     
-    # Coba tarik per cabang via BRANCH_MAP
-    for branch_name, b_info in BRANCH_MAP.items():
-        st_id = b_info["st_id"]
-        params = {
-            "draw": "1", "columns[0][data]": "article", "columns[0][name]": "article",
-            "columns[0][searchable]": "true", "columns[0][orderable]": "false",
-            "columns[0][search][value]": "", "columns[0][search][regex]": "false",
-            "order[0][column]": "0", "order[0][dir]": "desc",
-            "start": "0", "length": "5000", "search": "", 
-            "st_id": str(st_id), 
-            "waiting": waiting_val
-        }
-
-        res = session.get(url, params=params, headers=headers)
-        if res.status_code != 200:
-            continue
-        
+    try:
         raw_list = res.json().get("data", [])
-        for idx_item, item in enumerate(raw_list):
-            raw_art = item.get("article") or item.get("art_name") or "-"
-            parsed = clean_html_card(raw_art)
+    except Exception:
+        raw_list = []
 
-            p_id = item.get("plst_id") or item.get("pls_id") or item.get("plstr_id") or item.get("id")
-            if not p_id:
-                p_id = abs(hash(f"{kategori_label}_{st_id}_{parsed['article']}_{idx_item}")) % 2147483647
-            else:
-                p_id = safe_int_val(p_id)
+    clean_records = []
+    for idx_item, item in enumerate(raw_list):
+        raw_art = item.get("article") or item.get("art_name") or "-"
+        parsed = clean_html_card(raw_art)
 
-            clean_records.append({
-                "plst_id": int(p_id),
-                "pls_id": int(item.get("pls_id") or p_id),
-                "kategori": kategori_label,
-                "waiting_status": item.get("waiting") or waiting_val,
-                "brand": parsed["brand"] if parsed["brand"] != "-" else (item.get("brand") or "-"),
-                "article_name": parsed["article"],
-                "qty": safe_int_val(item.get("plst_qty") or item.get("qty"), 1),
-                "bin_target": parsed["bin"] if parsed["bin"] != "-" else strip_html(item.get("rack_name") or item.get("bin") or "-"),
-                "pic_name": strip_html(item.get("user_name") or item.get("scanned_by") or "Petugas"),
-                "scanned_at": str(item.get("created_at") or item.get("date") or datetime.now().isoformat()),
-                "store_id": st_id,
-                "synced_at": datetime.now().isoformat()
-            })
+        bin_target_str = parsed["bin"] if parsed["bin"] != "-" else strip_html(item.get("rack_name") or item.get("bin") or "-")
+        
+        # 🔥 MAGIC BARU: Python baca badge "JEZ KEDIRI" di HTML!
+        real_store_id = detect_store_id_smart(item, raw_art, bin_target_str)
 
-    # Fallback: jika per cabang kosong, coba query tanpa st_id (global)
-    if not clean_records:
-        params_global = {
-            "draw": "1", "columns[0][data]": "article", "columns[0][name]": "article",
-            "order[0][column]": "0", "order[0][dir]": "desc",
-            "start": "0", "length": "5000", "search": "", 
-            "st_id": "", 
-            "waiting": waiting_val
-        }
-        res_g = session.get(url, params=params_global, headers=headers)
-        if res_g.status_code == 200:
-            raw_g = res_g.json().get("data", [])
-            for idx_item, item in enumerate(raw_g):
-                raw_art = item.get("article") or "-"
-                parsed = clean_html_card(raw_art)
-                p_id = safe_int_val(item.get("plst_id") or item.get("pls_id") or idx_item + 1)
-                clean_records.append({
-                    "plst_id": int(p_id),
-                    "pls_id": int(item.get("pls_id") or p_id),
-                    "kategori": kategori_label,
-                    "waiting_status": item.get("waiting") or waiting_val,
-                    "brand": parsed["brand"],
-                    "article_name": parsed["article"],
-                    "qty": safe_int_val(item.get("plst_qty") or 1),
-                    "bin_target": parsed["bin"] if parsed["bin"] != "-" else "-",
-                    "pic_name": strip_html(item.get("user_name") or "Petugas"),
-                    "scanned_at": str(item.get("created_at") or datetime.now().isoformat()),
-                    "store_id": 3,
-                    "synced_at": datetime.now().isoformat()
-                })
+        raw_id = item.get("plst_id") or item.get("pls_id") or item.get("plstr_id") or item.get("id")
+        if raw_id:
+            p_id = safe_int_val(raw_id)
+        else:
+            p_id = abs(hash(f"{kategori_label}_{real_store_id}_{parsed['article']}_{idx_item}_{time.time()}")) % 2147483647
+
+        scanned_iso = parse_to_iso_timestamp(item.get("created_at") or item.get("date"))
+
+        clean_records.append({
+            "plst_id": int(p_id),
+            "pls_id": int(item.get("pls_id") or p_id),
+            "kategori": kategori_label,
+            "waiting_status": item.get("waiting") or waiting_val,
+            "brand": parsed["brand"] if parsed["brand"] != "-" else (item.get("brand") or "-"),
+            "article_name": parsed["article"],
+            "qty": safe_int_val(item.get("plst_qty") or item.get("qty"), 1),
+            "bin_target": bin_target_str,
+            "pic_name": strip_html(item.get("user_name") or item.get("scanned_by") or "Petugas"),
+            "scanned_at": scanned_iso,
+            "store_id": int(real_store_id),
+            "synced_at": datetime.now(timezone(timedelta(hours=7))).isoformat()
+        })
 
     print(f"   -> Ditemukan total {len(clean_records)} baris staging {kategori_label}.")
-    return clean_records
-
+    
+    # PEMBERSIH DUPLIKAT PLST_ID
+    seen_ids = set()
+    unique_records = []
+    for rec in clean_records:
+        pid = rec["plst_id"]
+        if pid not in seen_ids:
+            seen_ids.add(pid)
+            unique_records.append(rec)
+            
+    print(f"   -> Setelah dibersihkan (unik), tersisa {len(unique_records)} baris staging {kategori_label}.")
+    return unique_records
 # ==============================================================================
 # 2. MODUL TRANSFER STOK (ALL AREA LINTAS CABANG)
 # ==============================================================================
@@ -659,7 +694,7 @@ def fetch_single_adjustment_data(session):
     return clean_single_records
 
 # ==============================================================================
-# 5. PUSH KE SUPABASE (DILENGKAPI MERGE-DUPLICATES & CEK STATUS RESPONSE)
+# 5. PUSH KE SUPABASE (DILENGKAPI MERGE-DUPLICATES & PRINT ERROR RES)
 # ==============================================================================
 def push_all_to_supabase(staging_data, tf_headers, tf_items, ma_headers, ma_items, single_items):
     print("🚀 [6/6] Mengosongkan data lama & mengirim data terbaru ke Supabase...")
@@ -670,21 +705,25 @@ def push_all_to_supabase(staging_data, tf_headers, tf_items, ma_headers, ma_item
         "Prefer": "resolution=merge-duplicates"
     }
 
-    # 1. STAGING WAITING (Kosongkan dulu -> Kirim batch 200)
+   # 1. STAGING WAITING (Dilengkapi penanganan konflik & cetak error jika gagal)
     requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_waiting_staging?plst_id=gt.0", headers=headers)
     if staging_data:
         sukses_stg = 0
-        for i in range(0, len(staging_data), 200):
-            batch = staging_data[i:i + 200]
-            res = requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_waiting_staging", data=json.dumps(batch), headers=headers)
+        post_headers = {
+            **headers,
+            "Prefer": "resolution=merge-duplicates"
+        }
+        for i in range(0, len(staging_data), 100):
+            batch = staging_data[i:i + 100]
+            res = requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_waiting_staging", data=json.dumps(batch), headers=post_headers)
             if res.status_code in [200, 201]:
                 sukses_stg += len(batch)
             else:
-                print(f"   ⚠️ Gagal simpan staging batch {i}: Status {res.status_code} - {res.text}")
+                print(f"   ❌ Gagal simpan staging batch {i}: Status {res.status_code}")
+                print(f"      Detail Error Supabase: {res.text}")
         print(f"   ✅ Staging: Berhasil tersimpan {sukses_stg} dari {len(staging_data)} item.")
     else:
         print("   ✅ Staging: Bersih (0 antrean).")
-
     # 2. TRANSFER HEADERS
     requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_transfer_headers?stf_code=neq.", headers=headers)
     if tf_headers:
@@ -731,18 +770,17 @@ def push_all_to_supabase(staging_data, tf_headers, tf_items, ma_headers, ma_item
     else:
         print("   ✅ Single Adjustment: Bersih (0 transaksi butuh approval).")
 
-    print("🎉 SUKSES! Seluruh data telah tersinkronisasi bersih ke Supabase.")
+    print("🎉 SUKSES! Seluruh data Staging, Transfer, Multiple & Single Adjustment All Area telah tersinkronisasi bersih.")
 # ==============================================================================
 # MAIN PIPELINE EKSEKUSI
 # ==============================================================================
 if __name__ == "__main__":
     jez = create_jezpro_session()
     
-    # 1. Staging (All Area)
+    # 1. Staging (Global All Store)
     all_staging = []
     all_staging.extend(fetch_staging_data(jez, "scan_product_in_datatables", "MASUK_RAK", "WAITING OFFLINE"))
     all_staging.extend(fetch_staging_data(jez, "scan_product_in_refund_datatables", "REFUND", "Refund"))
-    
     # 2. Transfer Stok (All Area)
     tf_headers, tf_items = fetch_transfer_data(jez)
     
