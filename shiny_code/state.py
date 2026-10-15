@@ -6457,27 +6457,20 @@ class AppState:
         data = [x for x in self.ll01_ma_headers() if x.get("status_category") == "MENGGANTUNG"]
         filtered = []
         for x in data:
-            vals = list(x.values()) if isinstance(x, dict) else []
-            v_col4 = str(vals[4]) if len(vals) > 4 else ""
-            v_col3 = str(vals[3]) if len(vals) > 3 else ""
-            store_txt = f"{x.get('store_name', '')} {x.get('branch', '')} {x.get('store', '')} {v_col4} {v_col3}"
-            note_content = f"{x.get('note', '')} {x.get('ma_code', '')} {x.get('u_name', '')}"
-            if self._match_global_filter(x.get("created_at", ""), store_txt, note_content):
+            # Gabungkan SELURUH kolom/nilai dalam 1 baris record menjadi teks universal
+            row_text = " ".join([str(v) for v in x.values() if v is not None])
+            if self._match_global_filter(x.get("created_at", ""), row_text, row_text):
                 filtered.append(x)
         return filtered
 
-    def get_filtered_single_adj_data(self) -> list[dict]:
-        data = self.ll01_single_adj_list()
+    def get_filtered_ll01_special_stock(self) -> list[dict]:
+        data = self.ll01_special_stock_list()
+        if not data: return []
         filtered = []
         for x in data:
-            if "DONE" in str(x.get("status", "")).upper() or "CANCEL" in str(x.get("status", "")).upper():
-                continue
-            vals = list(x.values()) if isinstance(x, dict) else []
-            v_col3 = str(vals[3]) if len(vals) > 3 else ""
-            v_col2 = str(vals[2]) if len(vals) > 2 else ""
-            store_txt = f"{x.get('store_name', '')} {x.get('branch', '')} {x.get('store', '')} {v_col3} {v_col2}"
-            note_content = f"{x.get('note', '')} {x.get('article_name', '')} {x.get('ba_code', '')} {x.get('creator', '')}"
-            if self._match_global_filter(x.get("updated_at", ""), store_txt, note_content):
+            # Gabungkan SELURUH kolom/nilai dalam 1 baris record menjadi teks universal
+            row_text = " ".join([str(v) for v in x.values() if v is not None])
+            if self._match_global_filter(datetime.now().strftime("%Y-%m-%d"), row_text, row_text):
                 filtered.append(x)
         return filtered
 
