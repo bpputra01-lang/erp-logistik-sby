@@ -74,6 +74,36 @@ def clean_html_card(raw_html):
 
     return {"article": article_val, "brand": brand_val, "bin": bin_val}
 
+# ==============================================================================
+# LOGIN KE JEZPRO
+# ==============================================================================
+def create_jezpro_session():
+    session = requests.Session()
+    session.headers.update({
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    })
+
+    print("🔐 [1/6] Melakukan login ke Jezpro...")
+    res_login_page = session.get("https://jezpro.id/")
+    soup = BeautifulSoup(res_login_page.text, "html.parser")
+    token_input = soup.find("input", {"name": "_token"})
+    if not token_input:
+        raise Exception("CSRF Token tidak ditemukan di form login Jezpro!")
+
+    payload = {
+        "_token": token_input.get("value"),
+        "u_email": JEZPRO_EMAIL,
+        "password": JEZPRO_PASS
+    }
+    session.post("https://jezpro.id/user_login", data=payload, headers={"Referer": "https://jezpro.id/"})
+    print("✅ Berhasil login ke Jezpro!")
+
+    session.get("https://jezpro.id/helper_backup")
+    session.get("https://jezpro.id/transfer_stok")
+    session.get("https://jezpro.id/mass_adjustment")
+    session.get("https://jezpro.id/adjustment")
+    return session
+
 def detect_store_id_smart(item_dict, raw_html, bin_text):
     # Gabungkan semua data JSON & HTML lalu cari teks cabangnya (seperti di badge ungu)
     dump_text = (str(item_dict) + " " + str(raw_html)).upper()
