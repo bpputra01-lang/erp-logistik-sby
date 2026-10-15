@@ -2120,7 +2120,7 @@ def memo_pengajuan_view(state: AppState):
     )
 
 # ==============================================================================
-# VIEW: WAREHOUSE ACTIVITY MONITOR (ALA SAP LL01)
+# VIEW: WAREHOUSE ACTIVITY MONITOR (3 TAB LENGKAP: STAGING, TF, & ADJUSTMENT)
 # ==============================================================================
 import re
 from bs4 import BeautifulSoup
@@ -2131,18 +2131,13 @@ def clean_jezpro_card_text(raw_text):
         return str(raw_text).strip()
     
     soup = BeautifulSoup(str(raw_text), "html.parser")
-    
-    # Cari span yang berisi nama artikel & ukuran
     spans = soup.find_all("span")
     article_lines = []
     for s in spans:
         txt = s.get_text(" ", strip=True)
-        # Abaikan badge status umum
         if any(ign in txt for ign in ["REFUND", "WAITING", "TUKAR", "INV", "JEZ SURABAYA", "Bin Code"]):
             continue
-        # Jika memuat nama brand atau artikel
         if "[" in txt or any(char.isdigit() for char in txt):
-            # Bersihkan tanda [BRAND] - SKU
             cleaned = re.sub(r'\[.*?\]\s*-\s*\d+', '', txt)
             article_lines.append(cleaned.strip())
             
@@ -2150,11 +2145,10 @@ def clean_jezpro_card_text(raw_text):
         clean_name = " ".join([l for l in article_lines if l])
         return re.sub(r'\s+', ' ', clean_name).strip()
         
-    # Fallback jika pola tidak ketemu: buang semua tag HTML
     text_only = soup.get_text(" ", strip=True)
     text_only = re.sub(r'\b(REFUND|WAITING OFFLINE|JEZ SURABAYA|Jml\s*:\s*\d+)\b', '', text_only)
     return " ".join(text_only.split())
-    
+
 def warehouse_activity_monitor_view(state: AppState):
     # ==========================================================================
     # TAB 1: STAGING TRANSIT (MASUK RAK & REFUND)
@@ -2171,12 +2165,14 @@ def warehouse_activity_monitor_view(state: AppState):
         kat_label = "MASUK RAK" if r.get("kategori") == "MASUK_RAK" else "REFUND"
         kat_color = "#3182CE" if r.get("kategori") == "MASUK_RAK" else "#D69E2E"
 
+        clean_art = clean_jezpro_card_text(r.get("article_name", "-"))
+
         table_rows.append(ui.tags.tr(
             ui.tags.td(str(idx), style="text-align: center; font-weight: bold;"),
             ui.tags.td(status_badge, style="text-align: center;"),
             ui.tags.td(ui.span(kat_label, style=f"font-weight: 800; color: {kat_color};")),
             ui.tags.td(str(r.get("waiting_status", "-")), style="font-weight: 600; color: #4A5568;"),
-            ui.tags.td(str(r.get("article_name", "-")), style="font-weight: 700; color: #1A202C; max-width: 320px; white-space: normal;"),
+            ui.tags.td(clean_art, style="font-weight: 700; color: #1A202C; max-width: 320px; white-space: normal;"),
             ui.tags.td(str(r.get("qty", 1)), style="text-align: center; font-weight: 800;"),
             ui.tags.td(ui.tags.code(str(r.get("bin_target", "-")), style="font-weight: bold; color: #2B6CB0;")),
             ui.tags.td(str(r.get("pic_name", "-")), style="color: #4A5568;"),
@@ -2209,7 +2205,7 @@ def warehouse_activity_monitor_view(state: AppState):
     )
 
     # ==========================================================================
-    # TAB 2: OPEN TRANSFER ORDERS (DRAFT & IN PROGRESS DENGAN DRILL-DOWN)
+    # TAB 2: OPEN TRANSFER ORDERS (DRAFT & IN PROGRESS)
     # ==========================================================================
     tf_headers = state.ll01_tf_headers()
     tf_rows = []
@@ -2236,7 +2232,7 @@ def warehouse_activity_monitor_view(state: AppState):
             ui.tags.td(badge_st, style="text-align: center;"),
             ui.tags.td(ui.tags.b(code, style="color: #2D3748;")),
             ui.tags.td(f"{tf.get('start_store', '-')} ➔ {tf.get('end_store', '-')}", style="font-weight: 600;"),
-            ui.tags.td(str(tf.get("user_name", "-"))),
+            ui.tags.td(str(tf.get("u_name", tf.get("user_name", "-")))),
             ui.tags.td(f"{tf.get('qty_send', 0):,} Pcs", style="text-align: right; font-weight: 800; color: #E50914;"),
             ui.tags.td(str(tf.get("stf_created", "-"))[:16]),
             ui.tags.td(f"{aging} Jam ({round(aging/24, 1)} Hari)", style=f"font-weight: 800; text-align: center; color: {'#E53E3E' if is_crit else '#2F855A'};"),
@@ -2268,30 +2264,7 @@ def warehouse_activity_monitor_view(state: AppState):
         style="padding: 1rem 0;"
     )
 
-    return ui.div(
-        # HEADER KONTROL REFRESH
-        ui.div(
-            ui.div(
-                ui.h4("🏭 Warehouse Activity Monitor (SAP LL01 Dashboard)", style="font-size: 16px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
-                ui.p(f"🕒 Terakhir disinkronkan: {state.ll01_last_sync()} • Memantau antrean Staging Putaway/Refund & Open Transfer Orders.", style="color: #718096; font-size: 12px; margin: 0;")
-            ),
-            ui.div(
-                ui.tags.button(
-                    ui.tags.i(class_="fa-solid fa-arrows-rotate", style="margin-right: 6px;"), "REFRESH DATA CLOUD",
-                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_refresh_ll01_all', Math.random(), {priority: 'event'})",
-                    style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer;"
-                )
-            ),
-            style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 1.25rem 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 10px;"
-        ),
-        # 2 TAB NAVSET
-        ui.navset_card_tab(
-            ui.nav_panel("📥 1. STAGING TRANSIT (MASUK RAK & REFUND)", tab1_staging),
-            ui.nav_panel("🚚 2. OPEN TRANSFER ORDERS (DRAFT & IN PROGRESS)", tab2_transfer)
-        ),
-        style="width: 100%; padding: 1rem;"
-    )
-# ==========================================================================
+    # ==========================================================================
     # TAB 3: MULTIPLE ADJUSTMENT (MENGGANTUNG & CANCEL)
     # ==========================================================================
     ma_headers = state.get_filtered_ma_data()
@@ -2351,7 +2324,9 @@ def warehouse_activity_monitor_view(state: AppState):
         style="padding: 1rem 0;"
     )
 
-    # Gabungkan menjadi 3 TAB:
+    # ==========================================================================
+    # GABUNGKAN MENJADI 3 TAB DALAM 1 RETURN TUNGGAL
+    # ==========================================================================
     return ui.div(
         ui.div(
             ui.div(
