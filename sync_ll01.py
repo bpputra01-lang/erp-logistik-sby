@@ -1,9 +1,44 @@
 import os
 import json
+import re
 import requests
 from datetime import datetime
 from bs4 import BeautifulSoup
 
+def parse_card_html(raw_html):
+    """Mengekstrak BIN, Brand, dan Nama Artikel murni dari HTML Jezpro"""
+    if not raw_html or "<" not in str(raw_html):
+        return {"article": str(raw_html).strip(), "brand": "-", "bin": "-"}
+
+    soup = BeautifulSoup(str(raw_html), "html.parser")
+    
+    # 1. Ekstrak BIN target (ada di title="Bin Code")
+    bin_el = soup.find(attrs={"title": "Bin Code"})
+    bin_val = bin_el.get_text(strip=True) if bin_el else None
+
+    # 2. Ekstrak Brand (misal [ORTUSEIGHT])
+    m_brand = re.search(r'\[(.*?)\]', str(raw_html))
+    brand_val = m_brand.group(1).strip() if m_brand else "-"
+
+    # 3. Ekstrak Nama Artikel Bersih
+    spans = soup.find_all("span")
+    art_parts = []
+    for s in spans:
+        t = s.get_text(" ", strip=True)
+        if any(w in t for w in ["REFUND", "WAITING", "TUKAR", "INV", "JEZ SURABAYA", "Bin Code"]):
+            continue
+        cleaned = re.sub(r'\[.*?\]\s*-\s*\d+', '', t)
+        if cleaned.strip():
+            art_parts.append(cleaned.strip())
+            
+    article_val = " ".join(art_parts) if art_parts else soup.get_text(" ", strip=True)
+    article_val = re.sub(r'\s+', ' ', article_val).strip()
+
+    return {
+        "article": article_val,
+        "brand": brand_val,
+        "bin": bin_val
+    }
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 JEZPRO_EMAIL = os.environ.get("JEZPRO_EMAIL")
@@ -80,34 +115,33 @@ def fetch_data(session, endpoint_path, kategori_label, waiting_val):
 
     clean_records = []
     for idx_item, item in enumerate(raw_list):
+        raw_art = item.get("article") or item.get("art_name") or "-"
+        parsed = parse_card_html(raw_art)
+
         p_id = (
             item.get("plst_id") or 
             item.get("pls_id") or 
             item.get("id") or 
-            item.get("plstr_id") or 
-            item.get("retur_id")
+            item.get("plstr_id")
         )
-        
-        # Fallback ID unik angka jika backend tidak menyertakan key plst_id
         if not p_id:
-            text_seed = f"{kategori_label}_{item.get('article', '')}_{item.get('date', '')}_{idx_item}"
-            p_id = abs(hash(text_seed)) % (10**10)
-            
+            p_id = abs(hash(f"{kategori_label}_{parsed['article']}_{idx_item}")) % (10**10)
+
         clean_records.append({
             "plst_id": int(p_id),
             "pls_id": int(item.get("pls_id") or p_id),
             "kategori": kategori_label,
             "waiting_status": item.get("waiting") or waiting_val,
-            "brand": item.get("brand") or item.get("br_name") or "-",
-            "article_name": item.get("article") or item.get("art_name") or item.get("product_name") or "-",
+            "brand": parsed["brand"] if parsed["brand"] != "-" else (item.get("brand") or "-"),
+            "article_name": parsed["article"],
             "qty": int(item.get("plst_qty") or item.get("qty") or 1),
-            "bin_target": item.get("rack_name") or item.get("bin") or item.get("lokasi") or "-",
-            "pic_name": item.get("user_name") or item.get("scanned_by") or item.get("name") or "Petugas",
+            "bin_target": parsed["bin"] if parsed["bin"] != "-" else (item.get("rack_name") or item.get("bin") or "-"),
+            "pic_name": item.get("user_name") or item.get("scanned_by") or "Petugas",
             "scanned_at": item.get("created_at") or item.get("date") or datetime.now().isoformat(),
             "store_id": 3,
             "raw_json": item,
             "synced_at": datetime.now().isoformat()
-        })
+        }) 
     return clean_records
 
 def push_to_supabase(records):
