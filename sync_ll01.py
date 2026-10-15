@@ -7,15 +7,24 @@ from datetime import datetime, timezone, timedelta
 from bs4 import BeautifulSoup
 
 # ==============================================================================
-# KREDENSIAL DARI GITHUB SECRETS
+# 1. KREDENSIAL & MAPPING CABANG RESMI JEZPRO
 # ==============================================================================
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 JEZPRO_EMAIL = os.environ.get("JEZPRO_EMAIL")
 JEZPRO_PASS  = os.environ.get("JEZPRO_PASSWORD")
 
+BRANCH_MAP = {
+    "JEZ SURABAYA": {"st_id": 3, "db_id": "SURABAYA_LATEST"},
+    "JEZ MALANG": {"st_id": 2, "db_id": "MALANG_LATEST"},
+    "JEZ SIDOARJO": {"st_id": 8, "db_id": "SIDOARJO_LATEST"},
+    "JEZ KEDIRI": {"st_id": 51, "db_id": "KEDIRI_LATEST"},
+    "JEZ JEMBER": {"st_id": 40, "db_id": "JEMBER_LATEST"},
+    "JEZ SEMARANG": {"st_id": 53, "db_id": "SEMARANG_LATEST"},
+}
+
 # ==============================================================================
-# HELPER PEMBERSIH DATA (ANTI-HTML & ANTI-VALUEERROR)
+# HELPER PEMBERSIH DATA
 # ==============================================================================
 def strip_html(val):
     if not val:
@@ -91,58 +100,65 @@ def create_jezpro_session():
     return session
 
 # ==============================================================================
-# 1. MODUL STAGING (MASUK RAK & REFUND)
+# 1. MODUL STAGING (ALL AREA VIA BRANCH_MAP)
 # ==============================================================================
 def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
-    print(f"📥 [2/6] Menarik data staging [{kategori_label}]...")
+    print(f"📥 [2/6] Menarik data staging [{kategori_label}] untuk seluruh cabang...")
     url = f"https://jezpro.id/{endpoint_path}"
     headers = {
         "Accept": "application/json, text/javascript, */*; q=0.01",
         "X-Requested-With": "XMLHttpRequest",
         "Referer": "https://jezpro.id/helper_backup"
     }
-    params = {
-        "draw": "1", "columns[0][data]": "article", "columns[0][name]": "article",
-        "columns[0][searchable]": "true", "columns[0][orderable]": "false",
-        "columns[0][search][value]": "", "columns[0][search][regex]": "false",
-        "order[0][column]": "0", "order[0][dir]": "desc",
-        "start": "0", "length": "5000", "search": "", "st_id": "", "waiting": waiting_val
-    }
 
-    res = session.get(url, params=params, headers=headers)
-    if res.status_code != 200:
-        return []
-    
-    raw_list = res.json().get("data", [])
     clean_records = []
-    for idx_item, item in enumerate(raw_list):
-        raw_art = item.get("article") or item.get("art_name") or "-"
-        parsed = clean_html_card(raw_art)
+    
+    for branch_name, b_info in BRANCH_MAP.items():
+        st_id = b_info["st_id"]
+        params = {
+            "draw": "1", "columns[0][data]": "article", "columns[0][name]": "article",
+            "columns[0][searchable]": "true", "columns[0][orderable]": "false",
+            "columns[0][search][value]": "", "columns[0][search][regex]": "false",
+            "order[0][column]": "0", "order[0][dir]": "desc",
+            "start": "0", "length": "5000", "search": "", 
+            "st_id": str(st_id), 
+            "waiting": waiting_val
+        }
 
-        p_id = item.get("plst_id") or item.get("pls_id") or item.get("id") or item.get("plstr_id")
-        if not p_id:
-            p_id = abs(hash(f"{kategori_label}_{parsed['article']}_{idx_item}")) % (10**10)
+        res = session.get(url, params=params, headers=headers)
+        if res.status_code != 200:
+            continue
+        
+        raw_list = res.json().get("data", [])
+        for idx_item, item in enumerate(raw_list):
+            raw_art = item.get("article") or item.get("art_name") or "-"
+            parsed = clean_html_card(raw_art)
 
-        clean_records.append({
-            "plst_id": int(p_id),
-            "pls_id": int(item.get("pls_id") or p_id),
-            "kategori": kategori_label,
-            "waiting_status": item.get("waiting") or waiting_val,
-            "brand": parsed["brand"] if parsed["brand"] != "-" else (item.get("brand") or "-"),
-            "article_name": parsed["article"],
-            "qty": safe_int_val(item.get("plst_qty") or item.get("qty"), 1),
-            "bin_target": parsed["bin"] if parsed["bin"] != "-" else strip_html(item.get("rack_name") or item.get("bin") or "-"),
-            "pic_name": strip_html(item.get("user_name") or item.get("scanned_by") or "Petugas"),
-            "scanned_at": item.get("created_at") or item.get("date") or datetime.now().isoformat(),
-            "store_id": 3,
-            "raw_json": item,
-            "synced_at": datetime.now().isoformat()
-        })
-    print(f"   -> Ditemukan {len(clean_records)} baris staging {kategori_label}.")
+            p_id = item.get("plst_id") or item.get("pls_id") or item.get("id") or item.get("plstr_id")
+            if not p_id:
+                p_id = abs(hash(f"{kategori_label}_{st_id}_{parsed['article']}_{idx_item}")) % (10**10)
+
+            clean_records.append({
+                "plst_id": int(p_id),
+                "pls_id": int(item.get("pls_id") or p_id),
+                "kategori": kategori_label,
+                "waiting_status": item.get("waiting") or waiting_val,
+                "brand": parsed["brand"] if parsed["brand"] != "-" else (item.get("brand") or "-"),
+                "article_name": parsed["article"],
+                "qty": safe_int_val(item.get("plst_qty") or item.get("qty"), 1),
+                "bin_target": parsed["bin"] if parsed["bin"] != "-" else strip_html(item.get("rack_name") or item.get("bin") or "-"),
+                "pic_name": strip_html(item.get("user_name") or item.get("scanned_by") or "Petugas"),
+                "scanned_at": item.get("created_at") or item.get("date") or datetime.now().isoformat(),
+                "store_id": st_id,
+                "raw_json": item,
+                "synced_at": datetime.now().isoformat()
+            })
+
+    print(f"   -> Ditemukan total {len(clean_records)} baris staging {kategori_label} (Semua Cabang).")
     return clean_records
 
 # ==============================================================================
-# 2. MODUL TRANSFER STOK (DRAFT & IN PROGRESS >= 2026 + FULL ITEMS)
+# 2. MODUL TRANSFER STOK (ALL AREA LINTAS CABANG)
 # ==============================================================================
 def fetch_all_items_for_single_tf(session, tf_code, status_txt, headers, now_wib):
     all_items = []
@@ -202,7 +218,7 @@ def fetch_all_items_for_single_tf(session, tf_code, status_txt, headers, now_wib
     return all_items
 
 def fetch_transfer_data(session):
-    print("🚚 [3/6] Menarik SELURUH Riwayat Transfer Stok (Membaca s/d baris terakhir)...")
+    print("🚚 [3/6] Menarik Seluruh Riwayat Transfer Stok (All Store)...")
     url_history = "https://jezpro.id/transfer_history_datatables"
     headers = {
         "Accept": "application/json, text/javascript, */*; q=0.01",
@@ -245,7 +261,6 @@ def fetch_transfer_data(session):
         total_expected = data_json.get("recordsTotal", total_expected)
         raw_history.extend(data_chunk)
         start_row += len(data_chunk)
-        print(f"   -> Mengumpulkan riwayat transfer: {len(raw_history)} / {total_expected} baris...")
 
     print(f"✅ Total {len(raw_history)} baris riwayat transfer berhasil dimuat.")
 
@@ -306,11 +321,11 @@ def fetch_transfer_data(session):
         doc_items = fetch_all_items_for_single_tf(session, tf_code, status_txt, headers, now_wib)
         open_items.extend(doc_items)
 
-    print(f"   -> BERHASIL! {len(open_headers)} Surat Jalan & TOTAL {len(open_items)} Detail Barang Transfer Tersaring.")
+    print(f"   -> BERHASIL! {len(open_headers)} Surat Jalan & TOTAL {len(open_items)} Detail Barang Transfer.")
     return open_headers, open_items
 
 # ==============================================================================
-# 3. MODUL MULTIPLE ADJUSTMENT (KHUSUS MENGGANTUNG TAHUN >= 2026)
+# 3. MODUL MULTIPLE ADJUSTMENT (ALL STORE, MENGGANTUNG TAHUN >= 2026)
 # ==============================================================================
 def fetch_mass_adjustment_data(session):
     print("⚖️ [4/6] Menarik Data Multiple Adjustment (Khusus Menggantung >= 2026)...")
@@ -359,7 +374,6 @@ def fetch_mass_adjustment_data(session):
         total_expected = data_json.get("recordsTotal", total_expected)
         raw_adjustments.extend(data_chunk)
         start_row += len(data_chunk)
-        print(f"   -> Mengumpulkan adjustment: {len(raw_adjustments)} / {total_expected} baris...")
 
     print(f"✅ Total {len(raw_adjustments)} baris adjustment berhasil dimuat.")
 
@@ -373,6 +387,7 @@ def fetch_mass_adjustment_data(session):
 
         is_menggantung = any(k in status_raw for k in ["MENUNGGU", "PENDING", "DRAFT", "PROGRESS"]) or "MENUNGGU" in approve_raw.upper()
 
+        # Lewati jika bukan dokumen menggantung
         if not is_menggantung:
             continue
 
@@ -490,10 +505,10 @@ def fetch_mass_adjustment_data(session):
     return open_ma_headers, open_ma_items
 
 # ==============================================================================
-# 4. MODUL SINGLE ADJUSTMENT (PENARIKAN HISTORI TRANSAKSI PENUH TAHUN >= 2026)
+# 4. MODUL SINGLE ADJUSTMENT (SEMUA STORE VIA BRANCH_MAP - NEED APPROVAL ONLY)
 # ==============================================================================
 def fetch_single_adjustment_data(session):
-    print("📝 [5/6] Menarik Data Single Adjustment (Tahun >= 2026)...")
+    print("📝 [5/6] Menarik Data Single Adjustment (Need Approval) untuk SELURUH CABANG...")
     url_single = "https://jezpro.id/adjustment_history_datatables"
     headers = {
         "Accept": "application/json, text/javascript, */*; q=0.01",
@@ -503,110 +518,115 @@ def fetch_single_adjustment_data(session):
 
     today_str = datetime.now().strftime("%Y-%m-%d")
     date_range = f"2026-01-01|{today_str}"
-
-    raw_single = []
-    start_row = 0
-    batch_size = 500
-    total_expected = 999999
-
-    while start_row < total_expected:
-        params = {
-            "draw": "1",
-            "columns[0][data]": "DT_RowIndex", "columns[0][name]": "ba_id", "columns[0][orderable]": "true",
-            "columns[1][data]": "ba_code", "columns[1][name]": "ba_code", "columns[1][orderable]": "true",
-            "columns[2][data]": "st_name", "columns[2][name]": "st_name", "columns[2][orderable]": "true",
-            "columns[3][data]": "pl_code", "columns[3][name]": "pl_code", "columns[3][orderable]": "true",
-            "columns[4][data]": "u_name", "columns[4][name]": "u_name", "columns[4][orderable]": "true",
-            "columns[5][data]": "ba_approve", "columns[5][name]": "ba_approve", "columns[5][orderable]": "true",
-            "columns[6][data]": "ba_executor", "columns[6][name]": "ba_executor", "columns[6][orderable]": "true",
-            "columns[7][data]": "br_name", "columns[7][name]": "br_name", "columns[7][orderable]": "true",
-            "columns[8][data]": "p_name", "columns[8][name]": "p_name", "columns[8][orderable]": "true",
-            "columns[9][data]": "ps_barcode", "columns[9][name]": "ps_barcode", "columns[9][orderable]": "true",
-            "columns[10][data]": "p_color", "columns[10][name]": "p_color", "columns[10][orderable]": "true",
-            "columns[11][data]": "sz_name", "columns[11][name]": "sz_name", "columns[11][orderable]": "true",
-            "columns[12][data]": "cogs", "columns[12][name]": "cogs", "columns[12][orderable]": "true",
-            "columns[13][data]": "ba_updated_at", "columns[13][name]": "ba_updated_at", "columns[13][orderable]": "false",
-            "columns[14][data]": "ba_old_qty", "columns[14][name]": "ba_old_qty", "columns[14][orderable]": "false",
-            "columns[15][data]": "ba_new_qty", "columns[15][name]": "ba_new_qty", "columns[15][orderable]": "false",
-            "columns[16][data]": "adjust", "columns[16][name]": "adjust", "columns[16][orderable]": "false",
-            "columns[17][data]": "ba_note", "columns[17][name]": "ba_note", "columns[17][orderable]": "false",
-            "columns[18][data]": "ba_proof_file", "columns[18][name]": "ba_proof_file", "columns[18][orderable]": "false",
-            "columns[19][data]": "ba_status", "columns[19][name]": "ba_status", "columns[19][orderable]": "false",
-            "order[0][column]": "0", "order[0][dir]": "desc",
-            "start": str(start_row), "length": str(batch_size),
-            "search": "", "st_id": "", "adjustment_date": date_range, "status": ""
-        }
-
-        res = session.get(url_single, params=params, headers=headers)
-        if res.status_code != 200:
-            break
-
-        data_json = res.json()
-        data_chunk = data_json.get("data", [])
-        if not data_chunk:
-            break
-
-        total_expected = data_json.get("recordsTotal", total_expected)
-        raw_single.extend(data_chunk)
-        start_row += len(data_chunk)
-        print(f"   -> Mengumpulkan single adjustment: {len(raw_single)} / {total_expected} baris...")
-
-    print(f"✅ Total {len(raw_single)} baris single adjustment berhasil dimuat.")
-
     now_wib = datetime.now(timezone(timedelta(hours=7))).replace(tzinfo=None)
     clean_single_records = []
 
-    for idx, row in enumerate(raw_single):
-        status_raw = strip_html(row.get("ba_status") or "").upper()
-        approve_raw = strip_html(row.get("ba_approve") or "").upper()
+    # Loop ke setiap cabang secara eksplisit menggunakan st_id resmi
+    for branch_name, b_info in BRANCH_MAP.items():
+        st_id = b_info["st_id"]
+        start_row = 0
+        batch_size = 500
+        total_expected = 999999
+        branch_found_count = 0
 
-        # 🛑 1. ABAIKAN YANG SUDAH DONE / CANCEL
-        if any(x in status_raw for x in ["DONE", "SELESAI", "CANCEL", "BATAL"]):
-            continue
+        while start_row < total_expected:
+            params = {
+                "draw": "1",
+                "columns[0][data]": "DT_RowIndex", "columns[0][name]": "ba_id", "columns[0][orderable]": "true",
+                "columns[1][data]": "ba_code", "columns[1][name]": "ba_code", "columns[1][orderable]": "true",
+                "columns[2][data]": "st_name", "columns[2][name]": "st_name", "columns[2][orderable]": "true",
+                "columns[3][data]": "pl_code", "columns[3][name]": "pl_code", "columns[3][orderable]": "true",
+                "columns[4][data]": "u_name", "columns[4][name]": "u_name", "columns[4][orderable]": "true",
+                "columns[5][data]": "ba_approve", "columns[5][name]": "ba_approve", "columns[5][orderable]": "true",
+                "columns[6][data]": "ba_executor", "columns[6][name]": "ba_executor", "columns[6][orderable]": "true",
+                "columns[7][data]": "br_name", "columns[7][name]": "br_name", "columns[7][orderable]": "true",
+                "columns[8][data]": "p_name", "columns[8][name]": "p_name", "columns[8][orderable]": "true",
+                "columns[9][data]": "ps_barcode", "columns[9][name]": "ps_barcode", "columns[9][orderable]": "true",
+                "columns[10][data]": "p_color", "columns[10][name]": "p_color", "columns[10][orderable]": "true",
+                "columns[11][data]": "sz_name", "columns[11][name]": "sz_name", "columns[11][orderable]": "true",
+                "columns[12][data]": "cogs", "columns[12][name]": "cogs", "columns[12][orderable]": "true",
+                "columns[13][data]": "ba_updated_at", "columns[13][name]": "ba_updated_at", "columns[13][orderable]": "false",
+                "columns[14][data]": "ba_old_qty", "columns[14][name]": "ba_old_qty", "columns[14][orderable]": "false",
+                "columns[15][data]": "ba_new_qty", "columns[15][name]": "ba_new_qty", "columns[15][orderable]": "false",
+                "columns[16][data]": "adjust", "columns[16][name]": "adjust", "columns[16][orderable]": "false",
+                "columns[17][data]": "ba_note", "columns[17][name]": "ba_note", "columns[17][orderable]": "false",
+                "columns[18][data]": "ba_proof_file", "columns[18][name]": "ba_proof_file", "columns[18][orderable]": "false",
+                "columns[19][data]": "ba_status", "columns[19][name]": "ba_status", "columns[19][orderable]": "false",
+                "order[0][column]": "0", "order[0][dir]": "desc",
+                "start": str(start_row), "length": str(batch_size),
+                "search": "", 
+                "st_id": str(st_id), 
+                "adjustment_date": date_range, 
+                "status": ""
+            }
 
-        # ✅ 2. HANYA AMBIL YANG BUTUH APPROVAL (MENUNGGU / PENDING / BELUM ADA APPROVER)
-        is_need_approval = (
-            any(k in status_raw for k in ["MENUNGGU", "PENDING", "NEED", "WAITING", "PROGRESS", "DRAFT"])
-            or approve_raw in ["-", "", "NONE", "NAN"]
-            or "MENUNGGU" in approve_raw
-        )
-        if not is_need_approval:
-            continue
+            res = session.get(url_single, params=params, headers=headers)
+            if res.status_code != 200:
+                break
 
-        ba_id_val = safe_int_val(row.get("ba_id") or row.get("id"))
-        raw_code = strip_html(row.get("ba_code") or "-")
-        if not ba_id_val:
-            ba_id_val = abs(hash(f"{raw_code}_{idx}")) % (10**10)
+            data_json = res.json()
+            data_chunk = data_json.get("data", [])
+            if not data_chunk:
+                break
 
-        clean_single_records.append({
-            "id": ba_id_val,
-            "ba_code": raw_code,
-            "store_name": strip_html(row.get("st_name") or "-"),
-            "bin_code": strip_html(row.get("pl_code") or "-"),
-            "creator": strip_html(row.get("u_name") or "-"),
-            "approval": strip_html(row.get("ba_approve") or "-"),
-            "executor": strip_html(row.get("ba_executor") or "-"),
-            "brand": strip_html(row.get("br_name") or "-"),
-            "article_name": strip_html(row.get("p_name") or "-"),
-            "barcode_sku": strip_html(row.get("ps_barcode") or "-"),
-            "color": strip_html(row.get("p_color") or "-"),
-            "size_variant": strip_html(row.get("sz_name") or "-"),
-            "cogs": safe_int_val(row.get("cogs")),
-            "old_qty": safe_int_val(row.get("ba_old_qty")),
-            "new_qty": safe_int_val(row.get("ba_new_qty")),
-            "adjust_qty": safe_int_val(row.get("adjust")),
-            "note": strip_html(row.get("ba_note") or "-"),
-            "proof_file": strip_html(row.get("ba_proof_file") or "-"),
-            "status": strip_html(row.get("ba_status") or "Menunggu"),
-            "updated_at": strip_html(row.get("ba_updated_at") or ""),
-            "synced_at": now_wib.isoformat()
-        })
+            total_expected = data_json.get("recordsTotal", total_expected)
+            start_row += len(data_chunk)
 
-    print(f"   -> BERHASIL! {len(clean_single_records)} baris Single Adjustment siap dikirim ke Supabase.")
+            for idx, row in enumerate(data_chunk):
+                status_raw = strip_html(row.get("ba_status") or "").upper()
+                approve_raw = strip_html(row.get("ba_approve") or "").upper()
+
+                # Lewati yang sudah Done atau Cancel
+                if any(x in status_raw for x in ["DONE", "SELESAI", "CANCEL", "BATAL"]):
+                    continue
+
+                # Ambil hanya yang butuh approval
+                is_need_approval = (
+                    any(k in status_raw for k in ["MENUNGGU", "PENDING", "NEED", "WAITING", "PROGRESS", "DRAFT"])
+                    or approve_raw in ["-", "", "NONE", "NAN"]
+                    or "MENUNGGU" in approve_raw
+                )
+                if not is_need_approval:
+                    continue
+
+                ba_id_val = safe_int_val(row.get("ba_id") or row.get("id"))
+                raw_code = strip_html(row.get("ba_code") or "-")
+                if not ba_id_val:
+                    ba_id_val = abs(hash(f"{raw_code}_{st_id}_{start_row}_{idx}")) % (10**10)
+
+                clean_single_records.append({
+                    "id": ba_id_val,
+                    "ba_code": raw_code,
+                    "store_name": strip_html(row.get("st_name") or branch_name),
+                    "bin_code": strip_html(row.get("pl_code") or "-"),
+                    "creator": strip_html(row.get("u_name") or "-"),
+                    "approval": strip_html(row.get("ba_approve") or "-"),
+                    "executor": strip_html(row.get("ba_executor") or "-"),
+                    "brand": strip_html(row.get("br_name") or "-"),
+                    "article_name": strip_html(row.get("p_name") or "-"),
+                    "barcode_sku": strip_html(row.get("ps_barcode") or "-"),
+                    "color": strip_html(row.get("p_color") or "-"),
+                    "size_variant": strip_html(row.get("sz_name") or "-"),
+                    "cogs": safe_int_val(row.get("cogs")),
+                    "old_qty": safe_int_val(row.get("ba_old_qty")),
+                    "new_qty": safe_int_val(row.get("ba_new_qty")),
+                    "adjust_qty": safe_int_val(row.get("adjust")),
+                    "note": strip_html(row.get("ba_note") or "-"),
+                    "proof_file": strip_html(row.get("ba_proof_file") or "-"),
+                    "status": strip_html(row.get("ba_status") or "Menunggu"),
+                    "updated_at": strip_html(row.get("ba_updated_at") or ""),
+                    "synced_at": now_wib.isoformat()
+                })
+                branch_found_count += 1
+
+        if branch_found_count > 0:
+            print(f"   -> {branch_name} (st_id: {st_id}): {branch_found_count} baris Single Adjustment butuh approval.")
+
+    print(f"✅ Total {len(clean_single_records)} baris Single Adjustment (All Area Need Approval) terkumpul.")
     return clean_single_records
 
 # ==============================================================================
-# 5. PUSH KE SUPABASE (FITUR HAPUS BERSIH DULU -> ISI DATA BARU)
+# 5. PUSH KE SUPABASE (HAPUS BERSIH DATA LAMA -> ISI BARU)
 # ==============================================================================
 def push_all_to_supabase(staging_data, tf_headers, tf_items, ma_headers, ma_items, single_items):
     print("🚀 [6/6] Mengosongkan data lama & mengirim data terbaru ke Supabase...")
@@ -616,7 +636,7 @@ def push_all_to_supabase(staging_data, tf_headers, tf_items, ma_headers, ma_item
         "Content-Type": "application/json"
     }
 
-    # 1. STAGING WAITING (Kosongkan dulu -> Isi baru)
+    # 1. Staging Waiting
     requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_waiting_staging?plst_id=gt.0", headers=headers)
     if staging_data:
         for i in range(0, len(staging_data), 200):
@@ -626,7 +646,7 @@ def push_all_to_supabase(staging_data, tf_headers, tf_items, ma_headers, ma_item
     else:
         print("   ✅ Staging: Bersih (0 antrean).")
 
-    # 2. TRANSFER HEADERS (Kosongkan dulu -> Isi baru)
+    # 2. Transfer Headers
     requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_transfer_headers?stf_code=neq.", headers=headers)
     if tf_headers:
         for i in range(0, len(tf_headers), 200):
@@ -636,15 +656,15 @@ def push_all_to_supabase(staging_data, tf_headers, tf_items, ma_headers, ma_item
     else:
         print("   ✅ Transfer Headers: Bersih (0 open transfer).")
 
-    # 3. TRANSFER ITEMS (Kosongkan dulu -> Isi baru)
+    # 3. Transfer Items
     requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_transfer_items?id=gt.0", headers=headers)
     if tf_items:
         for i in range(0, len(tf_items), 200):
             batch = tf_items[i:i + 200]
             requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_transfer_items", data=json.dumps(batch), headers=headers)
-        print(f"   ✅ Transfer Items: Diperbarui {len(tf_items)} rincian barang.")
+        print(f"   ✅ Transfer Items: Diperbarui {len(tf_items)} item.")
 
-    # 4. MASS ADJUSTMENT HEADERS (Kosongkan dulu -> Isi baru)
+    # 4. Mass Adjustment Headers
     requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_adjustment_headers?ma_id=gt.0", headers=headers)
     if ma_headers:
         for i in range(0, len(ma_headers), 200):
@@ -654,15 +674,15 @@ def push_all_to_supabase(staging_data, tf_headers, tf_items, ma_headers, ma_item
     else:
         print("   ✅ MADJ Headers: Bersih (0 MADJ menggantung).")
 
-    # 5. MASS ADJUSTMENT ITEMS (Kosongkan dulu -> Isi baru)
+    # 5. Mass Adjustment Items
     requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_adjustment_items?id=gt.0", headers=headers)
     if ma_items:
         for i in range(0, len(ma_items), 200):
             batch = ma_items[i:i + 200]
             requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_adjustment_items", data=json.dumps(batch), headers=headers)
-        print(f"   ✅ MADJ Items: Diperbarui {len(ma_items)} rincian barang.")
+        print(f"   ✅ MADJ Items: Diperbarui {len(ma_items)} item.")
 
-    # 6. SINGLE ADJUSTMENT (Kosongkan dulu -> Isi baru)
+    # 6. Single Adjustment
     requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_single_adjustments?id=gt.0", headers=headers)
     if single_items:
         for i in range(0, len(single_items), 200):
@@ -672,7 +692,7 @@ def push_all_to_supabase(staging_data, tf_headers, tf_items, ma_headers, ma_item
     else:
         print("   ✅ Single Adjustment: Bersih (0 transaksi butuh approval).")
 
-    print("🎉 SUKSES! Seluruh tabel Supabase telah disegarkan secara bersih dan akurat.")
+    print("🎉 SUKSES! Seluruh data Staging, Transfer, Multiple & Single Adjustment All Area telah tersinkronisasi bersih.")
 
 # ==============================================================================
 # MAIN PIPELINE EKSEKUSI
@@ -680,20 +700,20 @@ def push_all_to_supabase(staging_data, tf_headers, tf_items, ma_headers, ma_item
 if __name__ == "__main__":
     jez = create_jezpro_session()
     
-    # 1. Staging
+    # 1. Staging (All Area)
     all_staging = []
     all_staging.extend(fetch_staging_data(jez, "scan_product_in_datatables", "MASUK_RAK", "WAITING OFFLINE"))
     all_staging.extend(fetch_staging_data(jez, "scan_product_in_refund_datatables", "REFUND", "Refund"))
     
-    # 2. Transfer Stok
+    # 2. Transfer Stok (All Area)
     tf_headers, tf_items = fetch_transfer_data(jez)
     
-    # 3. Multiple Adjustment
+    # 3. Multiple Adjustment (All Area)
     ma_headers, ma_items = fetch_mass_adjustment_data(jez)
     
-    # 4. Single Adjustment
+    # 4. Single Adjustment (All Area via BRANCH_MAP)
     single_items = fetch_single_adjustment_data(jez)
     
-    # 5. Push All to Supabase
+    # 5. Push All to Supabase (Clean & Replace)
     push_all_to_supabase(all_staging, tf_headers, tf_items, ma_headers, ma_items, single_items)
-    print("🎉 Pipeline LL01 & Inventory Sync selesai sempurna 100%!")
+    print("🏁 Pipeline selesai sempurna!")
