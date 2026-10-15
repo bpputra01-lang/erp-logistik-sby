@@ -6366,7 +6366,7 @@ class AppState:
         data = [x for x in self.get_filtered_ll01() if "CRITICAL" in str(x.get("ll01_status", ""))]
         return sum([safe_int(x.get("qty", 1)) for x in data])
 
-def load_transfer_orders_from_supabase(self):
+    def load_transfer_orders_from_supabase(self):
         try:
             client = get_supabase()
             if not client: return False, "Koneksi Supabase gagal!"
