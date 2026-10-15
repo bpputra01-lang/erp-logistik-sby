@@ -4912,7 +4912,8 @@ def server(input: Inputs, output: Outputs, session: Session):
             df_export.to_excel(writer, sheet_name='BUFFER_TRANSIT_STOCK', index=False)
         buf.seek(0)
         yield buf.getvalue()
-        @reactive.Effect
+        
+    @reactive.Effect
     @reactive.event(input.change_ll01_single_branch)
     def _on_change_ll01_sa_br():
         state.ll01_single_adj_filter_branch.set(input.change_ll01_single_branch())
