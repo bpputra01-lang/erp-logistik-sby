@@ -372,7 +372,6 @@ def fetch_mass_adjustment_data(session):
         approve_raw = strip_html(row.get("approve") or "")
 
         is_menggantung = any(k in status_raw for k in ["MENUNGGU", "PENDING", "DRAFT", "PROGRESS"]) or "MENUNGGU" in approve_raw.upper()
-        is_cancel = any(k in status_raw for k in ["CANCEL", "BATAL", "REJECT"]) or "CANCEL" in approve_raw.upper()
 
         if not (is_menggantung or is_cancel):
             continue
