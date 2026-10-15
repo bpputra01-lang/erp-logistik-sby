@@ -5,6 +5,7 @@ import re
 import time
 from datetime import datetime, timezone, timedelta
 from bs4 import BeautifulSoup
+import pandas as pd
 
 # ==============================================================================
 # 1. KREDENSIAL & MAPPING CABANG RESMI JEZPRO
