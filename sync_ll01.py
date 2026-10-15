@@ -207,19 +207,19 @@ def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
                     "synced_at": datetime.now(timezone(timedelta(hours=7))).isoformat()
                 })
 
-print(f"   -> Ditemukan total {len(clean_records)} baris staging {kategori_label}.")
-    
-    # --- PEMBERSIH DUPLIKAT PLST_ID MURNI PYTHON (TANPA PANDAS) ---
-    seen_ids = set()
-    unique_records = []
-    for rec in clean_records:
-        pid = rec["plst_id"]
-        if pid not in seen_ids:
-            seen_ids.add(pid)
-            unique_records.append(rec)
-            
-    print(f"   -> Setelah dibersihkan (unik), tersisa {len(unique_records)} baris staging {kategori_label}.")
-    return unique_records
+    print(f"   -> Ditemukan total {len(clean_records)} baris staging {kategori_label}.")
+        
+        # --- PEMBERSIH DUPLIKAT PLST_ID MURNI PYTHON (TANPA PANDAS) ---
+        seen_ids = set()
+        unique_records = []
+        for rec in clean_records:
+            pid = rec["plst_id"]
+            if pid not in seen_ids:
+                seen_ids.add(pid)
+                unique_records.append(rec)
+                
+        print(f"   -> Setelah dibersihkan (unik), tersisa {len(unique_records)} baris staging {kategori_label}.")
+        return unique_records
 # ==============================================================================
 # 2. MODUL TRANSFER STOK (ALL AREA LINTAS CABANG)
 # ==============================================================================
