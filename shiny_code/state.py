@@ -526,17 +526,21 @@ class AppState:
         self.pd_last_sync_time = reactive.Value("-")
         self.pd_data_source = reactive.Value("Belum ada data")
 
-        # --- WAREHOUSE ACTIVITY MONITOR (LL01) STATE ---
+    # --- WAREHOUSE ACTIVITY MONITOR (LL01) STATE ---
         self.ll01_data_list = reactive.Value([])
         self.ll01_filter_kategori = reactive.Value("SEMUA")      # "SEMUA", "MASUK_RAK", "REFUND"
-        self.ll01_filter_aging = reactive.Value("SEMUA")
-        self.ll01_filter_tgl_start = reactive.Value("")
-        self.ll01_filter_tgl_end = reactive.Value("")
-        self.ll01_filter_note = reactive.Value("")        # "SEMUA", "CRITICAL", "NORMAL"
+        self.ll01_filter_aging = reactive.Value("SEMUA")         # "SEMUA", "CRITICAL", "NORMAL"
         self.ll01_last_sync = reactive.Value("-")
         self._raw_df_ll01_filtered = pd.DataFrame()
-        
-        # --- TRANSFER STOK (OPEN ORDERS) STATE ---
+
+        # 👇 TAMBAHKAN BLOK INI (YANG MENYEBABKAN ERROR JIKA BELUM ADA):
+        # 1. Filter Tab 1 (Staging & SAP LL01 Summary)
+        self.ll01_filter_store = reactive.Value("SEMUA")
+        self.ll01_filter_tgl_start = reactive.Value("")
+        self.ll01_filter_tgl_end = reactive.Value("")
+        self.ll01_filter_note = reactive.Value("")
+
+        # 2. Filter Tab 2 (Transfer Order)
         self.ll01_tf_headers = reactive.Value([])
         self.ll01_tf_items = reactive.Value([])
         self.ll01_selected_tf_code = reactive.Value("")
@@ -545,7 +549,7 @@ class AppState:
         self.ll01_tf_filter_tgl_end = reactive.Value("")
         self.ll01_tf_filter_note = reactive.Value("")
 
-        # --- MASS ADJUSTMENT STATE ---
+        # 3. Filter Tab 3 (Multiple Adjustment / MADJ)
         self.ll01_ma_headers = reactive.Value([])
         self.ll01_ma_filter_status = reactive.Value("SEMUA")
         self.ll01_ma_filter_aging = reactive.Value("SEMUA")
@@ -554,7 +558,7 @@ class AppState:
         self.ll01_ma_filter_tgl_end = reactive.Value("")
         self.ll01_ma_filter_note = reactive.Value("")
 
-        # --- SINGLE ADJUSTMENT (TABEL JEZPRO_SINGLE_ADJUSTMENTS) ---
+        # 4. Filter Tab 3 (Single Adjustment / ADJ)
         self.ll01_single_adj_list = reactive.Value([])
         self.ll01_single_adj_filter_branch = reactive.Value("SEMUA")
         self.ll01_single_adj_filter_status = reactive.Value("SEMUA")
@@ -562,7 +566,7 @@ class AppState:
         self.ll01_single_adj_filter_tgl_end = reactive.Value("")
         self.ll01_single_adj_filter_note = reactive.Value("")
 
-        # --- TAB 4: BUFFER & TRANSIT STOCK (KARANTINA, INB, PUTAWAY, OUT) ---
+        # 5. Filter Tab 4 (Buffer & Transit Stock)
         self.ll01_special_stock_list = reactive.Value([])
         self.ll01_stock_filter_branch = reactive.Value("SEMUA")
         self.ll01_stock_filter_type = reactive.Value("SEMUA")
