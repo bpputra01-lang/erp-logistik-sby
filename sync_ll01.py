@@ -2,7 +2,7 @@ import os
 import json
 import requests
 import re
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from bs4 import BeautifulSoup
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
@@ -130,7 +130,7 @@ def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
     return clean_records
 
 # ------------------------------------------------------------------------------
-# 2. TARIK DATA TRANSFER STOCK (KOLOM PERSIS SUPABASE: u_name)
+# 2. TARIK DATA TRANSFER STOCK (WIB TIMEZONE & ANTI-MINUS)
 # ------------------------------------------------------------------------------
 def fetch_transfer_data(session):
     print("🚚 [3/5] Menarik data Transfer Stok (Khusus Tahun >= 2026)...")
@@ -167,6 +167,9 @@ def fetch_transfer_data(session):
     open_headers = []
     open_items = []
 
+    # Waktu acuan saat ini dalam WIB (UTC+7)
+    now_wib = datetime.now(timezone(timedelta(hours=7))).replace(tzinfo=None)
+
     for row in raw_history:
         status_txt = strip_html(row.get("stf_status") or row.get("status") or "").upper()
 
@@ -186,7 +189,9 @@ def fetch_transfer_data(session):
                 try:
                     dt_tf = datetime.strptime(tgl_str[:19].strip(), fmt)
                     doc_year = dt_tf.year
-                    aging_jam = round((datetime.now() - dt_tf).total_seconds() / 3600.0, 1)
+                    # Hitung selisih jam terhadap WIB sekarang (anti-minus)
+                    diff_sec = (now_wib - dt_tf).total_seconds()
+                    aging_jam = max(0.0, round(diff_sec / 3600.0, 1))
                     break
                 except Exception:
                     pass
@@ -199,7 +204,6 @@ def fetch_transfer_data(session):
         if doc_year is not None and doc_year < 2026:
             continue
 
-        # ✅ DIUBAH MENJADI 'u_name' AGAR 100% COCOK DENGAN SUPABASE
         open_headers.append({
             "stf_code": tf_code,
             "u_name": strip_html(row.get("u_name") or "-"),
@@ -209,13 +213,13 @@ def fetch_transfer_data(session):
             "start_store": strip_html(row.get("start_store") or "-"),
             "end_store": strip_html(row.get("end_store") or "-"),
             "u_name_receive": strip_html(row.get("u_name_receive") or "-"),
-            "stf_created": tgl_str if tgl_str else datetime.now().isoformat(),
+            "stf_created": tgl_str if tgl_str else now_wib.isoformat(),
             "stf_status": status_txt,
             "aging_hours": float(aging_jam),
-            "synced_at": datetime.now().isoformat()
+            "synced_at": now_wib.isoformat()
         })
 
-        # TARIK DETAIL BARANG PER DOKUMEN TF DENGAN PARAMETER LENGKAP
+        # TARIK DETAIL BARANG PER DOKUMEN TF
         url_detail = "https://jezpro.id/in_transfer_bin_datatables"
         params_det = {
             "draw": "1",
@@ -244,10 +248,10 @@ def fetch_transfer_data(session):
                     "start_store": strip_html(it.get("st_start") or "-"),
                     "end_store": strip_html(it.get("st_end") or "-"),
                     "status": status_txt,
-                    "synced_at": datetime.now().isoformat()
+                    "synced_at": now_wib.isoformat()
                 })
 
-    print(f"   -> BERHASIL! Didapat {len(open_headers)} Dokumen Terbuka & {len(open_items)} Detail Barang.")
+    print(f"   -> BERHASIL! Didapat {len(open_headers)} Dokumen Terbuka (Tahun >= 2026) & {len(open_items)} Detail Barang.")
     return open_headers, open_items
 
 # ------------------------------------------------------------------------------
