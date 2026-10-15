@@ -205,6 +205,17 @@ def fetch_transfer_data(session):
         if doc_year is not None and doc_year < 2026:
             continue
 
+        # Konversi tanggal ke ISO 8601 standar atau fallback string bersih
+        clean_iso_date = datetime.now().isoformat()
+        if tgl_str:
+            for fmt in ("%Y-%m-%d %H:%M:%S", "%d-%m-%Y %H:%M:%S", "%Y-%m-%d", "%d/%m/%Y %H:%M:%S"):
+                try:
+                    dt_tf = datetime.strptime(tgl_str[:19].strip(), fmt)
+                    clean_iso_date = dt_tf.isoformat()
+                    break
+                except Exception:
+                    pass
+
         open_headers.append({
             "stf_code": tf_code,
             "user_name": strip_html(row.get("u_name") or "-"),
@@ -214,9 +225,9 @@ def fetch_transfer_data(session):
             "start_store": strip_html(row.get("start_store") or "-"),
             "end_store": strip_html(row.get("end_store") or "-"),
             "u_name_receive": strip_html(row.get("u_name_receive") or "-"),
-            "stf_created": tgl_str if tgl_str else datetime.now().isoformat(),
+            "stf_created": clean_iso_date,
             "stf_status": status_txt,
-            "aging_hours": aging_jam,
+            "aging_hours": float(aging_jam),
             "synced_at": datetime.now().isoformat()
         })
 
