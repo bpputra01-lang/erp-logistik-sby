@@ -103,100 +103,90 @@ def create_jezpro_session():
 # ==============================================================================
 # 1. MODUL STAGING (DETEKSI CABANG OTOMATIS BERDASARKAN NAMA BIN)
 # ==============================================================================
-def detect_store_id_from_bin(bin_text):
-    b = str(bin_text).strip().upper()
-    if "KDR" in b: return 51        # Kediri
-    if "JBR" in b: return 40        # Jember
-    if "SMG" in b: return 53        # Semarang
-    if "SDA" in b: return 8         # Sidoarjo
-    if any(k in b for k in ["DAU", "KAV", "MALANG", "MLG"]): return 2  # Malang
-    return 3                        # Default Surabaya
-    
-def parse_to_iso_timestamp(dt_raw):
-    if not dt_raw:
-        return datetime.now(timezone(timedelta(hours=7))).isoformat()
-    s = strip_html(str(dt_raw)).strip()
-    s = s.replace('–', '-').replace('—', '-').replace('/', '-')
-    formats = (
-        "%Y-%m-%d %H:%M:%S", "%d-%m-%Y %H:%M:%S", "%d-%b-%Y %H:%M:%S", "%d-%B-%Y %H:%M:%S",
-        "%Y-%m-%d", "%d-%m-%Y", "%d-%b-%Y", "%d-%B-%Y"
-    )
-    for fmt in formats:
-        try:
-            dt = datetime.strptime(s[:19].strip(), fmt)
-            return dt.isoformat()
-        except Exception:
-            pass
-    try:
-        years = re.findall(r'\b(20\d{2})\b', s)
-        if years:
-            return datetime(int(years[0]), 1, 1, 0, 0, 0).isoformat()
-    except Exception:
-        pass
-    return datetime.now(timezone(timedelta(hours=7))).isoformat()
-
 def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
-    print(f"📥 [2/6] Menarik data staging [{kategori_label}] (Global All Store)...")
-    url = f"https://jezpro.id/{endpoint_path}"
+    print(f"📥 [2/6] Menarik data staging [{kategori_label}] untuk seluruh cabang...")
+    url_staging = f"https://jezpro.id/{endpoint_path}"
     headers = {
         "Accept": "application/json, text/javascript, */*; q=0.01",
         "X-Requested-With": "XMLHttpRequest",
         "Referer": "https://jezpro.id/helper_backup"
     }
 
-    params = {
-        "draw": "1", "columns[0][data]": "article", "columns[0][name]": "article",
-        "columns[0][searchable]": "true", "columns[0][orderable]": "false",
-        "columns[0][search][value]": "", "columns[0][search][regex]": "false",
-        "order[0][column]": "0", "order[0][dir]": "desc",
-        "start": "0", "length": "10000", "search": "", 
-        "st_id": "", 
-        "waiting": waiting_val
-    }
-
-    res = session.get(url, params=params, headers=headers)
-    if res.status_code != 200:
-        print(f"   ⚠️ Gagal tarik data staging {kategori_label} (HTTP {res.status_code})")
-        return []
-    
-    try:
-        raw_list = res.json().get("data", [])
-    except Exception:
-        raw_list = []
-
     clean_records = []
-    for idx_item, item in enumerate(raw_list):
-        raw_art = item.get("article") or item.get("art_name") or "-"
-        parsed = clean_html_card(raw_art)
-
-        raw_id = item.get("plst_id") or item.get("pls_id") or item.get("plstr_id") or item.get("id")
-        if raw_id:
-            p_id = safe_int_val(raw_id)
-        else:
-            p_id = abs(hash(f"{kategori_label}_{parsed['article']}_{idx_item}_{time.time()}")) % 2147483647
-
-        scanned_iso = parse_to_iso_timestamp(item.get("created_at") or item.get("date"))
-        bin_val = parsed["bin"] if parsed["bin"] != "-" else strip_html(item.get("rack_name") or item.get("bin") or "-")
+    
+    for branch_name, b_info in BRANCH_MAP.items():
+        st_id = b_info["st_id"]
         
-        # Deteksi store_id secara akurat dari nama BIN
-        real_store_id = detect_store_id_from_bin(bin_val)
+        # ======================================================================
+        # 🎯 TRIK 1: PAKSA GANTI SESI TOKO LEWAT ENDPOINT GANTI CABANG
+        # ======================================================================
+        print(f"   🔄 Mengganti sesi ke: {branch_name} (ID: {st_id})...")
+        try:
+            # Di Jezpro, biasanya dropdown ganti toko di menu atas itu memanggil URL change store
+            session.get(f"https://jezpro.id/change_store/{st_id}", headers={"Referer": "https://jezpro.id/"})
+            time.sleep(0.2)
+        except Exception as e:
+            pass
 
-        clean_records.append({
-            "plst_id": int(p_id),
-            "pls_id": int(item.get("pls_id") or p_id),
-            "kategori": kategori_label,
-            "waiting_status": item.get("waiting") or waiting_val,
-            "brand": parsed["brand"] if parsed["brand"] != "-" else (item.get("brand") or "-"),
-            "article_name": parsed["article"],
-            "qty": safe_int_val(item.get("plst_qty") or item.get("qty"), 1),
-            "bin_target": bin_val,
-            "pic_name": strip_html(item.get("user_name") or item.get("scanned_by") or "Petugas"),
-            "scanned_at": scanned_iso,
-            "store_id": int(real_store_id),
-            "synced_at": datetime.now(timezone(timedelta(hours=7))).isoformat()
-        })
+        # ======================================================================
+        # 🎯 TRIK 2: KIRIM PARAMETER LENGKAP (Termasuk search & id tersembunyi)
+        # ======================================================================
+        params = {
+            "draw": "1", 
+            "columns[0][data]": "article", "columns[0][name]": "article",
+            "columns[0][searchable]": "true", "columns[0][orderable]": "false",
+            "columns[0][search][value]": "", "columns[0][search][regex]": "false",
+            "order[0][column]": "0", "order[0][dir]": "desc",
+            "start": "0", "length": "10000", "search": "", 
+            "st_id": str(st_id), 
+            "store_id": str(st_id), # Tambahan (berjaga-jaga jika Jezpro butuh ini)
+            "waiting": waiting_val
+        }
 
-    print(f"   -> Ditemukan total {len(clean_records)} baris staging {kategori_label}.")
+        res = session.get(url_staging, params=params, headers=headers)
+        if res.status_code != 200:
+            print(f"   ⚠️ Gagal tarik data staging {branch_name} (HTTP {res.status_code})")
+            continue
+        
+        try:
+            raw_list = res.json().get("data", [])
+        except Exception:
+            raw_list = []
+
+        branch_found_count = 0
+        for idx_item, item in enumerate(raw_list):
+            raw_art = item.get("article") or item.get("art_name") or "-"
+            parsed = clean_html_card(raw_art)
+
+            raw_id = item.get("plst_id") or item.get("pls_id") or item.get("plstr_id") or item.get("id")
+            if raw_id:
+                p_id = safe_int_val(raw_id)
+            else:
+                p_id = abs(hash(f"{kategori_label}_{st_id}_{parsed['article']}_{idx_item}_{time.time()}")) % 2147483647
+
+            scanned_iso = parse_to_iso_timestamp(item.get("created_at") or item.get("date"))
+            bin_target_str = parsed["bin"] if parsed["bin"] != "-" else strip_html(item.get("rack_name") or item.get("bin") or "-")
+
+            clean_records.append({
+                "plst_id": int(p_id),
+                "pls_id": int(item.get("pls_id") or p_id),
+                "kategori": kategori_label,
+                "waiting_status": item.get("waiting") or waiting_val,
+                "brand": parsed["brand"] if parsed["brand"] != "-" else (item.get("brand") or "-"),
+                "article_name": parsed["article"],
+                "qty": safe_int_val(item.get("plst_qty") or item.get("qty"), 1),
+                "bin_target": bin_target_str,
+                "pic_name": strip_html(item.get("user_name") or item.get("scanned_by") or "Petugas"),
+                "scanned_at": scanned_iso,
+                "store_id": int(st_id),  # Mengikat ID Cabang Mutlak
+                "synced_at": datetime.now(timezone(timedelta(hours=7))).isoformat()
+            })
+            branch_found_count += 1
+
+        if branch_found_count > 0:
+            print(f"   -> {branch_name} (st_id: {st_id}): Berhasil! Ditemukan {branch_found_count} baris {kategori_label}.")
+
+    print(f"   -> Total keseluruhan sebelum dibersihkan: {len(clean_records)} baris staging {kategori_label}.")
     
     # PEMBERSIH DUPLIKAT PLST_ID MURNI PYTHON
     seen_ids = set()
