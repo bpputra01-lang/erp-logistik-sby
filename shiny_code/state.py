@@ -607,6 +607,7 @@ class AppState:
         elif cur_menu in ["Latihan Rumus Excel", "Excel Practice", "latihan_excel"]: return "excel_practice"
         elif cur_menu in ["Form Auditor", "Audit Form", "form_auditor"]: return "form_auditor"
         elif cur_menu in ["Memo Pengajuan", "memo_pengajuan"]: return "memo_pengajuan"
+        elif cur_menu in ["Warehouse Activity Monitor", "warehouse_activity_monitor"]: return "warehouse_activity_monitor"
         return "under_development"
 
 
