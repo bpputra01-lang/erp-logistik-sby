@@ -6457,7 +6457,10 @@ class AppState:
         data = [x for x in self.ll01_ma_headers() if x.get("status_category") == "MENGGANTUNG"]
         filtered = []
         for x in data:
-            store_txt = f"{x.get('store_name', '')} {x.get('branch', '')}"
+            vals = list(x.values()) if isinstance(x, dict) else []
+            v_col3 = str(vals[3]) if len(vals) > 3 else ""
+            v_col2 = str(vals[2]) if len(vals) > 2 else ""
+            store_txt = f"{x.get('store_name', '')} {x.get('branch', '')} {x.get('store', '')} {v_col3} {v_col2}"
             note_content = f"{x.get('note', '')} {x.get('ma_code', '')} {x.get('u_name', '')}"
             if self._match_global_filter(x.get("created_at", ""), store_txt, note_content):
                 filtered.append(x)
@@ -6469,7 +6472,10 @@ class AppState:
         for x in data:
             if "DONE" in str(x.get("status", "")).upper() or "CANCEL" in str(x.get("status", "")).upper():
                 continue
-            store_txt = f"{x.get('store_name', '')} {x.get('branch', '')}"
+            vals = list(x.values()) if isinstance(x, dict) else []
+            v_col3 = str(vals[3]) if len(vals) > 3 else ""
+            v_col2 = str(vals[2]) if len(vals) > 2 else ""
+            store_txt = f"{x.get('store_name', '')} {x.get('branch', '')} {x.get('store', '')} {v_col3} {v_col2}"
             note_content = f"{x.get('note', '')} {x.get('article_name', '')} {x.get('ba_code', '')} {x.get('creator', '')}"
             if self._match_global_filter(x.get("updated_at", ""), store_txt, note_content):
                 filtered.append(x)
@@ -6480,8 +6486,12 @@ class AppState:
         if not data: return []
         filtered = []
         for x in data:
-            note_content = f"{x.get('bin', '')} {x.get('sku', '')} {x.get('item_name', '')} {x.get('brand', '')}"
-            if self._match_global_filter(datetime.now().strftime("%Y-%m-%d"), x.get("branch", ""), note_content):
+            vals = list(x.values()) if isinstance(x, dict) else []
+            v_col2 = str(vals[2]) if len(vals) > 2 else ""
+            v_col1 = str(vals[1]) if len(vals) > 1 else ""
+            store_txt = f"{x.get('branch', '')} {x.get('store', '')} {v_col2} {v_col1}"
+            note_content = f"{x.get('bin', '')} {x.get('sku', '')} {x.get('item_name', '')} {x.get('brand', '')} {x.get('tipe_bin', '')}"
+            if self._match_global_filter(datetime.now().strftime("%Y-%m-%d"), store_txt, note_content):
                 filtered.append(x)
         return filtered
     # Metrik Ringkasan LL01
