@@ -2157,9 +2157,10 @@ def render_sap_ll01_summary_tree(state: AppState):
     sel_branch_tf = sel_store.replace("JEZ ", "").strip().upper()
     now_str = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
 
-    # --- 1. Kalkulasi Data: ALL WAITING (Rincian 6 Kategori Berdasarkan QTY) ---
+    # --- 1. Kalkulasi Data: ALL WAITING (Rincian 7 Kategori Berdasarkan QTY) ---
     stg_items = state.get_filtered_ll01()
     
+    qty_wait_receipt = 0   # 🌟 BARU: Variabel Khusus Waiting Receipt
     qty_wait_refund = 0
     qty_wait_offline = 0
     qty_wait_nameset = 0
@@ -2172,7 +2173,10 @@ def render_sap_ll01_summary_tree(state: AppState):
         st = str(x.get("waiting_status", "")).upper()
         kat = str(x.get("kategori", "")).upper()
 
-        if "REFUND" in st or kat == "REFUND":
+        # 🌟 Tangkap status RECEIPT sebelum jatuh ke else (Waiting Offline)
+        if "RECEIPT" in st:
+            qty_wait_receipt += q
+        elif "REFUND" in st or kat == "REFUND":
             qty_wait_refund += q
         elif "DONE" in st and "ONLINE" in st:
             qty_done_online += q
@@ -2186,7 +2190,7 @@ def render_sap_ll01_summary_tree(state: AppState):
             qty_wait_offline += q
 
     qty_wait_total = (
-        qty_wait_refund + qty_wait_offline + qty_wait_nameset + 
+        qty_wait_receipt + qty_wait_refund + qty_wait_offline + qty_wait_nameset + 
         qty_wait_checkout + qty_wait_online + qty_done_online
     )
 
@@ -2233,13 +2237,12 @@ def render_sap_ll01_summary_tree(state: AppState):
             
     count_adj_total = count_adj_appr + count_adj_exec
 
-    # --- 4. Kalkulasi Data: OUTSTANDING ITEMS (Lengkap dengan Karantina, Inb, Out, Putaway, QC, Refund) ---
+    # --- 4. Kalkulasi Data: OUTSTANDING ITEMS ---
     buffer_items = state.get_filtered_ll01_special_stock()
     qty_karantina = sum(safe_int(x.get("qty", 0)) for x in buffer_items if "KARANTINA" in str(x.get("tipe_bin", "")).upper())
     qty_inb = sum(safe_int(x.get("qty", 0)) for x in buffer_items if "INB" in str(x.get("tipe_bin", "")).upper())
     qty_out = sum(safe_int(x.get("qty", 0)) for x in buffer_items if "OUT" in str(x.get("tipe_bin", "")).upper())
     qty_put = sum(safe_int(x.get("qty", 0)) for x in buffer_items if "PUTAWAY" in str(x.get("tipe_bin", "")).upper())
-    # 🌟 HITUNG QTY GAGAL QC & REFUND
     qty_qc = sum(safe_int(x.get("qty", 0)) for x in buffer_items if "QC" in str(x.get("tipe_bin", "")).upper())
     qty_ref_bin = sum(safe_int(x.get("qty", 0)) for x in buffer_items if "REFUND" in str(x.get("tipe_bin", "")).upper())
     
@@ -2278,7 +2281,6 @@ def render_sap_ll01_summary_tree(state: AppState):
             border_bottom = "border-bottom: 1px solid #E2E8F0;"
             tree_icon = ui.div(style="width: 14px; height: 22px; border-left: 2px solid #A0AEC0; border-bottom: 2px solid #A0AEC0; border-bottom-left-radius: 4px; margin-left: 6px; margin-right: 16px; margin-top: -12px;")
 
-        # 3 Bulatan Indikator (Merah, Kuning, Hijau)
         indicator = ui.div(
             ui.div(style=f"width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; {style_r}"),
             ui.div(style=f"width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; {style_y}"),
@@ -2286,7 +2288,6 @@ def render_sap_ll01_summary_tree(state: AppState):
             style="display: flex; align-items: center; margin-right: 14px; flex-shrink: 0;"
         )
 
-        # Badge Count Text
         badge = ui.div(
             str(count),
             style=f"background: {status_color}15; color: {status_color}; font-weight: 800; font-size: 12px; padding: 2px 8px; border-radius: 12px; min-width: 36px; text-align: center; margin-right: 14px; border: 1px solid {status_color}40;"
@@ -2323,14 +2324,15 @@ def render_sap_ll01_summary_tree(state: AppState):
         
         # --- Tree List Structure ---
         ui.div(
-            # TAB 1: ALL WAITING (Rincian Lengkap Berdasarkan QTY)
+            # TAB 1: ALL WAITING (Rincian 7 Kategori Berdasarkan QTY)
             clean_tree_row("ALL WAITING", qty_wait_total, now_str, is_header=True),
-            clean_tree_row("WAITING REFUND", qty_wait_refund, now_str, is_alt=False),
-            clean_tree_row("WAITING OFFLINE", qty_wait_offline, now_str, is_alt=True),
-            clean_tree_row("WAITING FOR NAMESET", qty_wait_nameset, now_str, is_alt=False),
-            clean_tree_row("WAITING FOR CHECKOUT", qty_wait_checkout, now_str, is_alt=True),
-            clean_tree_row("WAITING ONLINE", qty_wait_online, now_str, is_alt=False),
-            clean_tree_row("DONE ONLINE", qty_done_online, now_str, is_alt=True),
+            clean_tree_row("WAITING RECEIPT", qty_wait_receipt, now_str, is_alt=False),  # 🌟 BARIS BARU
+            clean_tree_row("WAITING REFUND", qty_wait_refund, now_str, is_alt=True),
+            clean_tree_row("WAITING OFFLINE", qty_wait_offline, now_str, is_alt=False),
+            clean_tree_row("WAITING FOR NAMESET", qty_wait_nameset, now_str, is_alt=True),
+            clean_tree_row("WAITING FOR CHECKOUT", qty_wait_checkout, now_str, is_alt=False),
+            clean_tree_row("WAITING ONLINE", qty_wait_online, now_str, is_alt=True),
+            clean_tree_row("DONE ONLINE", qty_done_online, now_str, is_alt=False),
 
             # TAB 2: TRANSFER ORDER (Berdasarkan Jumlah Baris)
             clean_tree_row("TRANSFER ORDER", count_tf_total, now_str, is_header=True),
@@ -2348,13 +2350,14 @@ def render_sap_ll01_summary_tree(state: AppState):
             clean_tree_row("INBOUND AREA", qty_inb, now_str, is_alt=True),
             clean_tree_row("OUTBOUND AREA", qty_out, now_str, is_alt=False),
             clean_tree_row("PUTAWAY AREA", qty_put, now_str, is_alt=True),
-            clean_tree_row("GAGAL QC AREA", qty_qc, now_str, is_alt=False),     # 🌟 BARU
+            clean_tree_row("GAGAL QC AREA", qty_qc, now_str, is_alt=False),
             clean_tree_row("REFUND AREA", qty_ref_bin, now_str, is_alt=True),
 
             style="border-radius: 8px; overflow: hidden; border: 1px solid #CBD5E0; margin-top: 8px;"
         ),
         style="background: #FFFFFF; border-radius: 12px; padding: 16px; margin-bottom: 1.5rem; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid #E2E8F0;"
     )
+
 # ==============================================================================
 # VIEW: WAREHOUSE ACTIVITY MONITOR (DENGAN SAP LL01 TREE & 4 TAB BERGESER)
 # ==============================================================================
