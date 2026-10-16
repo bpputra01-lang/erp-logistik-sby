@@ -2157,11 +2157,38 @@ def render_sap_ll01_summary_tree(state: AppState):
     sel_branch_tf = sel_store.replace("JEZ ", "").strip().upper()
     now_str = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
 
-    # --- 1. Kalkulasi Data: ALL WAITING (Berdasarkan QTY) ---
+    # --- 1. Kalkulasi Data: ALL WAITING (Rincian 6 Kategori Berdasarkan QTY) ---
     stg_items = state.get_filtered_ll01()
-    qty_wait_refund = sum(safe_int(x.get("qty", 1)) for x in stg_items if x.get("kategori") == "REFUND")
-    qty_wait_offline = sum(safe_int(x.get("qty", 1)) for x in stg_items if x.get("kategori") == "MASUK_RAK")
-    qty_wait_total = qty_wait_refund + qty_wait_offline
+    
+    qty_wait_refund = 0
+    qty_wait_offline = 0
+    qty_wait_nameset = 0
+    qty_wait_checkout = 0
+    qty_wait_online = 0
+    qty_done_online = 0
+
+    for x in stg_items:
+        q = safe_int(x.get("qty", 1))
+        st = str(x.get("waiting_status", "")).upper()
+        kat = str(x.get("kategori", "")).upper()
+
+        if "REFUND" in st or kat == "REFUND":
+            qty_wait_refund += q
+        elif "DONE" in st and "ONLINE" in st:
+            qty_done_online += q
+        elif "NAMESET" in st:
+            qty_wait_nameset += q
+        elif "CHECKOUT" in st:
+            qty_wait_checkout += q
+        elif "ONLINE" in st and "WAITING" in st:
+            qty_wait_online += q
+        else:
+            qty_wait_offline += q
+
+    qty_wait_total = (
+        qty_wait_refund + qty_wait_offline + qty_wait_nameset + 
+        qty_wait_checkout + qty_wait_online + qty_done_online
+    )
 
     # --- 2. Kalkulasi Data: TRANSFER ORDER (Berdasarkan JUMLAH BARIS / DOKUMEN) ---
     tf_headers = state.get_filtered_tf_headers()
@@ -2217,8 +2244,7 @@ def render_sap_ll01_summary_tree(state: AppState):
 
     # --- Helper UI untuk Visual Tree yang Clean & Zebra Striping ---
     def clean_tree_row(text, count, time_text, is_header=False, is_alt=False):
-        # Aturan Warna (Traffic Light) berdasar angka
-        inactive_style = "border: 1.5px solid #A0AEC0; background-color: transparent;" # Lingkaran kosong (Abu-abu gelap)
+        inactive_style = "border: 1.5px solid #A0AEC0; background-color: transparent;"
 
         if count == 0:
             status_color = "#10B981" # Hijau
@@ -2237,7 +2263,7 @@ def render_sap_ll01_summary_tree(state: AppState):
             style_g = inactive_style
 
         if is_header:
-            bg_row = "#E2E8F0" # Background lebih gelap untuk folder header
+            bg_row = "#E2E8F0"
             font_weight = "900"
             text_color = "#1A202C"
             border_bottom = "border-bottom: 2px solid #CBD5E0;"
@@ -2278,7 +2304,7 @@ def render_sap_ll01_summary_tree(state: AppState):
             style=f"display: flex; justify-content: space-between; align-items: center; background-color: {bg_row}; {border_bottom} padding: 10px 16px;"
         )
 
-    store_name_label = f"📍 {sel_store}" if sel_store != "SEMUA" else "📍 ALL BRANCH"
+    store_name_label = f"📍 {sel_store}" if sel_store != "SEMUA" else "📍 ALL SITES (SURABAYA & CABANG)"
 
     return ui.div(
         # --- Header Title Box ---
@@ -2294,22 +2320,26 @@ def render_sap_ll01_summary_tree(state: AppState):
         
         # --- Tree List Structure ---
         ui.div(
-            # TAB 1: ALL WAITING
+            # TAB 1: ALL WAITING (Rincian Lengkap Berdasarkan QTY)
             clean_tree_row("ALL WAITING", qty_wait_total, now_str, is_header=True),
             clean_tree_row("WAITING REFUND", qty_wait_refund, now_str, is_alt=False),
             clean_tree_row("WAITING OFFLINE", qty_wait_offline, now_str, is_alt=True),
+            clean_tree_row("WAITING FOR NAMESET", qty_wait_nameset, now_str, is_alt=False),
+            clean_tree_row("WAITING FOR CHECKOUT", qty_wait_checkout, now_str, is_alt=True),
+            clean_tree_row("WAITING ONLINE", qty_wait_online, now_str, is_alt=False),
+            clean_tree_row("DONE ONLINE", qty_done_online, now_str, is_alt=True),
 
-            # TAB 2: TRANSFER ORDER
+            # TAB 2: TRANSFER ORDER (Berdasarkan Jumlah Baris)
             clean_tree_row("TRANSFER ORDER", count_tf_total, now_str, is_header=True),
             clean_tree_row("OPEN TF IN", count_tf_in, now_str, is_alt=False),
             clean_tree_row("OPEN TF OUT", count_tf_out, now_str, is_alt=True),
 
-            # TAB 3: ALL ADJUSTMENT
+            # TAB 3: ALL ADJUSTMENT (Berdasarkan Jumlah Baris)
             clean_tree_row("ALL ADJUSTMENT", count_adj_total, now_str, is_header=True),
             clean_tree_row("OUTSTANDING ADJUSTMENT (NEED APPROVAL)", count_adj_appr, now_str, is_alt=False),
             clean_tree_row("OUTSTANDING ADJUSTMENT (NEED EKSEKUSI)", count_adj_exec, now_str, is_alt=True),
 
-            # TAB 4: OUTSTANDING ITEMS
+            # TAB 4: OUTSTANDING ITEMS (Berdasarkan QTY)
             clean_tree_row("OUTSTANDING ITEMS", qty_outstd_total, now_str, is_header=True),
             clean_tree_row("KARANTINA AREA", qty_karantina, now_str, is_alt=False),
             clean_tree_row("INBOUND AREA", qty_inb, now_str, is_alt=True),
