@@ -180,10 +180,10 @@ def clean_stock_tracking_article(raw_html):
 # 1. MODUL STAGING VIA STOCK TRACKING (SEMUA 9 CABANG >= 2026)
 # ==============================================================================
 # ==============================================================================
-# 1. MODUL STAGING VIA STOCK TRACKING (SEMUA 9 CABANG >= 2026)
+# 1. MODUL STAGING VIA STOCK TRACKING (SEMUA VARIASI WAITING, CHECKOUT, NAMESET, REFUND)
 # ==============================================================================
 def fetch_staging_from_stock_tracking(session):
-    print("📥 [2/6] Menarik Data Staging & Refund dari Stock Tracking (9 Cabang Lengkap >= 2026)...")
+    print("📥 [2/6] Menarik Data Staging & Refund dari Stock Tracking (Semua Variasi Waiting & Cabang)...")
     url = "https://jezpro.id/stock_tracking_datatables"
     headers = {
         "Accept": "application/json, text/javascript, */*; q=0.01",
@@ -191,22 +191,25 @@ def fetch_staging_from_stock_tracking(session):
         "Referer": "https://jezpro.id/stock_tracking"
     }
 
-    # 🌟 KUNCI TANGGAL: Mulai dari 2026-01-01 s/d masa depan (2030)
-    # Ini menjamin transaksi 2026 ke atas pasti tertangkap tanpa terpengaruh jam lokal komputer!
+    # Range tanggal dari 2026 ke atas
     date_range = "2026-01-01|2030-12-31"
 
-    # Target pencarian status
+    # 🌟 DAFTAR TARGET QUERY LENGKAP UNTUK SEMUA VARIASI WAITING & REFUND
     query_targets = [
-        {"status": "REFUND", "search": ""},
-        {"status": "WAITING OFFLINE", "search": ""},
-        {"status": "WAITING", "search": ""},
-        {"status": "", "search": "WAITING"}
+        {"status": "REFUND", "status_search": ""},
+        {"status": "WAITING OFFLINE", "status_search": ""},
+        {"status": "WAITING CHECKOUT", "status_search": ""},
+        {"status": "CHECKOUT", "status_search": ""},
+        {"status": "WAITING NAMESET", "status_search": ""},
+        {"status": "NAMESET", "status_search": ""},
+        {"status": "WAITING ONLINE", "status_search": ""},
+        {"status": "WAITING", "status_search": ""},
+        {"status": "", "status_search": "WAITING"}  # 🌟 Mencari apapun yang mengandung kata WAITING
     ]
 
     all_clean_records = []
     seen_ids = set()
 
-    # 🌟 LOOP KE SEMUA 9 CABANG (SURABAYA, KEDIRI, MALANG, JEMBER, SIDOARJO, SEMARANG, JAKARTA, DLL)
     for branch_name, b_info in BRANCH_MAP.items():
         st_id = b_info["st_id"]
         branch_found_count = 0
@@ -222,19 +225,25 @@ def fetch_staging_from_stock_tracking(session):
                 "columns[5][data]": "cust_name", "columns[5][name]": "cust_name", "columns[5][orderable]": "true",
                 "columns[6][data]": "qty", "columns[6][name]": "p_name", "columns[6][orderable]": "true",
                 "columns[7][data]": "product_location", "columns[7][name]": "pl_code", "columns[7][orderable]": "true",
-                "columns[8][data]": "status", "columns[8][name]": "plst_status", "columns[8][orderable]": "true",
+                # 🌟 AKTIFKAN PENCARIAN KOLOM STATUS MENJADI TRUE
+                "columns[8][data]": "status", 
+                "columns[8][name]": "plst_status", 
+                "columns[8][searchable]": "true",
+                "columns[8][search][value]": q["status_search"],
+                "columns[8][search][regex]": "false",
+                "columns[8][orderable]": "true",
                 "columns[9][data]": "instock_source", "columns[9][name]": "instock_source_status", "columns[9][orderable]": "false",
                 "order[0][column]": "0", "order[0][dir]": "desc",
                 "start": "0",
                 "length": "-1",
-                "search[value]": q["search"],
-                "search": q["search"],
+                "search[value]": "",
+                "search": "",
                 "status": q["status"],
                 "instock_source": "",
                 "psc_id": "",
-                "std_id": "",          # 🌟 WAJIB KOSONG (Bukan Store ID)
+                "std_id": "",
                 "br_id": "",
-                "st_id": str(st_id),   # 🌟 PARAMETER CABANG RESMI JEZPRO
+                "st_id": str(st_id),
                 "date": date_range
             }
 
@@ -250,14 +259,17 @@ def fetch_staging_from_stock_tracking(session):
                 status_raw = strip_html(item.get("status") or item.get("plst_status") or "").upper()
                 loc_raw = strip_html(item.get("product_location") or item.get("pl_code") or "").upper()
 
-                # 1. Filter Status: Harus REFUND atau mengandung kata WAITING
+                # 🌟 FILTER STATUS: Menerima REFUND, WAITING, CHECKOUT, dan NAMESET
                 is_refund = "REFUND" in status_raw
-                is_waiting = "WAITING" in status_raw or "WAITING" in loc_raw
+                is_waiting = (
+                    any(k in status_raw for k in ["WAITING", "CHECKOUT", "NAMESET"])
+                    or "WAITING" in loc_raw
+                )
 
                 if not (is_refund or is_waiting):
                     continue
 
-                # 2. Filter Tahun: Wajib >= 2026
+                # Filter Tahun >= 2026
                 dt_raw = strip_html(item.get("datetime") or item.get("plst_created") or "")
                 doc_year = None
                 for fmt in ("%d/%m/%Y %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%d-%m-%Y %H:%M:%S", "%d/%m/%Y", "%Y-%m-%d"):
@@ -278,7 +290,7 @@ def fetch_staging_from_stock_tracking(session):
 
                 kategori_label = "REFUND" if is_refund else "MASUK_RAK"
 
-                # 3. ID Unik: Hindari DT_RowIndex agar tidak tabrakan antar cabang
+                # ID Unik
                 raw_id = item.get("plst_id") or item.get("id")
                 p_id = safe_int_val(raw_id)
                 if not p_id or p_id == 0:
@@ -290,7 +302,6 @@ def fetch_staging_from_stock_tracking(session):
                     continue
                 seen_ids.add(p_id)
 
-                # 4. Format Bersih
                 raw_art = item.get("article") or item.get("p_name") or "-"
                 art_info = clean_stock_tracking_article(raw_art)
                 scanned_iso = parse_to_iso_timestamp(dt_raw)
@@ -314,9 +325,9 @@ def fetch_staging_from_stock_tracking(session):
             time.sleep(0.08)
 
         if branch_found_count > 0:
-            print(f"   -> {branch_name} (st_id: {st_id}): Ditemukan {branch_found_count} item (>= 2026).")
+            print(f"   -> {branch_name} (st_id: {st_id}): Ditemukan {branch_found_count} item Staging/Waiting/Refund (>= 2026).")
 
-    print(f"✅ Selesai! Terkumpul total {len(all_clean_records)} item Staging/Refund dari seluruh cabang (>= 2026).")
+    print(f"✅ Selesai! Terkumpul total {len(all_clean_records)} item Staging/Waiting/Refund lengkap.")
     return all_clean_records
 # ==============================================================================
 # 2. MODUL TRANSFER STOK (ALL AREA LINTAS CABANG)
