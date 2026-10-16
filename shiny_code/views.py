@@ -2150,13 +2150,14 @@ def clean_jezpro_card_text(raw_text):
     return " ".join(text_only.split())
 
 # ==============================================================================
-# KOMPONEN TREE MONITOR SAP LL01 (PERSIS SEPERTI GAMBAR SAP GUI)
+# KOMPONEN TREE MONITOR WAREHOUSE (CLEAN & MODERN DESIGN)
 # ==============================================================================
 def render_sap_ll01_summary_tree(state: AppState):
     sel_store = state.ll01_global_store()
     sel_branch_tf = sel_store.replace("JEZ ", "").strip().upper()
-    now_str = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+    now_str = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
 
+    # --- Kalkulasi Data (Sesuai dengan isi 4 Tab) ---
     stg_items = state.get_filtered_ll01()
     c_stg_total = len(stg_items)
     c_stg_inb = sum(1 for x in stg_items if x.get("kategori") == "MASUK_RAK")
@@ -2200,74 +2201,100 @@ def render_sap_ll01_summary_tree(state: AppState):
     c_buf_inb = sum(1 for x in buffer_items if "INBOUND" in str(x.get("tipe_bin", "")))
     c_buf_out = sum(1 for x in buffer_items if "OUT" in str(x.get("tipe_bin", "")))
 
-    def sap_row(level, text, count, time_text, is_critical=False, is_warn=False):
-        indent_px = level * 26
-        if is_critical and count > 0: traffic = ui.span("🔴⚪⚪", style="font-size: 11px; margin-right: 6px;")
-        elif is_warn and count > 0: traffic = ui.span("⚪🟡⚪", style="font-size: 11px; margin-right: 6px;")
-        else: traffic = ui.span("⚪⚪🟢", style="font-size: 11px; margin-right: 6px;")
-        folder_icon = "📂" if level <= 1 else "↳ 📄"
+    # --- Helper UI untuk Baris Tree yang Clean ---
+    def clean_tree_row(level, text, count, time_text, is_critical=False, is_warn=False, is_header=False):
+        # 1. Warna Status
+        if is_critical and count > 0:
+            status_color = "#E53E3E" # Merah
+            icon_status = "fa-circle-exclamation"
+        elif is_warn and count > 0:
+            status_color = "#DD6B20" # Orange
+            icon_status = "fa-triangle-exclamation"
+        else:
+            status_color = "#10B981" # Hijau
+            icon_status = "fa-circle-check"
+
+        # 2. Level Indentasi & Styling Text
+        indent_px = level * 28
+        
+        if is_header:
+            bg_row = "#F8FAFC"
+            font_weight = "800"
+            text_color = "#1A202C"
+            border_bottom = "border-bottom: 2px solid #E2E8F0;"
+            icon_tree = '<i class="fa-regular fa-folder-open" style="color: #4A5568; margin-right: 10px; font-size: 14px;"></i>'
+        else:
+            bg_row = "#FFFFFF"
+            font_weight = "600"
+            text_color = "#4A5568"
+            border_bottom = "border-bottom: 1px solid #F1F5F9;"
+            # Ikon anak panah siku (seperti tree view modern)
+            icon_tree = '<i class="fa-solid fa-arrow-turn-up fa-rotate-90" style="color: #CBD5E0; margin-right: 10px; margin-left: 6px; font-size: 12px;"></i>'
 
         return ui.div(
             ui.div(
-                ui.span(traffic),
-                ui.span(f"{folder_icon} ", style="margin-right: 4px;"),
-                ui.span(f"{count:>3}  ", style="font-weight: 800; color: #000; min-width: 32px; display: inline-block;"),
-                ui.span(text, style="font-weight: 700; color: #111;"),
+                ui.HTML(icon_tree),
+                # Badge Angka
+                ui.div(
+                    str(count),
+                    style=f"background: {status_color}15; color: {status_color}; font-weight: 800; font-size: 12px; padding: 2px 8px; border-radius: 12px; min-width: 36px; text-align: center; margin-right: 12px; border: 1px solid {status_color}40;"
+                ),
+                ui.span(text, style=f"font-weight: {font_weight}; color: {text_color}; font-size: 13px;"),
+                style=f"display: flex; align-items: center; padding-left: {indent_px}px;"
+            ),
+            ui.div(
+                ui.tags.i(class_=f"fa-solid {icon_status}", style=f"color: {status_color}; margin-right: 8px; font-size: 12px;"),
+                ui.span(time_text, style="font-size: 11px; color: #718096; font-weight: 600; font-family: monospace;"),
                 style="display: flex; align-items: center;"
             ),
-            ui.span(time_text, style="font-family: monospace; font-size: 12px; color: #1A365D; font-weight: 600;"),
-            style=f"""
-                display: flex; justify-content: space-between; align-items: center;
-                background-color: #BFE7FF; border-bottom: 1px solid #A0D8F8;
-                border-radius: 4px; padding: 5px 12px; margin: 2px 0 2px {indent_px}px;
-                font-family: 'Consolas', 'Lucida Console', monospace; font-size: 13px;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-            """
+            style=f"display: flex; justify-content: space-between; align-items: center; background-color: {bg_row}; {border_bottom} padding: 8px 16px;"
         )
 
-    store_name_label = f"Whse: {sel_store}" if sel_store != "SEMUA" else "Whse: ALL SITES (SURABAYA & CABANG)"
+    store_name_label = f"📍 {sel_store}" if sel_store != "SEMUA" else "📍 ALL SITES (SURABAYA & CABANG)"
 
     return ui.div(
+        # --- Header Box Modern ---
         ui.div(
             ui.div(
-                ui.tags.span("🔍 🔄 ➕ ➖ 📑 Line", style="font-family: monospace; font-size: 12px; font-weight: bold; color: #2D3748; background: #E2E8F0; padding: 4px 8px; border-radius: 4px; border: 1px solid #CBD5E0; margin-right: 12px;"),
-                ui.span("Critical Processes in Warehouse Monitor (SAP LL01 Overview)", style="font-weight: 800; font-size: 14px; color: #2C5282;"),
+                ui.tags.i(class_="fa-solid fa-network-wired", style="color: #3182CE; font-size: 16px; margin-right: 8px;"),
+                ui.span("Warehouse Critical Processes Overview", style="font-weight: 800; font-size: 14px; color: #1A202C;"),
                 style="display: flex; align-items: center;"
             ),
-            ui.span(store_name_label, style="background: #FEFCBF; color: #744210; font-weight: 800; font-size: 12px; padding: 4px 10px; border-radius: 4px; border: 1px solid #F6E05E;"),
-            style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #CBD5E0; padding-bottom: 6px; margin-bottom: 8px;"
+            ui.span(store_name_label, style="background: #EBF8FF; color: #2B6CB0; font-weight: 800; font-size: 12px; padding: 4px 12px; border-radius: 6px; border: 1px solid #BEE3F8;"),
+            style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; margin-bottom: 4px; border-bottom: 2px solid #E2E8F0;"
         ),
+        
+        # --- Tree List ---
         ui.div(
-            sap_row(0, "Critical Processes Root (SAP LL01)", c_stg_total + c_tf_total + c_ma_total + c_sa_total, now_str, is_critical=(c_stg_crit + c_tf_crit + c_ma_crit > 0)),
-            
-            # 1. Unconfirmed Transfer Orders dengan rincian TF IN & TF OUT
-            sap_row(1, "1. Unconfirmed Transfer Orders (Open Orders)", c_tf_total, now_str, is_critical=(c_tf_crit > 0), is_warn=(c_tf_total > 0)),
-            sap_row(2, "Open Transfer Orders (TF IN)", c_tf_in, now_str),
-            sap_row(2, "Open Transfer Orders (TF OUT)", c_tf_out, now_str),
-            sap_row(2, "Draft Transfer Orders", c_tf_draft, now_str),
-            sap_row(2, "In Progress Transfer Orders", c_tf_prog, now_str, is_warn=True),
-            sap_row(2, "Critical Stuck Transfers (>24 Hours)", c_tf_crit, now_str, is_critical=True),
+            # Root Tersembunyi / digabung langsung ke header biar clean
+            # 1. Unconfirmed Transfer Orders
+            clean_tree_row(0, "1. Unconfirmed Transfer Orders (Open Orders)", c_tf_total, now_str, is_critical=(c_tf_crit > 0), is_warn=(c_tf_total > 0), is_header=True),
+            clean_tree_row(1, "Open Transfer Orders (TF IN)", c_tf_in, now_str),
+            clean_tree_row(1, "Open Transfer Orders (TF OUT)", c_tf_out, now_str),
+            clean_tree_row(1, "Draft Transfer Orders", c_tf_draft, now_str),
+            clean_tree_row(1, "In Progress Transfer Orders", c_tf_prog, now_str, is_warn=True),
+            clean_tree_row(1, "Critical Stuck Transfers (>24 Hours)", c_tf_crit, now_str, is_critical=True),
 
             # 2. Open Staging Transit
-            sap_row(1, "2. Open Staging Transit (Waiting Putaway & Refund)", c_stg_total, now_str, is_critical=(c_stg_crit > 0), is_warn=(c_stg_total > 0)),
-            sap_row(2, "Movement Type 101 Goods Receipt (Masuk Rak)", c_stg_inb, now_str),
-            sap_row(2, "Movement Type 601 GI / Return Refund", c_stg_ref, now_str),
-            sap_row(2, "Critical Staging Waiting (>2 Hours)", c_stg_crit, now_str, is_critical=True),
+            clean_tree_row(0, "2. Open Staging Transit (Waiting Putaway & Refund)", c_stg_total, now_str, is_critical=(c_stg_crit > 0), is_warn=(c_stg_total > 0), is_header=True),
+            clean_tree_row(1, "Movement Type 101 Goods Receipt (Masuk Rak)", c_stg_inb, now_str),
+            clean_tree_row(1, "Movement Type 601 GI / Return Refund", c_stg_ref, now_str),
+            clean_tree_row(1, "Critical Staging Waiting (>2 Hours)", c_stg_crit, now_str, is_critical=True),
 
             # 3. Unapproved Stock Adjustments
-            sap_row(1, "3. Open Stock Adjustments (Pending Postings)", c_ma_total + c_sa_total, now_str, is_critical=(c_ma_crit > 0), is_warn=(c_ma_total + c_sa_total > 0)),
-            sap_row(2, "Mass Adjustments (MADJ) Menggantung", c_ma_total, now_str, is_critical=(c_ma_crit > 0)),
-            sap_row(2, "Single Adjustment Need Approval", c_sa_total, now_str, is_warn=True),
+            clean_tree_row(0, "3. Open Stock Adjustments (Pending Postings)", c_ma_total + c_sa_total, now_str, is_critical=(c_ma_crit > 0), is_warn=(c_ma_total + c_sa_total > 0), is_header=True),
+            clean_tree_row(1, "Mass Adjustments (MADJ) Menggantung", c_ma_total, now_str, is_critical=(c_ma_crit > 0)),
+            clean_tree_row(1, "Single Adjustment Need Approval", c_sa_total, now_str, is_warn=True),
 
             # 4. Interim Storage & Buffer
-            sap_row(1, "4. Interim Storage & Buffer Stock (Karantina / Buffer)", c_buf_total, now_str, is_warn=(c_buf_karan > 0)),
-            sap_row(2, "DestStorType 999 Karantina DC / Store", c_buf_karan, now_str, is_critical=True),
-            sap_row(2, "Interim Inbound / Putaway Buffer", c_buf_inb, now_str),
-            sap_row(2, "Shipping Area / Outbound Buffer", c_buf_out, now_str),
+            clean_tree_row(0, "4. Interim Storage & Buffer Stock (Karantina / Buffer)", c_buf_total, now_str, is_warn=(c_buf_karan > 0), is_header=True),
+            clean_tree_row(1, "DestStorType 999 Karantina DC / Store", c_buf_karan, now_str, is_critical=True),
+            clean_tree_row(1, "Interim Inbound / Putaway Buffer", c_buf_inb, now_str),
+            clean_tree_row(1, "Shipping Area / Outbound Buffer", c_buf_out, now_str),
 
-            style="background: #FDFDFD; padding: 10px; border-radius: 6px; border: 1.5px solid #CBD5E0;"
+            style="border-radius: 8px; overflow: hidden; border: 1px solid #E2E8F0;"
         ),
-        style="background: #EDF2F7; border: 2px solid #CBD5E0; border-radius: 8px; padding: 12px 14px; margin-bottom: 1.25rem;"
+        style="background: #FFFFFF; border-radius: 12px; padding: 16px; margin-bottom: 1.5rem; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid #E2E8F0;"
     )
     
 # ==============================================================================
