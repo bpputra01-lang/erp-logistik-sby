@@ -2432,26 +2432,7 @@ def warehouse_activity_monitor_view(state: AppState):
             ),
             style="display: flex; flex-direction: column;"
         ),
-        ui.div(
-            ui.span("Search:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
-            ui.tags.input(
-                type="text", 
-                id="ll01_global_note", 
-                value=state.ll01_global_note(), 
-                placeholder="Ketik kata kunci...", 
-                oninput="""
-                    // Debounce 400ms: Tidak memicu reload tiap ketukan huruf, tunggu jeda mengetik selesai
-                    clearTimeout(window.ll01SearchDebounceTimer);
-                    let val = this.value;
-                    window.ll01SearchDebounceTimer = setTimeout(function() {
-                        Shiny.setInputValue('change_ll01_global_note', val, {priority: 'event'});
-                    }, 400);
-                """,
-                onkeydown="if (event.key === 'Enter') { clearTimeout(window.ll01SearchDebounceTimer); Shiny.setInputValue('change_ll01_global_note', this.value, {priority: 'event'}); }",
-                style="padding: 6px 10px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-size: 12px; background: white; width: 220px;"
-            ),
-            style="display: flex; flex-direction: column;"
-        ),
+        
         style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap; background: #FFFFFF; padding: 15px 20px; border-radius: 12px; border: 2px solid #CBD5E0; margin-bottom: 1.25rem; width: 100%; box-shadow: 0 4px 12px rgba(0,0,0,0.03);"
     )
     # ==========================================================================
