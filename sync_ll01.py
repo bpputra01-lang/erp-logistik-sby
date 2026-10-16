@@ -177,13 +177,10 @@ def clean_stock_tracking_article(raw_html):
     return {"article": clean_name if clean_name else s, "brand": brand_val}
 
 # ==============================================================================
-# 1. MODUL STAGING VIA STOCK TRACKING (SEMUA 9 CABANG >= 2026)
-# ==============================================================================
-# ==============================================================================
-# 1. MODUL STAGING VIA STOCK TRACKING (SEMUA VARIASI WAITING, CHECKOUT, NAMESET, REFUND)
+# 1. MODUL STAGING VIA STOCK TRACKING (LENGKAP DENGAN DONE ONLINE)
 # ==============================================================================
 def fetch_staging_from_stock_tracking(session):
-    print("📥 [2/6] Menarik Data Staging & Refund dari Stock Tracking (Semua Variasi Waiting & Cabang)...")
+    print("📥 [2/6] Menarik Data Staging & Refund dari Stock Tracking (All Cabang + Done Online)...")
     url = "https://jezpro.id/stock_tracking_datatables"
     headers = {
         "Accept": "application/json, text/javascript, */*; q=0.01",
@@ -191,10 +188,9 @@ def fetch_staging_from_stock_tracking(session):
         "Referer": "https://jezpro.id/stock_tracking"
     }
 
-    # Range tanggal dari 2026 ke atas
     date_range = "2026-01-01|2030-12-31"
 
-    # 🌟 DAFTAR TARGET QUERY LENGKAP UNTUK SEMUA VARIASI WAITING & REFUND
+    # 🌟 TARGET QUERY: Tambahkan "DONE ONLINE"
     query_targets = [
         {"status": "REFUND", "status_search": ""},
         {"status": "WAITING OFFLINE", "status_search": ""},
@@ -203,8 +199,9 @@ def fetch_staging_from_stock_tracking(session):
         {"status": "WAITING NAMESET", "status_search": ""},
         {"status": "NAMESET", "status_search": ""},
         {"status": "WAITING ONLINE", "status_search": ""},
+        {"status": "DONE ONLINE", "status_search": ""},       # 🌟 BARU: Tarik status Done Online
         {"status": "WAITING", "status_search": ""},
-        {"status": "", "status_search": "WAITING"}  # 🌟 Mencari apapun yang mengandung kata WAITING
+        {"status": "", "status_search": "WAITING"}
     ]
 
     all_clean_records = []
@@ -225,7 +222,6 @@ def fetch_staging_from_stock_tracking(session):
                 "columns[5][data]": "cust_name", "columns[5][name]": "cust_name", "columns[5][orderable]": "true",
                 "columns[6][data]": "qty", "columns[6][name]": "p_name", "columns[6][orderable]": "true",
                 "columns[7][data]": "product_location", "columns[7][name]": "pl_code", "columns[7][orderable]": "true",
-                # 🌟 AKTIFKAN PENCARIAN KOLOM STATUS MENJADI TRUE
                 "columns[8][data]": "status", 
                 "columns[8][name]": "plst_status", 
                 "columns[8][searchable]": "true",
@@ -259,14 +255,15 @@ def fetch_staging_from_stock_tracking(session):
                 status_raw = strip_html(item.get("status") or item.get("plst_status") or "").upper()
                 loc_raw = strip_html(item.get("product_location") or item.get("pl_code") or "").upper()
 
-                # 🌟 FILTER STATUS: Menerima REFUND, WAITING, CHECKOUT, dan NAMESET
+                # 🌟 FILTER STATUS: Menerima REFUND, WAITING, CHECKOUT, NAMESET, dan DONE ONLINE
                 is_refund = "REFUND" in status_raw
+                is_done_online = "DONE ONLINE" in status_raw or ("DONE" in status_raw and "ONLINE" in status_raw)
                 is_waiting = (
                     any(k in status_raw for k in ["WAITING", "CHECKOUT", "NAMESET"])
                     or "WAITING" in loc_raw
                 )
 
-                if not (is_refund or is_waiting):
+                if not (is_refund or is_waiting or is_done_online):
                     continue
 
                 # Filter Tahun >= 2026
@@ -288,7 +285,13 @@ def fetch_staging_from_stock_tracking(session):
                 if doc_year is not None and doc_year < 2026:
                     continue
 
-                kategori_label = "REFUND" if is_refund else "MASUK_RAK"
+                # Label kategori
+                if is_refund:
+                    kategori_label = "REFUND"
+                elif is_done_online:
+                    kategori_label = "DONE_ONLINE"
+                else:
+                    kategori_label = "MASUK_RAK"
 
                 # ID Unik
                 raw_id = item.get("plst_id") or item.get("id")
@@ -325,7 +328,7 @@ def fetch_staging_from_stock_tracking(session):
             time.sleep(0.08)
 
         if branch_found_count > 0:
-            print(f"   -> {branch_name} (st_id: {st_id}): Ditemukan {branch_found_count} item Staging/Waiting/Refund (>= 2026).")
+            print(f"   -> {branch_name} (st_id: {st_id}): Ditemukan {branch_found_count} item (>= 2026).")
 
     print(f"✅ Selesai! Terkumpul total {len(all_clean_records)} item Staging/Waiting/Refund lengkap.")
     return all_clean_records
