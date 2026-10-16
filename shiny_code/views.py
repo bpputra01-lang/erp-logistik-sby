@@ -2278,7 +2278,7 @@ def render_sap_ll01_summary_tree(state: AppState):
             style=f"display: flex; justify-content: space-between; align-items: center; background-color: {bg_row}; {border_bottom} padding: 10px 16px;"
         )
 
-    store_name_label = f"📍 {sel_store}" if sel_store != "SEMUA" else "📍 ALL SITES (SURABAYA & CABANG)"
+    store_name_label = f"📍 {sel_store}" if sel_store != "SEMUA" else "📍 ALL BRANCH"
 
     return ui.div(
         # --- Header Title Box ---
