@@ -2163,26 +2163,25 @@ def render_sap_ll01_summary_tree(state: AppState):
     qty_wait_offline = sum(safe_int(x.get("qty", 1)) for x in stg_items if x.get("kategori") == "MASUK_RAK")
     qty_wait_total = qty_wait_refund + qty_wait_offline
 
-    # --- 2. Kalkulasi Data: TRANSFER ORDER (Berdasarkan QTY) ---
+    # --- 2. Kalkulasi Data: TRANSFER ORDER (Berdasarkan JUMLAH BARIS / DOKUMEN) ---
     tf_headers = state.get_filtered_tf_headers()
-    qty_tf_in, qty_tf_out = 0, 0
+    count_tf_in, count_tf_out = 0, 0
     for x in tf_headers:
         start_st = str(x.get("start_store", "")).upper()
         end_st = str(x.get("end_store", "")).upper()
-        q_send = safe_int(x.get("qty_send", 0))
         
         if sel_branch_tf != "SEMUA":
             if sel_branch_tf in end_st and sel_branch_tf not in start_st: 
-                qty_tf_in += q_send
+                count_tf_in += 1
             elif sel_branch_tf in start_st and sel_branch_tf not in end_st: 
-                qty_tf_out += q_send
+                count_tf_out += 1
             else:
-                if sel_branch_tf in start_st: qty_tf_out += q_send
-                if sel_branch_tf in end_st: qty_tf_in += q_send
+                if sel_branch_tf in start_st: count_tf_out += 1
+                if sel_branch_tf in end_st: count_tf_in += 1
         else:
-            qty_tf_out += q_send
+            count_tf_out += 1
     
-    qty_tf_total = qty_tf_in + qty_tf_out
+    count_tf_total = count_tf_in + count_tf_out
 
     # --- 3. Kalkulasi Data: ALL ADJUSTMENT (Berdasarkan JUMLAH BARIS/DOKUMEN) ---
     ma_items = state.get_filtered_ma_data()
@@ -2214,31 +2213,32 @@ def render_sap_ll01_summary_tree(state: AppState):
     qty_put = sum(safe_int(x.get("qty", 0)) for x in buffer_items if "PUTAWAY" in str(x.get("tipe_bin", "")).upper())
     qty_outstd_total = qty_inb + qty_out + qty_put
 
-    # --- Helper UI untuk Visual Tree yang Clean ---
-    def clean_tree_row(text, count, time_text, is_header=False):
-        # Aturan Warna (Traffic Light) berdasar angka
+    # --- Helper UI untuk Visual Tree yang Clean & Zebra Striping ---
+    def clean_tree_row(text, count, time_text, is_header=False, is_alt=False):
+        # Aturan Warna (Traffic Light) berdasar angka Qty/Count
         if count == 0:
-            status_color = "#10B981" # Hijau
+            status_color = "#10B981" # Hijau (Aman/Kosong)
         elif count <= 5:
             status_color = "#D69E2E" # Kuning/Orange
         else:
             status_color = "#E53E3E" # Merah
 
         if is_header:
-            bg_row = "#F8FAFC"
+            bg_row = "#EDF2F7" # Abu-abu kebiruan agar stand out sebagai folder
             font_weight = "800"
             text_color = "#1A202C"
-            border_bottom = "border-bottom: 2px solid #E2E8F0;"
-            tree_icon = ui.div(ui.tags.i(class_="fa-regular fa-folder-open", style="color: #4A5568; font-size: 14px; margin-right: 12px;"), style="display: flex; align-items: center;")
+            border_bottom = "border-bottom: 2px solid #CBD5E0;"
+            tree_icon = ui.div(ui.tags.i(class_="fa-solid fa-folder-open", style="color: #4A5568; font-size: 14px; margin-right: 12px;"), style="display: flex; align-items: center;")
         else:
-            bg_row = "#FFFFFF"
+            # Menggunakan Zebra Striping / Selang-seling warna agar mata mudah membaca
+            bg_row = "#F7FAFC" if is_alt else "#FFFFFF" 
             font_weight = "600"
-            text_color = "#4A5568"
-            border_bottom = "border-bottom: 1px solid #F1F5F9;"
-            # Garis konektor menyiku ala "Tree"
-            tree_icon = ui.div(style="width: 14px; height: 22px; border-left: 2px solid #CBD5E0; border-bottom: 2px solid #CBD5E0; border-bottom-left-radius: 4px; margin-left: 6px; margin-right: 16px; margin-top: -12px;")
+            text_color = "#2D3748"
+            border_bottom = "border-bottom: 1px solid #E2E8F0;"
+            # Garis konektor menyiku ala "Tree" yang lebih solid
+            tree_icon = ui.div(style="width: 14px; height: 22px; border-left: 2px solid #A0AEC0; border-bottom: 2px solid #A0AEC0; border-bottom-left-radius: 4px; margin-left: 6px; margin-right: 16px; margin-top: -12px;")
 
-        # Bulatan Indikator
+        # Bulatan Indikator Solid
         indicator = ui.div(style=f"width: 10px; height: 10px; border-radius: 50%; background-color: {status_color}; margin-right: 12px; box-shadow: 0 0 4px {status_color}80; flex-shrink: 0;")
 
         # Badge Count
@@ -2280,30 +2280,29 @@ def render_sap_ll01_summary_tree(state: AppState):
         ui.div(
             # TAB 1: ALL WAITING
             clean_tree_row("1. ALL WAITING", qty_wait_total, now_str, is_header=True),
-            clean_tree_row("WAITING REFUND", qty_wait_refund, now_str),
-            clean_tree_row("WAITING OFFLINE", qty_wait_offline, now_str),
+            clean_tree_row("WAITING REFUND", qty_wait_refund, now_str, is_alt=False),
+            clean_tree_row("WAITING OFFLINE", qty_wait_offline, now_str, is_alt=True),
 
             # TAB 2: TRANSFER ORDER
-            clean_tree_row("2. TRANSFER ORDER", qty_tf_total, now_str, is_header=True),
-            clean_tree_row("OPEN TF IN", qty_tf_in, now_str),
-            clean_tree_row("OPEN TF OUT", qty_tf_out, now_str),
+            clean_tree_row("2. TRANSFER ORDER", count_tf_total, now_str, is_header=True),
+            clean_tree_row("OPEN TF IN", count_tf_in, now_str, is_alt=False),
+            clean_tree_row("OPEN TF OUT", count_tf_out, now_str, is_alt=True),
 
             # TAB 3: ALL ADJUSTMENT (Menggunakan Row Count)
             clean_tree_row("3. ALL ADJUSTMENT", count_adj_total, now_str, is_header=True),
-            clean_tree_row("OUTSTANDING ADJUSTMENT (NEED APPROVAL)", count_adj_appr, now_str),
-            clean_tree_row("OUTSTANDING ADJUSTMENT (NEED EKSEKUSI)", count_adj_exec, now_str),
+            clean_tree_row("OUTSTANDING ADJUSTMENT (NEED APPROVAL)", count_adj_appr, now_str, is_alt=False),
+            clean_tree_row("OUTSTANDING ADJUSTMENT (NEED EKSEKUSI)", count_adj_exec, now_str, is_alt=True),
 
             # TAB 4: OUTSTANDING ITEMS
             clean_tree_row("4. OUTSTANDING ITEMS", qty_outstd_total, now_str, is_header=True),
-            clean_tree_row("INBOUND AREA", qty_inb, now_str),
-            clean_tree_row("OUTBOUND AREA", qty_out, now_str),
-            clean_tree_row("PUTAWAY AREA", qty_put, now_str),
+            clean_tree_row("INBOUND AREA", qty_inb, now_str, is_alt=False),
+            clean_tree_row("OUTBOUND AREA", qty_out, now_str, is_alt=True),
+            clean_tree_row("PUTAWAY AREA", qty_put, now_str, is_alt=False),
 
-            style="border-radius: 8px; overflow: hidden; border: 1px solid #E2E8F0; margin-top: 8px;"
+            style="border-radius: 8px; overflow: hidden; border: 1px solid #CBD5E0; margin-top: 8px;"
         ),
         style="background: #FFFFFF; border-radius: 12px; padding: 16px; margin-bottom: 1.5rem; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid #E2E8F0;"
     )
-    
 # ==============================================================================
 # VIEW: WAREHOUSE ACTIVITY MONITOR (DENGAN SAP LL01 TREE & 4 TAB BERGESER)
 # ==============================================================================
