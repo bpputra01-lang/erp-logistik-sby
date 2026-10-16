@@ -4692,17 +4692,6 @@ def server(input: Inputs, output: Outputs, session: Session):
     def _on_change_ll01_aging():
         state.ll01_filter_aging.set(input.change_ll01_aging())
 
-    @reactive.Effect
-    def _auto_load_ll01_on_menu():
-        if state.logged_in() and state.get_active_content_type() == "warehouse_activity_monitor":
-            with reactive.isolate():
-                # Jika data sudah ada di memori, JANGAN query Supabase lagi (agar ganti tab/menu tidak berat)
-                if not state.ll01_data_list() and not state.ll01_single_adj_list():
-                    state.load_ll01_data_from_supabase()
-                    state.load_transfer_orders_from_supabase()
-                    state.load_mass_adjustments_from_supabase()
-                    state.load_single_adjustments_from_supabase()
-                    state.load_special_buffer_stock_from_supabase()
     # Download Excel Report
     @render.download(
         filename=lambda: f"LL01_WAREHOUSE_MONITOR_{datetime.now().strftime('%d_%m_%Y_%H%M')}.xlsx"

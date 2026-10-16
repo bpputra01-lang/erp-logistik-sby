@@ -6547,19 +6547,6 @@ class AppState:
         except Exception as e:
             return False, f"Gagal load adjustment: {e}"
 
-    def get_filtered_ma_data(self) -> list[dict]:
-        data = self.ll01_ma_headers()
-        st_flt = self.ll01_ma_filter_status()
-        ag_flt = self.ll01_ma_filter_aging()
-
-        res = data
-        if st_flt != "SEMUA":
-            res = [x for x in res if x.get("status_category") == st_flt]
-        if ag_flt == "CRITICAL":
-            res = [x for x in res if float(x.get("aging_hours") or 0) >= 24.0 and x.get("status_category") == "MENGGANTUNG"]
-        elif ag_flt == "NORMAL":
-            res = [x for x in res if float(x.get("aging_hours") or 0) < 24.0 or x.get("status_category") == "CANCEL"]
-        return res
 
     def ll01_ma_metric_total(self) -> int: return len(self.get_filtered_ma_data())
     def ll01_ma_metric_menggantung(self) -> int: return len([x for x in self.get_filtered_ma_data() if x.get("status_category") == "MENGGANTUNG"])
@@ -6648,22 +6635,6 @@ class AppState:
             print("Gagal load buffer stock:", e)
             return False, f"Terjadi kesalahan: {str(e)}"
 
-    def get_filtered_ll01_special_stock(self) -> list[dict]:
-        data = self.ll01_special_stock_list()
-        if not data:
-            return []
-
-        flt_br = self.ll01_stock_filter_branch()
-        flt_tp = self.ll01_stock_filter_type()
-
-        res = data
-        if flt_br != "SEMUA":
-            res = [x for x in res if x.get("branch", "").upper() == flt_br.upper()]
-
-        if flt_tp != "SEMUA":
-            res = [x for x in res if flt_tp.upper() in str(x.get("tipe_bin", "")).upper()]
-
-        return res
 
     # Metrik Tab 4
     def ll01_stock_metric_total_qty(self) -> int:
