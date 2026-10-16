@@ -17,7 +17,7 @@ BRANCH_MAP = {
     "JEZ SURABAYA": {"st_id": 3, "db_id": "SURABAYA_LATEST"},
     "JEZ MALANG": {"st_id": 2, "db_id": "MALANG_LATEST"},
     "JEZ SIDOARJO": {"st_id": 8, "db_id": "SIDOARJO_LATEST"},
-    "JEZ KEDIRI": {"st_id": 51, "db_id": "KEDIRI_LATEST"},
+    "JEZ KEDIRI": {"st_id": 5, "db_id": "KEDIRI_LATEST"},
     "JEZ JEMBER": {"st_id": 40, "db_id": "JEMBER_LATEST"},
     "JEZ SEMARANG": {"st_id": 53, "db_id": "SEMARANG_LATEST"},
 }
