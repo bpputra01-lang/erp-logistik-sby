@@ -179,6 +179,9 @@ def clean_stock_tracking_article(raw_html):
 # ==============================================================================
 # 1. MODUL STAGING VIA STOCK TRACKING (SEMUA 9 CABANG >= 2026)
 # ==============================================================================
+# ==============================================================================
+# 1. MODUL STAGING VIA STOCK TRACKING (SEMUA 9 CABANG >= 2026)
+# ==============================================================================
 def fetch_staging_from_stock_tracking(session):
     print("📥 [2/6] Menarik Data Staging & Refund dari Stock Tracking (9 Cabang Lengkap >= 2026)...")
     url = "https://jezpro.id/stock_tracking_datatables"
@@ -188,21 +191,22 @@ def fetch_staging_from_stock_tracking(session):
         "Referer": "https://jezpro.id/stock_tracking"
     }
 
-    # 🌟 FILTER TANGGAL: Mulai tahun 2026 s/d hari ini
-    today_str = datetime.now().strftime("%Y-%m-%d")
-    date_range = f"2026-01-01|{today_str}"
+    # 🌟 KUNCI TANGGAL: Mulai dari 2026-01-01 s/d masa depan (2030)
+    # Ini menjamin transaksi 2026 ke atas pasti tertangkap tanpa terpengaruh jam lokal komputer!
+    date_range = "2026-01-01|2030-12-31"
 
-    # Target query status
+    # Target pencarian status
     query_targets = [
         {"status": "REFUND", "search": ""},
         {"status": "WAITING OFFLINE", "search": ""},
+        {"status": "WAITING", "search": ""},
         {"status": "", "search": "WAITING"}
     ]
 
     all_clean_records = []
     seen_ids = set()
 
-    # 🌟 LOOP KE SEMUA 9 CABANG
+    # 🌟 LOOP KE SEMUA 9 CABANG (SURABAYA, KEDIRI, MALANG, JEMBER, SIDOARJO, SEMARANG, JAKARTA, DLL)
     for branch_name, b_info in BRANCH_MAP.items():
         st_id = b_info["st_id"]
         branch_found_count = 0
@@ -223,13 +227,14 @@ def fetch_staging_from_stock_tracking(session):
                 "order[0][column]": "0", "order[0][dir]": "desc",
                 "start": "0",
                 "length": "-1",
+                "search[value]": q["search"],
                 "search": q["search"],
                 "status": q["status"],
                 "instock_source": "",
                 "psc_id": "",
-                "std_id": str(st_id),  # 🌟 SUNTIKKAN ID TOKO KE std_id
+                "std_id": "",          # 🌟 WAJIB KOSONG (Bukan Store ID)
                 "br_id": "",
-                "st_id": str(st_id),   # 🌟 SUNTIKKAN ID TOKO KE st_id
+                "st_id": str(st_id),   # 🌟 PARAMETER CABANG RESMI JEZPRO
                 "date": date_range
             }
 
@@ -252,7 +257,7 @@ def fetch_staging_from_stock_tracking(session):
                 if not (is_refund or is_waiting):
                     continue
 
-                # 2. Filter Tahun: Pastikan hanya tahun 2026 ke atas
+                # 2. Filter Tahun: Wajib >= 2026
                 dt_raw = strip_html(item.get("datetime") or item.get("plst_created") or "")
                 doc_year = None
                 for fmt in ("%d/%m/%Y %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%d-%m-%Y %H:%M:%S", "%d/%m/%Y", "%Y-%m-%d"):
@@ -273,12 +278,13 @@ def fetch_staging_from_stock_tracking(session):
 
                 kategori_label = "REFUND" if is_refund else "MASUK_RAK"
 
-                # 3. ID Unik & Anti-Duplikat
-                raw_id = item.get("plst_id") or item.get("id") or item.get("DT_RowIndex")
+                # 3. ID Unik: Hindari DT_RowIndex agar tidak tabrakan antar cabang
+                raw_id = item.get("plst_id") or item.get("id")
                 p_id = safe_int_val(raw_id)
-                if not p_id or p_id in seen_ids:
+                if not p_id or p_id == 0:
                     bar = strip_html(item.get("ps_barcode") or "")
-                    p_id = abs(hash(f"{st_id}_{bar}_{dt_raw}_{idx}")) % 2147483647
+                    inv = strip_html(item.get("invoice") or "")
+                    p_id = abs(hash(f"{st_id}_{bar}_{inv}_{dt_raw}")) % 2147483647
 
                 if p_id in seen_ids:
                     continue
@@ -289,7 +295,6 @@ def fetch_staging_from_stock_tracking(session):
                 art_info = clean_stock_tracking_article(raw_art)
                 scanned_iso = parse_to_iso_timestamp(dt_raw)
 
-                # Simpan data
                 all_clean_records.append({
                     "plst_id": int(p_id),
                     "pls_id": int(item.get("pls_id") or p_id),
@@ -309,7 +314,7 @@ def fetch_staging_from_stock_tracking(session):
             time.sleep(0.08)
 
         if branch_found_count > 0:
-            print(f"   -> {branch_name} (ID: {st_id}): {branch_found_count} item (>= 2026).")
+            print(f"   -> {branch_name} (st_id: {st_id}): Ditemukan {branch_found_count} item (>= 2026).")
 
     print(f"✅ Selesai! Terkumpul total {len(all_clean_records)} item Staging/Refund dari seluruh cabang (>= 2026).")
     return all_clean_records
