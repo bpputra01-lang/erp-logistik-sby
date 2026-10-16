@@ -126,7 +126,8 @@ def server(input: Inputs, output: Outputs, session: Session):
         "form-auditor": "Form Auditor",
         "auditor-pack": "Form Auditor",
         "memo-pengajuan": "Memo Pengajuan",
-        "warehouse-activity-monitor": "Warehouse Activity Monitor",  # <-- TAMBAHKAN INI
+        "warehouse-activity-monitor": "Warehouse Activity Monitor",
+        "warehouse-monitoring": "Warehouse Activity Monitor",
         "ll01-monitor": "Warehouse Activity Monitor"
     }
 
