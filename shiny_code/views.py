@@ -2330,7 +2330,13 @@ def warehouse_activity_monitor_view(state: AppState):
         ui.div(
             ui.span("Choose branch:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
             ui.tags.select(
-                *[ui.tags.option(opt, value=opt, selected=(opt == state.ll01_global_store())) for opt in ["SEMUA", "JEZ SURABAYA", "JEZ MALANG", "JEZ SIDOARJO", "JEZ KEDIRI", "JEZ JEMBER", "JEZ SEMARANG"]],
+                # 👇 PERBARUI DAFTAR PILIHAN CABANG INI 👇
+                *[ui.tags.option(opt, value=opt, selected=(opt == state.ll01_global_store())) for opt in [
+                    "SEMUA", 
+                    "JEZ SURABAYA", "JEZ KEDIRI", "JEZ MALANG", 
+                    "JEZ JEMBER", "JEZ SIDOARJO", "JEZ SEMARANG",
+                    "HUB JAKARTA", "ONLINE HUB SURABAYA", "ONLINE HUB MALANG"
+                ]],
                 id="ll01_global_store",
                 onchange="Shiny.setInputValue('change_ll01_global_store', this.value, {priority: 'event'})",
                 style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; background: white; cursor: pointer; min-width: 180px;"

@@ -6331,6 +6331,26 @@ class AppState:
 
             df = pd.DataFrame(res.data)
 
+            # 👇 TAMBAHKAN / PERBARUI BLOK INI (MAPPING 9 CABANG LENGKAP) 👇
+            STORE_ID_MAP = {
+                3: "JEZ SURABAYA",
+                5: "JEZ KEDIRI",            # 🌟 ID Resmi: 5
+                2: "JEZ MALANG",
+                40: "JEZ JEMBER",
+                8: "JEZ SIDOARJO",
+                53: "JEZ SEMARANG",
+                55: "HUB JAKARTA",          # 🌟 ID Resmi: 55
+                30: "ONLINE HUB SURABAYA",  # 🌟 ID Resmi: 30
+                20: "ONLINE HUB MALANG"     # 🌟 ID Resmi: 20
+            }
+            if 'store_id' in df.columns:
+                df['branch'] = df['store_id'].map(STORE_ID_MAP).fillna("-")
+                df['store_name'] = df['branch']
+            else:
+                df['branch'] = "-"
+                df['store_name'] = "-"
+            # 👆 ========================================================= 👆
+
             # Hitung Aging Jam & Menit
             if not df.empty and 'scanned_at' in df.columns:
                 df['dt_scanned'] = pd.to_datetime(df['scanned_at'], errors='coerce')
