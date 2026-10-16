@@ -2314,7 +2314,7 @@ def render_sap_ll01_summary_tree(state: AppState):
         ui.div(
             ui.div(
                 ui.tags.i(class_="fa-solid fa-network-wired", style="color: #3182CE; font-size: 16px; margin-right: 8px;"),
-                ui.span("Warehouse Critical Processes Overview", style="font-weight: 800; font-size: 14px; color: #1A202C;"),
+                ui.span("Warehouse Activty Monitor", style="font-weight: 800; font-size: 14px; color: #1A202C;"),
                 style="display: flex; align-items: center;"
             ),
             ui.span(store_name_label, style="background: #EBF8FF; color: #2B6CB0; font-weight: 800; font-size: 12px; padding: 4px 12px; border-radius: 6px; border: 1px solid #BEE3F8;"),
