@@ -2152,9 +2152,6 @@ def clean_jezpro_card_text(raw_text):
 # ==============================================================================
 # KOMPONEN TREE MONITOR WAREHOUSE (CLEAN & MODERN DESIGN)
 # ==============================================================================
-# ==============================================================================
-# KOMPONEN TREE MONITOR WAREHOUSE (CLEAN & MODERN DESIGN)
-# ==============================================================================
 def render_sap_ll01_summary_tree(state: AppState):
     sel_store = state.ll01_global_store()
     sel_branch_tf = sel_store.replace("JEZ ", "").strip().upper()
@@ -2211,40 +2208,53 @@ def render_sap_ll01_summary_tree(state: AppState):
 
     # --- 4. Kalkulasi Data: OUTSTANDING ITEMS (Berdasarkan QTY) ---
     buffer_items = state.get_filtered_ll01_special_stock()
+    qty_karantina = sum(safe_int(x.get("qty", 0)) for x in buffer_items if "KARANTINA" in str(x.get("tipe_bin", "")).upper())
     qty_inb = sum(safe_int(x.get("qty", 0)) for x in buffer_items if "INB" in str(x.get("tipe_bin", "")).upper())
     qty_out = sum(safe_int(x.get("qty", 0)) for x in buffer_items if "OUT" in str(x.get("tipe_bin", "")).upper())
     qty_put = sum(safe_int(x.get("qty", 0)) for x in buffer_items if "PUTAWAY" in str(x.get("tipe_bin", "")).upper())
-    qty_outstd_total = qty_inb + qty_out + qty_put
+    
+    qty_outstd_total = qty_karantina + qty_inb + qty_out + qty_put
 
     # --- Helper UI untuk Visual Tree yang Clean & Zebra Striping ---
     def clean_tree_row(text, count, time_text, is_header=False, is_alt=False):
         # Aturan Warna (Traffic Light) berdasar angka Qty/Count
         if count == 0:
-            status_color = "#10B981" # Hijau (Aman/Kosong)
+            status_color = "#10B981" # Hijau Utama
+            c_red, c_yel, c_grn = "#E2E8F0", "#E2E8F0", "#10B981"
+            s_red, s_yel, s_grn = "", "", "box-shadow: 0 0 6px #10B981;"
         elif count <= 5:
-            status_color = "#D69E2E" # Kuning/Orange
+            status_color = "#D69E2E" # Kuning Utama
+            c_red, c_yel, c_grn = "#E2E8F0", "#D69E2E", "#E2E8F0"
+            s_red, s_yel, s_grn = "", "box-shadow: 0 0 6px #D69E2E;", ""
         else:
-            status_color = "#E53E3E" # Merah
+            status_color = "#E53E3E" # Merah Utama
+            c_red, c_yel, c_grn = "#E53E3E", "#E2E8F0", "#E2E8F0"
+            s_red, s_yel, s_grn = "box-shadow: 0 0 6px #E53E3E;", "", ""
 
         if is_header:
-            bg_row = "#EDF2F7" # Abu-abu kebiruan agar stand out sebagai folder
-            font_weight = "800"
+            bg_row = "#E2E8F0" # Background dibikin lebih gelap agar sangat kontras dengan isinya
+            font_weight = "900"
             text_color = "#1A202C"
             border_bottom = "border-bottom: 2px solid #CBD5E0;"
             tree_icon = ui.div(ui.tags.i(class_="fa-solid fa-folder-open", style="color: #4A5568; font-size: 14px; margin-right: 12px;"), style="display: flex; align-items: center;")
         else:
             # Menggunakan Zebra Striping / Selang-seling warna agar mata mudah membaca
             bg_row = "#F7FAFC" if is_alt else "#FFFFFF" 
-            font_weight = "600"
+            font_weight = "700"
             text_color = "#2D3748"
             border_bottom = "border-bottom: 1px solid #E2E8F0;"
             # Garis konektor menyiku ala "Tree" yang lebih solid
             tree_icon = ui.div(style="width: 14px; height: 22px; border-left: 2px solid #A0AEC0; border-bottom: 2px solid #A0AEC0; border-bottom-left-radius: 4px; margin-left: 6px; margin-right: 16px; margin-top: -12px;")
 
-        # Bulatan Indikator Solid
-        indicator = ui.div(style=f"width: 10px; height: 10px; border-radius: 50%; background-color: {status_color}; margin-right: 12px; box-shadow: 0 0 4px {status_color}80; flex-shrink: 0;")
+        # 3 Bulatan Indikator (Merah, Kuning, Hijau)
+        indicator = ui.div(
+            ui.div(style=f"width: 10px; height: 10px; border-radius: 50%; background-color: {c_red}; margin-right: 4px; {s_red}"),
+            ui.div(style=f"width: 10px; height: 10px; border-radius: 50%; background-color: {c_yel}; margin-right: 4px; {s_yel}"),
+            ui.div(style=f"width: 10px; height: 10px; border-radius: 50%; background-color: {c_grn}; {s_grn}"),
+            style="display: flex; align-items: center; margin-right: 12px; flex-shrink: 0;"
+        )
 
-        # Badge Count
+        # Badge Count Text
         badge = ui.div(
             str(count),
             style=f"background: {status_color}15; color: {status_color}; font-weight: 800; font-size: 12px; padding: 2px 8px; border-radius: 12px; min-width: 36px; text-align: center; margin-right: 14px; border: 1px solid {status_color}40;"
@@ -2291,16 +2301,17 @@ def render_sap_ll01_summary_tree(state: AppState):
             clean_tree_row("OPEN TF IN", count_tf_in, now_str, is_alt=False),
             clean_tree_row("OPEN TF OUT", count_tf_out, now_str, is_alt=True),
 
-            # TAB 3: ALL ADJUSTMENT (Menggunakan Row Count)
+            # TAB 3: ALL ADJUSTMENT
             clean_tree_row("3. ALL ADJUSTMENT", count_adj_total, now_str, is_header=True),
             clean_tree_row("OUTSTANDING ADJUSTMENT (NEED APPROVAL)", count_adj_appr, now_str, is_alt=False),
             clean_tree_row("OUTSTANDING ADJUSTMENT (NEED EKSEKUSI)", count_adj_exec, now_str, is_alt=True),
 
             # TAB 4: OUTSTANDING ITEMS
             clean_tree_row("4. OUTSTANDING ITEMS", qty_outstd_total, now_str, is_header=True),
-            clean_tree_row("INBOUND AREA", qty_inb, now_str, is_alt=False),
-            clean_tree_row("OUTBOUND AREA", qty_out, now_str, is_alt=True),
-            clean_tree_row("PUTAWAY AREA", qty_put, now_str, is_alt=False),
+            clean_tree_row("KARANTINA AREA", qty_karantina, now_str, is_alt=False),
+            clean_tree_row("INBOUND AREA", qty_inb, now_str, is_alt=True),
+            clean_tree_row("OUTBOUND AREA", qty_out, now_str, is_alt=False),
+            clean_tree_row("PUTAWAY AREA", qty_put, now_str, is_alt=True),
 
             style="border-radius: 8px; overflow: hidden; border: 1px solid #CBD5E0; margin-top: 8px;"
         ),
