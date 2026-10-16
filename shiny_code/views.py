@@ -2295,22 +2295,22 @@ def render_sap_ll01_summary_tree(state: AppState):
         # --- Tree List Structure ---
         ui.div(
             # TAB 1: ALL WAITING
-            clean_tree_row("1. ALL WAITING", qty_wait_total, now_str, is_header=True),
+            clean_tree_row("ALL WAITING", qty_wait_total, now_str, is_header=True),
             clean_tree_row("WAITING REFUND", qty_wait_refund, now_str, is_alt=False),
             clean_tree_row("WAITING OFFLINE", qty_wait_offline, now_str, is_alt=True),
 
             # TAB 2: TRANSFER ORDER
-            clean_tree_row("2. TRANSFER ORDER", count_tf_total, now_str, is_header=True),
+            clean_tree_row("TRANSFER ORDER", count_tf_total, now_str, is_header=True),
             clean_tree_row("OPEN TF IN", count_tf_in, now_str, is_alt=False),
             clean_tree_row("OPEN TF OUT", count_tf_out, now_str, is_alt=True),
 
             # TAB 3: ALL ADJUSTMENT
-            clean_tree_row("3. ALL ADJUSTMENT", count_adj_total, now_str, is_header=True),
+            clean_tree_row("ALL ADJUSTMENT", count_adj_total, now_str, is_header=True),
             clean_tree_row("OUTSTANDING ADJUSTMENT (NEED APPROVAL)", count_adj_appr, now_str, is_alt=False),
             clean_tree_row("OUTSTANDING ADJUSTMENT (NEED EKSEKUSI)", count_adj_exec, now_str, is_alt=True),
 
             # TAB 4: OUTSTANDING ITEMS
-            clean_tree_row("4. OUTSTANDING ITEMS", qty_outstd_total, now_str, is_header=True),
+            clean_tree_row("OUTSTANDING ITEMS", qty_outstd_total, now_str, is_header=True),
             clean_tree_row("KARANTINA AREA", qty_karantina, now_str, is_alt=False),
             clean_tree_row("INBOUND AREA", qty_inb, now_str, is_alt=True),
             clean_tree_row("OUTBOUND AREA", qty_out, now_str, is_alt=False),
@@ -2328,7 +2328,7 @@ def warehouse_activity_monitor_view(state: AppState):
     # 1. BARIS FILTER GLOBAL TUNGGAL (POSISI DI ATAS SEBELUM SUMMARY)
     global_filter_bar = ui.div(
         ui.div(
-            ui.span("🏢 Pilih Cabang / Store Global:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
+            ui.span("Choose branch:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
             ui.tags.select(
                 *[ui.tags.option(opt, value=opt, selected=(opt == state.ll01_global_store())) for opt in ["SEMUA", "JEZ SURABAYA", "JEZ MALANG", "JEZ SIDOARJO", "JEZ KEDIRI", "JEZ JEMBER", "JEZ SEMARANG"]],
                 id="ll01_global_store",
@@ -2338,17 +2338,17 @@ def warehouse_activity_monitor_view(state: AppState):
             style="display: flex; flex-direction: column;"
         ),
         ui.div(
-            ui.span("Tgl Awal:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
+            ui.span("Start Date:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
             ui.tags.input(type="date", id="ll01_global_tgl_start", value=state.ll01_global_tgl_start(), onchange="Shiny.setInputValue('change_ll01_global_tgl_start', this.value, {priority: 'event'})", style="padding: 5px 8px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; background: white;"),
             style="display: flex; flex-direction: column;"
         ),
         ui.div(
-            ui.span("Tgl Akhir:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
+            ui.span("End Date:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
             ui.tags.input(type="date", id="ll01_global_tgl_end", value=state.ll01_global_tgl_end(), onchange="Shiny.setInputValue('change_ll01_global_tgl_end', this.value, {priority: 'event'})", style="padding: 5px 8px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; background: white;"),
             style="display: flex; flex-direction: column;"
         ),
         ui.div(
-            ui.span("Cari Note / Kode / Artikel:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
+            ui.span("Search:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
             ui.tags.input(type="text", id="ll01_global_note", value=state.ll01_global_note(), placeholder="Ketik kata kunci...", oninput="Shiny.setInputValue('change_ll01_global_note', this.value, {priority: 'event'})", style="padding: 6px 10px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-size: 12px; background: white; width: 220px;"),
             style="display: flex; flex-direction: column;"
         ),
