@@ -2349,7 +2349,7 @@ def render_sap_ll01_summary_tree(state: AppState):
             clean_tree_row("OUTBOUND AREA", qty_out, now_str, is_alt=False),
             clean_tree_row("PUTAWAY AREA", qty_put, now_str, is_alt=True),
             clean_tree_row("GAGAL QC AREA", qty_qc, now_str, is_alt=False),     # 🌟 BARU
-            clean_tree_row("REFUND BIN AREA", qty_ref_bin, now_str, is_alt=True),
+            clean_tree_row("REFUND AREA", qty_ref_bin, now_str, is_alt=True),
 
             style="border-radius: 8px; overflow: hidden; border: 1px solid #CBD5E0; margin-top: 8px;"
         ),
