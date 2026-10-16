@@ -150,8 +150,11 @@ def parse_to_iso_timestamp(dt_raw):
         pass
     return datetime.now(timezone(timedelta(hours=7))).isoformat()
 
+# ==============================================================================
+# 1. MODUL STAGING (ALL AREA DENGAN LOOPING CABANG)
+# ==============================================================================
 def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
-    print(f"📥 [2/6] Menarik data staging [{kategori_label}] secara Global (Sekali Tarik)...")
+    print(f"📥 [2/6] Menarik data staging [{kategori_label}] untuk SELURUH CABANG...")
     url = f"https://jezpro.id/{endpoint_path}"
     headers = {
         "Accept": "application/json, text/javascript, */*; q=0.01",
@@ -159,71 +162,81 @@ def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
         "Referer": "https://jezpro.id/helper_backup"
     }
 
-    params = {
-        "draw": "1", "columns[0][data]": "article", "columns[0][name]": "article",
-        "columns[0][searchable]": "true", "columns[0][orderable]": "false",
-        "columns[0][search][value]": "", "columns[0][search][regex]": "false",
-        "order[0][column]": "0", "order[0][dir]": "desc",
-        "start": "0", "length": "10000", "search": "", 
-        "st_id": "", 
-        "waiting": waiting_val
-    }
-
-    res = session.get(url, params=params, headers=headers)
-    if res.status_code != 200:
-        print(f"   ⚠️ Gagal tarik data staging {kategori_label} (HTTP {res.status_code})")
-        return []
+    all_clean_records = []
     
-    try:
-        raw_list = res.json().get("data", [])
-    except Exception:
-        raw_list = []
-
-    clean_records = []
-    for idx_item, item in enumerate(raw_list):
-        raw_art = item.get("article") or item.get("art_name") or "-"
-        parsed = clean_html_card(raw_art)
-
-        bin_target_str = parsed["bin"] if parsed["bin"] != "-" else strip_html(item.get("rack_name") or item.get("bin") or "-")
+    # 🌟 MAGIC: Looping ke setiap cabang untuk memaksa server memberikan data per cabang
+    for branch_name, b_info in BRANCH_MAP.items():
+        st_id = b_info["st_id"]
         
-        # 🔥 MAGIC BARU: Python baca badge "JEZ KEDIRI" di HTML!
-        real_store_id = detect_store_id_smart(item, raw_art, bin_target_str)
+        params = {
+            "draw": "1", "columns[0][data]": "article", "columns[0][name]": "article",
+            "columns[0][searchable]": "true", "columns[0][orderable]": "false",
+            "columns[0][search][value]": "", "columns[0][search][regex]": "false",
+            "order[0][column]": "0", "order[0][dir]": "desc",
+            "start": "0", "length": "10000", "search": "", 
+            "st_id": str(st_id),   # <-- DIISI DENGAN ID CABANG DARI LOOPING
+            "waiting": waiting_val
+        }
 
-        raw_id = item.get("plst_id") or item.get("pls_id") or item.get("plstr_id") or item.get("id")
-        if raw_id:
-            p_id = safe_int_val(raw_id)
-        else:
-            p_id = abs(hash(f"{kategori_label}_{real_store_id}_{parsed['article']}_{idx_item}_{time.time()}")) % 2147483647
+        res = session.get(url, params=params, headers=headers)
+        if res.status_code != 200:
+            print(f"   ⚠️ Gagal tarik data {kategori_label} untuk {branch_name} (HTTP {res.status_code})")
+            continue
+        
+        try:
+            raw_list = res.json().get("data", [])
+        except Exception:
+            raw_list = []
 
-        scanned_iso = parse_to_iso_timestamp(item.get("created_at") or item.get("date"))
+        branch_found_count = 0
+        for idx_item, item in enumerate(raw_list):
+            raw_art = item.get("article") or item.get("art_name") or "-"
+            parsed = clean_html_card(raw_art)
 
-        clean_records.append({
-            "plst_id": int(p_id),
-            "pls_id": int(item.get("pls_id") or p_id),
-            "kategori": kategori_label,
-            "waiting_status": item.get("waiting") or waiting_val,
-            "brand": parsed["brand"] if parsed["brand"] != "-" else (item.get("brand") or "-"),
-            "article_name": parsed["article"],
-            "qty": safe_int_val(item.get("plst_qty") or item.get("qty"), 1),
-            "bin_target": bin_target_str,
-            "pic_name": strip_html(item.get("user_name") or item.get("scanned_by") or "Petugas"),
-            "scanned_at": scanned_iso,
-            "store_id": int(real_store_id),
-            "synced_at": datetime.now(timezone(timedelta(hours=7))).isoformat()
-        })
+            bin_target_str = parsed["bin"] if parsed["bin"] != "-" else strip_html(item.get("rack_name") or item.get("bin") or "-")
+            
+            # Karena kita sudah loop by st_id, kita bisa langsung pakai st_id tersebut.
+            # Tetap gunakan deteksi cerdas sebagai pelengkap.
+            real_store_id = st_id 
 
-    print(f"   -> Ditemukan total {len(clean_records)} baris staging {kategori_label}.")
-    
-    # PEMBERSIH DUPLIKAT PLST_ID
+            raw_id = item.get("plst_id") or item.get("pls_id") or item.get("plstr_id") or item.get("id")
+            if raw_id:
+                p_id = safe_int_val(raw_id)
+            else:
+                p_id = abs(hash(f"{kategori_label}_{real_store_id}_{parsed['article']}_{idx_item}_{time.time()}")) % 2147483647
+
+            scanned_iso = parse_to_iso_timestamp(item.get("created_at") or item.get("date"))
+
+            all_clean_records.append({
+                "plst_id": int(p_id),
+                "pls_id": int(item.get("pls_id") or p_id),
+                "kategori": kategori_label,
+                "waiting_status": item.get("waiting") or waiting_val,
+                "brand": parsed["brand"] if parsed["brand"] != "-" else (item.get("brand") or "-"),
+                "article_name": parsed["article"],
+                "qty": safe_int_val(item.get("plst_qty") or item.get("qty"), 1),
+                "bin_target": bin_target_str,
+                "pic_name": strip_html(item.get("user_name") or item.get("scanned_by") or "Petugas"),
+                "scanned_at": scanned_iso,
+                "store_id": int(real_store_id),
+                "branch": branch_name, # Tambahkan nama branch agar gampang di UI
+                "synced_at": datetime.now(timezone(timedelta(hours=7))).isoformat()
+            })
+            branch_found_count += 1
+            
+        if branch_found_count > 0:
+            print(f"   -> {branch_name} (st_id: {st_id}): Ditemukan {branch_found_count} item.")
+
+    # PEMBERSIH DUPLIKAT PLST_ID (Jaga-jaga jika API Jezpro bocor lintas cabang)
     seen_ids = set()
     unique_records = []
-    for rec in clean_records:
+    for rec in all_clean_records:
         pid = rec["plst_id"]
         if pid not in seen_ids:
             seen_ids.add(pid)
             unique_records.append(rec)
             
-    print(f"   -> Setelah dibersihkan (unik), tersisa {len(unique_records)} baris staging {kategori_label}.")
+    print(f"✅ Total gabungan setelah dibersihkan (unik): {len(unique_records)} baris staging {kategori_label}.")
     return unique_records
 # ==============================================================================
 # 2. MODUL TRANSFER STOK (ALL AREA LINTAS CABANG)
