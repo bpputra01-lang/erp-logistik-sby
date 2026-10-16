@@ -2233,14 +2233,17 @@ def render_sap_ll01_summary_tree(state: AppState):
             
     count_adj_total = count_adj_appr + count_adj_exec
 
-    # --- 4. Kalkulasi Data: OUTSTANDING ITEMS (Berdasarkan QTY) ---
+    # --- 4. Kalkulasi Data: OUTSTANDING ITEMS (Lengkap dengan Karantina, Inb, Out, Putaway, QC, Refund) ---
     buffer_items = state.get_filtered_ll01_special_stock()
     qty_karantina = sum(safe_int(x.get("qty", 0)) for x in buffer_items if "KARANTINA" in str(x.get("tipe_bin", "")).upper())
     qty_inb = sum(safe_int(x.get("qty", 0)) for x in buffer_items if "INB" in str(x.get("tipe_bin", "")).upper())
     qty_out = sum(safe_int(x.get("qty", 0)) for x in buffer_items if "OUT" in str(x.get("tipe_bin", "")).upper())
     qty_put = sum(safe_int(x.get("qty", 0)) for x in buffer_items if "PUTAWAY" in str(x.get("tipe_bin", "")).upper())
+    # 🌟 HITUNG QTY GAGAL QC & REFUND
+    qty_qc = sum(safe_int(x.get("qty", 0)) for x in buffer_items if "QC" in str(x.get("tipe_bin", "")).upper())
+    qty_ref_bin = sum(safe_int(x.get("qty", 0)) for x in buffer_items if "REFUND" in str(x.get("tipe_bin", "")).upper())
     
-    qty_outstd_total = qty_karantina + qty_inb + qty_out + qty_put
+    qty_outstd_total = qty_karantina + qty_inb + qty_out + qty_put + qty_qc + qty_ref_bin
 
     # --- Helper UI untuk Visual Tree yang Clean & Zebra Striping ---
     def clean_tree_row(text, count, time_text, is_header=False, is_alt=False):

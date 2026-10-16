@@ -6574,7 +6574,7 @@ class AppState:
     def ll01_ma_metric_critical(self) -> int: return len([x for x in self.get_filtered_ma_data() if float(x.get("aging_hours") or 0) >= 24.0 and x.get("status_category") == "MENGGANTUNG"])
 
     # ==========================================================================
-    # TAB 4: BUFFER & TRANSIT STOCK (KARANTINA, INB, PUTAWAY, OUT) DARI SUPABASE
+    # TAB 4: BUFFER & TRANSIT STOCK DARI SUPABASE (LENGKAP DENGAN QC & REFUND)
     # ==========================================================================
     def load_special_buffer_stock_from_supabase(self):
         """Menarik seluruh data stock dari table 'stock_live_cache' dan memfilter BIN transit/buffer"""
@@ -6595,7 +6595,8 @@ class AppState:
                         return item_dict[c]
                 return default
 
-            target_keywords = ["KARANTINA", "INB", "PUTAWAY", "OUT"]
+            # 🌟 TAMBAHKAN KATA KUNCI "GAGAL QC", "QC", DAN "REFUND"
+            target_keywords = ["KARANTINA", "INB", "PUTAWAY", "OUT", "GAGAL QC", "QC", "REFUND"]
             matched_records = []
 
             for row in res.data:
@@ -6630,12 +6631,16 @@ class AppState:
                         matched_types.append("PUTAWAY")
                     if "OUT" in bin_val or "OUTBOUND" in bin_val:
                         matched_types.append("OUT")
+                    # 🌟 DETEKSI BIN GAGAL QC & REFUND
+                    if "GAGAL QC" in bin_val or "QC" in bin_val:
+                        matched_types.append("GAGAL QC")
+                    if "REFUND" in bin_val:
+                        matched_types.append("REFUND")
 
                     if matched_types:
                         qty_raw = extract_field(it, ["QTY SYSTEM", "QTY SYS", "QTY", "qty", "STOK", "QUANTITY", "stok", "Jumlah"], 0)
                         qty_val = safe_int(qty_raw, 0)
 
-                        # Hanya ambil barang yang ada kuantitas fisiknya (> 0)
                         if qty_val > 0:
                             matched_records.append({
                                 "branch": branch_name,
@@ -6654,7 +6659,6 @@ class AppState:
         except Exception as e:
             print("Gagal load buffer stock:", e)
             return False, f"Terjadi kesalahan: {str(e)}"
-
 
     # Metrik Tab 4
     def ll01_stock_metric_total_qty(self) -> int:
