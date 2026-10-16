@@ -2572,7 +2572,8 @@ def warehouse_activity_monitor_view(state: AppState):
             ),
             ui.tags.button(
                 ui.tags.i(class_="fa-solid fa-arrows-rotate", style="margin-right: 6px;"), "REFRESH DATA CLOUD",
-                onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_refresh_ll01_all', Math.random(), {priority: 'event'})",
+                # Bagian window.showGlobalSpinner() DIHAPUS agar layar tidak gelap
+                onclick="Shiny.setInputValue('btn_refresh_ll01_all', Math.random(), {priority: 'event'});",
                 style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer;"
             ),
             style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 1.25rem 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 10px;"
