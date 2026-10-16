@@ -2348,6 +2348,8 @@ def render_sap_ll01_summary_tree(state: AppState):
             clean_tree_row("INBOUND AREA", qty_inb, now_str, is_alt=True),
             clean_tree_row("OUTBOUND AREA", qty_out, now_str, is_alt=False),
             clean_tree_row("PUTAWAY AREA", qty_put, now_str, is_alt=True),
+            clean_tree_row("GAGAL QC AREA", qty_qc, now_str, is_alt=False),     # 🌟 BARU
+            clean_tree_row("REFUND BIN AREA", qty_ref_bin, now_str, is_alt=True),
 
             style="border-radius: 8px; overflow: hidden; border: 1px solid #CBD5E0; margin-top: 8px;"
         ),
@@ -2610,6 +2612,8 @@ def warehouse_activity_monitor_view(state: AppState):
         if "KARANTINA" in tipe: badge_color = "#E53E3E"; badge_bg = "#FED7D7"
         elif "INBOUND" in tipe: badge_color = "#22543D"; badge_bg = "#C6F6D5"
         elif "PUTAWAY" in tipe: badge_color = "#2B6CB0"; badge_bg = "#EBF8FF"
+        elif "GAGAL QC" in tipe: badge_color = "#C05621"; badge_bg = "#FEEBC8" # 🌟 Badge QC
+        elif "REFUND" in tipe: badge_color = "#97266D"; badge_bg = "#FED7E2"   # 🌟 Badge Refund
         else: badge_color = "#744210"; badge_bg = "#FEFCBF"
 
         badge_tipe = ui.span(tipe, style=f"background: {badge_bg}; color: {badge_color}; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 4px;")
@@ -2635,7 +2639,10 @@ def warehouse_activity_monitor_view(state: AppState):
             dark_metric_box("KARANTINA", f"{sum([safe_int(x.get('qty', 0)) for x in special_items if 'KARANTINA' in str(x.get('tipe_bin', ''))]):,} PCS", "#E53E3E"),
             dark_metric_box("INBOUND", f"{sum([safe_int(x.get('qty', 0)) for x in special_items if 'INBOUND' in str(x.get('tipe_bin', ''))]):,} PCS", "#10B981"),
             dark_metric_box("PUTAWAY", f"{sum([safe_int(x.get('qty', 0)) for x in special_items if 'PUTAWAY' in str(x.get('tipe_bin', ''))]):,} PCS", "#38BDF8"),
-            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+            # 🌟 KOTAK METRIK BARU DI ATAS TABEL
+            dark_metric_box("GAGAL QC", f"{sum([safe_int(x.get('qty', 0)) for x in special_items if 'QC' in str(x.get('tipe_bin', ''))]):,} PCS", "#DD6B20"),
+            dark_metric_box("REFUND BIN", f"{sum([safe_int(x.get('qty', 0)) for x in special_items if 'REFUND' in str(x.get('tipe_bin', ''))]):,} PCS", "#D53F8C"),
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
         ),
         ui.div(
             ui.tags.table(
