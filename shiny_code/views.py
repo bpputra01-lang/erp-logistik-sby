@@ -1247,9 +1247,9 @@ def percentage_display_view(state: AppState):
             # HEADER & KONTROL CABANG
             ui.div(
                 ui.div(
-                    ui.h4("🧥 Percentage Display Control & Refill Toko", style="font-size: 16px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
+                    ui.h4("Percentage Display", style="font-size: 16px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
                     ui.span(
-                        f"🏬 Cabang: {state.pd_selected_branch()} • 🕒 Terakhir Update: {state.pd_last_sync_time()} (Auto-refresh 1 jam).",
+                        f"Branch: {state.pd_selected_branch()} • Last Sync: {state.pd_last_sync_time()} (Auto-refresh 1 jam).",
                         style="color: #059669; font-weight: 700; font-size: 12px;"
                     ),
                 ),
@@ -2592,10 +2592,10 @@ def warehouse_activity_monitor_view(state: AppState):
 
     tab4_transit_stock = ui.div(
         ui.div(
-            dark_metric_box("📦 TOTAL QTY OUTSTANDING", f"{sum([safe_int(x.get('qty', 0)) for x in special_items]):,} PCS", "#3182CE"),
-            dark_metric_box("☣️ KARANTINA", f"{sum([safe_int(x.get('qty', 0)) for x in special_items if 'KARANTINA' in str(x.get('tipe_bin', ''))]):,} PCS", "#E53E3E"),
-            dark_metric_box("📥 INBOUND", f"{sum([safe_int(x.get('qty', 0)) for x in special_items if 'INBOUND' in str(x.get('tipe_bin', ''))]):,} PCS", "#10B981"),
-            dark_metric_box("🚚 PUTAWAY", f"{sum([safe_int(x.get('qty', 0)) for x in special_items if 'PUTAWAY' in str(x.get('tipe_bin', ''))]):,} PCS", "#38BDF8"),
+            dark_metric_box("TOTAL QTY OUTSTANDING", f"{sum([safe_int(x.get('qty', 0)) for x in special_items]):,} PCS", "#3182CE"),
+            dark_metric_box("KARANTINA", f"{sum([safe_int(x.get('qty', 0)) for x in special_items if 'KARANTINA' in str(x.get('tipe_bin', ''))]):,} PCS", "#E53E3E"),
+            dark_metric_box("INBOUND", f"{sum([safe_int(x.get('qty', 0)) for x in special_items if 'INBOUND' in str(x.get('tipe_bin', ''))]):,} PCS", "#10B981"),
+            dark_metric_box("PUTAWAY", f"{sum([safe_int(x.get('qty', 0)) for x in special_items if 'PUTAWAY' in str(x.get('tipe_bin', ''))]):,} PCS", "#38BDF8"),
             style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
         ),
         ui.div(
@@ -2612,19 +2612,19 @@ def warehouse_activity_monitor_view(state: AppState):
     )
 
     # ==========================================================================
-    # RETURN UTAMA
+    # RETURN UTAMA (Di bagian paling bawah fungsi warehouse_activity_monitor_view)
     # ==========================================================================
     return ui.div(
         ui.div(
             ui.div(
-                ui.h4("🏭 Warehouse Activity Monitor (SAP LL01 Full Suite)", style="font-size: 16px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
-                ui.p(f"🕒 Terakhir disinkronkan: {state.ll01_last_sync()} • Filter global mengontrol ringkasan tree dan seluruh tab.", style="color: #718096; font-size: 12px; margin: 0;")
+                ui.h4("Warehouse Activity Monitor", style="font-size: 16px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
+                ui.p(f"Last Sync: {state.ll01_last_sync()} • Filter global mengontrol ringkasan tree dan seluruh tab.", style="color: #718096; font-size: 12px; margin: 0;")
             ),
             ui.tags.button(
                 ui.tags.i(class_="fa-solid fa-arrows-rotate", style="margin-right: 6px;"), "REFRESH DATA CLOUD",
-                # Bagian window.showGlobalSpinner() DIHAPUS agar layar tidak gelap
-                onclick="Shiny.setInputValue('btn_refresh_ll01_all', Math.random(), {priority: 'event'});",
-                style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer;"
+                # KEMBALIKAN window.showGlobalSpinner() DI SINI:
+                onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_refresh_ll01_all', Math.random(), {priority: 'event'});",
+                style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);"
             ),
             style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 1.25rem 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 10px;"
         ),
@@ -2633,10 +2633,10 @@ def warehouse_activity_monitor_view(state: AppState):
         render_sap_ll01_summary_tree(state),
 
         ui.navset_card_tab(
-            ui.nav_panel("📥 1. ALL WAITING", tab1_staging),
-            ui.nav_panel("🚚 2. TRANSFER ORDER", tab2_transfer),
-            ui.nav_panel("⚖️ 3. ALL ADJUSTMENT", tab3_adjustment),
-            ui.nav_panel("📦 4. OUTSTANDING ITEMS", tab4_transit_stock)
+            ui.nav_panel("1. ALL WAITING", tab1_staging),
+            ui.nav_panel("2. TRANSFER ORDER", tab2_transfer),
+            ui.nav_panel("3. ALL ADJUSTMENT", tab3_adjustment),
+            ui.nav_panel("4. OUTSTANDING ITEMS", tab4_transit_stock)
         ),
         style="width: 100%; padding: 1rem;"
     )
