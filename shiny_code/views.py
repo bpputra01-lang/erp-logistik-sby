@@ -2152,6 +2152,9 @@ def clean_jezpro_card_text(raw_text):
 # ==============================================================================
 # KOMPONEN TREE MONITOR WAREHOUSE (CLEAN & MODERN DESIGN)
 # ==============================================================================
+# ==============================================================================
+# KOMPONEN TREE MONITOR WAREHOUSE (CLEAN & MODERN DESIGN)
+# ==============================================================================
 def render_sap_ll01_summary_tree(state: AppState):
     sel_store = state.ll01_global_store()
     sel_branch_tf = sel_store.replace("JEZ ", "").strip().upper()
