@@ -2157,103 +2157,115 @@ def render_sap_ll01_summary_tree(state: AppState):
     sel_branch_tf = sel_store.replace("JEZ ", "").strip().upper()
     now_str = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
 
-    # --- Kalkulasi Data (Sesuai dengan isi 4 Tab) ---
+    # --- 1. Kalkulasi Data: ALL WAITING (Berdasarkan QTY) ---
     stg_items = state.get_filtered_ll01()
-    c_stg_total = len(stg_items)
-    c_stg_inb = sum(1 for x in stg_items if x.get("kategori") == "MASUK_RAK")
-    c_stg_ref = sum(1 for x in stg_items if x.get("kategori") == "REFUND")
-    c_stg_crit = sum(1 for x in stg_items if "CRITICAL" in str(x.get("ll01_status", "")))
+    qty_wait_refund = sum(safe_int(x.get("qty", 1)) for x in stg_items if x.get("kategori") == "REFUND")
+    qty_wait_offline = sum(safe_int(x.get("qty", 1)) for x in stg_items if x.get("kategori") == "MASUK_RAK")
+    qty_wait_total = qty_wait_refund + qty_wait_offline
 
+    # --- 2. Kalkulasi Data: TRANSFER ORDER (Berdasarkan QTY) ---
     tf_headers = state.get_filtered_tf_headers()
-    c_tf_in, c_tf_out, c_tf_draft, c_tf_prog, c_tf_crit = 0, 0, 0, 0, 0
-
+    qty_tf_in, qty_tf_out = 0, 0
     for x in tf_headers:
-        st = str(x.get("stf_status", "DRAFT")).upper()
         start_st = str(x.get("start_store", "")).upper()
         end_st = str(x.get("end_store", "")).upper()
-        aging = float(x.get("aging_hours") or 0)
-
-        if aging >= 24.0: c_tf_crit += 1
-        if "DRAFT" in st: c_tf_draft += 1
-        elif "PROGRESS" in st or "IN PROGRESS" in st: c_tf_prog += 1
-
-        if sel_branch_tf != "SEMUA":
-            if sel_branch_tf in end_st and sel_branch_tf not in start_st: c_tf_in += 1
-            elif sel_branch_tf in start_st and sel_branch_tf not in end_st: c_tf_out += 1
-            else:
-                if sel_branch_tf in start_st: c_tf_out += 1
-                if sel_branch_tf in end_st: c_tf_in += 1
-        else:
-            c_tf_out += 1
-
-    c_tf_total = len(tf_headers)
-
-    ma_items = state.get_filtered_ma_data()
-    c_ma_total = len(ma_items)
-    c_ma_crit = sum(1 for x in ma_items if float(x.get("aging_hours") or 0) >= 24.0)
-
-    sa_items = state.get_filtered_single_adj_data()
-    c_sa_total = len(sa_items)
-
-    buffer_items = state.get_filtered_ll01_special_stock()
-    c_buf_total = len(buffer_items)
-    c_buf_karan = sum(1 for x in buffer_items if "KARANTINA" in str(x.get("tipe_bin", "")))
-    c_buf_inb = sum(1 for x in buffer_items if "INBOUND" in str(x.get("tipe_bin", "")))
-    c_buf_out = sum(1 for x in buffer_items if "OUT" in str(x.get("tipe_bin", "")))
-
-    # --- Helper UI untuk Baris Tree yang Clean ---
-    def clean_tree_row(level, text, count, time_text, is_critical=False, is_warn=False, is_header=False):
-        # 1. Warna Status
-        if is_critical and count > 0:
-            status_color = "#E53E3E" # Merah
-            icon_status = "fa-circle-exclamation"
-        elif is_warn and count > 0:
-            status_color = "#DD6B20" # Orange
-            icon_status = "fa-triangle-exclamation"
-        else:
-            status_color = "#10B981" # Hijau
-            icon_status = "fa-circle-check"
-
-        # 2. Level Indentasi & Styling Text
-        indent_px = level * 28
+        q_send = safe_int(x.get("qty_send", 0))
         
+        if sel_branch_tf != "SEMUA":
+            if sel_branch_tf in end_st and sel_branch_tf not in start_st: 
+                qty_tf_in += q_send
+            elif sel_branch_tf in start_st and sel_branch_tf not in end_st: 
+                qty_tf_out += q_send
+            else:
+                if sel_branch_tf in start_st: qty_tf_out += q_send
+                if sel_branch_tf in end_st: qty_tf_in += q_send
+        else:
+            qty_tf_out += q_send
+    
+    qty_tf_total = qty_tf_in + qty_tf_out
+
+    # --- 3. Kalkulasi Data: ALL ADJUSTMENT (Berdasarkan JUMLAH BARIS/DOKUMEN) ---
+    ma_items = state.get_filtered_ma_data()
+    sa_items = state.get_filtered_single_adj_data()
+    
+    count_adj_appr = 0
+    count_adj_exec = 0
+    
+    for x in ma_items:
+        appr_stat = str(x.get("approve", "")).upper()
+        if "APPROVAL" in appr_stat or "PENDING" in appr_stat or "NEED" in appr_stat:
+            count_adj_appr += 1
+        else:
+            count_adj_exec += 1
+            
+    for x in sa_items:
+        sa_stat = str(x.get("status", "")).upper()
+        if "APPROVAL" in sa_stat or "PENDING" in sa_stat or "NEED" in sa_stat:
+            count_adj_appr += 1
+        else:
+            count_adj_exec += 1
+            
+    count_adj_total = count_adj_appr + count_adj_exec
+
+    # --- 4. Kalkulasi Data: OUTSTANDING ITEMS (Berdasarkan QTY) ---
+    buffer_items = state.get_filtered_ll01_special_stock()
+    qty_inb = sum(safe_int(x.get("qty", 0)) for x in buffer_items if "INB" in str(x.get("tipe_bin", "")).upper())
+    qty_out = sum(safe_int(x.get("qty", 0)) for x in buffer_items if "OUT" in str(x.get("tipe_bin", "")).upper())
+    qty_put = sum(safe_int(x.get("qty", 0)) for x in buffer_items if "PUTAWAY" in str(x.get("tipe_bin", "")).upper())
+    qty_outstd_total = qty_inb + qty_out + qty_put
+
+    # --- Helper UI untuk Visual Tree yang Clean ---
+    def clean_tree_row(text, count, time_text, is_header=False):
+        # Aturan Warna (Traffic Light) berdasar angka
+        if count == 0:
+            status_color = "#10B981" # Hijau
+        elif count <= 5:
+            status_color = "#D69E2E" # Kuning/Orange
+        else:
+            status_color = "#E53E3E" # Merah
+
         if is_header:
             bg_row = "#F8FAFC"
             font_weight = "800"
             text_color = "#1A202C"
             border_bottom = "border-bottom: 2px solid #E2E8F0;"
-            icon_tree = '<i class="fa-regular fa-folder-open" style="color: #4A5568; margin-right: 10px; font-size: 14px;"></i>'
+            tree_icon = ui.div(ui.tags.i(class_="fa-regular fa-folder-open", style="color: #4A5568; font-size: 14px; margin-right: 12px;"), style="display: flex; align-items: center;")
         else:
             bg_row = "#FFFFFF"
             font_weight = "600"
             text_color = "#4A5568"
             border_bottom = "border-bottom: 1px solid #F1F5F9;"
-            # Ikon anak panah siku (seperti tree view modern)
-            icon_tree = '<i class="fa-solid fa-arrow-turn-up fa-rotate-90" style="color: #CBD5E0; margin-right: 10px; margin-left: 6px; font-size: 12px;"></i>'
+            # Garis konektor menyiku ala "Tree"
+            tree_icon = ui.div(style="width: 14px; height: 22px; border-left: 2px solid #CBD5E0; border-bottom: 2px solid #CBD5E0; border-bottom-left-radius: 4px; margin-left: 6px; margin-right: 16px; margin-top: -12px;")
+
+        # Bulatan Indikator
+        indicator = ui.div(style=f"width: 10px; height: 10px; border-radius: 50%; background-color: {status_color}; margin-right: 12px; box-shadow: 0 0 4px {status_color}80; flex-shrink: 0;")
+
+        # Badge Count
+        badge = ui.div(
+            str(count),
+            style=f"background: {status_color}15; color: {status_color}; font-weight: 800; font-size: 12px; padding: 2px 8px; border-radius: 12px; min-width: 36px; text-align: center; margin-right: 14px; border: 1px solid {status_color}40;"
+        )
 
         return ui.div(
             ui.div(
-                ui.HTML(icon_tree),
-                # Badge Angka
-                ui.div(
-                    str(count),
-                    style=f"background: {status_color}15; color: {status_color}; font-weight: 800; font-size: 12px; padding: 2px 8px; border-radius: 12px; min-width: 36px; text-align: center; margin-right: 12px; border: 1px solid {status_color}40;"
-                ),
+                tree_icon,
+                indicator,
+                badge,
                 ui.span(text, style=f"font-weight: {font_weight}; color: {text_color}; font-size: 13px;"),
-                style=f"display: flex; align-items: center; padding-left: {indent_px}px;"
-            ),
-            ui.div(
-                ui.tags.i(class_=f"fa-solid {icon_status}", style=f"color: {status_color}; margin-right: 8px; font-size: 12px;"),
-                ui.span(time_text, style="font-size: 11px; color: #718096; font-weight: 600; font-family: monospace;"),
                 style="display: flex; align-items: center;"
             ),
-            style=f"display: flex; justify-content: space-between; align-items: center; background-color: {bg_row}; {border_bottom} padding: 8px 16px;"
+            ui.div(
+                ui.span(time_text, style="font-size: 11px; color: #A0AEC0; font-weight: 600; font-family: monospace;"),
+                style="display: flex; align-items: center;"
+            ),
+            style=f"display: flex; justify-content: space-between; align-items: center; background-color: {bg_row}; {border_bottom} padding: 10px 16px;"
         )
 
     store_name_label = f"📍 {sel_store}" if sel_store != "SEMUA" else "📍 ALL SITES (SURABAYA & CABANG)"
 
     return ui.div(
-        # --- Header Box Modern ---
+        # --- Header Title Box ---
         ui.div(
             ui.div(
                 ui.tags.i(class_="fa-solid fa-network-wired", style="color: #3182CE; font-size: 16px; margin-right: 8px;"),
@@ -2264,35 +2276,30 @@ def render_sap_ll01_summary_tree(state: AppState):
             style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; margin-bottom: 4px; border-bottom: 2px solid #E2E8F0;"
         ),
         
-        # --- Tree List ---
+        # --- Tree List Structure ---
         ui.div(
-            # Root Tersembunyi / digabung langsung ke header biar clean
-            # 1. Unconfirmed Transfer Orders
-            clean_tree_row(0, "1. Unconfirmed Transfer Orders (Open Orders)", c_tf_total, now_str, is_critical=(c_tf_crit > 0), is_warn=(c_tf_total > 0), is_header=True),
-            clean_tree_row(1, "Open Transfer Orders (TF IN)", c_tf_in, now_str),
-            clean_tree_row(1, "Open Transfer Orders (TF OUT)", c_tf_out, now_str),
-            clean_tree_row(1, "Draft Transfer Orders", c_tf_draft, now_str),
-            clean_tree_row(1, "In Progress Transfer Orders", c_tf_prog, now_str, is_warn=True),
-            clean_tree_row(1, "Critical Stuck Transfers (>24 Hours)", c_tf_crit, now_str, is_critical=True),
+            # TAB 1: ALL WAITING
+            clean_tree_row("1. ALL WAITING", qty_wait_total, now_str, is_header=True),
+            clean_tree_row("WAITING REFUND", qty_wait_refund, now_str),
+            clean_tree_row("WAITING OFFLINE", qty_wait_offline, now_str),
 
-            # 2. Open Staging Transit
-            clean_tree_row(0, "2. Open Staging Transit (Waiting Putaway & Refund)", c_stg_total, now_str, is_critical=(c_stg_crit > 0), is_warn=(c_stg_total > 0), is_header=True),
-            clean_tree_row(1, "Movement Type 101 Goods Receipt (Masuk Rak)", c_stg_inb, now_str),
-            clean_tree_row(1, "Movement Type 601 GI / Return Refund", c_stg_ref, now_str),
-            clean_tree_row(1, "Critical Staging Waiting (>2 Hours)", c_stg_crit, now_str, is_critical=True),
+            # TAB 2: TRANSFER ORDER
+            clean_tree_row("2. TRANSFER ORDER", qty_tf_total, now_str, is_header=True),
+            clean_tree_row("OPEN TF IN", qty_tf_in, now_str),
+            clean_tree_row("OPEN TF OUT", qty_tf_out, now_str),
 
-            # 3. Unapproved Stock Adjustments
-            clean_tree_row(0, "3. Open Stock Adjustments (Pending Postings)", c_ma_total + c_sa_total, now_str, is_critical=(c_ma_crit > 0), is_warn=(c_ma_total + c_sa_total > 0), is_header=True),
-            clean_tree_row(1, "Mass Adjustments (MADJ) Menggantung", c_ma_total, now_str, is_critical=(c_ma_crit > 0)),
-            clean_tree_row(1, "Single Adjustment Need Approval", c_sa_total, now_str, is_warn=True),
+            # TAB 3: ALL ADJUSTMENT (Menggunakan Row Count)
+            clean_tree_row("3. ALL ADJUSTMENT", count_adj_total, now_str, is_header=True),
+            clean_tree_row("OUTSTANDING ADJUSTMENT (NEED APPROVAL)", count_adj_appr, now_str),
+            clean_tree_row("OUTSTANDING ADJUSTMENT (NEED EKSEKUSI)", count_adj_exec, now_str),
 
-            # 4. Interim Storage & Buffer
-            clean_tree_row(0, "4. Interim Storage & Buffer Stock (Karantina / Buffer)", c_buf_total, now_str, is_warn=(c_buf_karan > 0), is_header=True),
-            clean_tree_row(1, "DestStorType 999 Karantina DC / Store", c_buf_karan, now_str, is_critical=True),
-            clean_tree_row(1, "Interim Inbound / Putaway Buffer", c_buf_inb, now_str),
-            clean_tree_row(1, "Shipping Area / Outbound Buffer", c_buf_out, now_str),
+            # TAB 4: OUTSTANDING ITEMS
+            clean_tree_row("4. OUTSTANDING ITEMS", qty_outstd_total, now_str, is_header=True),
+            clean_tree_row("INBOUND AREA", qty_inb, now_str),
+            clean_tree_row("OUTBOUND AREA", qty_out, now_str),
+            clean_tree_row("PUTAWAY AREA", qty_put, now_str),
 
-            style="border-radius: 8px; overflow: hidden; border: 1px solid #E2E8F0;"
+            style="border-radius: 8px; overflow: hidden; border: 1px solid #E2E8F0; margin-top: 8px;"
         ),
         style="background: #FFFFFF; border-radius: 12px; padding: 16px; margin-bottom: 1.5rem; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid #E2E8F0;"
     )
