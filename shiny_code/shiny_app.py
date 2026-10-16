@@ -4710,7 +4710,8 @@ def server(input: Inputs, output: Outputs, session: Session):
             df_export.to_excel(writer, sheet_name='LL01_STAGING_MONITOR', index=False)
         buf.seek(0)
         yield buf.getvalue()
-        # Event Refresh Seluruh Data LL01 (Staging + Transfer)@reactive.Effect
+        
+    @reactive.Effect
     @reactive.event(input.btn_refresh_ll01_all)
     def refresh_warehouse_monitor():
         state.load_ll01_data_from_supabase()
