@@ -17,11 +17,14 @@ JEZPRO_PASS  = os.environ.get("JEZPRO_PASSWORD")
 
 BRANCH_MAP = {
     "JEZ SURABAYA": {"st_id": 3, "db_id": "SURABAYA_LATEST"},
+    "JEZ KEDIRI": {"st_id": 5, "db_id": "KEDIRI_LATEST"},            # 🌟 Diperbaiki: value="5"
     "JEZ MALANG": {"st_id": 2, "db_id": "MALANG_LATEST"},
-    "JEZ SIDOARJO": {"st_id": 8, "db_id": "SIDOARJO_LATEST"},
-    "JEZ KEDIRI": {"st_id": 51, "db_id": "KEDIRI_LATEST"},
     "JEZ JEMBER": {"st_id": 40, "db_id": "JEMBER_LATEST"},
+    "JEZ SIDOARJO": {"st_id": 8, "db_id": "SIDOARJO_LATEST"},
     "JEZ SEMARANG": {"st_id": 53, "db_id": "SEMARANG_LATEST"},
+    "HUB JAKARTA": {"st_id": 55, "db_id": "JAKARTA_LATEST"},         # 🌟 Baru: value="55"
+    "ONLINE HUB SURABAYA": {"st_id": 30, "db_id": "ONL_SBY_LATEST"}, # 🌟 Baru: value="30"
+    "ONLINE HUB MALANG": {"st_id": 20, "db_id": "ONL_MLG_LATEST"},   # 🌟 Baru: value="20"
 }
 
 # ==============================================================================
@@ -105,24 +108,28 @@ def create_jezpro_session():
     return session
 
 def detect_store_id_smart(item_dict, raw_html, bin_text):
-    # Gabungkan semua data JSON & HTML lalu cari teks cabangnya (seperti di badge ungu)
     dump_text = (str(item_dict) + " " + str(raw_html)).upper()
     
-    if "JEZ KEDIRI" in dump_text: return 51
+    if "HUB JAKARTA" in dump_text or "JKT" in dump_text: return 55
+    if "ONLINE HUB MALANG" in dump_text: return 20
+    if "ONLINE HUB SURABAYA" in dump_text: return 30
+    if "JEZ KEDIRI" in dump_text: return 5
     if "JEZ JEMBER" in dump_text: return 40
     if "JEZ SEMARANG" in dump_text: return 53
     if "JEZ SIDOARJO" in dump_text: return 8
     if "JEZ MALANG" in dump_text: return 2
     if "JEZ SURABAYA" in dump_text: return 3
     
-    # Fallback terakhir jika tidak ada badge nama cabang, baru nebak dari nama BIN
+    # Fallback dari nama BIN
     b = str(bin_text).strip().upper()
-    if "KDR" in b: return 51
+    if "JKT" in b: return 55
+    if "KDR" in b: return 5
     if "JBR" in b: return 40
     if "SMG" in b: return 53
     if "SDA" in b: return 8
     if any(k in b for k in ["DAU", "KAV", "MALANG", "MLG"]): return 2
     return 3
+
 
 # ==============================================================================
 # 1. MODUL STAGING (ALL AREA GLOBAL)
@@ -150,81 +157,162 @@ def parse_to_iso_timestamp(dt_raw):
         pass
     return datetime.now(timezone(timedelta(hours=7))).isoformat()
 
-def fetch_staging_data(session, endpoint_path, kategori_label, waiting_val):
-    print(f"📥 [2/6] Menarik data staging [{kategori_label}] secara Global (Sekali Tarik)...")
-    url = f"https://jezpro.id/{endpoint_path}"
+# ==============================================================================
+# HELPER PEMBERSIH ARTIKEL DARI STOCK TRACKING
+# ==============================================================================
+def clean_stock_tracking_article(raw_html):
+    if not raw_html:
+        return {"article": "-", "brand": "-"}
+    s = strip_html(str(raw_html)).strip()
+    
+    # Ambil brand di dalam kurung siku pertama, contoh: [ORTUSEIGHT]
+    m_brand = re.search(r'\[(.*?)\]', s)
+    brand_val = m_brand.group(1).strip() if m_brand else "-"
+    
+    # Hapus [BRAND] di depan nama artikel
+    clean_name = re.sub(r'^\[.*?\]\s*', '', s)
+    # Hapus harga di belakang artikel (contoh: | 499000 | 299400)
+    clean_name = clean_name.split('|')[0].strip()
+    
+    return {"article": clean_name if clean_name else s, "brand": brand_val}
+
+# ==============================================================================
+# 1. MODUL STAGING VIA STOCK TRACKING (SEMUA 9 CABANG >= 2026)
+# ==============================================================================
+def fetch_staging_from_stock_tracking(session):
+    print("📥 [2/6] Menarik Data Staging & Refund dari Stock Tracking (9 Cabang Lengkap >= 2026)...")
+    url = "https://jezpro.id/stock_tracking_datatables"
     headers = {
         "Accept": "application/json, text/javascript, */*; q=0.01",
         "X-Requested-With": "XMLHttpRequest",
-        "Referer": "https://jezpro.id/helper_backup"
+        "Referer": "https://jezpro.id/stock_tracking"
     }
 
-    params = {
-        "draw": "1", "columns[0][data]": "article", "columns[0][name]": "article",
-        "columns[0][searchable]": "true", "columns[0][orderable]": "false",
-        "columns[0][search][value]": "", "columns[0][search][regex]": "false",
-        "order[0][column]": "0", "order[0][dir]": "desc",
-        "start": "0", "length": "10000", "search": "", 
-        "st_id": "", 
-        "waiting": waiting_val
-    }
+    # 🌟 FILTER TANGGAL: Mulai tahun 2026 s/d hari ini
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    date_range = f"2026-01-01|{today_str}"
 
-    res = session.get(url, params=params, headers=headers)
-    if res.status_code != 200:
-        print(f"   ⚠️ Gagal tarik data staging {kategori_label} (HTTP {res.status_code})")
-        return []
-    
-    try:
-        raw_list = res.json().get("data", [])
-    except Exception:
-        raw_list = []
+    # Target query status
+    query_targets = [
+        {"status": "REFUND", "search": ""},
+        {"status": "WAITING OFFLINE", "search": ""},
+        {"status": "", "search": "WAITING"}
+    ]
 
-    clean_records = []
-    for idx_item, item in enumerate(raw_list):
-        raw_art = item.get("article") or item.get("art_name") or "-"
-        parsed = clean_html_card(raw_art)
-
-        bin_target_str = parsed["bin"] if parsed["bin"] != "-" else strip_html(item.get("rack_name") or item.get("bin") or "-")
-        
-        # 🔥 MAGIC BARU: Python baca badge "JEZ KEDIRI" di HTML!
-        real_store_id = detect_store_id_smart(item, raw_art, bin_target_str)
-
-        raw_id = item.get("plst_id") or item.get("pls_id") or item.get("plstr_id") or item.get("id")
-        if raw_id:
-            p_id = safe_int_val(raw_id)
-        else:
-            p_id = abs(hash(f"{kategori_label}_{real_store_id}_{parsed['article']}_{idx_item}_{time.time()}")) % 2147483647
-
-        scanned_iso = parse_to_iso_timestamp(item.get("created_at") or item.get("date"))
-
-        clean_records.append({
-            "plst_id": int(p_id),
-            "pls_id": int(item.get("pls_id") or p_id),
-            "kategori": kategori_label,
-            "waiting_status": item.get("waiting") or waiting_val,
-            "brand": parsed["brand"] if parsed["brand"] != "-" else (item.get("brand") or "-"),
-            "article_name": parsed["article"],
-            "qty": safe_int_val(item.get("plst_qty") or item.get("qty"), 1),
-            "bin_target": bin_target_str,
-            "pic_name": strip_html(item.get("user_name") or item.get("scanned_by") or "Petugas"),
-            "scanned_at": scanned_iso,
-            "store_id": int(real_store_id),
-            "synced_at": datetime.now(timezone(timedelta(hours=7))).isoformat()
-        })
-
-    print(f"   -> Ditemukan total {len(clean_records)} baris staging {kategori_label}.")
-    
-    # PEMBERSIH DUPLIKAT PLST_ID
+    all_clean_records = []
     seen_ids = set()
-    unique_records = []
-    for rec in clean_records:
-        pid = rec["plst_id"]
-        if pid not in seen_ids:
-            seen_ids.add(pid)
-            unique_records.append(rec)
-            
-    print(f"   -> Setelah dibersihkan (unik), tersisa {len(unique_records)} baris staging {kategori_label}.")
-    return unique_records
+
+    # 🌟 LOOP KE SEMUA 9 CABANG
+    for branch_name, b_info in BRANCH_MAP.items():
+        st_id = b_info["st_id"]
+        branch_found_count = 0
+
+        for q in query_targets:
+            params = {
+                "draw": "1",
+                "columns[0][data]": "DT_RowIndex", "columns[0][name]": "plst_id", "columns[0][orderable]": "true",
+                "columns[1][data]": "datetime", "columns[1][name]": "plst_created", "columns[1][orderable]": "true",
+                "columns[2][data]": "ps_barcode", "columns[2][name]": "ps_barcode", "columns[2][orderable]": "true",
+                "columns[3][data]": "article", "columns[3][name]": "p_name", "columns[3][orderable]": "true",
+                "columns[4][data]": "invoice", "columns[4][name]": "p_name", "columns[4][orderable]": "true",
+                "columns[5][data]": "cust_name", "columns[5][name]": "cust_name", "columns[5][orderable]": "true",
+                "columns[6][data]": "qty", "columns[6][name]": "p_name", "columns[6][orderable]": "true",
+                "columns[7][data]": "product_location", "columns[7][name]": "pl_code", "columns[7][orderable]": "true",
+                "columns[8][data]": "status", "columns[8][name]": "plst_status", "columns[8][orderable]": "true",
+                "columns[9][data]": "instock_source", "columns[9][name]": "instock_source_status", "columns[9][orderable]": "false",
+                "order[0][column]": "0", "order[0][dir]": "desc",
+                "start": "0",
+                "length": "-1",
+                "search": q["search"],
+                "status": q["status"],
+                "instock_source": "",
+                "psc_id": "",
+                "std_id": str(st_id),  # 🌟 SUNTIKKAN ID TOKO KE std_id
+                "br_id": "",
+                "st_id": str(st_id),   # 🌟 SUNTIKKAN ID TOKO KE st_id
+                "date": date_range
+            }
+
+            try:
+                res = session.get(url, params=params, headers=headers)
+                if res.status_code != 200:
+                    continue
+                raw_list = res.json().get("data", [])
+            except Exception:
+                raw_list = []
+
+            for idx, item in enumerate(raw_list):
+                status_raw = strip_html(item.get("status") or item.get("plst_status") or "").upper()
+                loc_raw = strip_html(item.get("product_location") or item.get("pl_code") or "").upper()
+
+                # 1. Filter Status: Harus REFUND atau mengandung kata WAITING
+                is_refund = "REFUND" in status_raw
+                is_waiting = "WAITING" in status_raw or "WAITING" in loc_raw
+
+                if not (is_refund or is_waiting):
+                    continue
+
+                # 2. Filter Tahun: Pastikan hanya tahun 2026 ke atas
+                dt_raw = strip_html(item.get("datetime") or item.get("plst_created") or "")
+                doc_year = None
+                for fmt in ("%d/%m/%Y %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%d-%m-%Y %H:%M:%S", "%d/%m/%Y", "%Y-%m-%d"):
+                    try:
+                        dt_obj = datetime.strptime(dt_raw[:19].strip(), fmt)
+                        doc_year = dt_obj.year
+                        break
+                    except Exception:
+                        pass
+
+                if doc_year is None:
+                    years = re.findall(r'\b(20\d{2})\b', dt_raw)
+                    if years:
+                        doc_year = int(years[0])
+
+                if doc_year is not None and doc_year < 2026:
+                    continue
+
+                kategori_label = "REFUND" if is_refund else "MASUK_RAK"
+
+                # 3. ID Unik & Anti-Duplikat
+                raw_id = item.get("plst_id") or item.get("id") or item.get("DT_RowIndex")
+                p_id = safe_int_val(raw_id)
+                if not p_id or p_id in seen_ids:
+                    bar = strip_html(item.get("ps_barcode") or "")
+                    p_id = abs(hash(f"{st_id}_{bar}_{dt_raw}_{idx}")) % 2147483647
+
+                if p_id in seen_ids:
+                    continue
+                seen_ids.add(p_id)
+
+                # 4. Format Bersih
+                raw_art = item.get("article") or item.get("p_name") or "-"
+                art_info = clean_stock_tracking_article(raw_art)
+                scanned_iso = parse_to_iso_timestamp(dt_raw)
+
+                # Simpan data
+                all_clean_records.append({
+                    "plst_id": int(p_id),
+                    "pls_id": int(item.get("pls_id") or p_id),
+                    "kategori": kategori_label,
+                    "waiting_status": status_raw if status_raw else kategori_label,
+                    "brand": art_info["brand"],
+                    "article_name": art_info["article"],
+                    "qty": safe_int_val(item.get("qty"), 1),
+                    "bin_target": loc_raw if loc_raw else "[STAGING INBOUND]",
+                    "pic_name": strip_html(item.get("u_name") or item.get("user_name") or item.get("cust_name") or "Petugas"),
+                    "scanned_at": scanned_iso,
+                    "store_id": int(st_id),
+                    "synced_at": datetime.now(timezone(timedelta(hours=7))).isoformat()
+                })
+                branch_found_count += 1
+
+            time.sleep(0.08)
+
+        if branch_found_count > 0:
+            print(f"   -> {branch_name} (ID: {st_id}): {branch_found_count} item (>= 2026).")
+
+    print(f"✅ Selesai! Terkumpul total {len(all_clean_records)} item Staging/Refund dari seluruh cabang (>= 2026).")
+    return all_clean_records
 # ==============================================================================
 # 2. MODUL TRANSFER STOK (ALL AREA LINTAS CABANG)
 # ==============================================================================
@@ -777,10 +865,12 @@ def push_all_to_supabase(staging_data, tf_headers, tf_items, ma_headers, ma_item
 if __name__ == "__main__":
     jez = create_jezpro_session()
     
-    # 1. Staging (Global All Store)
-    all_staging = []
-    all_staging.extend(fetch_staging_data(jez, "scan_product_in_datatables", "MASUK_RAK", "WAITING OFFLINE"))
-    all_staging.extend(fetch_staging_data(jez, "scan_product_in_refund_datatables", "REFUND", "Refund"))
+    # Kunjungi juga halaman stock tracking agar session/tokennya siap
+    jez.get("https://jezpro.id/stock_tracking")
+    
+    # 1. Staging (Tarik Global All Cabang dari Stock Tracking)
+    all_staging = fetch_staging_from_stock_tracking(jez)
+    
     # 2. Transfer Stok (All Area)
     tf_headers, tf_items = fetch_transfer_data(jez)
     
