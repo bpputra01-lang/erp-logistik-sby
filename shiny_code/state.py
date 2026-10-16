@@ -6499,15 +6499,35 @@ class AppState:
         return filtered
 
     def get_filtered_ll01_special_stock(self) -> list[dict]:
+        """Filter khusus Tab 4 (Outstanding Items) - MURNI CABANG & SEARCH (TANPA FILTER TANGGAL)"""
         data = self.ll01_special_stock_list()
-        if not data: return []
+        if not data:
+            return []
+
+        store_f = self.ll01_global_store()
+        note_q = self.ll01_global_note()
+
         filtered = []
         for x in data:
-            # Gabungkan SELURUH kolom/nilai dalam 1 baris record menjadi teks universal
-            row_text = " ".join([str(v) for v in x.values() if v is not None])
-            if self._match_global_filter(datetime.now().strftime("%Y-%m-%d"), row_text, row_text):
-                filtered.append(x)
+            row_text = " ".join([str(v) for v in x.values() if v is not None]).upper()
+
+            # 1. Filter Store / Cabang Saja
+            if store_f != "SEMUA":
+                sf_clean = store_f.replace("JEZ ", "").strip().upper()
+                branch_clean = str(x.get("branch", "")).strip().upper()
+                if sf_clean not in branch_clean and sf_clean not in row_text:
+                    continue
+
+            # 2. Filter Kata Kunci Pencarian (Search) Jika Diisi
+            if note_q and note_q.strip():
+                if note_q.strip().upper() not in row_text:
+                    continue
+
+            # ✅ LOLOS: Tidak ada pemeriksaan tanggal sama sekali
+            filtered.append(x)
+
         return filtered
+        
     # Metrik Ringkasan LL01
     def ll01_metric_total_antrean(self) -> int:
         return sum([safe_int(x.get("qty", 1)) for x in self.get_filtered_ll01()])
