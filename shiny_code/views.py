@@ -2217,41 +2217,44 @@ def render_sap_ll01_summary_tree(state: AppState):
 
     # --- Helper UI untuk Visual Tree yang Clean & Zebra Striping ---
     def clean_tree_row(text, count, time_text, is_header=False, is_alt=False):
-        # Aturan Warna (Traffic Light) berdasar angka Qty/Count
+        # Aturan Warna (Traffic Light) berdasar angka
+        inactive_style = "border: 1.5px solid #A0AEC0; background-color: transparent;" # Lingkaran kosong (Abu-abu gelap)
+
         if count == 0:
-            status_color = "#10B981" # Hijau Utama
-            c_red, c_yel, c_grn = "#E2E8F0", "#E2E8F0", "#10B981"
-            s_red, s_yel, s_grn = "", "", "box-shadow: 0 0 6px #10B981;"
+            status_color = "#10B981" # Hijau
+            style_r = inactive_style
+            style_y = inactive_style
+            style_g = f"background-color: {status_color}; border: 1.5px solid {status_color}; box-shadow: 0 0 6px {status_color};"
         elif count <= 5:
-            status_color = "#D69E2E" # Kuning Utama
-            c_red, c_yel, c_grn = "#E2E8F0", "#D69E2E", "#E2E8F0"
-            s_red, s_yel, s_grn = "", "box-shadow: 0 0 6px #D69E2E;", ""
+            status_color = "#D69E2E" # Kuning/Orange
+            style_r = inactive_style
+            style_y = f"background-color: {status_color}; border: 1.5px solid {status_color}; box-shadow: 0 0 6px {status_color};"
+            style_g = inactive_style
         else:
-            status_color = "#E53E3E" # Merah Utama
-            c_red, c_yel, c_grn = "#E53E3E", "#E2E8F0", "#E2E8F0"
-            s_red, s_yel, s_grn = "box-shadow: 0 0 6px #E53E3E;", "", ""
+            status_color = "#E53E3E" # Merah
+            style_r = f"background-color: {status_color}; border: 1.5px solid {status_color}; box-shadow: 0 0 6px {status_color};"
+            style_y = inactive_style
+            style_g = inactive_style
 
         if is_header:
-            bg_row = "#E2E8F0" # Background dibikin lebih gelap agar sangat kontras dengan isinya
+            bg_row = "#E2E8F0" # Background lebih gelap untuk folder header
             font_weight = "900"
             text_color = "#1A202C"
             border_bottom = "border-bottom: 2px solid #CBD5E0;"
             tree_icon = ui.div(ui.tags.i(class_="fa-solid fa-folder-open", style="color: #4A5568; font-size: 14px; margin-right: 12px;"), style="display: flex; align-items: center;")
         else:
-            # Menggunakan Zebra Striping / Selang-seling warna agar mata mudah membaca
             bg_row = "#F7FAFC" if is_alt else "#FFFFFF" 
             font_weight = "700"
             text_color = "#2D3748"
             border_bottom = "border-bottom: 1px solid #E2E8F0;"
-            # Garis konektor menyiku ala "Tree" yang lebih solid
             tree_icon = ui.div(style="width: 14px; height: 22px; border-left: 2px solid #A0AEC0; border-bottom: 2px solid #A0AEC0; border-bottom-left-radius: 4px; margin-left: 6px; margin-right: 16px; margin-top: -12px;")
 
         # 3 Bulatan Indikator (Merah, Kuning, Hijau)
         indicator = ui.div(
-            ui.div(style=f"width: 10px; height: 10px; border-radius: 50%; background-color: {c_red}; margin-right: 4px; {s_red}"),
-            ui.div(style=f"width: 10px; height: 10px; border-radius: 50%; background-color: {c_yel}; margin-right: 4px; {s_yel}"),
-            ui.div(style=f"width: 10px; height: 10px; border-radius: 50%; background-color: {c_grn}; {s_grn}"),
-            style="display: flex; align-items: center; margin-right: 12px; flex-shrink: 0;"
+            ui.div(style=f"width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; {style_r}"),
+            ui.div(style=f"width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; {style_y}"),
+            ui.div(style=f"width: 10px; height: 10px; border-radius: 50%; {style_g}"),
+            style="display: flex; align-items: center; margin-right: 14px; flex-shrink: 0;"
         )
 
         # Badge Count Text

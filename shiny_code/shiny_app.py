@@ -4712,17 +4712,15 @@ def server(input: Inputs, output: Outputs, session: Session):
         # Event Refresh Seluruh Data LL01 (Staging + Transfer)
     @reactive.Effect
     @reactive.event(input.btn_refresh_ll01_all)
-    def _on_refresh_ll01_all():
-        # Tarik semua data dari cloud
+    def refresh_warehouse_monitor():
+        # 1. Load semua data dari Supabase
         state.load_ll01_data_from_supabase()
         state.load_transfer_orders_from_supabase()
         state.load_mass_adjustments_from_supabase()
         state.load_single_adjustments_from_supabase()
         state.load_special_buffer_stock_from_supabase()
-        
-        # Hilangkan layar gelap seketika setelah selesai
-        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
-        ui.notification_show("✅ Seluruh data Warehouse Activity Monitor berhasil disinkronkan dari Cloud!", type="message", duration=4)
+        state.show_success_modal.set(True)
+        ui.insert_accordion_panel("dummy", ui.accordion_panel("", ui.tags.script("window.hideGlobalSpinner();")))
     # ==========================================================================
     # POP-UP DETAIL ITEM TRANSFER (ANTI-CRASH, NATIVE REGEX, DIRECT QUERY)
     # ==========================================================================
