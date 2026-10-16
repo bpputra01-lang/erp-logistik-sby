@@ -13,6 +13,7 @@ from config import get_supabase, safe_int, load_data_from_info, format_datetime_
 class AppState:
     def __init__(self):
         # Navigation & Role
+        # Navigation & Role
         self.logged_in = reactive.Value(False)
         self.role = reactive.Value("DC")
         self.branch = reactive.Value("SURABAYA")
@@ -20,12 +21,15 @@ class AppState:
         self.username = reactive.Value("")
         self.password = reactive.Value("")
         self.login_timestamp_ms = reactive.Value(0)
-        self.main_menu = reactive.Value("Database Ongkir In/Out")
         
+        # 🌟 1. UBAH DEFAULT MENU KE WAREHOUSE ACTIVITY MONITOR
+        self.main_menu = reactive.Value("Warehouse Activity Monitor")
 
         # Sidebar Dropdowns
         self.sidebar_open = reactive.Value(True)
-        self.dropdown_operational = reactive.Value(True)
+        # 🌟 2. DROPDOWN MONITORING TERBUKA SECARA DEFAULT
+        self.dropdown_monitoring = reactive.Value(True)
+        self.dropdown_operational = reactive.Value(False)
         self.dropdown_inventory = reactive.Value(False)
         self.dropdown_extras = reactive.Value(False)
 
@@ -586,7 +590,9 @@ class AppState:
     def set_main_menu(self, menu: str): self.main_menu.set(menu)
     def toggle_sidebar(self): self.sidebar_open.set(not self.sidebar_open())
     def toggle_dropdown(self, key: str):
-        if key == "operational": self.dropdown_operational.set(not self.dropdown_operational())
+        # 🌟 Handle toggle dropdown monitoring
+        if key == "monitoring": self.dropdown_monitoring.set(not self.dropdown_monitoring())
+        elif key == "operational": self.dropdown_operational.set(not self.dropdown_operational())
         elif key == "inventory": self.dropdown_inventory.set(not self.dropdown_inventory())
         elif key == "extras": self.dropdown_extras.set(not self.dropdown_extras())
 
@@ -616,6 +622,9 @@ class AppState:
         self.role.set("DC")
         self.login_timestamp_ms.set(0)
 
+    def get_menu_monitoring(self) -> list[str]:
+        return ["Warehouse Activity Monitor"]
+
     def get_menu_operational(self) -> list[str]:
         if self.role() == "DC":
             return ["Putaway System", "Compare RTO", "Purchase Order Receiving", "Instock Validation", "Compare Penerimaan RTO"]
@@ -623,7 +632,7 @@ class AppState:
 
     def get_menu_inventory(self) -> list[str]:
         if self.role() == "DC":
-            return ["Warehouse Activity Monitor", "Stock Opname", "Cycle Count", "Justification SO", "Stock Minus", "Compare System", "Physical Inventory List", "Validation Barcode SKU", "Cross Check Real & System", "List Retur Out", "Reloc Koli to Koli"]
+            return ["Stock Opname", "Cycle Count", "Justification SO", "Stock Minus", "Compare System", "Physical Inventory List", "Validation Barcode SKU", "Cross Check Real & System", "List Retur Out", "Reloc Koli to Koli"]
         return ["Stock Minus", "Cycle Count", "Compare System", "Justification SO"]
 
     def get_menu_extras(self) -> list[str]:
@@ -652,7 +661,7 @@ class AppState:
         elif cur_menu in ["Latihan Rumus Excel", "Excel Practice", "latihan_excel"]: return "excel_practice"
         elif cur_menu in ["Form Auditor", "Audit Form", "form_auditor"]: return "form_auditor"
         elif cur_menu in ["Memo Pengajuan", "memo_pengajuan"]: return "memo_pengajuan"
-        elif cur_menu in ["Warehouse Activity Monitor", "warehouse_activity_monitor"]: return "warehouse_activity_monitor"
+        elif cur_menu in ["Warehouse Activity Monitor", "Warehouse Monitoring", "warehouse_activity_monitor"]: return "warehouse_activity_monitor"
         return "under_development"
 
 
@@ -6527,7 +6536,7 @@ class AppState:
             filtered.append(x)
 
         return filtered
-        
+
     # Metrik Ringkasan LL01
     def ll01_metric_total_antrean(self) -> int:
         return sum([safe_int(x.get("qty", 1)) for x in self.get_filtered_ll01()])

@@ -4709,18 +4709,16 @@ def server(input: Inputs, output: Outputs, session: Session):
             df_export.to_excel(writer, sheet_name='LL01_STAGING_MONITOR', index=False)
         buf.seek(0)
         yield buf.getvalue()
-        # Event Refresh Seluruh Data LL01 (Staging + Transfer)
-    @reactive.Effect
+        # Event Refresh Seluruh Data LL01 (Staging + Transfer)@reactive.Effect
     @reactive.event(input.btn_refresh_ll01_all)
     def refresh_warehouse_monitor():
-        # 1. Load semua data dari Supabase
         state.load_ll01_data_from_supabase()
         state.load_transfer_orders_from_supabase()
         state.load_mass_adjustments_from_supabase()
         state.load_single_adjustments_from_supabase()
         state.load_special_buffer_stock_from_supabase()
+        # Modal hijau langsung muncul tanpa tirai gelap di belakangnya
         state.show_success_modal.set(True)
-        ui.insert_accordion_panel("dummy", ui.accordion_panel("", ui.tags.script("window.hideGlobalSpinner();")))
     # ==========================================================================
     # POP-UP DETAIL ITEM TRANSFER (ANTI-CRASH, NATIVE REGEX, DIRECT QUERY)
     # ==========================================================================
@@ -4934,14 +4932,11 @@ def server(input: Inputs, output: Outputs, session: Session):
         state.ll01_global_store.set(input.change_ll01_global_store())
 
     @reactive.Effect
-    @reactive.event(input.change_ll01_global_tgl_start)
-    def _on_change_ll01_global_tgl_start():
-        state.ll01_global_tgl_start.set(input.change_ll01_global_tgl_start())
-
-    @reactive.Effect
-    @reactive.event(input.change_ll01_global_tgl_end)
-    def _on_change_ll01_global_tgl_end():
-        state.ll01_global_tgl_end.set(input.change_ll01_global_tgl_end())
+    @reactive.event(input.change_ll01_global_dates)
+    def _on_change_ll01_global_dates():
+        data = input.change_ll01_global_dates() or {}
+        state.ll01_global_tgl_start.set(data.get("start", ""))
+        state.ll01_global_tgl_end.set(data.get("end", ""))
 
     @reactive.Effect
     @reactive.event(input.change_ll01_global_note)

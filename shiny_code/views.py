@@ -343,6 +343,23 @@ CUSTOM_HEAD = ui.head_content(
             padding: 2rem 1.5rem; width: 100%; text-align: center; margin-bottom: 1.25rem;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
         }
+
+        /* HILANGKAN LAYAR REDUP / BLUR BAWAAN SHINY SAAT REKALKULASI */
+        .recalculating, 
+        .shiny-output-binding-busy,
+        .shiny-bound-output.recalculating {
+            opacity: 1 !important;
+            filter: none !important;
+            transition: none !important;
+        }
+
+        /* Jaga input search tetap fokus dan tidak berkedip */
+        #ll01_global_note:focus, 
+        #ll01_global_tgl_start:focus, 
+        #ll01_global_tgl_end:focus {
+            outline: none;
+            border-color: #3182CE !important;
+        }
         .csv-batch-box .shiny-input-container { margin-bottom: 0 !important; width: 100%; }
         .csv-batch-box .input-group { display: flex !important; align-items: center !important; width: 100% !important; margin-bottom: 0 !important; }
         .csv-batch-box .btn-file { background: #1A202C !important; color: #FFFFFF !important; font-weight: 700 !important; border-radius: 6px !important; border: none !important; padding: 8px 16px !important; margin-right: 10px !important; }
@@ -2364,11 +2381,11 @@ def render_sap_ll01_summary_tree(state: AppState):
 def warehouse_activity_monitor_view(state: AppState):
     
     # 1. BARIS FILTER GLOBAL TUNGGAL (POSISI DI ATAS SEBELUM SUMMARY)
+    # 1. BARIS FILTER GLOBAL TUNGGAL (SMART DEBOUNCE SEARCH & TRIGGER AFTER END DATE)
     global_filter_bar = ui.div(
         ui.div(
             ui.span("Choose branch:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
             ui.tags.select(
-                # 👇 PERBARUI DAFTAR PILIHAN CABANG INI 👇
                 *[ui.tags.option(opt, value=opt, selected=(opt == state.ll01_global_store())) for opt in [
                     "SEMUA", 
                     "JEZ SURABAYA", "JEZ KEDIRI", "JEZ MALANG", 
@@ -2383,22 +2400,60 @@ def warehouse_activity_monitor_view(state: AppState):
         ),
         ui.div(
             ui.span("Start Date:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
-            ui.tags.input(type="date", id="ll01_global_tgl_start", value=state.ll01_global_tgl_start(), onchange="Shiny.setInputValue('change_ll01_global_tgl_start', this.value, {priority: 'event'})", style="padding: 5px 8px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; background: white;"),
+            ui.tags.input(
+                type="date", 
+                id="ll01_global_tgl_start", 
+                value=state.ll01_global_tgl_start(),
+                onchange="""
+                    let s = this.value;
+                    let e = document.getElementById('ll01_global_tgl_end').value;
+                    // Hanya kirim jika tanggal dihapus (reset) atau jika end date sudah terisi
+                    if (!s || e) {
+                        Shiny.setInputValue('change_ll01_global_dates', {start: s, end: e}, {priority: 'event'});
+                    }
+                """, 
+                style="padding: 5px 8px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; background: white;"
+            ),
             style="display: flex; flex-direction: column;"
         ),
         ui.div(
             ui.span("End Date:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
-            ui.tags.input(type="date", id="ll01_global_tgl_end", value=state.ll01_global_tgl_end(), onchange="Shiny.setInputValue('change_ll01_global_tgl_end', this.value, {priority: 'event'})", style="padding: 5px 8px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; background: white;"),
+            ui.tags.input(
+                type="date", 
+                id="ll01_global_tgl_end", 
+                value=state.ll01_global_tgl_end(),
+                onchange="""
+                    // Trigger filter hanya setelah memilih End Date
+                    let s = document.getElementById('ll01_global_tgl_start').value;
+                    let e = this.value;
+                    Shiny.setInputValue('change_ll01_global_dates', {start: s, end: e}, {priority: 'event'});
+                """, 
+                style="padding: 5px 8px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; background: white;"
+            ),
             style="display: flex; flex-direction: column;"
         ),
         ui.div(
             ui.span("Search:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
-            ui.tags.input(type="text", id="ll01_global_note", value=state.ll01_global_note(), placeholder="Ketik kata kunci...", oninput="Shiny.setInputValue('change_ll01_global_note', this.value, {priority: 'event'})", style="padding: 6px 10px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-size: 12px; background: white; width: 220px;"),
+            ui.tags.input(
+                type="text", 
+                id="ll01_global_note", 
+                value=state.ll01_global_note(), 
+                placeholder="Ketik kata kunci...", 
+                oninput="""
+                    // Debounce 400ms: Tidak memicu reload tiap ketukan huruf, tunggu jeda mengetik selesai
+                    clearTimeout(window.ll01SearchDebounceTimer);
+                    let val = this.value;
+                    window.ll01SearchDebounceTimer = setTimeout(function() {
+                        Shiny.setInputValue('change_ll01_global_note', val, {priority: 'event'});
+                    }, 400);
+                """,
+                onkeydown="if (event.key === 'Enter') { clearTimeout(window.ll01SearchDebounceTimer); Shiny.setInputValue('change_ll01_global_note', this.value, {priority: 'event'}); }",
+                style="padding: 6px 10px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-size: 12px; background: white; width: 220px;"
+            ),
             style="display: flex; flex-direction: column;"
         ),
         style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap; background: #FFFFFF; padding: 15px 20px; border-radius: 12px; border: 2px solid #CBD5E0; margin-bottom: 1.25rem; width: 100%; box-shadow: 0 4px 12px rgba(0,0,0,0.03);"
     )
-
     # ==========================================================================
     # TAB 1: ALL WAITING (STAGING TRANSIT)
     # ==========================================================================
@@ -2745,9 +2800,42 @@ def sidebar(state: AppState):
             style="display: flex; justify-content: space-between; width: 100%; align-items: center; margin-bottom: 0.8rem; padding-bottom: 0.6rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08);"
         ),
         ui.div(
-            ui.div(section_dropdown_header("OPERATIONAL", "operational", state.dropdown_operational()), ui.div(*[menu_item(item, item, cur_menu) for item in state.get_menu_operational()], style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_operational() else "display: none;"), style="width: 100%;"),
-            ui.div(section_dropdown_header("INVENTORY", "inventory", state.dropdown_inventory()), ui.div(*[menu_item(item, item, cur_menu) for item in state.get_menu_inventory()], style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_inventory() else "display: none;"), style="width: 100%;"),
-            ui.div(section_dropdown_header("EXTRAS", "extras", state.dropdown_extras()), ui.div(*[menu_item(item, item, cur_menu) for item in state.get_menu_extras()], style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_extras() else "display: none;"), style="width: 100%;"),
+            # 🌟 MENU SECTION 1: WAREHOUSE MONITORING (POSISI PALING ATAS)
+            ui.div(
+                section_dropdown_header("WAREHOUSE MONITORING", "monitoring", state.dropdown_monitoring()), 
+                ui.div(
+                    *[menu_item(item, item, cur_menu) for item in state.get_menu_monitoring()], 
+                    style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_monitoring() else "display: none;"
+                ), 
+                style="width: 100%;"
+            ),
+            # SECTION OPERATIONAL
+            ui.div(
+                section_dropdown_header("OPERATIONAL", "operational", state.dropdown_operational()), 
+                ui.div(
+                    *[menu_item(item, item, cur_menu) for item in state.get_menu_operational()], 
+                    style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_operational() else "display: none;"
+                ), 
+                style="width: 100%;"
+            ),
+            # SECTION INVENTORY
+            ui.div(
+                section_dropdown_header("INVENTORY", "inventory", state.dropdown_inventory()), 
+                ui.div(
+                    *[menu_item(item, item, cur_menu) for item in state.get_menu_inventory()], 
+                    style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_inventory() else "display: none;"
+                ), 
+                style="width: 100%;"
+            ),
+            # SECTION EXTRAS
+            ui.div(
+                section_dropdown_header("EXTRAS", "extras", state.dropdown_extras()), 
+                ui.div(
+                    *[menu_item(item, item, cur_menu) for item in state.get_menu_extras()], 
+                    style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_extras() else "display: none;"
+                ), 
+                style="width: 100%;"
+            ),
             style="width: 100%; flex: 1; overflow-y: auto; padding-right: 4px;"
         ),
         ui.div(ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-right-from-bracket", style="margin-right: 8px; font-size: 14px;"), ui.span("Logout Sistem", style="font-weight: bold; font-size: 13px;")), onclick="Shiny.setInputValue('btn_execute_logout', Math.random(), {priority: 'event'})", class_="btn-red-gradient", style="width: 100%; padding: 0.5rem; border-radius: 6px; display: flex; align-items: center; justify-content: center;"), style="width: 100%; padding-top: 0.8rem; border-top: 1px solid rgba(255, 255, 255, 0.1); margin-top: auto;"),
