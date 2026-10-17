@@ -12,7 +12,7 @@ from views import (
     justification_so_view, cycle_count_view, login_page, ppa_audit_view, 
     cycle_count_analyzer_view, global_header, cross_check_real_system_view,
     balancing_stock_view, physical_inventory_list_view, validation_barcode_sku_view, percentage_display_view,excel_practice_view,
-    auditor_view, memo_pengajuan_view, warehouse_activity_monitor_view
+    auditor_view, memo_pengajuan_view, warehouse_activity_monitor_view, compliance_audit_view 
 )
 
 app_ui = ui.page_fluid(
@@ -128,7 +128,8 @@ def server(input: Inputs, output: Outputs, session: Session):
         "memo-pengajuan": "Memo Pengajuan",
         "warehouse-activity-monitor": "Warehouse Activity Monitor",
         "warehouse-monitoring": "Warehouse Activity Monitor",
-        "ll01-monitor": "Warehouse Activity Monitor"
+        "ll01-monitor": "Warehouse Activity Monitor",
+        "warehouse-compliance-audit": "Warehouse Compliance Audit"
     }
 
     # 1. Saat menu diklik di sidebar -> URL di browser otomatis berubah
@@ -1020,6 +1021,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         elif content_type == "form_auditor": page_content = auditor_view(state)
         elif content_type in ["memo_pengajuan", "memo-pengajuan"]: page_content = memo_pengajuan_view(state)
         elif content_type == "warehouse_activity_monitor": page_content = warehouse_activity_monitor_view(state)
+        elif content_type == "compliance_audit": page_content = compliance_audit_view(state)  # <-- TAMBAHKAN ROUTE INI
         elif content_type == "access_denied":
             page_content = ui.div(ui.h2("⛔ Akses Ditolak", style="font-size: 28px; color: #E53E3E; font-weight: bold;"), ui.p("Maaf, halaman ini dibatasi hak aksesnya.", style="color: #718096; font-size: 15px;"), style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;")
         else:
@@ -4946,5 +4948,123 @@ def server(input: Inputs, output: Outputs, session: Session):
         state.ll01_global_note.set(input.change_ll01_global_note())
 
     
+# ==========================================================================
+    # WAREHOUSE COMPLIANCE AUDIT CONTROLLERS & EVENT HANDLERS
+    # ==========================================================================
+    # 1. Update Hasil Item Checklist Live
+    @reactive.Effect
+    @reactive.event(input.comp_item_changed)
+    def _on_comp_item_changed():
+        d = input.comp_item_changed() or {}
+        idx = d.get("idx", 0)
+        hasil = d.get("hasil", "Sesuai")
+        cat = d.get("cat", "")
+        state.update_compliance_item(idx, hasil, cat)
+
+    # 2. Reset Default Items
+    @reactive.Effect
+    @reactive.event(input.btn_reset_comp_checklist)
+    def _on_reset_comp():
+        state.reset_compliance_checklist_defaults()
+        ui.notification_show("Daftar periksa dikembalikan ke 27 butir standar WH-AUD-001.", type="message", duration=3)
+
+    # 3. Tambah & Hapus CAPA
+    @reactive.Effect
+    @reactive.event(input.btn_add_comp_capa)
+    def _on_add_comp_capa():
+        d = input.btn_add_comp_capa() or {}
+        succ, msg = state.add_compliance_capa(
+            d.get("id_audit", "RCV-01"),
+            d.get("uraian", ""),
+            d.get("tingkat", "NC Minor"),
+            d.get("akar", ""),
+            d.get("tindakan", ""),
+            d.get("pic", ""),
+            d.get("due", "")
+        )
+        if succ:
+            ui.notification_show(f"✅ {msg}", type="message", duration=3)
+        else:
+            ui.notification_show(f"⚠️ {msg}", type="warning", duration=4)
+
+    @reactive.Effect
+    @reactive.event(input.btn_delete_comp_capa)
+    def _on_del_comp_capa():
+        idx = input.btn_delete_comp_capa()
+        state.delete_compliance_capa(idx)
+        ui.notification_show("🗑️ Temuan CAPA berhasil dihapus.", type="message", duration=2)
+
+    @reactive.Effect
+    @reactive.event(input.btn_toggle_comp_capa)
+    def _on_toggle_comp_capa():
+        idx = input.btn_toggle_comp_capa()
+        succ, msg = state.toggle_compliance_capa_status(idx)
+        if succ:
+            ui.notification_show(msg, type="message", duration=2)
+
+    # 4. Simpan ke Supabase
+    @reactive.Effect
+    @reactive.event(input.btn_save_comp_audit_supabase)
+    def _on_save_comp_supabase():
+        meta = input.btn_save_comp_audit_supabase() or {}
+        succ, msg = state.save_compliance_session_to_supabase(meta)
+        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+        if succ:
+            state.show_success_modal.set(True)
+            ui.update_navs("comp_audit_navset_tab", selected="📂 5. RIWAYAT & ARSIP")
+            ui.notification_show(msg, type="message", duration=5)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+
+    # 5. Download Excel WH-AUD-001
+    @render.download(
+        filename=lambda: f"WH_AUD_001_COMPLIANCE_{datetime.now().strftime('%d_%m_%Y_%H%M')}.xlsx"
+    )
+    def btn_dl_comp_excel():
+        meta_dict = {
+            "branch": input.comp_branch() if "comp_branch" in input else "Surabaya",
+            "address": input.comp_address() if "comp_address" in input else "-",
+            "lead": input.comp_lead() if "comp_lead" in input else "",
+            "auditee": input.comp_auditee() if "comp_auditee" in input else "",
+            "date": input.comp_date() if "comp_date" in input else datetime.now().strftime("%Y-%m-%d"),
+            "type": input.comp_type() if "comp_type" in input else "Internal",
+            "scope": input.comp_scope() if "comp_scope" in input else "Gudang Pusat (DC)",
+            "doc_no": input.comp_doc_no() if "comp_doc_no" in input else "WH-AUD-001",
+            "trading_period": input.comp_trading() if "comp_trading" in input else "Reguler"
+        }
+        content = state.generate_compliance_excel_pack(meta_dict)
+        yield content
+
+    # 6. Impor Excel Terisi
+    @reactive.Effect
+    @reactive.event(input.btn_import_comp_excel)
+    def _on_import_comp_excel():
+        f = input.upload_filled_comp_excel() if "upload_filled_comp_excel" in input else None
+        if not f:
+            ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+            ui.notification_show("Pilih file Excel WH-AUD-001 terlebih dahulu!", type="warning", duration=4)
+            return
+
+        succ, msg = state.import_filled_compliance_excel(f)
+        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+        if succ:
+            ui.notification_show(msg, type="message", duration=4)
+        else:
+            ui.notification_show(msg, type="error", duration=4)
+
+    # 7. Refresh & Hapus History
+    @reactive.Effect
+    @reactive.event(input.btn_refresh_comp_history)
+    def _on_refresh_comp_hist():
+        state.load_compliance_history()
+        ui.notification_show("Riwayat audit kepatuhan telah dimuat ulang.", type="message", duration=2)
+
+    @reactive.Effect
+    @reactive.event(input.btn_delete_comp_history)
+    def _on_del_comp_hist():
+        a_id = input.btn_delete_comp_history()
+        succ, msg = state.delete_compliance_session(a_id)
+        ui.notification_show(f"🗑️ {msg}", type="message", duration=3)
         
 app = App(app_ui, server)

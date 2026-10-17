@@ -31,6 +31,7 @@ class AppState:
         self.dropdown_monitoring = reactive.Value(True)
         self.dropdown_operational = reactive.Value(False)
         self.dropdown_inventory = reactive.Value(False)
+        self.dropdown_auditor = reactive.Value(True) 
         self.dropdown_extras = reactive.Value(False)
 
         # Modals
@@ -585,6 +586,63 @@ class AppState:
         # --- PHYSICAL INVENTORY LIST STATE (UNIFIED) ---
         self.pil_mode = reactive.Value("")
 
+        # --- WAREHOUSE COMPLIANCE AUDIT STATE (WH-AUD-001) ---
+        self.comp_audit_company = reactive.Value("PT ZONA KARYA NUSANTARA")
+        self.comp_audit_branch = reactive.Value("Surabaya")
+        self.comp_audit_address = reactive.Value("Gudang Pusat Logistik Surabaya")
+        self.comp_audit_lead = reactive.Value("")
+        self.comp_audit_auditee = reactive.Value("")
+        self.comp_audit_date = reactive.Value(datetime.now().strftime("%Y-%m-%d"))
+        self.comp_audit_type = reactive.Value("Internal")
+        self.comp_audit_doc_no = reactive.Value("WH-AUD-001")
+        self.comp_audit_trading_period = reactive.Value("Reguler / All Season")
+        self.comp_audit_scope = reactive.Value("Gudang Pusat (DC)")
+
+        # Master Checklist 27 Kriteria dari PDF
+        self.COMPLIANCE_DEFAULT_ITEMS = [
+            # 1. GOOD RECEIVING
+            {"area": "Good Receiving", "id": "RCV-01", "kriteria": "Barang yang diterima sesuai dengan Surat Jalan (Jumlah Koli & Brand)", "bobot": 3, "hasil": "Sesuai", "catatan": ""},
+            {"area": "Good Receiving", "id": "RCV-02", "kriteria": "Surat jalan ditandatangani penerima dengan stampel resmi PT Zona Karya Nusantara (Logistik) dan salinan diarsipkan.", "bobot": 3, "hasil": "Sesuai", "catatan": ""},
+            {"area": "Good Receiving", "id": "RCV-03", "kriteria": "Selisih (kurang / lebih / rusak) dari Supplier dicatat dan dilaporkan ke Purchasing maksimal 24 jam.", "bobot": 2, "hasil": "Sesuai", "catatan": ""},
+            {"area": "Good Receiving", "id": "RCV-04", "kriteria": "Selisih (kurang / lebih / rusak) antar DC dicatat dan dilaporkan ke Purchasing maksimal 24 jam.", "bobot": 3, "hasil": "Sesuai", "catatan": ""},
+            # 2. STORAGE
+            {"area": "Penyimpanan & Putaway", "id": "STO-01", "kriteria": "Setiap lokasi shelving terdapat barcode BIN yang tertempel dengan jelas dan dapat di scan", "bobot": 2, "hasil": "Sesuai", "catatan": ""},
+            {"area": "Penyimpanan & Putaway", "id": "STO-02", "kriteria": "Koli yang digunakan untuk menyimpan barang, tertempel dengan jelas lokasi dan identifikasi koli serta dapat di scan", "bobot": 2, "hasil": "Sesuai", "catatan": ""},
+            {"area": "Penyimpanan & Putaway", "id": "STO-03", "kriteria": "Barang tertata di Shelving rapi, rapat dan tidak ada yang terjatuh, miring dari area shelving", "bobot": 2, "hasil": "Sesuai", "catatan": ""},
+            {"area": "Penyimpanan & Putaway", "id": "STO-04", "kriteria": "Area Terpisah Untuk Staging, Karantina, Defect & Reject", "bobot": 2, "hasil": "Sesuai", "catatan": ""},
+            {"area": "Penyimpanan & Putaway", "id": "STO-05", "kriteria": "Tidak ada Stock atau barang yang keluar dari Shelving tanpa tag", "bobot": 3, "hasil": "Sesuai", "catatan": ""},
+            {"area": "Penyimpanan & Putaway", "id": "STO-06", "kriteria": "Tidak ada barang dengan barcode Rusak, Hilang atau Sobek", "bobot": 2, "hasil": "Sesuai", "catatan": ""},
+            {"area": "Penyimpanan & Putaway", "id": "STO-07", "kriteria": "Tidak ada Barang yang disimpan di area tersembunyi (tidak terlihat jelas), Bawah Meja kasir, Dalam Box tanpa tag, Belakang ruangan, dll)", "bobot": 2, "hasil": "Sesuai", "catatan": ""},
+            # 3. FULFILMENT
+            {"area": "Fulfilment", "id": "OUT-01", "kriteria": "Picking berdasarkan pick list / Transfer Order dari sistem (bukan instruksi lisan).", "bobot": 2, "hasil": "Sesuai", "catatan": ""},
+            {"area": "Fulfilment", "id": "OUT-02", "kriteria": "Akurasi QC sebelum packing. Dengan memerhatikan Kecocokan Resi, Barang, Kualitas dan Detail Order", "bobot": 2, "hasil": "Sesuai", "catatan": ""},
+            {"area": "Fulfilment", "id": "OUT-03", "kriteria": "Area staging terpisah; pesanan siap kirim tidak dibiarkan tanpa pengamanan semalaman.", "bobot": 1, "hasil": "Sesuai", "catatan": ""},
+            # 4. TRANSFER
+            {"area": "Transfer Request", "id": "TRF-01", "kriteria": "Pengambilan Transfer Stock berdasarkan List yang dibuat oleh Tim Purchasing atau Store Leader", "bobot": 3, "hasil": "Sesuai", "catatan": ""},
+            {"area": "Transfer Request", "id": "TRF-02", "kriteria": "Pengecekan Transfer IN / OUT Outstanding (Batas Akhir Bulan)", "bobot": 2, "hasil": "Sesuai", "catatan": ""},
+            {"area": "Transfer Request", "id": "TRF-03", "kriteria": "Pengecekan Real Item sebelum di Packing", "bobot": 2, "hasil": "Sesuai", "catatan": ""},
+            {"area": "Transfer Request", "id": "TRF-04", "kriteria": "Jika terdapat selisih dalam pengambilan barang maka wajib informasikan kepada RTO List Maker (Purchasing / Store Leader)", "bobot": 2, "hasil": "Sesuai", "catatan": ""},
+            {"area": "Transfer Request", "id": "TRF-05", "kriteria": "Terdapat Label pada packing Koli yang digunakan untuk RTO", "bobot": 2, "hasil": "Sesuai", "catatan": ""},
+            {"area": "Transfer Request", "id": "TRF-06", "kriteria": "Menyertakan surat jalan dan beberapa dokumentasi untuk cabang penerima", "bobot": 3, "hasil": "Sesuai", "catatan": ""},
+            # 5. K3
+            {"area": "Keselamatan dan Kesehatan Kerja (K3)", "id": "HSE-01", "kriteria": "APAR tersedia, mudah dijangkau, bertag dan masih dalam masa inspeksi / kedaluwarsa.", "bobot": 3, "hasil": "Sesuai", "catatan": ""},
+            {"area": "Keselamatan dan Kesehatan Kerja (K3)", "id": "HSE-05", "kriteria": "Kotak P3K lengkap dan ada petugas P3K yang terlatih.", "bobot": 2, "hasil": "Sesuai", "catatan": ""},
+            {"area": "Keselamatan dan Kesehatan Kerja (K3)", "id": "HSE-06", "kriteria": "Tangga aman untuk digunakan dan sesuai dengan ketentuan K3", "bobot": 2, "hasil": "Sesuai", "catatan": ""},
+            # 6. KEBERSIHAN & HAMA
+            {"area": "Kebersihan & Pengendalian Hama", "id": "HKP-01", "kriteria": "Lantai bersih dan kering; lorong bebas sampah dan tumpahan.", "bobot": 2, "hasil": "Sesuai", "catatan": ""},
+            {"area": "Kebersihan & Pengendalian Hama", "id": "HKP-02", "kriteria": "Sampah kemasan (karton, plastik) diangkut sesuai jadwal dan tidak menumpuk", "bobot": 1, "hasil": "Sesuai", "catatan": ""},
+            {"area": "Kebersihan & Pengendalian Hama", "id": "HKP-03", "kriteria": "Tidak ada rayap di area Stock, Office dan sekitaran area kerja", "bobot": 2, "hasil": "Sesuai", "catatan": ""},
+            {"area": "Kebersihan & Pengendalian Hama", "id": "HKP-04", "kriteria": "Barang terlindung dari lembap, debu dan sinar matahari langsung; tidak ada atap bocor.", "bobot": 2, "hasil": "Sesuai", "catatan": ""},
+            {"area": "Kebersihan & Pengendalian Hama", "id": "HKP-05", "kriteria": "5S diterapkan: alat dan perlengkapan punya tempat tetap dan dikembalikan setelah dipakai.", "bobot": 1, "hasil": "Sesuai", "catatan": ""},
+            # 7. PERALATAN & FASILITAS
+            {"area": "Peralatan & Fasilitas", "id": "EQP-03", "kriteria": "Scanner, printer dan PC berfungsi; perangkat cadangan tersedia.", "bobot": 1, "hasil": "Sesuai", "catatan": ""},
+            {"area": "Peralatan & Fasilitas", "id": "EQP-05", "kriteria": "Pencahayaan, ventilasi dan suhu memadai untuk pekerja", "bobot": 1, "hasil": "Sesuai", "catatan": ""}
+        ]
+        self.comp_audit_checklist = reactive.Value([dict(x) for x in self.COMPLIANCE_DEFAULT_ITEMS])
+        self.comp_audit_capa_list = reactive.Value([])
+        self.comp_audit_history_list = reactive.Value([])
+        self.comp_audit_selected_for_pdf = reactive.Value(None)
+
         
 
     def set_main_menu(self, menu: str): self.main_menu.set(menu)
@@ -592,6 +650,7 @@ class AppState:
     def toggle_dropdown(self, key: str):
         # 🌟 Handle toggle dropdown monitoring
         if key == "monitoring": self.dropdown_monitoring.set(not self.dropdown_monitoring())
+        elif key == "auditor": self.dropdown_auditor.set(not self.dropdown_auditor())
         elif key == "operational": self.dropdown_operational.set(not self.dropdown_operational())
         elif key == "inventory": self.dropdown_inventory.set(not self.dropdown_inventory())
         elif key == "extras": self.dropdown_extras.set(not self.dropdown_extras())
@@ -623,7 +682,10 @@ class AppState:
         self.login_timestamp_ms.set(0)
 
     def get_menu_monitoring(self) -> list[str]:
-        return ["Warehouse Activity Monitor"]
+        return ["Warehouse Activity Monitor", "Form Auditor", "Memo Pengajuan", "Balancing Stock", "Database Ongkir In/Out", "Precentage Display"]
+    
+    def get_menu_auditor(self) -> list[str]:
+        return ["Warehouse Inventory Audit", "Warehouse Compliance Audit"]
 
     def get_menu_operational(self) -> list[str]:
         if self.role() == "DC":
@@ -637,7 +699,7 @@ class AppState:
 
     def get_menu_extras(self) -> list[str]:
         if self.role() == "DC":
-            return ["Balancing Stock", "Data Timbang Ongkir", "Database Ongkir In/Out", "Precentage Display","Latihan Rumus Excel", "Form Auditor", "Memo Pengajuan"]
+            return ["Data Timbang Ongkir", "Latihan Rumus Excel"]
         return ["Precentage Display", "Refill Toko", "Store Leader RTO Decission"]
 
     def get_active_content_type(self) -> str:
@@ -659,11 +721,12 @@ class AppState:
         elif cur_menu in ["Validation Barcode SKU", "Validasi Barcode SKU"]: return "validation_barcode_sku"
         elif cur_menu in ["Precentage Display", "Percentage Display", "Refill Toko"]: return "percentage_display"
         elif cur_menu in ["Latihan Rumus Excel", "Excel Practice", "latihan_excel"]: return "excel_practice"
-        elif cur_menu in ["Form Auditor", "Audit Form", "form_auditor"]: return "form_auditor"
+        elif cur_menu in ["Warehouse Inventory Audit", "Form Auditor", "Audit Form", "form_auditor"]: return "form_auditor"
+        # Handler untuk Warehouse Compliance Audit yang baru
+        elif cur_menu in ["Warehouse Compliance Audit", "compliance_audit", "warehouse_compliance_audit"]: return "compliance_audit"
         elif cur_menu in ["Memo Pengajuan", "memo_pengajuan"]: return "memo_pengajuan"
         elif cur_menu in ["Warehouse Activity Monitor", "Warehouse Monitoring", "warehouse_activity_monitor"]: return "warehouse_activity_monitor"
         return "under_development"
-
 
     # --- Ongkir Methods ---
     def load_ongkir_data(self):
@@ -6748,3 +6811,307 @@ class AppState:
 
     def ll01_single_adj_metric_minus(self) -> int:
         return sum([abs(safe_int(x.get("adjust_qty", 0))) for x in self.get_filtered_single_adj_data() if safe_int(x.get("adjust_qty", 0)) < 0])
+
+
+    # --- METODE COMPLIANCE AUDIT ENGINE ---
+    def get_compliance_scores(self):
+        items = self.comp_audit_checklist()
+        total_maks = 0.0
+        total_diraih = 0.0
+        
+        for it in items:
+            h = str(it.get("hasil", "Sesuai")).strip().upper()
+            b = float(it.get("bobot", 1))
+            if h == "N/A":
+                continue
+            total_maks += b * 1.0
+            if h == "SESUAI":
+                total_diraih += b * 1.0
+            elif "MINOR" in h:
+                total_diraih += b * 0.5
+            elif "MAYOR" in h:
+                total_diraih += b * 0.0
+
+        pct = (total_diraih / total_maks * 100.0) if total_maks > 0 else 0.0
+        
+        if pct >= 90.0:
+            grade = "Sangat Baik"
+        elif pct >= 80.0:
+            grade = "Baik"
+        elif pct >= 70.0:
+            grade = "Perlu Perbaikan"
+        else:
+            grade = "Kritis"
+            
+        passed = pct >= 80.0
+        return total_maks, total_diraih, pct, grade, passed
+
+    def update_compliance_item(self, index: int, hasil: str, catatan: str):
+        items = list(self.comp_audit_checklist())
+        if 0 <= index < len(items):
+            items[index]["hasil"] = hasil
+            items[index]["catatan"] = catatan
+            self.comp_audit_checklist.set(items)
+            return True
+        return False
+
+    def add_compliance_capa(self, id_audit: str, uraian: str, tingkat: str, akar: str, tindakan: str, pic: str, due_date: str, status: str = "Terbuka"):
+        if not uraian.strip():
+            return False, "Uraian temuan tidak boleh kosong!"
+        items = self.comp_audit_checklist()
+        matched = next((x for x in items if x["id"] == id_audit), None)
+        area = matched["area"] if matched else "General"
+        
+        capas = list(self.comp_audit_capa_list())
+        capa_id = f"F-{len(capas)+1:03d}"
+        capas.append({
+            "id": capa_id,
+            "tanggal": datetime.now().strftime("%Y-%m-%d"),
+            "id_audit": id_audit,
+            "area": area,
+            "uraian": uraian.strip(),
+            "tingkat": tingkat,
+            "akar": akar.strip(),
+            "tindakan": tindakan.strip(),
+            "pic": pic.strip(),
+            "due_date": due_date,
+            "status": status,
+            "tgl_selesai": ""
+        })
+        self.comp_audit_capa_list.set(capas)
+        return True, f"Temuan {capa_id} berhasil ditambahkan!"
+
+    def delete_compliance_capa(self, index: int):
+        capas = list(self.comp_audit_capa_list())
+        if 0 <= index < len(capas):
+            capas.pop(index)
+            self.comp_audit_capa_list.set(capas)
+
+    def toggle_compliance_capa_status(self, index: int):
+        capas = list(self.comp_audit_capa_list())
+        if 0 <= index < len(capas):
+            cur = capas[index].get("status", "Terbuka")
+            new_stat = "Selesai" if cur != "Selesai" else "Terbuka"
+            capas[index]["status"] = new_stat
+            capas[index]["tgl_selesai"] = datetime.now().strftime("%Y-%m-%d") if new_stat == "Selesai" else ""
+            self.comp_audit_capa_list.set(capas)
+            return True, f"Status temuan diubah menjadi '{new_stat}'"
+        return False, "Indeks temuan tidak valid"
+
+    def reset_compliance_checklist_defaults(self):
+        self.comp_audit_checklist.set([dict(x) for x in self.COMPLIANCE_DEFAULT_ITEMS])
+        self.comp_audit_capa_list.set([])
+
+    def load_compliance_history(self):
+        try:
+            client = get_supabase()
+            if client:
+                res = client.table("warehouse_compliance_audits").select("*").order("created_at", desc=True).execute()
+                if res and hasattr(res, 'data') and res.data:
+                    self.comp_audit_history_list.set(res.data)
+                else:
+                    self.comp_audit_history_list.set([])
+        except Exception as e:
+            print("Gagal load history compliance audit:", e)
+
+    def save_compliance_session_to_supabase(self, form_meta: dict):
+        try:
+            tot_maks, tot_diraih, pct, grade, passed = self.get_compliance_scores()
+            audit_id = f"WCA/{form_meta.get('branch', 'SBY')[:3].upper()}/{datetime.now().strftime('%Y%m%d')}/{random.randint(100, 999)}"
+            
+            payload = {
+                "id": audit_id,
+                "company": form_meta.get("company", "PT ZONA KARYA NUSANTARA"),
+                "branch": form_meta.get("branch", "Surabaya"),
+                "address": form_meta.get("address", "-"),
+                "lead_auditor": form_meta.get("lead", ""),
+                "auditee": form_meta.get("auditee", ""),
+                "audit_date": form_meta.get("date", datetime.now().strftime("%Y-%m-%d")),
+                "audit_type": form_meta.get("type", "Internal"),
+                "doc_no": form_meta.get("doc_no", "WH-AUD-001"),
+                "trading_period": form_meta.get("trading_period", "Reguler"),
+                "scope": form_meta.get("scope", "Gudang Pusat (DC)"),
+                "total_poin_maks": tot_maks,
+                "total_poin_diraih": tot_diraih,
+                "score_pct": round(pct, 2),
+                "grade": grade,
+                "passed": passed,
+                "sign_auditor_img": form_meta.get("sign_auditor_img", ""),
+                "sign_auditee_img": form_meta.get("sign_auditee_img", ""),
+                "checklist": list(self.comp_audit_checklist()),
+                "capa": list(self.comp_audit_capa_list())
+            }
+
+            client = get_supabase()
+            if client:
+                client.table("warehouse_compliance_audits").insert(payload).execute()
+            
+            self.load_compliance_history()
+            return True, f"✅ Audit Kepatuhan {audit_id} Berhasil Disimpan ke Supabase!"
+        except Exception as e:
+            # Fallback ke state lokal jika tabel belum dibuat di Supabase
+            cur = list(self.comp_audit_history_list())
+            payload["created_at"] = datetime.now().isoformat()
+            cur.insert(0, payload)
+            self.comp_audit_history_list.set(cur)
+            return True, f"✅ Data Audit ({audit_id}) Tersimpan di Sesi Lokal!"
+
+    def delete_compliance_session(self, audit_id: str):
+        try:
+            client = get_supabase()
+            if client:
+                client.table("warehouse_compliance_audits").delete().in_("id", [audit_id]).execute()
+            self.load_compliance_history()
+        except Exception:
+            cur = [h for h in self.comp_audit_history_list() if h.get("id") != audit_id]
+            self.comp_audit_history_list.set(cur)
+        return True, f"Sesi audit {audit_id} berhasil dihapus!"
+
+    def generate_compliance_excel_pack(self, form_meta: dict):
+        import io
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+        wb = Workbook()
+        ws_audit = wb.active
+        ws_audit.title = "FORM AUDIT"
+        ws_audit.sheet_view.showGridLines = True
+
+        navy_fill = PatternFill(start_color="1A365D", end_color="1A365D", fill_type="solid")
+        yellow_fill = PatternFill(start_color="FEFCBF", end_color="FEFCBF", fill_type="solid")
+        font_th = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
+        font_title = Font(name="Calibri", size=13, bold=True, color="1A365D")
+        font_sub = Font(name="Calibri", size=9, italic=True, color="4A5568")
+        font_bold = Font(name="Calibri", size=10, bold=True)
+        thin_border = Border(
+            left=Side(style='thin', color='CBD5E0'), right=Side(style='thin', color='CBD5E0'),
+            top=Side(style='thin', color='CBD5E0'), bottom=Side(style='thin', color='CBD5E0')
+        )
+
+        # Header Info Dokumen
+        ws_audit["A1"] = "FORM AUDIT KEPATUHAN GUDANG"
+        ws_audit["A1"].font = font_title
+        ws_audit["A2"] = "Daftar periksa standar gudang ritel | No. dok. WH-AUD-001 | Rev. 1"
+        ws_audit["A2"].font = font_sub
+
+        info_meta = [
+            ("Cabang / Toko / DC", form_meta.get("branch", "Surabaya"), "Tanggal audit", form_meta.get("date", "")),
+            ("Alamat / area gudang", form_meta.get("address", "-"), "Jenis audit", form_meta.get("type", "Internal")),
+            ("Auditor utama", form_meta.get("lead", "-"), "Auditee / Kepala gudang", form_meta.get("auditee", "-")),
+            ("Periode yang diaudit", form_meta.get("trading_period", "Reguler"), "No. dokumen / Ref. audit", form_meta.get("doc_no", "WH-AUD-001")),
+            ("Level / lingkup audit", form_meta.get("scope", "Gudang Pusat (DC)"), "Periode trading / musim", form_meta.get("trading_period", "-"))
+        ]
+        for idx, (k1, v1, k2, v2) in enumerate(info_meta, start=4):
+            ws_audit.cell(row=idx, column=1, value=k1).font = font_bold
+            ws_audit.cell(row=idx, column=2, value=v1).fill = yellow_fill
+            ws_audit.cell(row=idx, column=6, value=k2).font = font_bold
+            ws_audit.cell(row=idx, column=7, value=v2).fill = yellow_fill
+
+        # Table Header Checklist
+        headers_chk = ["Area audit", "ID", "Kriteria audit", "Bobot", "Hasil", "Skor", "Poin maks", "Poin diraih", "Bukti / pengamatan"]
+        for col_idx, h_text in enumerate(headers_chk, start=1):
+            cell = ws_audit.cell(row=10, column=col_idx, value=h_text)
+            cell.fill = navy_fill
+            cell.font = font_th
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+        items = self.comp_audit_checklist()
+        row_cur = 11
+        for it in items:
+            h = str(it.get("hasil", "Sesuai"))
+            b = float(it.get("bobot", 1))
+            if h == "Sesuai": skor_f, diraih_f, maks_f = 1.0, b, b
+            elif "Minor" in h: skor_f, diraih_f, maks_f = 0.5, b * 0.5, b
+            elif "Mayor" in h: skor_f, diraih_f, maks_f = 0.0, 0.0, b
+            else: skor_f, diraih_f, maks_f = 0.0, 0.0, 0.0
+
+            ws_audit.cell(row=row_cur, column=1, value=it.get("area"))
+            ws_audit.cell(row=row_cur, column=2, value=it.get("id")).alignment = Alignment(horizontal="center")
+            ws_audit.cell(row=row_cur, column=3, value=it.get("kriteria"))
+            ws_audit.cell(row=row_cur, column=4, value=b).alignment = Alignment(horizontal="center")
+            
+            c_h = ws_audit.cell(row=row_cur, column=5, value=h)
+            c_h.fill = yellow_fill
+            c_h.alignment = Alignment(horizontal="center")
+
+            ws_audit.cell(row=row_cur, column=6, value=f"{int(skor_f*100)}%" if h != "N/A" else "-").alignment = Alignment(horizontal="center")
+            ws_audit.cell(row=row_cur, column=7, value=maks_f).alignment = Alignment(horizontal="right")
+            ws_audit.cell(row=row_cur, column=8, value=diraih_f).alignment = Alignment(horizontal="right")
+            ws_audit.cell(row=row_cur, column=9, value=it.get("catatan", ""))
+
+            for c in range(1, 10): ws_audit.cell(row=row_cur, column=c).border = thin_border
+            row_cur += 1
+
+        # Summary Total Row
+        tot_maks, tot_diraih, pct, grade, passed = self.get_compliance_scores()
+        ws_audit.cell(row=row_cur, column=3, value="TOTAL (poin tertimbang)").font = font_bold
+        ws_audit.cell(row=row_cur, column=6, value=f"{pct:.1f}%").font = font_bold
+        ws_audit.cell(row=row_cur, column=7, value=tot_maks).font = font_bold
+        ws_audit.cell(row=row_cur, column=8, value=tot_diraih).font = font_bold
+        for c in range(1, 10): ws_audit.cell(row=row_cur, column=c).border = thin_border
+
+        # Sheet 2: CAPA
+        ws_capa = wb.create_sheet(title="Log Temuan & CAPA")
+        ws_capa.sheet_view.showGridLines = True
+        ws_capa["A1"] = "Log Temuan & Corrective and Preventive Action (CAPA)"
+        ws_capa["A1"].font = font_title
+        
+        headers_capa = ["ID Temuan", "Tanggal", "ID butir audit", "Area audit", "Uraian temuan / bukti", "Tingkat", "Akar masalah", "Tindakan korektif & preventif", "PIC", "Batas waktu", "Status", "Tanggal selesai"]
+        for col_idx, h_text in enumerate(headers_capa, start=1):
+            cell = ws_capa.cell(row=3, column=col_idx, value=h_text)
+            cell.fill = navy_fill
+            cell.font = font_th
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+
+        capas = self.comp_audit_capa_list()
+        for idx_c, cp in enumerate(capas, start=4):
+            ws_capa.append([cp.get("id"), cp.get("tanggal"), cp.get("id_audit"), cp.get("area"), cp.get("uraian"), cp.get("tingkat"), cp.get("akar"), cp.get("tindakan"), cp.get("pic"), cp.get("due_date"), cp.get("status"), cp.get("tgl_selesai")])
+            for c in range(1, 13): ws_capa.cell(row=idx_c, column=c).border = thin_border
+
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        return buf.getvalue()
+
+    def import_filled_compliance_excel(self, file_info):
+        try:
+            df = load_data_from_info(file_info)
+            if df.empty or df.shape[1] < 5:
+                return False, "File Excel tidak sesuai format standar WH-AUD-001!"
+            
+            cur_items = list(self.comp_audit_checklist())
+            item_map = {x["id"].upper(): idx for idx, x in enumerate(cur_items)}
+            
+            # Cari kolom ID dan Hasil
+            c_id = None
+            c_hasil = None
+            c_cat = None
+            for idx_c, col in enumerate(df.columns):
+                c_str = str(col).strip().upper()
+                if "ID" in c_str: c_id = idx_c
+                elif "HASIL" in c_str: c_hasil = idx_c
+                elif any(k in c_str for k in ["BUKTI", "CATATAN", "PENGAMATAN"]): c_cat = idx_c
+
+            if c_id is None or c_hasil is None:
+                c_id = 1
+                c_hasil = 4
+                c_cat = 8 if df.shape[1] > 8 else -1
+
+            updated = 0
+            for _, r in df.iterrows():
+                row_id = str(r.iloc[c_id]).strip().upper()
+                if row_id in item_map:
+                    val_hasil = str(r.iloc[c_hasil]).strip()
+                    val_cat = str(r.iloc[c_cat]).strip() if c_cat != -1 and not pd.isna(r.iloc[c_cat]) else ""
+                    
+                    if val_hasil.lower() != "nan" and val_hasil != "":
+                        idx = item_map[row_id]
+                        cur_items[idx]["hasil"] = val_hasil
+                        if val_cat:
+                            cur_items[idx]["catatan"] = val_cat
+                        updated += 1
+
+            self.comp_audit_checklist.set(cur_items)
+            return True, f"Berhasil sinkronisasi {updated} butir kriteria kepatuhan dari Excel!"
+        except Exception as e:
+            return False, f"Gagal membaca file: {str(e)}"
