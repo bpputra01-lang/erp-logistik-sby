@@ -95,6 +95,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             state.load_ongkir_data()
             state.load_memo_data()
             state.load_auditor_history()
+            state.load_compliance_history()sss
             ui.notification_show(msg, type="message", duration=4)
         else:
             state.error_modal_message.set(msg)
@@ -5176,5 +5177,134 @@ def server(input: Inputs, output: Outputs, session: Session):
         a_id = input.btn_delete_comp_history()
         succ, msg = state.delete_compliance_session(a_id)
         ui.notification_show(f"🗑️ {msg}", type="message", duration=3)
+
+    # ==========================================================================
+    # 1. RENDER TABEL LOG TEMUAN & CAPA DI TAB 3 (AGAR MUNCUL SAAT DIKLIK TAMBAH)
+    # ==========================================================================
+    @render.ui
+    def comp_capa_table_ui():
+        capa_list = state.comp_audit_capa_list()
+        if not capa_list:
+            return ui.div(
+                ui.p("Belum ada temuan ketidaksesuaian (CAPA) yang dicatat.", style="color: #718096; font-style: italic; text-align: center; padding: 1.5rem;"),
+                style="background: #F8FAFC; border: 1px dashed #CBD5E0; border-radius: 8px;"
+            )
+
+        tr_capa = []
+        for idx_cp, cp in enumerate(capa_list):
+            c_status = cp.get("status", "Terbuka")
+            is_done = (c_status == "Selesai")
+            
+            badge_stat = (
+                ui.span("Selesai", style="background: #C6F6D5; color: #22543D; font-weight: 800; padding: 3px 8px; border-radius: 4px; font-size: 11px;")
+                if is_done else 
+                ui.span(c_status, style="background: #FED7D7; color: #9B2C2C; font-weight: 800; padding: 3px 8px; border-radius: 4px; font-size: 11px;")
+            )
+
+            btn_toggle = ui.tags.button(
+                "Buka" if is_done else "Selesaikan",
+                onclick=f"Shiny.setInputValue('btn_toggle_comp_capa', {idx_cp}, {{priority: 'event'}})",
+                style="background: #EDF2F7; border: 1px solid #CBD5E0; font-size: 11px; padding: 3px 8px; border-radius: 4px; cursor: pointer; margin-right: 4px; font-weight: 600;"
+            )
+            btn_del = ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-trash", style="color: #E53E3E;"),
+                onclick=f"Shiny.setInputValue('btn_delete_comp_capa', {idx_cp}, {{priority: 'event'}})",
+                style="background: transparent; border: none; cursor: pointer; padding: 4px;"
+            )
+
+            tr_capa.append(ui.tags.tr(
+                ui.tags.td(str(cp.get("id")), style="font-weight: bold; text-align: center;"),
+                ui.tags.td(str(cp.get("tanggal"))),
+                ui.tags.td(ui.tags.code(str(cp.get("id_audit")), style="color: #2B6CB0; font-weight: bold;")),
+                ui.tags.td(str(cp.get("area"))),
+                ui.tags.td(str(cp.get("uraian")), style="max-width: 250px; white-space: normal;"),
+                ui.tags.td(str(cp.get("tingkat")), style="font-weight: 700; text-align: center;"),
+                ui.tags.td(str(cp.get("akar"))),
+                ui.tags.td(str(cp.get("tindakan"))),
+                ui.tags.td(str(cp.get("pic"))),
+                ui.tags.td(str(cp.get("due_date"))),
+                ui.tags.td(badge_stat, style="text-align: center;"),
+                ui.tags.td(ui.div(btn_toggle, btn_del, style="display: flex; align-items: center; justify-content: center;"))
+            ))
+
+        headers_capa = ["ID", "Tanggal", "Butir", "Area", "Uraian Temuan", "Tingkat", "Akar Masalah", "Tindakan CAPA", "PIC", "Batas Waktu", "Status", "Aksi"]
+        th_list = [ui.tags.th(h, style="text-align: center;" if h in ["ID", "Tingkat", "Status", "Aksi"] else "") for h in headers_capa]
+
+        return ui.div(
+            ui.tags.table(
+                ui.tags.thead(ui.tags.tr(*th_list)),
+                ui.tags.tbody(*tr_capa),
+                class_="custom-clean-table", style="width: 100%; border: 1px solid #CBD5E0; border-radius: 8px;"
+            ),
+            style="overflow-x: auto; background: white; margin-top: 1rem;"
+        )
+
+    # ==========================================================================
+    # 2. RENDER KARTU RIWAYAT DI TAB 5 (DITAMPILKAN DARI SUPABASE)
+    # ==========================================================================
+    @render.ui
+    def comp_history_cards_ui():
+        histories = state.comp_audit_history_list()
+        if not histories:
+            return ui.div(
+                ui.p("Belum ada riwayat audit kepatuhan yang tersimpan di Supabase.", style="color: #718096; font-style: italic; text-align: center; padding: 2rem;"),
+                style="background: #F8FAFC; border: 1px dashed #CBD5E0; border-radius: 8px; margin-top: 1rem;"
+            )
+
+        h_cards = []
+        for h in histories:
+            h_id = h.get("id", "-")
+            dt = str(h.get("audit_date", "-"))
+            br = h.get("branch", "-")
+            pct_val = h.get("score_pct", 0.0)
+            grade_val = h.get("grade", "-")
+            passed_val = h.get("passed", False)
+
+            pass_badge = (
+                ui.span("LULUS AUDIT", style="background: #C6F6D5; color: #22543D; font-weight: 800; padding: 3px 8px; border-radius: 4px; font-size: 11px;")
+                if passed_val else 
+                ui.span("BELUM LULUS", style="background: #FED7D7; color: #9B2C2C; font-weight: 800; padding: 3px 8px; border-radius: 4px; font-size: 11px;")
+            )
+
+            h_cards.append(ui.div(
+                ui.div(
+                    ui.div(
+                        ui.div(
+                            ui.span(h_id, style="font-weight: 800; font-size: 15px; color: #1A202C; margin-right: 8px;"),
+                            ui.span(f"Tanggal: {dt}", style="background: #EDF2F7; color: #2D3748; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 4px; margin-right: 6px;"),
+                            pass_badge,
+                            style="display: flex; align-items: center; margin-bottom: 4px; flex-wrap: wrap; gap: 4px;"
+                        ),
+                        ui.p(f"Cabang: {br} • Skor: {pct_val}% ({grade_val}) • Lead Auditor: {h.get('lead_auditor', '-')}", style="margin: 0; font-size: 12px; color: #718096;")
+                    ),
+                    ui.div(
+                        ui.tags.button(
+                            ui.tags.i(class_="fa-solid fa-trash", style="margin-right: 4px;"), "Hapus",
+                            onclick=f"Shiny.setInputValue('btn_delete_comp_history', '{h_id}', {{priority: 'event'}})",
+                            style="background: #FFF5F5; color: #E53E3E; border: 1.5px solid #FEB2B2; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer;"
+                        ),
+                        style="display: flex; align-items: center;"
+                    ),
+                    style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;"
+                ),
+                style="background: white; border: 1.5px solid #CBD5E0; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 0.85rem;"
+            ))
+
+        return ui.div(
+            ui.div(
+                ui.div(
+                    ui.h4("📂 Riwayat Laporan Audit Kepatuhan (Supabase)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
+                    ui.p("Seluruh hasil kepatuhan gudang tersimpan otomatis dan dapat ditinjau kapan saja.", style="color: #718096; font-size: 13px; margin: 0;"),
+                ),
+                ui.tags.button(
+                    ui.tags.i(class_="fa-solid fa-arrows-rotate", style="margin-right: 6px;"), "Refresh History",
+                    onclick="Shiny.setInputValue('btn_refresh_comp_history', Math.random(), {priority: 'event'})",
+                    style="background: #EDF2F7; color: #2D3748; border: 1.5px solid #CBD5E0; padding: 6px 14px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer;"
+                ),
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 8px;"
+            ),
+            *h_cards,
+            style="margin-top: 1rem;"
+        )
 
 app = App(app_ui, server)
