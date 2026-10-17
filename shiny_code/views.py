@@ -2727,28 +2727,33 @@ def warehouse_activity_monitor_view(state: AppState):
     )
 
 # ==============================================================================
-# VIEW: WAREHOUSE COMPLIANCE AUDIT (WH-AUD-001) - ANTI-JUMP TAB VERSION
+# VIEW: WAREHOUSE COMPLIANCE AUDIT (WH-AUD-001) - 5 TAB RESMI SESUAI PDF
 # ==============================================================================
 def compliance_audit_view(state: AppState):
-    # --- TAB 1: DATA AUDIT (STATIS) ---
+    tot_maks, tot_diraih, pct, grade, passed = state.get_compliance_scores()
+    status_bg = "#C6F6D5" if passed else "#FED7D7"
+    status_col = "#22543D" if passed else "#9B2C2C"
+    status_text = "LULUS AUDIT (≥ 80%)" if passed else "BELUM LULUS (< 80%)"
+
+    # --- TAB 1: ENGAGEMENT DETAILS / DATA UMUM AUDIT ---
     tab1_eng = ui.div(
         ui.h4("📋 Data Pelaksanaan Audit Kepatuhan Gudang (WH-AUD-001)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 1rem;"),
         ui.div(
-            ui.div(ui.span("🏢 Perusahaan:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="comp_company", type="text", value="PT ZONA KARYA NUSANTARA", class_="form-control"), style="flex: 1; min-width: 220px;"),
+            ui.div(ui.span("🏢 Perusahaan:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="comp_company", type="text", value=state.comp_audit_company(), class_="form-control"), style="flex: 1; min-width: 220px;"),
             ui.div(
                 ui.span("🏬 Cabang / Toko / DC:", style="font-size: 12px; font-weight: 800;"),
                 ui.tags.select(
-                    *[ui.tags.option(c, value=c) for c in ["Surabaya", "Malang", "Sidoarjo", "Kediri", "Jember", "Semarang", "Kantor Pusat / Lainnya"]],
+                    *[ui.tags.option(c, value=c, selected=(c == state.comp_audit_branch())) for c in ["Surabaya", "Malang", "Sidoarjo", "Kediri", "Jember", "Semarang", "Kantor Pusat / Lainnya"]],
                     id="comp_branch", class_="form-control"
                 ), style="flex: 1; min-width: 180px;"
             ),
-            ui.div(ui.span("📍 Alamat / Area Gudang:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="comp_address", type="text", value="Gudang Pusat Logistik Surabaya", class_="form-control"), style="flex: 2; min-width: 260px;"),
+            ui.div(ui.span("📍 Alamat / Area Gudang:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="comp_address", type="text", value=state.comp_audit_address(), class_="form-control"), style="flex: 2; min-width: 260px;"),
             style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;"
         ),
         ui.div(
             ui.div(ui.span("👤 Auditor Utama:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="comp_lead", type="text", placeholder="Nama Auditor Utama...", class_="form-control"), style="flex: 1; min-width: 200px;"),
             ui.div(ui.span("👤 Auditee / Kepala Gudang:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="comp_auditee", type="text", placeholder="Nama Kepala Gudang...", class_="form-control"), style="flex: 1; min-width: 200px;"),
-            ui.div(ui.span("📅 Tanggal Audit:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="comp_date", type="date", value=datetime.now().strftime("%Y-%m-%d"), class_="form-control"), style="flex: 1; min-width: 160px;"),
+            ui.div(ui.span("📅 Tanggal Audit:", style="font-size: 12px; font-weight: 800;"), ui.tags.input(id="comp_date", type="date", value=state.comp_audit_date(), class_="form-control"), style="flex: 1; min-width: 160px;"),
             style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;"
         ),
         ui.div(
@@ -2779,13 +2784,132 @@ def compliance_audit_view(state: AppState):
         style="padding: 1rem 0;"
     )
 
-    # --- TAB 2: CHECKLIST (KONTEN DI-RENDER TERPISAH SUPAYA TAB TIDAK LONCAT) ---
+    # --- TAB 2: CHECKLIST DAFTAR PERIKSA KEPATUHAN GUDANG ---
+    checklist_items = state.comp_audit_checklist()
+    tr_chk_rows = []
+    for idx, it in enumerate(checklist_items):
+        cur_hasil = str(it.get("hasil", "Sesuai"))
+        b = float(it.get("bobot", 1))
+        
+        # Kalkulasi Baris
+        if cur_hasil == "Sesuai": skor_str, diraih = "100%", b
+        elif "Minor" in cur_hasil: skor_str, diraih = "50%", b * 0.5
+        elif "Mayor" in cur_hasil: skor_str, diraih = "0%", 0.0
+        else: skor_str, diraih = "-", "-"
+
+        select_hasil = ui.tags.select(
+            ui.tags.option("Sesuai", value="Sesuai", selected=(cur_hasil == "Sesuai")),
+            ui.tags.option("NC Minor", value="NC Minor", selected=(cur_hasil == "NC Minor")),
+            ui.tags.option("NC Mayor", value="NC Mayor", selected=(cur_hasil == "NC Mayor")),
+            ui.tags.option("N/A", value="N/A", selected=(cur_hasil == "N/A")),
+            id=f"chk_hasil_{idx}",
+            onchange=f"Shiny.setInputValue('comp_item_changed', {{idx: {idx}, hasil: this.value, cat: document.getElementById('chk_cat_{idx}').value}}, {{priority: 'event'}})",
+            style="padding: 4px 8px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer;"
+        )
+
+        input_cat = ui.tags.input(
+            id=f"chk_cat_{idx}", type="text", value=str(it.get("catatan", "")), placeholder="Bukti / Catatan...",
+            onchange=f"Shiny.setInputValue('comp_item_changed', {{idx: {idx}, hasil: document.getElementById('chk_hasil_{idx}').value, cat: this.value}}, {{priority: 'event'}})",
+            style="width: 100%; min-width: 180px; padding: 4px 8px; font-size: 12px; border: 1px solid #CBD5E0; border-radius: 6px;"
+        )
+
+        bobot_color = "#E53E3E" if b == 3 else ("#DD6B20" if b == 2 else "#4A5568")
+
+        tr_chk_rows.append(ui.tags.tr(
+            ui.tags.td(str(it.get("area")), style="font-weight: 600; font-size: 12px;"),
+            ui.tags.td(ui.tags.code(str(it.get("id")), style="font-weight: bold; color: #2B6CB0;"), style="text-align: center;"),
+            ui.tags.td(str(it.get("kriteria")), style="max-width: 320px; white-space: normal; font-size: 12.5px;"),
+            ui.tags.td(f"{int(b)}", style=f"text-align: center; font-weight: 800; color: {bobot_color};"),
+            ui.tags.td(select_hasil, style="text-align: center; background: #FEFCBF;"),
+            ui.tags.td(skor_str, style="text-align: center; font-weight: 700;"),
+            ui.tags.td(f"{b:.1f}" if cur_hasil != "N/A" else "-", style="text-align: right;"),
+            ui.tags.td(f"{diraih:.1f}" if diraih != "-" else "-", style="text-align: right; font-weight: 800; color: #2B6CB0;"),
+            ui.tags.td(input_cat)
+        ))
+
+    headers_chk = ["Area Audit", "ID", "Kriteria Audit", "Bobot", "Hasil Audit", "Skor", "Poin Maks", "Poin Diraih", "Bukti / Catatan Pengamatan"]
+    th_cells_chk = [ui.tags.th(h, style="text-align: center;" if h in ["ID", "Bobot", "Hasil Audit", "Skor", "Poin Maks", "Poin Diraih"] else "") for h in headers_chk]
+
     tab2_checklist = ui.div(
-        ui.output_ui("comp_checklist_container_ui"),
+        ui.div(
+            ui.div(
+                ui.h4("📝 Pengisian Formulir Kepatuhan Gudang (27 Butir)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
+                ui.p("Pilih status kepatuhan (Sesuai 100%, NC Minor 50%, NC Mayor 0%, atau N/A). Skor & total poin akan terkalkulasi secara otomatis.", style="color: #718096; font-size: 12px; margin: 0;"),
+            ),
+            ui.div(
+                ui.download_button(
+                    "btn_dl_comp_excel",
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-file-excel", style="margin-right: 6px;"), "DOWNLOAD EXCEL WH-AUD-001"),
+                    style="background: #10B981; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer;"
+                ),
+                ui.tags.button(
+                    ui.tags.i(class_="fa-solid fa-rotate-left", style="margin-right: 4px;"), "Reset Standar",
+                    onclick="Shiny.setInputValue('btn_reset_comp_checklist', Math.random(), {priority: 'event'})",
+                    style="background: #EDF2F7; color: #4A5568; border: 1.5px solid #CBD5E0; padding: 7px 12px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer; margin-left: 6px;"
+                ),
+                style="display: flex; align-items: center;"
+            ),
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 8px;"
+        ),
+        ui.div(
+            ui.tags.table(
+                ui.tags.thead(ui.tags.tr(*th_cells_chk)),
+                ui.tags.tbody(*tr_chk_rows),
+                class_="custom-clean-table", style="width: 100%; border: 1px solid #CBD5E0; border-radius: 8px;"
+            ),
+            style="overflow-x: auto; width: 100%; background: white; margin-bottom: 1rem;"
+        ),
+        # Upload balik Excel jika user mengisi offline
+        ui.tags.details(
+            ui.tags.summary("📥 Impor File Excel yang Sudah Diisi"),
+            ui.div(
+                ui.input_file("upload_filled_comp_excel", None, accept=[".xlsx", ".xls"], button_label="Pilih File Excel", placeholder="Upload file Excel WH-AUD-001..."),
+                ui.tags.button(
+                    "Sinkronkan Nilai ke Web",
+                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_import_comp_excel', Math.random(), {priority: 'event'})",
+                    class_="btn-red-gradient", style="padding: 6px 14px; font-size: 12px; margin-top: 6px;"
+                ),
+                style="padding: 10px 0;"
+            ),
+            style="background: #F8FAFC; border: 1px dashed #CBD5E0; border-radius: 8px; padding: 8px 12px;"
+        ),
         style="padding: 0.5rem 0;"
     )
 
     # --- TAB 3: LOG TEMUAN & CAPA ---
+    capa_list = state.comp_audit_capa_list()
+    tr_capa = []
+    for idx_cp, cp in enumerate(capa_list):
+        c_status = cp.get("status", "Terbuka")
+        is_done = (c_status == "Selesai")
+        badge_stat = ui.span("Selesai", style="background: #C6F6D5; color: #22543D; font-weight: 800; padding: 3px 8px; border-radius: 4px; font-size: 11px;") if is_done else ui.span(c_status, style="background: #FED7D7; color: #9B2C2C; font-weight: 800; padding: 3px 8px; border-radius: 4px; font-size: 11px;")
+
+        btn_toggle = ui.tags.button(
+            "Buka" if is_done else "Selesaikan",
+            onclick=f"Shiny.setInputValue('btn_toggle_comp_capa', {idx_cp}, {{priority: 'event'}})",
+            style="background: #EDF2F7; border: 1px solid #CBD5E0; font-size: 11px; padding: 3px 8px; border-radius: 4px; cursor: pointer; margin-right: 4px;"
+        )
+        btn_del = ui.tags.button(
+            ui.tags.i(class_="fa-solid fa-trash", style="color: #E53E3E;"),
+            onclick=f"Shiny.setInputValue('btn_delete_comp_capa', {idx_cp}, {{priority: 'event'}})",
+            style="background: transparent; border: none; cursor: pointer;"
+        )
+
+        tr_capa.append(ui.tags.tr(
+            ui.tags.td(str(cp.get("id")), style="font-weight: bold; text-align: center;"),
+            ui.tags.td(str(cp.get("tanggal"))),
+            ui.tags.td(ui.tags.code(str(cp.get("id_audit")), style="color: #2B6CB0; font-weight: bold;")),
+            ui.tags.td(str(cp.get("area"))),
+            ui.tags.td(str(cp.get("uraian")), style="max-width: 250px; white-space: normal;"),
+            ui.tags.td(str(cp.get("tingkat")), style="font-weight: 700; text-align: center;"),
+            ui.tags.td(str(cp.get("akar"))),
+            ui.tags.td(str(cp.get("tindakan"))),
+            ui.tags.td(str(cp.get("pic"))),
+            ui.tags.td(str(cp.get("due_date"))),
+            ui.tags.td(badge_stat, style="text-align: center;"),
+            ui.tags.td(ui.div(btn_toggle, btn_del, style="display: flex; align-items: center; justify-content: center;"))
+        ))
+
     tab3_capa = ui.div(
         ui.h4("🔍 Log Temuan & Corrective and Preventive Action (CAPA)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
         ui.p("Catat setiap ketidaksesuaian (NC Mayor, NC Minor, atau Observasi) lengkap dengan batas waktu dan penanggung jawab.", style="color: #718096; font-size: 13px; margin-bottom: 1rem;"),
@@ -2795,7 +2919,7 @@ def compliance_audit_view(state: AppState):
             ui.div(
                 ui.div(
                     ui.span("Butir Audit Terkait:", style="font-weight: 700; font-size: 12px;"),
-                    ui.tags.select(*[ui.tags.option(f"{x['id']} - {x['kriteria'][:40]}...", value=x['id']) for x in state.COMPLIANCE_DEFAULT_ITEMS], id="capa_id_audit", class_="form-control"),
+                    ui.tags.select(*[ui.tags.option(f"{x['id']} - {x['kriteria'][:40]}...", value=x['id']) for x in checklist_items], id="capa_id_audit", class_="form-control"),
                     style="flex: 1; min-width: 200px;"
                 ),
                 ui.div(ui.span("Uraian Temuan / Bukti:", style="font-weight: 700; font-size: 12px;"), ui.tags.input(id="capa_uraian", type="text", placeholder="Jelaskan temuan...", class_="form-control"), style="flex: 2; min-width: 250px;"),
@@ -2835,24 +2959,39 @@ def compliance_audit_view(state: AppState):
             ),
             style="background: #F8FAFC; border: 1.5px solid #E2E8F0; padding: 1.25rem; border-radius: 10px; margin-bottom: 1.25rem;"
         ),
-        ui.output_ui("comp_capa_table_ui"),
+        ui.div(
+            ui.tags.table(
+                ui.tags.thead(ui.tags.tr(
+                    ui.tags.th("ID"), ui.tags.th("Tanggal"), ui.tags.th("Butir"), ui.tags.th("Area"), ui.tags.th("Uraian Temuan"), ui.tags.th("Tingkat"), ui.tags.th("Akar Masalah"), ui.tags.th("Tindakan CAPA"), ui.tags.th("PIC"), ui.tags.th("Batas"), ui.tags.th("Status"), ui.tags.th("Aksi")
+                )),
+                ui.tags.tbody(*tr_capa) if tr_capa else ui.tags.tr(ui.tags.td("Belum ada temuan yang dicatat.", colspan=12, style="text-align: center; color: #718096; padding: 1.5rem; font-style: italic;")),
+                class_="custom-clean-table", style="width: 100%;"
+            ),
+            style="overflow-x: auto; background: white; border: 1px solid #CBD5E0; border-radius: 8px;"
+        ),
         style="padding: 0.5rem 0;"
     )
 
     # --- TAB 4: SIGN-OFF & SUMMARY SKOR ---
     tab4_sign = ui.div(
         ui.h4("✍️ Hasil Audit & Tanda Tangan Pengesahan (Sign-Off)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
-        
-        # Skor Live Update di Tab 4
-        ui.output_ui("comp_scorecard_ui"),
-
         ui.div(
+            dark_metric_box("📊 TOTAL POIN MAKS", f"{tot_maks:.1f}", "#3182CE"),
+            dark_metric_box("🎯 POIN DIRAIS", f"{tot_diraih:.1f}", "#10B981"),
+            dark_metric_box("📈 SKOR KEPATUHAN", f"{pct:.1f}%", "#C5A059"),
+            dark_metric_box("🏆 PERINGKAT", grade, "#7B61FF"),
+            dark_metric_box("⚖️ STATUS HASIL", status_text, "#E53E3E" if not passed else "#10B981"),
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.5rem;"
+        ),
+        ui.div(
+            # TTD Auditor Utama
             ui.div(
                 ui.strong("1. Auditor Utama", style="font-size: 13px; color: #1A202C; display: block; margin-bottom: 6px;"),
                 ui.tags.canvas(id="canvas_sign_comp_auditor", width="260", height="100", style="border: 1px dashed #CBD5E0; border-radius: 6px; background: #FFF; width: 100%; cursor: crosshair;"),
                 ui.tags.button("Bersihkan TTD", type="button", onclick="window.clearSignCanvas('canvas_sign_comp_auditor')", style="background: #EDF2F7; border: 1px solid #CBD5E0; font-size: 11px; padding: 2px 8px; border-radius: 4px; margin-top: 4px; cursor: pointer;"),
                 style="flex: 1; min-width: 240px; background: #F8FAFC; padding: 1rem; border-radius: 8px; border: 1px solid #E2E8F0;"
             ),
+            # TTD Auditee / Kepala Gudang
             ui.div(
                 ui.strong("2. Auditee / Kepala Gudang", style="font-size: 13px; color: #1A202C; display: block; margin-bottom: 6px;"),
                 ui.tags.canvas(id="canvas_sign_comp_auditee", width="260", height="100", style="border: 1px dashed #CBD5E0; border-radius: 6px; background: #FFF; width: 100%; cursor: crosshair;"),
@@ -2918,9 +3057,56 @@ def compliance_audit_view(state: AppState):
         style="padding: 0.5rem 0;"
     )
 
-    # --- TAB 5: RIWAYAT & ARSIP ---
+    # --- TAB 5: HISTORY AUDIT KEPATUHAN ---
+    histories = state.comp_audit_history_list()
+    h_cards = []
+    for h in histories:
+        h_id = h.get("id", "-")
+        dt = h.get("audit_date", "-")
+        br = h.get("branch", "-")
+        pct_val = h.get("score_pct", 0.0)
+        grade_val = h.get("grade", "-")
+        passed_val = h.get("passed", False)
+        pass_badge = ui.span("LULUS", style="background: #C6F6D5; color: #22543D; font-weight: 800; padding: 3px 8px; border-radius: 4px; font-size: 11px;") if passed_val else ui.span("TIDAK LULUS", style="background: #FED7D7; color: #9B2C2C; font-weight: 800; padding: 3px 8px; border-radius: 4px; font-size: 11px;")
+
+        h_cards.append(ui.div(
+            ui.div(
+                ui.div(
+                    ui.div(
+                        ui.span(h_id, style="font-weight: 800; font-size: 15px; color: #1A202C; margin-right: 8px;"),
+                        ui.span(f"Tanggal: {dt}", style="background: #EDF2F7; color: #2D3748; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 4px; margin-right: 6px;"),
+                        pass_badge,
+                        style="display: flex; align-items: center; margin-bottom: 4px; flex-wrap: wrap; gap: 4px;"
+                    ),
+                    ui.p(f"Cabang: {br} • Skor: {pct_val}% ({grade_val}) • Lead: {h.get('lead_auditor')}", style="margin: 0; font-size: 12px; color: #718096;")
+                ),
+                ui.div(
+                    ui.tags.button(
+                        ui.tags.i(class_="fa-solid fa-trash", style="margin-right: 4px;"), "Hapus",
+                        onclick=f"Shiny.setInputValue('btn_delete_comp_history', '{h_id}', {{priority: 'event'}})",
+                        style="background: #FFF5F5; color: #E53E3E; border: 1.5px solid #FEB2B2; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer;"
+                    ),
+                    style="display: flex; align-items: center;"
+                ),
+                style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;"
+            ),
+            style="background: white; border: 1.5px solid #CBD5E0; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 0.85rem;"
+        ))
+
     tab5_history = ui.div(
-        ui.output_ui("comp_history_cards_ui"),
+        ui.div(
+            ui.div(
+                ui.h4("📂 Riwayat Laporan Audit Kepatuhan (Supabase)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
+                ui.p("Seluruh hasil kepatuhan gudang tersimpan otomatis dan dapat diekspor kapan saja.", style="color: #718096; font-size: 13px; margin: 0;"),
+            ),
+            ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-arrows-rotate", style="margin-right: 6px;"), "Refresh History",
+                onclick="Shiny.setInputValue('btn_refresh_comp_history', Math.random(), {priority: 'event'})",
+                style="background: #EDF2F7; color: #2D3748; border: 1.5px solid #CBD5E0; padding: 6px 14px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer;"
+            ),
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 8px;"
+        ),
+        ui.div(*h_cards) if h_cards else ui.p("Belum ada riwayat audit kepatuhan tersimpan.", style="color: #718096; font-style: italic; text-align: center; padding: 2rem; background: #F8FAFC; border: 1px dashed #CBD5E0; border-radius: 8px;"),
         style="padding: 0.5rem 0;"
     )
 
@@ -2936,45 +3122,6 @@ def compliance_audit_view(state: AppState):
             ),
             style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
         ),
-        # JS Helper: Update Baris Langsung di Browser Tanpa Refresh Halaman
-        ui.tags.script("""
-            window.compDebounceTimers = window.compDebounceTimers || {};
-            window.onCompItemChange = function(idx, bobotVal) {
-                let hasilEl = document.getElementById('chk_hasil_' + idx);
-                let catEl = document.getElementById('chk_cat_' + idx);
-                let skorCell = document.getElementById('chk_skor_cell_' + idx);
-                let diraihCell = document.getElementById('chk_diraih_cell_' + idx);
-
-                let hasil = hasilEl ? hasilEl.value : 'Sesuai';
-                let cat = catEl ? catEl.value : '';
-                let b = parseFloat(bobotVal) || 1.0;
-
-                // 1. Update sel baris secara instan di browser
-                if (skorCell && diraihCell) {
-                    if (hasil === 'Sesuai') {
-                        skorCell.innerText = '100%';
-                        diraihCell.innerText = b.toFixed(1);
-                    } else if (hasil.includes('Minor')) {
-                        skorCell.innerText = '50%';
-                        diraihCell.innerText = (b * 0.5).toFixed(1);
-                    } else if (hasil.includes('Mayor')) {
-                        skorCell.innerText = '0%';
-                        diraihCell.innerText = '0.0';
-                    } else {
-                        skorCell.innerText = '-';
-                        diraihCell.innerText = '-';
-                    }
-                }
-
-                // 2. Kirim ke Python Shiny di background (tanpa reload tab)
-                clearTimeout(window.compDebounceTimers[idx]);
-                window.compDebounceTimers[idx] = setTimeout(function() {
-                    if (window.Shiny && window.Shiny.setInputValue) {
-                        Shiny.setInputValue('comp_item_changed', {idx: idx, hasil: hasil, cat: cat}, {priority: 'event'});
-                    }
-                }, 200);
-            };
-        """),
         style="width: 100%; padding: 1rem;"
     )
 
