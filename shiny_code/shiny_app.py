@@ -4951,7 +4951,81 @@ def server(input: Inputs, output: Outputs, session: Session):
 # ==========================================================================
     # WAREHOUSE COMPLIANCE AUDIT CONTROLLERS & EVENT HANDLERS
     # ==========================================================================
+
     # 1. Update Hasil Item Checklist Live
+# ==========================================================================
+    # WAREHOUSE COMPLIANCE AUDIT: RENDER CHECKLIST TERISOLASI (ANTI-LONCAT)
+    # ==========================================================================
+    @render.ui
+    def comp_checklist_container_ui():
+        # Baca checklist dari state
+        items = state.comp_audit_checklist()
+        if not items:
+            return ui.p("Data checklist kosong.", style="color: #718096; font-style: italic;")
+
+        th_headers = ["Area Audit", "ID", "Kriteria Audit", "Bobot", "Hasil Pemeriksaan", "Skor", "Poin Diraih", "Catatan / Bukti"]
+        th_cells = [ui.tags.th(h, style="text-align: center;" if h in ["ID", "Bobot", "Hasil Pemeriksaan", "Skor", "Poin Diraih"] else "") for h in th_headers]
+
+        tr_rows = []
+        for idx, it in enumerate(items):
+            hasil_val = it.get("hasil", "Sesuai")
+            bobot = float(it.get("bobot", 1))
+            catatan = it.get("catatan", "")
+
+            # Hitung skor & poin awal
+            if hasil_val == "Sesuai":
+                skor_str, diraih_str = "100%", f"{bobot:.1f}"
+            elif "Minor" in hasil_val:
+                skor_str, diraih_str = "50%", f"{(bobot * 0.5):.1f}"
+            elif "Mayor" in hasil_val:
+                skor_str, diraih_str = "0%", "0.0"
+            else:
+                skor_str, diraih_str = "-", "-"
+
+            # Dropdown Hasil (Tidak memicu reload seluruh tab)
+            select_hasil = ui.tags.select(
+                ui.tags.option("Sesuai", value="Sesuai", selected=(hasil_val == "Sesuai")),
+                ui.tags.option("NC Minor", value="NC Minor", selected=("Minor" in hasil_val)),
+                ui.tags.option("NC Mayor", value="NC Mayor", selected=("Mayor" in hasil_val)),
+                ui.tags.option("N/A", value="N/A", selected=(hasil_val == "N/A")),
+                id=f"chk_hasil_{idx}",
+                onchange=f"window.onCompItemChange({idx}, {bobot})",
+                style="padding: 4px 8px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; background: white; cursor: pointer;"
+            )
+
+            input_cat = ui.tags.input(
+                id=f"chk_cat_{idx}",
+                type="text",
+                value=catatan,
+                placeholder="Catatan temuan...",
+                onchange=f"window.onCompItemChange({idx}, {bobot})",
+                style="width: 100%; font-size: 12px; padding: 4px 8px; border-radius: 6px; border: 1px solid #CBD5E0; background: white; outline: none;"
+            )
+
+            tr_rows.append(ui.tags.tr(
+                ui.tags.td(str(it.get("area", "-")), style="font-weight: 600; color: #4A5568;"),
+                ui.tags.td(ui.tags.b(str(it.get("id", "-"))), style="text-align: center; color: #2B6CB0;"),
+                ui.tags.td(str(it.get("kriteria", "-")), style="max-width: 320px; white-space: normal;"),
+                ui.tags.td(str(int(bobot)), style="text-align: center; font-weight: bold;"),
+                ui.tags.td(select_hasil, style="text-align: center; background: #FFFDF0;"),
+                ui.tags.td(skor_str, id=f"chk_skor_cell_{idx}", style="text-align: center; font-weight: 800;"),
+                ui.tags.td(diraih_str, id=f"chk_diraih_cell_{idx}", style="text-align: right; font-weight: 800; color: #276749;"),
+                ui.tags.td(input_cat)
+            ))
+
+        return ui.div(
+            ui.div(
+                ui.tags.table(
+                    ui.tags.thead(ui.tags.tr(*th_cells)),
+                    ui.tags.tbody(*tr_rows),
+                    class_="custom-clean-table",
+                    style="width: 100%; border-collapse: collapse;"
+                ),
+                style="overflow-x: auto; width: 100%; background: white; border-radius: 8px; border: 1px solid #E2E8F0;"
+            ),
+            style="width: 100%;"
+        )
+    
     @reactive.Effect
     @reactive.event(input.comp_item_changed)
     def _on_comp_item_changed():
@@ -4959,7 +5033,9 @@ def server(input: Inputs, output: Outputs, session: Session):
         idx = d.get("idx", 0)
         hasil = d.get("hasil", "Sesuai")
         cat = d.get("cat", "")
-        state.update_compliance_item(idx, hasil, cat)
+        # Gunakan isolate agar tidak memicu render ulang halaman utama
+        with reactive.isolate():
+            state.update_compliance_item(idx, hasil, cat)
 
     # 2. Reset Default Items
     @reactive.Effect
@@ -5066,5 +5142,5 @@ def server(input: Inputs, output: Outputs, session: Session):
         a_id = input.btn_delete_comp_history()
         succ, msg = state.delete_compliance_session(a_id)
         ui.notification_show(f"🗑️ {msg}", type="message", duration=3)
-        
+
 app = App(app_ui, server)

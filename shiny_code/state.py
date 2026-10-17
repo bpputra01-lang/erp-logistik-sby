@@ -682,7 +682,7 @@ class AppState:
         self.login_timestamp_ms.set(0)
 
     def get_menu_monitoring(self) -> list[str]:
-        return ["Warehouse Activity Monitor", "Form Auditor", "Memo Pengajuan", "Balancing Stock", "Database Ongkir In/Out", "Precentage Display"]
+        return ["Warehouse Activity Monitor", "Memo Pengajuan", "Balancing Stock", "Database Ongkir In/Out", "Precentage Display"]
     
     def get_menu_auditor(self) -> list[str]:
         return ["Warehouse Inventory Audit", "Warehouse Compliance Audit"]
