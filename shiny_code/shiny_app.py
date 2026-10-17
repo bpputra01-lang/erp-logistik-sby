@@ -95,7 +95,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             state.load_ongkir_data()
             state.load_memo_data()
             state.load_auditor_history()
-            state.load_compliance_history()sss
+            state.load_compliance_history()
             ui.notification_show(msg, type="message", duration=4)
         else:
             state.error_modal_message.set(msg)
