@@ -6931,11 +6931,11 @@ class AppState:
                 "doc_no": form_meta.get("doc_no", "WH-AUD-001"),
                 "trading_period": form_meta.get("trading_period", "Reguler"),
                 "scope": form_meta.get("scope", "Gudang Pusat (DC)"),
-                "total_poin_maks": tot_maks,
-                "total_poin_diraih": tot_diraih,
-                "score_pct": round(pct, 2),
+                "total_poin_maks": float(tot_maks),
+                "total_poin_diraih": float(tot_diraih),
+                "score_pct": round(float(pct), 2),
                 "grade": grade,
-                "passed": passed,
+                "passed": bool(passed),
                 "sign_auditor_img": form_meta.get("sign_auditor_img", ""),
                 "sign_auditee_img": form_meta.get("sign_auditee_img", ""),
                 "checklist": list(self.comp_audit_checklist()),
@@ -6947,15 +6947,11 @@ class AppState:
                 client.table("warehouse_compliance_audits").insert(payload).execute()
             
             self.load_compliance_history()
-            return True, f"✅ Audit Kepatuhan {audit_id} Berhasil Disimpan ke Supabase!"
+            return True, f"✅ Laporan Audit Kepatuhan ({audit_id}) Berhasil Disimpan ke Supabase!"
         except Exception as e:
-            # Fallback ke state lokal jika tabel belum dibuat di Supabase
-            cur = list(self.comp_audit_history_list())
-            payload["created_at"] = datetime.now().isoformat()
-            cur.insert(0, payload)
-            self.comp_audit_history_list.set(cur)
-            return True, f"✅ Data Audit ({audit_id}) Tersimpan di Sesi Lokal!"
-
+            print("Gagal simpan ke Supabase:", e)
+            return False, f"Gagal simpan ke database: {str(e)}"
+            
     def delete_compliance_session(self, audit_id: str):
         try:
             client = get_supabase()

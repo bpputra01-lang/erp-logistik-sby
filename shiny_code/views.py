@@ -2876,17 +2876,29 @@ def compliance_audit_view(state: AppState):
         ui.h4("✍️ Hasil Audit & Tanda Tangan Pengesahan (Sign-Off)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
         ui.output_ui("comp_scorecard_ui"),
         ui.div(
+            # Kotak TTD 1: Auditor Utama
             ui.div(
                 ui.strong("1. Auditor Utama", style="font-size: 13px; color: #1A202C; display: block; margin-bottom: 6px;"),
-                ui.tags.canvas(id="canvas_sign_comp_auditor", width="260", height="100", style="border: 1px dashed #CBD5E0; border-radius: 6px; background: #FFF; width: 100%; cursor: crosshair;"),
-                ui.tags.button("Bersihkan TTD", type="button", onclick="window.clearSignCanvas('canvas_sign_comp_auditor')", style="background: #EDF2F7; border: 1px solid #CBD5E0; font-size: 11px; padding: 2px 8px; border-radius: 4px; margin-top: 4px; cursor: pointer;"),
-                style="flex: 1; min-width: 240px; background: #F8FAFC; padding: 1rem; border-radius: 8px; border: 1px solid #E2E8F0;"
+                ui.tags.canvas(
+                    id="canvas_sign_comp_auditor", 
+                    width="320", 
+                    height="120", 
+                    style="border: 1.5px dashed #CBD5E0; border-radius: 6px; background: #FFFFFF; width: 100%; height: 120px; cursor: crosshair; display: block; touch-action: none;"
+                ),
+                ui.tags.button("Bersihkan TTD", type="button", onclick="window.clearCompSign('canvas_sign_comp_auditor')", style="background: #EDF2F7; border: 1px solid #CBD5E0; font-size: 11px; padding: 4px 10px; border-radius: 4px; margin-top: 6px; cursor: pointer; font-weight: bold;"),
+                style="flex: 1; min-width: 260px; background: #F8FAFC; padding: 1rem; border-radius: 8px; border: 1px solid #E2E8F0;"
             ),
+            # Kotak TTD 2: Auditee / Kepala Gudang
             ui.div(
                 ui.strong("2. Auditee / Kepala Gudang", style="font-size: 13px; color: #1A202C; display: block; margin-bottom: 6px;"),
-                ui.tags.canvas(id="canvas_sign_comp_auditee", width="260", height="100", style="border: 1px dashed #CBD5E0; border-radius: 6px; background: #FFF; width: 100%; cursor: crosshair;"),
-                ui.tags.button("Bersihkan TTD", type="button", onclick="window.clearSignCanvas('canvas_sign_comp_auditee')", style="background: #EDF2F7; border: 1px solid #CBD5E0; font-size: 11px; padding: 2px 8px; border-radius: 4px; margin-top: 4px; cursor: pointer;"),
-                style="flex: 1; min-width: 240px; background: #F8FAFC; padding: 1rem; border-radius: 8px; border: 1px solid #E2E8F0;"
+                ui.tags.canvas(
+                    id="canvas_sign_comp_auditee", 
+                    width="320", 
+                    height="120", 
+                    style="border: 1.5px dashed #CBD5E0; border-radius: 6px; background: #FFFFFF; width: 100%; height: 120px; cursor: crosshair; display: block; touch-action: none;"
+                ),
+                ui.tags.button("Bersihkan TTD", type="button", onclick="window.clearCompSign('canvas_sign_comp_auditee')", style="background: #EDF2F7; border: 1px solid #CBD5E0; font-size: 11px; padding: 4px 10px; border-radius: 4px; margin-top: 6px; cursor: pointer; font-weight: bold;"),
+                style="flex: 1; min-width: 260px; background: #F8FAFC; padding: 1rem; border-radius: 8px; border: 1px solid #E2E8F0;"
             ),
             style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem;"
         ),
@@ -2894,28 +2906,127 @@ def compliance_audit_view(state: AppState):
             ui.tags.button(
                 ui.tags.span(ui.tags.i(class_="fa-solid fa-floppy-disk", style="margin-right: 8px; font-size: 15px;"), "SIMPAN LAPORAN AUDIT KEPATUHAN KE SUPABASE"),
                 onclick="""
-                    let getCanvas = function(id) { let c = document.getElementById(id); return c ? c.toDataURL() : ''; };
+                    let getCanvasData = function(id) {
+                        let c = document.getElementById(id);
+                        if (!c) return '';
+                        // Cek apakah canvas kosong atau sudah ada goresan
+                        let blank = document.createElement('canvas');
+                        blank.width = c.width;
+                        blank.height = c.height;
+                        if (c.toDataURL() === blank.toDataURL()) return '';
+                        return c.toDataURL();
+                    };
+
                     let meta = {
                         company: document.getElementById('comp_company') ? document.getElementById('comp_company').value : '',
-                        branch: document.getElementById('comp_branch') ? document.getElementById('comp_branch').value : '',
+                        branch: document.getElementById('comp_branch') ? document.getElementById('comp_branch').value : 'Surabaya',
                         address: document.getElementById('comp_address') ? document.getElementById('comp_address').value : '',
                         lead: document.getElementById('comp_lead') ? document.getElementById('comp_lead').value : '',
                         auditee: document.getElementById('comp_auditee') ? document.getElementById('comp_auditee').value : '',
                         date: document.getElementById('comp_date') ? document.getElementById('comp_date').value : '',
-                        type: document.getElementById('comp_type') ? document.getElementById('comp_type').value : '',
-                        scope: document.getElementById('comp_scope') ? document.getElementById('comp_scope').value : '',
-                        doc_no: document.getElementById('comp_doc_no') ? document.getElementById('comp_doc_no').value : '',
-                        trading_period: document.getElementById('comp_trading') ? document.getElementById('comp_trading').value : '',
-                        sign_auditor_img: getCanvas('canvas_sign_comp_auditor'),
-                        sign_auditee_img: getCanvas('canvas_sign_comp_auditee')
+                        type: document.getElementById('comp_type') ? document.getElementById('comp_type').value : 'Internal',
+                        scope: document.getElementById('comp_scope') ? document.getElementById('comp_scope').value : 'Gudang Pusat (DC)',
+                        doc_no: document.getElementById('comp_doc_no') ? document.getElementById('comp_doc_no').value : 'WH-AUD-001',
+                        trading_period: document.getElementById('comp_trading') ? document.getElementById('comp_trading').value : 'Reguler',
+                        sign_auditor_img: getCanvasData('canvas_sign_comp_auditor'),
+                        sign_auditee_img: getCanvasData('canvas_sign_comp_auditee')
                     };
-                    window.showGlobalSpinner();
+
+                    if (window.showGlobalSpinner) window.showGlobalSpinner();
                     Shiny.setInputValue('btn_save_comp_audit_supabase', meta, {priority: 'event'});
                 """,
-                class_="btn-red-gradient", style="padding: 12px 24px; font-size: 14px; font-weight: 800;"
+                class_="btn-red-gradient", 
+                style="padding: 12px 24px; font-size: 14px; font-weight: 800; border-radius: 8px;"
             ),
             style="display: flex; justify-content: flex-end; width: 100%;"
         ),
+        # Skrip TTD Super Responsif & Bebas Macet
+        ui.tags.script("""
+            window.clearCompSign = function(id) {
+                let canvas = document.getElementById(id);
+                if (canvas) {
+                    let ctx = canvas.getContext('2d');
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                }
+            };
+
+            function setupComplianceCanvas(canvasId) {
+                let canvas = document.getElementById(canvasId);
+                if (!canvas || canvas.dataset.ready === "true") return;
+                canvas.dataset.ready = "true";
+
+                // Sinkronkan resolusi canvas dengan CSS width
+                let rect = canvas.getBoundingClientRect();
+                if (rect.width > 0) {
+                    canvas.width = rect.width;
+                    canvas.height = 120;
+                }
+
+                let ctx = canvas.getContext('2d');
+                ctx.lineWidth = 2.5;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.strokeStyle = '#000000';
+
+                let drawing = false;
+
+                function getCoords(e) {
+                    let box = canvas.getBoundingClientRect();
+                    let clientX = e.clientX;
+                    let clientY = e.clientY;
+                    if (e.touches && e.touches.length > 0) {
+                        clientX = e.touches[0].clientX;
+                        clientY = e.touches[0].clientY;
+                    }
+                    return {
+                        x: clientX - box.left,
+                        y: clientY - box.top
+                    };
+                }
+
+                function startDraw(e) {
+                    drawing = true;
+                    let pos = getCoords(e);
+                    ctx.beginPath();
+                    ctx.moveTo(pos.x, pos.y);
+                }
+
+                function moveDraw(e) {
+                    if (!drawing) return;
+                    let pos = getCoords(e);
+                    ctx.lineTo(pos.x, pos.y);
+                    ctx.stroke();
+                }
+
+                function stopDraw() {
+                    drawing = false;
+                }
+
+                // Mouse events
+                canvas.addEventListener('mousedown', startDraw);
+                canvas.addEventListener('mousemove', moveDraw);
+                window.addEventListener('mouseup', stopDraw);
+
+                // Touch events (layar sentuh / iPad / HP)
+                canvas.addEventListener('touchstart', function(e) { e.preventDefault(); startDraw(e); }, { passive: false });
+                canvas.addEventListener('touchmove', function(e) { e.preventDefault(); moveDraw(e); }, { passive: false });
+                window.addEventListener('touchend', stopDraw);
+            }
+
+            function initAllCompCanvases() {
+                setupComplianceCanvas('canvas_sign_comp_auditor');
+                setupComplianceCanvas('canvas_sign_comp_auditee');
+            }
+
+            // Inisialisasi berkala & saat tab diklik
+            setTimeout(initAllCompCanvases, 400);
+            setTimeout(initAllCompCanvases, 1000);
+            document.addEventListener('click', function(e) {
+                if (e.target && e.target.innerText && e.target.innerText.includes('SIGN-OFF')) {
+                    setTimeout(initAllCompCanvases, 150);
+                }
+            });
+        """),
         style="padding: 0.5rem 0;"
     )
 
