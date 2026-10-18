@@ -6936,137 +6936,46 @@ class AppState:
 
     def sync_markom_event_requests(self, file_source=None, silent=False):
         """
-        Scrapping tiap 5 menit:
-        - Hanya ambil baris yang Kolom B (Note) mengandung kata 'EVENT'.
-        - Detailnya disimpan di Tab 1 (self.memo_scraped_event_items).
-        - Otomatis dibuatkan Card Memo di Tab 2 (siap cetak 2 PDF tanpa approval).
+        Di Shiny Static (Pyodide):
+        Tinggal panggil load_memo_data() untuk menarik data terbaru dari Supabase
+        yang sudah dimasukkan oleh GitHub Actions.
         """
         try:
-            df = None
-            if file_source is not None:
-                if isinstance(file_source, str) and file_source.endswith(('.xlsx', '.xls')):
-                    try: df = pd.read_excel(file_source, sheet_name="PERMINTAAN MARKOM")
-                    except Exception: df = pd.read_excel(file_source)
-                else: df = pd.read_csv(file_source)
-            else:
-                for cand in ["PERMINTAAN MARKOM.xlsx", "REQUEST BARANG.csv", "PERMINTAAN_MARKOM.xlsx", "REQUEST_BARANG.csv"]:
-                    if os.path.exists(cand):
-                        try:
-                            if cand.endswith(('.xlsx', '.xls')): df = pd.read_excel(cand, sheet_name="PERMINTAAN MARKOM")
-                            else: df = pd.read_csv(cand)
-                            break
-                        except Exception: continue
-
-            if df is None or df.empty or df.shape[1] < 2:
-                return False, "Spreadsheet tidak ditemukan atau kosong."
-
-            # Filter hanya baris Kolom B yang mengandung kata EVENT
-            col_b = df.iloc[:, 1].fillna("").astype(str)
-            df_event = df[col_b.str.contains("EVENT", case=False, na=False)].copy()
-
-            if df_event.empty:
-                self.memo_last_sync_time.set(datetime.now().strftime("%d/%m/%Y %H:%M"))
-                return True, "Tidak ada data dengan Note 'EVENT'."
-
-            stock_lookup = self.get_stock_cache_lookup()
-            event_items = []
-            pic_peminta = "MARKOM"
-            keterangan_event = "EVENT"
-            tanggal_req = datetime.now().strftime("%Y-%m-%d")
-
-            for row_idx, (_, r) in enumerate(df_event.iterrows(), start=1):
-                # Kolom A = PIC (Index 0)
-                pic_val = str(r.iloc[0]).strip() if len(r) > 0 and pd.notna(r.iloc[0]) else ""
-                if pic_val: pic_peminta = pic_val
-
-                # Kolom B = Note -> UPPER (Index 1)
-                note_val = str(r.iloc[1]).strip() if len(r) > 1 and pd.notna(r.iloc[1]) else ""
-                if note_val: keterangan_event = note_val.upper()
-
-                # Kolom M = Tanggal (Index 12)
-                tgl_val = str(r.iloc[12]).strip() if len(r) > 12 and pd.notna(r.iloc[12]) else ""
-                if tgl_val: tanggal_req = tgl_val
-
-                # Kolom O = BIN Pick (Index 14)
-                bin_val = str(r.iloc[14]).strip() if len(r) > 14 and pd.notna(r.iloc[14]) else "GL1-DC-OUT"
-
-                # Kolom D = Qty (Index 3)
-                qty_raw = str(r.iloc[3]).strip() if len(r) > 3 and pd.notna(r.iloc[3]) else "1"
-                qty_val = safe_int(qty_raw, 1)
-
-                # SKU
-                sku_raw = ""
-                for c_name in r.index:
-                    if "SKU" in str(c_name).upper():
-                        sku_raw = str(r[c_name]).split('.')[0].strip().upper()
-                        break
-                if not sku_raw:
-                    sku_raw = str(r.iloc[3]).split('.')[0].strip().upper()
-
-                info = stock_lookup.get(sku_raw, {})
-                item_name = info.get("item_name") or sku_raw
-                harga_beli = info.get("harga_beli", 0)
-
-                distinct_id = f"EVT-{sku_raw}-{row_idx}-{random.randint(100, 999)}"
-
-                event_items.append({
-                    "id": distinct_id,
-                    "tanggal": tanggal_req,
-                    "pic": pic_peminta,
-                    "keterangan": keterangan_event,
-                    "bin": bin_val,
-                    "sku": sku_raw,
-                    "item_name": item_name,
-                    "cogs": harga_beli,
-                    "qty": qty_val,
-                    "subtotal": harga_beli * qty_val
-                })
-
-            if not event_items:
-                return False, "Tidak ada item valid."
-
-            # Simpan detail item scraping untuk TAB 1
-            self.memo_scraped_event_items.set(event_items)
-            self.memo_last_sync_time.set(datetime.now().strftime("%d/%m/%Y %H:%M"))
-
-            # Buat Card Memo di TAB 2 (Langsung Siap Cetak 2 PDF)
-            tot_nom = sum([x["subtotal"] for x in event_items])
-            memo_id = f"MEMO/ZKN/{datetime.now().strftime('%Y%m%d')}/EVT{random.randint(100, 999)}"
-
-            new_memo = {
-                "id": memo_id,
-                "tanggal": tanggal_req,
-                "divisi": "Markom SBY",
-                "jenis": "Pengajuan Adjustment untuk Hadiah (Event)",
-                "tujuan": keterangan_event,
-                "nominal": tot_nom,
-                "diajukan_oleh": pic_peminta,
-                "diproses_oleh": "Tim Purchasing",
-                "diperiksa_oleh": "Tim Finance",
-                "items": event_items
-            }
-
-            client = get_supabase()
-            if client:
-                client.table("memo_pengajuan").insert(new_memo).execute()
             self.load_memo_data()
-            return True, f"Berhasil menarik {len(event_items)} item EVENT!"
+            items = self.memo_scraped_event_items()
+            if items:
+                return True, f"Berhasil sinkronisasi {len(items)} item event dari database!"
+            return True, "Data memo sudah sinkron dengan database cloud."
         except Exception as e:
-            return False, str(e)
+            return False, f"Gagal sinkronisasi: {str(e)}"
 
     def load_memo_data(self):
+        """Memuat riwayat memo dari tabel Supabase memo_pengajuan"""
         try:
             client = get_supabase()
             if client:
-                res = client.table("memo_pengajuan").select("*").order("created_at", desc=True).execute()
+                res = client.table("memo_pengajuan").select("*").order("tanggal", desc=True).execute()
                 if res and hasattr(res, 'data') and res.data:
                     self.memo_list.set(res.data)
+                    
+                    # Otomatis isi Tab 1 (Detail Scraping) dari memo event terbaru
+                    latest_memo = res.data[0]
+                    items = latest_memo.get("items", [])
+                    if isinstance(items, str):
+                        try: items = json.loads(items)
+                        except Exception: items = []
+                    
+                    if items:
+                        self.memo_scraped_event_items.set(items)
+                        self.memo_last_sync_time.set(datetime.now().strftime("%d/%m/%Y %H:%M") + " WIB")
                 else:
                     self.memo_list.set([])
+                    self.memo_scraped_event_items.set([])
         except Exception as e:
             print("Supabase load memo error:", e)
 
     def delete_memo(self, memo_id: str):
+        """Menghapus memo dari Supabase"""
         try:
             client = get_supabase()
             if client:
