@@ -525,6 +525,8 @@ class AppState:
         self.memo_list = reactive.Value([])            # List semua memo
         self.memo_current_items = reactive.Value([])    # List item barang di form draft
         self.memo_selected_for_pdf = reactive.Value(None)
+        self.memo_scraped_event_items = reactive.Value([]) # [BARU] Rincian detail item hasil scraping Event
+        self.memo_last_sync_time = reactive.Value("-")     # [BARU] Waktu sync terakhir
 
         # Tambahkan 2 baris ini di dalam def __init__(self):
         self.pd_selected_branch = reactive.Value("JEZ SURABAYA")
@@ -6171,215 +6173,8 @@ class AppState:
             return False, f"Gagal simpan ke database: {str(e)}"
 
 
-# ==========================================================================
-    # LOGIKA WORKFLOW MEMO PENGAJUAN
-    # ==========================================================================
-    def add_memo_item_draft(self, sku: str, name: str, cogs_str: str, qty_str: str):
-        sku = str(sku).strip().upper()
-        name = str(name).strip().upper()
-        cogs = safe_int(cogs_str, 0)
-        qty = safe_int(qty_str, 1)
 
-        if not sku:
-            return False, "SKU Barang tidak boleh kosong!"
-        if qty <= 0:
-            return False, "Quantity barang minimal 1!"
-
-        items = list(self.memo_current_items())
-        items.append({
-            "sku": sku,
-            "item_name": name if name else sku,
-            "cogs": cogs,
-            "qty": qty,
-            "subtotal": cogs * qty
-        })
-        self.memo_current_items.set(items)
-        return True, "Item berhasil ditambahkan ke daftar pengajuan!"
-
-    def remove_memo_item_draft(self, index: int):
-        items = list(self.memo_current_items())
-        if 0 <= index < len(items):
-            items.pop(index)
-            self.memo_current_items.set(items)
     
-    def process_bulk_memo_items(self, file_info):
-        """Membaca file Excel/CSV secara massal dan memasukkannya ke draft memo"""
-        try:
-            df = load_data_from_info(file_info)
-            if df is None or df.empty:
-                return False, "File yang diupload kosong atau format tidak sesuai!"
-
-            df_cols = [str(c).strip().upper() for c in df.columns]
-
-            def find_col(keywords, default_idx):
-                for i, col in enumerate(df_cols):
-                    if any(k in col for k in keywords):
-                        return i
-                return default_idx if df.shape[1] > default_idx else 0
-
-            # Deteksi otomatis kolom: SKU, Name, COGS, Qty
-            c_sku = find_col(['SKU', 'KODE', 'BARCODE', 'ITEM CODE'], 0)
-            c_name = find_col(['ITEM NAME', 'NAME', 'DESKRIPSI', 'NAMA', 'DESCRIPTION'], 1)
-            c_cogs = find_col(['COGS', 'HARGA', 'PRICE', 'BELI', 'POKOK', 'MODAL'], 2)
-            c_qty = find_col(['QTY', 'JUMLAH', 'QUANTITY', 'TOTAL'], 3)
-
-            current_items = list(self.memo_current_items())
-            added_count = 0
-
-            for _, row in df.iterrows():
-                raw_sku = str(row.iloc[c_sku]).split('.')[0].strip().upper() if not pd.isna(row.iloc[c_sku]) else ""
-                if not raw_sku or raw_sku in ["NAN", "NONE", "SKU"]:
-                    continue
-
-                raw_name = str(row.iloc[c_name]).strip().upper() if df.shape[1] > c_name and not pd.isna(row.iloc[c_name]) else raw_sku
-                if raw_name in ["NAN", "NONE", ""]:
-                    raw_name = raw_sku
-
-                raw_cogs = safe_int(row.iloc[c_cogs], 0) if df.shape[1] > c_cogs else 0
-                raw_qty = safe_int(row.iloc[c_qty], 1) if df.shape[1] > c_qty else 1
-                if raw_qty <= 0:
-                    raw_qty = 1
-
-                current_items.append({
-                    "sku": raw_sku,
-                    "item_name": raw_name,
-                    "cogs": raw_cogs,
-                    "qty": raw_qty,
-                    "subtotal": raw_cogs * raw_qty
-                })
-                added_count += 1
-
-            if added_count == 0:
-                return False, "Tidak ditemukan baris barang yang valid pada file!"
-
-            self.memo_current_items.set(current_items)
-            return True, f"Berhasil menambahkan {added_count} barang ke dalam draft memo!"
-        except Exception as e:
-            return False, f"Gagal membaca file: {str(e)}"
-# 1. Fungsi penarik data dari Supabase saat aplikasi dibuka
-    def load_memo_data(self):
-        try:
-            client = get_supabase()
-            if client:
-                res = client.table("memo_pengajuan").select("*").order("created_at", desc=True).execute()
-                if res and hasattr(res, 'data') and res.data:
-                    self.memo_list.set(res.data)
-                else:
-                    self.memo_list.set([])
-        except Exception as e:
-            print("Supabase load memo error:", e)
-
-    # 2. Simpan permanen ke Supabase saat submit
-    def submit_memo_pengajuan(self, tanggal: str, divisi: str, jenis: str, tujuan: str, diajukan_oleh: str):
-        items = list(self.memo_current_items())
-        if not items:
-            return False, "Daftar item barang masih kosong!", None
-
-        tot_nominal = sum([safe_int(x.get("subtotal", 0)) for x in items])
-        rand_code = random.randint(100, 999)
-        memo_no = f"MEMO/ZKN/{datetime.now().strftime('%Y%m%d')}/{rand_code}"
-
-        new_memo = {
-            "id": memo_no,
-            "tanggal": tanggal if tanggal else datetime.now().strftime("%Y-%m-%d"),
-            "divisi": divisi,
-            "jenis": jenis,
-            "tujuan": tujuan if tujuan else "-",
-            "nominal": tot_nominal,
-            "diajukan_oleh": diajukan_oleh if diajukan_oleh else f"Tim {divisi}",
-            "diproses_oleh": "-",
-            "status_logistik": "Belum Diproses",
-            "diperiksa_oleh": "-",
-            "status_spv": "Belum Diperiksa",
-            "status_akhir": "Menunggu Logistik",
-            "items": items
-        }
-
-        # Simpan ke Supabase
-        try:
-            client = get_supabase()
-            if client:
-                client.table("memo_pengajuan").insert(new_memo).execute()
-            self.load_memo_data()
-        except Exception as e:
-            print("Gagal simpan memo ke Supabase:", e)
-            cur_list = list(self.memo_list())
-            cur_list.insert(0, new_memo)
-            self.memo_list.set(cur_list)
-
-        self.memo_current_items.set([])
-
-        # Format Chat WA dengan Enter Asli (\n)
-        item_lines = [f"{idx}. {it.get('sku')} & {it.get('item_name')} & {it.get('qty')}" for idx, it in enumerate(items, 1)]
-        list_str = "\n".join(item_lines)
-        pesan_wa = f"Ada Request dari {divisi} dengan {jenis}, Tolong Proses ya (No: {memo_no})\n\n{list_str}"
-        wa_url = f"https://api.whatsapp.com/send?text={urllib.parse.quote(pesan_wa)}"
-
-        return True, f"Memo {memo_no} berhasil disimpan ke database!", wa_url
-
-    # 1. Fungsi Hapus Memo Permanen dari Database Supabase
-    def delete_memo(self, memo_id: str):
-        try:
-            client = get_supabase()
-            if client:
-                client.table("memo_pengajuan").delete().in_("id", [memo_id]).execute()
-            self.load_memo_data()
-            return True, f"Memo {memo_id} berhasil dihapus dari database!"
-        except Exception as e:
-            print("Gagal hapus memo dari Supabase:", e)
-            cur_list = [m for m in self.memo_list() if m["id"] != memo_id]
-            self.memo_list.set(cur_list)
-            return True, f"Memo {memo_id} berhasil dihapus!"
-
-    # 2. Update Approval Logistik (Menyimpan Nama Petugas Logistik)
-    def approve_memo_by_logistik(self, memo_id: str, nama_logistik: str):
-        nama = str(nama_logistik).strip().upper()
-        if not nama or nama in ["-", "NONE", "NAN"]:
-            return False, "Nama Petugas Logistik wajib diisi!", None
-
-        payload = {
-            "diproses_oleh": nama,
-            "status_logistik": "Logistik Teams",
-            "status_akhir": "Diproses Logistik (Menunggu SPV)"
-        }
-        try:
-            client = get_supabase()
-            if client:
-                client.table("memo_pengajuan").update(payload).in_("id", [memo_id]).execute()
-            self.load_memo_data()
-        except Exception as e:
-            print("Gagal update logistik di Supabase:", e)
-
-        target_memo = next((m for m in self.memo_list() if m["id"] == memo_id), None)
-        item_lines = [f"{idx}. {it.get('sku')} & {it.get('item_name')} & {it.get('qty')}" for idx, it in enumerate(target_memo.get('items', []), 1)] if target_memo else []
-        list_str = "\n".join(item_lines)
-
-        # Pesan WA SPV mencantumkan nama petugas logistik yang memproses
-        pesan_wa2 = f"Halo SPV, Memo {memo_id} telah DIPROSES oleh Logistik ({nama}). Mohon dicek untuk verifikasi pengeluaran barang.\n\n{list_str}"
-        wa_url2 = f"https://api.whatsapp.com/send?phone=6281232844032&text={urllib.parse.quote(pesan_wa2)}"
-
-        return True, f"Memo {memo_id} berhasil diproses oleh {nama}!", wa_url2
-
-    # 3. Update Approval SPV (Menyimpan Nama SPV)
-    def approve_memo_by_spv(self, memo_id: str, nama_spv: str):
-        nama = str(nama_spv).strip().upper()
-        if not nama or nama in ["-", "NONE", "NAN"]:
-            return False, "Nama SPV wajib diisi!"
-
-        payload = {
-            "diperiksa_oleh": nama,
-            "status_spv": "Disetujui SPV",
-            "status_akhir": "Disetujui SPV (Selesai)"
-        }
-        try:
-            client = get_supabase()
-            if client:
-                client.table("memo_pengajuan").update(payload).in_("id", [memo_id]).execute()
-            self.load_memo_data()
-        except Exception as e:
-            print("Gagal update SPV di Supabase:", e)
-
-        return True, f"Memo {memo_id} telah disetujui oleh SPV ({nama})! Dokumen PDF resmi siap diunduh."
 
 # ==========================================================================
     # LOGIKA WAREHOUSE ACTIVITY MONITOR (SAP LL01)
@@ -7111,3 +6906,174 @@ class AppState:
             return True, f"Berhasil sinkronisasi {updated} butir kriteria kepatuhan dari Excel!"
         except Exception as e:
             return False, f"Gagal membaca file: {str(e)}"
+
+
+    # ==========================================================================
+    # LOGIKA WORKFLOW MEMO PENGAJUAN (TANPA APPROVAL - LANGSUNG SIAP CETAK)
+    # ==========================================================================
+    def get_stock_cache_lookup(self):
+        """Ambil data master dari Supabase tabel stock_live_cache untuk nama artikel & harga beli"""
+        lookup = {}
+        try:
+            client = get_supabase()
+            if not client: return lookup
+            res = client.table("stock_live_cache").select("*").execute()
+            if res and res.data:
+                for row in res.data:
+                    s_data = row.get("stock_data", [])
+                    if isinstance(s_data, list):
+                        for it in s_data:
+                            if not isinstance(it, dict): continue
+                            sku_k = str(it.get("SKU", it.get("sku", it.get("BARCODE", "")))).split('.')[0].strip().upper()
+                            if not sku_k: continue
+                            name_v = str(it.get("ITEM NAME", it.get("item_name", it.get("ARTIKEL", "-")))).strip()
+                            cogs_v = safe_int(it.get("HARGA BELI", it.get("Harga Beli", it.get("cogs", 0))), 0)
+                            if sku_k not in lookup or lookup[sku_k]["harga_beli"] == 0:
+                                lookup[sku_k] = {"item_name": name_v, "harga_beli": cogs_v}
+        except Exception as e:
+            print("Gagal load stock_live_cache:", e)
+        return lookup
+
+    def sync_markom_event_requests(self, file_source=None, silent=False):
+        """
+        Scrapping tiap 5 menit:
+        - Hanya ambil baris yang Kolom B (Note) mengandung kata 'EVENT'.
+        - Detailnya disimpan di Tab 1 (self.memo_scraped_event_items).
+        - Otomatis dibuatkan Card Memo di Tab 2 (siap cetak 2 PDF tanpa approval).
+        """
+        try:
+            df = None
+            if file_source is not None:
+                if isinstance(file_source, str) and file_source.endswith(('.xlsx', '.xls')):
+                    try: df = pd.read_excel(file_source, sheet_name="PERMINTAAN MARKOM")
+                    except Exception: df = pd.read_excel(file_source)
+                else: df = pd.read_csv(file_source)
+            else:
+                for cand in ["PERMINTAAN MARKOM.xlsx", "REQUEST BARANG.csv", "PERMINTAAN_MARKOM.xlsx", "REQUEST_BARANG.csv"]:
+                    if os.path.exists(cand):
+                        try:
+                            if cand.endswith(('.xlsx', '.xls')): df = pd.read_excel(cand, sheet_name="PERMINTAAN MARKOM")
+                            else: df = pd.read_csv(cand)
+                            break
+                        except Exception: continue
+
+            if df is None or df.empty or df.shape[1] < 2:
+                return False, "Spreadsheet tidak ditemukan atau kosong."
+
+            # Filter hanya baris Kolom B yang mengandung kata EVENT
+            col_b = df.iloc[:, 1].fillna("").astype(str)
+            df_event = df[col_b.str.contains("EVENT", case=False, na=False)].copy()
+
+            if df_event.empty:
+                self.memo_last_sync_time.set(datetime.now().strftime("%d/%m/%Y %H:%M"))
+                return True, "Tidak ada data dengan Note 'EVENT'."
+
+            stock_lookup = self.get_stock_cache_lookup()
+            event_items = []
+            pic_peminta = "MARKOM"
+            keterangan_event = "EVENT"
+            tanggal_req = datetime.now().strftime("%Y-%m-%d")
+
+            for row_idx, (_, r) in enumerate(df_event.iterrows(), start=1):
+                # Kolom A = PIC (Index 0)
+                pic_val = str(r.iloc[0]).strip() if len(r) > 0 and pd.notna(r.iloc[0]) else ""
+                if pic_val: pic_peminta = pic_val
+
+                # Kolom B = Note -> UPPER (Index 1)
+                note_val = str(r.iloc[1]).strip() if len(r) > 1 and pd.notna(r.iloc[1]) else ""
+                if note_val: keterangan_event = note_val.upper()
+
+                # Kolom M = Tanggal (Index 12)
+                tgl_val = str(r.iloc[12]).strip() if len(r) > 12 and pd.notna(r.iloc[12]) else ""
+                if tgl_val: tanggal_req = tgl_val
+
+                # Kolom O = BIN Pick (Index 14)
+                bin_val = str(r.iloc[14]).strip() if len(r) > 14 and pd.notna(r.iloc[14]) else "GL1-DC-OUT"
+
+                # Kolom D = Qty (Index 3)
+                qty_raw = str(r.iloc[3]).strip() if len(r) > 3 and pd.notna(r.iloc[3]) else "1"
+                qty_val = safe_int(qty_raw, 1)
+
+                # SKU
+                sku_raw = ""
+                for c_name in r.index:
+                    if "SKU" in str(c_name).upper():
+                        sku_raw = str(r[c_name]).split('.')[0].strip().upper()
+                        break
+                if not sku_raw:
+                    sku_raw = str(r.iloc[3]).split('.')[0].strip().upper()
+
+                info = stock_lookup.get(sku_raw, {})
+                item_name = info.get("item_name") or sku_raw
+                harga_beli = info.get("harga_beli", 0)
+
+                distinct_id = f"EVT-{sku_raw}-{row_idx}-{random.randint(100, 999)}"
+
+                event_items.append({
+                    "id": distinct_id,
+                    "tanggal": tanggal_req,
+                    "pic": pic_peminta,
+                    "keterangan": keterangan_event,
+                    "bin": bin_val,
+                    "sku": sku_raw,
+                    "item_name": item_name,
+                    "cogs": harga_beli,
+                    "qty": qty_val,
+                    "subtotal": harga_beli * qty_val
+                })
+
+            if not event_items:
+                return False, "Tidak ada item valid."
+
+            # Simpan detail item scraping untuk TAB 1
+            self.memo_scraped_event_items.set(event_items)
+            self.memo_last_sync_time.set(datetime.now().strftime("%d/%m/%Y %H:%M"))
+
+            # Buat Card Memo di TAB 2 (Langsung Siap Cetak 2 PDF)
+            tot_nom = sum([x["subtotal"] for x in event_items])
+            memo_id = f"MEMO/ZKN/{datetime.now().strftime('%Y%m%d')}/EVT{random.randint(100, 999)}"
+
+            new_memo = {
+                "id": memo_id,
+                "tanggal": tanggal_req,
+                "divisi": "Markom SBY",
+                "jenis": "Pengajuan Adjustment untuk Hadiah (Event)",
+                "tujuan": keterangan_event,
+                "nominal": tot_nom,
+                "diajukan_oleh": pic_peminta,
+                "diproses_oleh": "Tim Purchasing",
+                "diperiksa_oleh": "Tim Finance",
+                "items": event_items
+            }
+
+            client = get_supabase()
+            if client:
+                client.table("memo_pengajuan").insert(new_memo).execute()
+            self.load_memo_data()
+            return True, f"Berhasil menarik {len(event_items)} item EVENT!"
+        except Exception as e:
+            return False, str(e)
+
+    def load_memo_data(self):
+        try:
+            client = get_supabase()
+            if client:
+                res = client.table("memo_pengajuan").select("*").order("created_at", desc=True).execute()
+                if res and hasattr(res, 'data') and res.data:
+                    self.memo_list.set(res.data)
+                else:
+                    self.memo_list.set([])
+        except Exception as e:
+            print("Supabase load memo error:", e)
+
+    def delete_memo(self, memo_id: str):
+        try:
+            client = get_supabase()
+            if client:
+                client.table("memo_pengajuan").delete().in_("id", [memo_id]).execute()
+            self.load_memo_data()
+            return True, f"Memo {memo_id} berhasil dihapus!"
+        except Exception as e:
+            cur_list = [m for m in self.memo_list() if m.get("id") != memo_id]
+            self.memo_list.set(cur_list)
+            return True, f"Memo {memo_id} berhasil dihapus!"

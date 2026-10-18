@@ -944,3 +944,154 @@ def generate_audit_pack_pdf_bytes(audit_data: dict) -> bytes:
 
     buf_native.extend(f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_offset}\n%%EOF\n".encode('latin-1'))
     return bytes(buf_native)
+
+    # ==============================================================================
+# [BARU] GENERATOR MODEL 2: MEMO KAS ADJUSTMENT (PERSIS SEPERTI GAMBAR)
+# ==============================================================================
+def generate_memo_kas_pdf_bytes(memo_dict: dict) -> bytes:
+    import io
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+
+    buffer = io.BytesIO()
+    # Format Landscape (Mendatar) sesuai gambar acuan
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        leftMargin=36,
+        rightMargin=36,
+        topMargin=25,
+        bottomMargin=25
+    )
+    elements = []
+
+    styles = getSampleStyleSheet()
+    style_normal = ParagraphStyle('KasNormal', parent=styles['Normal'], fontSize=9, leading=11, fontName='Helvetica')
+    style_bold = ParagraphStyle('KasBold', parent=styles['Normal'], fontSize=9, leading=11, fontName='Helvetica-Bold')
+
+    # 1. HEADER (Kiri: JEZ Merah, Kanan: MEMO KAS ADJUSTMENT Merah)
+    header_data = [
+        [
+            Paragraph("<font size=24 color='#D32F2F'><b><i>JEZ</i></b></font><br/><font size=8 color='#000000'><b>PT. ZONA KARYA NUSANTARA</b></font>", style_normal),
+            Paragraph("<font size=15 color='#D32F2F'><b>MEMO KAS ADJUSTMENT</b></font><br/><font size=8 color='#000000'>PT ZONA KARYA NUSANTARA</font>", ParagraphStyle('HRight', parent=style_normal, alignment=2))
+        ]
+    ]
+    t_header = Table(header_data, colWidths=[380, 390])
+    t_header.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('LINEBELOW', (0, 0), (-1, -1), 1.5, colors.black),
+    ]))
+    elements.append(t_header)
+    elements.append(Spacer(1, 10))
+
+    # Helper Tanggal Indonesia
+    raw_tgl = memo_dict.get("tanggal", "")
+    try:
+        dt = pd.to_datetime(raw_tgl)
+        bln = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
+        tgl_str = f"{dt.day} {bln[dt.month]} {dt.year}"
+    except Exception:
+        tgl_str = str(raw_tgl)
+
+    nama_pengaju = str(memo_dict.get("diajukan_oleh", "Markom")).strip()
+    divisi_txt = str(memo_dict.get("divisi", "Markom SBY")).strip()
+    ket_adj = str(memo_dict.get("tujuan", memo_dict.get("jenis", "-"))).strip().upper()
+
+    # 2. METADATA DETAIL (No. Adjustment dikosongkan)
+    meta_rows = [
+        [Paragraph("Tanggal", style_normal), Paragraph(f": {tgl_str}", style_normal)],
+        [Paragraph("Nama Pengaju", style_normal), Paragraph(f": {nama_pengaju}", style_normal)],
+        [Paragraph("Divisi", style_normal), Paragraph(f": : {divisi_txt}", style_normal)],
+        [Paragraph("Keterangan Adjustment", style_normal), Paragraph(f": {ket_adj}", style_normal)],
+        [Paragraph("No. Adjustment", style_normal), Paragraph(": ", style_normal)], # Dikosongkan sesuai poin 9
+        [Paragraph("Detail Adjustment", style_normal), Paragraph(":", style_normal)]
+    ]
+    t_meta = Table(meta_rows, colWidths=[150, 620])
+    t_meta.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 1),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),
+    ]))
+    elements.append(t_meta)
+    elements.append(Spacer(1, 6))
+
+    # 3. TABEL 4 KOLOM: BIN | SKU | ITEM NAME | HARGA BELI
+    items = memo_dict.get("items", [])
+    table_content = [
+        [
+            Paragraph("<b>BIN</b>", ParagraphStyle('TH', parent=style_bold, alignment=1)),
+            Paragraph("<b>SKU</b>", ParagraphStyle('TH', parent=style_bold, alignment=1)),
+            Paragraph("<b>ITEM NAME</b>", ParagraphStyle('TH', parent=style_bold, alignment=1)),
+            Paragraph("<b>HARGA BELI</b>", ParagraphStyle('TH', parent=style_bold, alignment=1))
+        ]
+    ]
+
+    total_beli = 0
+    for it in items:
+        bin_val = str(it.get("bin", "-")).strip()
+        sku_val = str(it.get("sku", "-")).strip()
+        item_val = str(it.get("item_name", "-")).strip()
+        cogs_val = safe_int(it.get("cogs", 0), 0)
+        total_beli += cogs_val
+
+        table_content.append([
+            Paragraph(bin_val, ParagraphStyle('TC', parent=style_normal, alignment=1)),
+            Paragraph(sku_val, ParagraphStyle('TC', parent=style_normal, alignment=1)),
+            Paragraph(item_val, style_normal),
+            Paragraph(f"Rp.{cogs_val:,}", ParagraphStyle('TR', parent=style_normal, alignment=2))
+        ])
+
+    while len(table_content) < 4:
+        table_content.append(["", "", "", ""])
+
+    # Baris Total
+    table_content.append(["Total", "", "", f"Rp.{total_beli:,}"])
+
+    t_detail = Table(table_content, colWidths=[130, 160, 330, 150])
+    t_detail.setStyle(TableStyle([
+        ('GRID', (0, 0), (-1, -2), 1, colors.black),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('SPAN', (0, -1), (2, -1)),
+        ('ALIGN', (0, -1), (2, -1), 'RIGHT'),
+        ('ALIGN', (3, -1), (3, -1), 'RIGHT'),
+        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, -1), (-1, -1), 9),
+        ('GRID', (0, -1), (-1, -1), 1, colors.black),
+    ]))
+    elements.append(t_detail)
+    elements.append(Spacer(1, 15))
+
+    # 4. KOTAK TANDA TANGAN (Diajukan oleh | Diproses oleh | Diperiksa oleh)
+    sign_data = [
+        [
+            Paragraph("<b>Diajukan oleh,</b>", style_bold),
+            Paragraph("<b>Diproses oleh,</b>", style_bold),
+            Paragraph("<b>Diperiksa oleh,</b>", style_bold)
+        ],
+        ["\n\n\n", "\n\n\n", "\n\n\n"],
+        [
+            Paragraph(nama_pengaju, style_normal),
+            Paragraph("Tim Purchasing", style_normal),
+            Paragraph("Tim Finance", style_normal)
+        ]
+    ]
+    t_sign = Table(sign_data, colWidths=[256, 257, 257])
+    t_sign.setStyle(TableStyle([
+        ('BOX', (0, 0), (-1, -1), 1, colors.black),
+        ('INNERGRID', (0, 0), (-1, -1), 1, colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+    ]))
+    elements.append(t_sign)
+
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer.getvalue()

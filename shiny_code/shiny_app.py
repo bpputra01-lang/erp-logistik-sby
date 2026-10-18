@@ -4152,527 +4152,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             yield b""
         else:
             yield generate_audit_pack_pdf_bytes(sel)
-    # ==========================================================================
-    # MEMO PENGAJUAN CONTROLLER & HANDLERS (FULL FIX ANTI-GLITCH)
-    # ==========================================================================
-
-    # 1. Render Tabel Item Draft di Tab 1
-    @render.ui
-    def memo_draft_items_table_ui():
-        items = state.memo_current_items()
-        if not items:
-            return ui.div(
-                ui.p("Belum ada barang yang ditambahkan ke memo.", style="color: #718096; font-style: italic; text-align: center; margin: 1rem 0;"),
-                style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 1rem;"
-            )
-
-        headers = ["NO", "SKU", "ITEM NAME", "COGS", "QTY", "SUBTOTAL", "AKSI"]
-        tr_list = []
-        tot_nominal = 0
-        tot_qty = 0
-
-        for idx, it in enumerate(items, start=1):
-            cogs = it.get("cogs", 0)
-            qty = it.get("qty", 0)
-            subtot = it.get("subtotal", 0)
-            tot_nominal += subtot
-            tot_qty += qty
-
-            del_btn = ui.tags.button(
-                ui.tags.i(class_="fa-solid fa-trash", style="color: #E53E3E; font-size: 13px;"),
-                onclick=f"Shiny.setInputValue('btn_del_item_idx', {idx-1}, {{priority: 'event'}})",
-                style="background: transparent; border: none; cursor: pointer; padding: 4px;"
-            )
-            tr_list.append(ui.tags.tr(
-                ui.tags.td(str(idx), style="text-align: center; font-weight: bold;"),
-                ui.tags.td(str(it.get("sku", ""))),
-                ui.tags.td(str(it.get("item_name", ""))),
-                ui.tags.td(f"Rp {cogs:,}"),
-                ui.tags.td(str(qty), style="text-align: center; font-weight: bold;"),
-                ui.tags.td(f"Rp {subtot:,}", style="font-weight: bold; color: #276749;"),
-                ui.tags.td(del_btn, style="text-align: center;")
-            ))
-
-        # Baris Grand Total
-        tr_list.append(ui.tags.tr(
-            ui.tags.td("TOTAL", colspan=4, style="text-align: center; font-weight: 800; background: #EDF2F7;"),
-            ui.tags.td(f"{tot_qty:,}", style="text-align: center; font-weight: 800; background: #EDF2F7;"),
-            ui.tags.td(f"Rp {tot_nominal:,}", style="font-weight: 800; color: #E50914; background: #EDF2F7;"),
-            ui.tags.td("", style="background: #EDF2F7;")
-        ))
-
-        th_list = [ui.tags.th(h, style="background: #1A202C; color: white; padding: 8px 10px; font-size: 12px; text-align: center;" if h in ["NO","QTY","AKSI"] else "background: #1A202C; color: white; padding: 8px 10px; font-size: 12px;") for h in headers]
-
-        return ui.div(
-            ui.tags.table(
-                ui.tags.thead(ui.tags.tr(*th_list)),
-                ui.tags.tbody(*tr_list),
-                class_="custom-clean-table",
-                style="border: 1px solid #CBD5E0; border-radius: 8px; overflow: hidden;"
-            ),
-            ui.div(
-                ui.span(f"Grand Total Nominal: Rp {tot_nominal:,}", style="font-weight: 800; color: #E50914; font-size: 15px;"),
-                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.75rem;"
-            )
-        )
-
-    # 2. Handler Tambah Item ke Draft
-    @reactive.Effect
-    @reactive.event(input.btn_add_item_to_memo)
-    def _on_add_item_memo():
-        data = input.btn_add_item_to_memo()
-        succ, msg = state.add_memo_item_draft(
-            data.get("sku", ""),
-            data.get("name", ""),
-            data.get("cogs", "0"),
-            data.get("qty", "1")
-        )
-        if succ:
-            ui.notification_show(msg, type="message", duration=3)
-        else:
-            ui.notification_show(msg, type="warning", duration=4)
-
-    # 3. Handler Hapus Item dari Draft
-    @reactive.Effect
-    @reactive.event(input.btn_del_item_idx)
-    def _on_del_item_memo():
-        idx = input.btn_del_item_idx()
-        state.remove_memo_item_draft(idx)
-
-    # 4. Handler Submit Memo Pengajuan (Pindah ke Tab 2 & Buka WA Otomatis)
-    @reactive.Effect
-    @reactive.event(input.btn_execute_submit_memo)
-    def _on_submit_memo():
-        d = input.btn_execute_submit_memo() or {}
-        
-        tgl = str(input.memo_in_tanggal()) if "memo_in_tanggal" in input and input.memo_in_tanggal() is not None else datetime.now().strftime("%Y-%m-%d")
-        divisi = str(input.memo_in_divisi()) if "memo_in_divisi" in input and input.memo_in_divisi() is not None else "MARKOM"
-        jenis = str(input.memo_in_jenis()) if "memo_in_jenis" in input and input.memo_in_jenis() is not None else "Peminjaman Barang Display / Event"
-        tujuan = d.get("tujuan", "")
-        pemohon = d.get("pemohon", "")
-
-        succ, msg, wa_url = state.submit_memo_pengajuan(tgl, divisi, jenis, tujuan, pemohon)
-        
-        if succ:
-            # 1. Otomatis Pindah ke Tab 2 (History)
-            ui.update_navs("memo_navset", selected="tab_memo_history")
-
-            # 2. Buka WhatsApp Otomatis ke +62 823-3292-9992 & Bersihkan Layar Gelap
-            ui.insert_ui(
-                ui.tags.script(f"""
-                    if (window.hideGlobalSpinner) window.hideGlobalSpinner();
-                    document.body.classList.remove('process-running');
-                    window.open('{wa_url}', '_blank');
-                """),
-                selector="head",
-                where="beforeEnd"
-            )
-
-            ui.notification_show("✅ Memo berhasil diajukan! Dialihkan ke Tab History...", type="message", duration=5)
-        else:
-            ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner(); document.body.classList.remove('process-running');"), selector="head", where="beforeEnd")
-            ui.notification_show(f"⚠️ {msg}", type="warning", duration=5)
-
-    # 5. Render Tabel History & Approval Tracking di Tab 2
-    # 5. Render Tabel History & Approval Tracking di Tab 2
-    @render.ui
-    def memo_history_table_ui():
-        memos = state.memo_list()
-        if not memos:
-            return ui.div(
-                ui.p("Belum ada riwayat memo pengajuan. Buat memo pertama pada Tab 1.", style="color: #718096; font-style: italic; text-align: center; padding: 2rem;"),
-                style="background: white; border-radius: 10px; border: 1px solid #E2E8F0;"
-            )
-
-        cards = []
-        import urllib.parse
-
-        for m in memos:
-            m_id = m["id"]
-            stat = m.get("status_akhir", "")
-            divisi = m.get("divisi", "MARKOM")
-            jenis = m.get("jenis", "Pengajuan")
-
-            # Warna Badge Status
-            if "Disetujui SPV" in stat:
-                badge_bg = "#C6F6D5"; badge_col = "#22543D"
-            elif "Diproses Logistik" in stat:
-                badge_bg = "#FEFCBF"; badge_col = "#744210"
-            else:
-                badge_bg = "#FED7D7"; badge_col = "#742A2A"
-
-            # Format Chat WA ke Grup
-            item_lines = [f"{idx}. {it.get('sku')} & {it.get('item_name')} & {it.get('qty')}" for idx, it in enumerate(m.get('items', []), 1)]
-            list_str = "\n".join(item_lines)
-            pesan_wa = urllib.parse.quote(f"Ada Request dari {divisi} dengan {jenis}, Tolong Proses ya (No: {m_id})\n\n{list_str}")
-            wa_href = f"https://api.whatsapp.com/send?text={pesan_wa}"
-
-            wa_link_btn = ui.tags.a(
-                ui.tags.i(class_="fa-brands fa-whatsapp", style="margin-right: 6px; font-size: 13px;"),
-                "Share ke Grup DC",
-                href=wa_href,
-                target="_blank",
-                style="background: #25D366; color: white; padding: 7px 12px; border-radius: 6px; text-decoration: none; font-weight: 700; font-size: 12px; display: inline-flex; align-items: center;"
-            )
-
-            # Tombol Aksi Berjenjang
-            action_buttons = []
-            if stat == "Menunggu Logistik":
-                action_buttons.append(wa_link_btn)
-                action_buttons.append(
-                    ui.tags.button(
-                        ui.tags.i(class_="fa-solid fa-box-open", style="margin-right: 6px;"),
-                        "PROSES & APPROVE LOGISTIK",
-                        onclick=f"Shiny.setInputValue('btn_open_approve_logistik_modal', '{m_id}', {{priority: 'event'}})",
-                        style="background: #3182CE; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer;"
-                    )
-                )
-            elif "Menunggu SPV" in stat:
-                action_buttons.append(
-                    ui.tags.button(
-                        ui.tags.i(class_="fa-solid fa-user-check", style="margin-right: 6px;"),
-                        "VERIFIKASI & APPROVE SPV",
-                        onclick=f"Shiny.setInputValue('btn_open_approve_spv_modal', '{m_id}', {{priority: 'event'}})",
-                        style="background: #10B981; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer;"
-                    )
-                )
-            elif "Disetujui SPV" in stat:
-                action_buttons.append(
-                    ui.tags.button(
-                        ui.tags.i(class_="fa-solid fa-file-pdf", style="margin-right: 6px;"),
-                        "DOWNLOAD PDF RESMI",
-                        onclick=f"Shiny.setInputValue('btn_prepare_pdf_memo', '{m_id}', {{priority: 'event'}})",
-                        style="background: linear-gradient(135deg, #E50914 0%, #B20710 100%); color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer; box-shadow: 0 4px 10px rgba(229,9,20,0.3);"
-                    )
-                )
-
-            # 👇 TOMBOL HAPUS MEMO DITAMBAHKAN PADA SETIAP KARTU 👇
-            btn_hapus_memo = ui.tags.button(
-                ui.tags.i(class_="fa-solid fa-trash", style="margin-right: 4px; font-size: 12px;"),
-                "Hapus",
-                onclick=f"Shiny.setInputValue('btn_open_del_memo_modal', '{m_id}', {{priority: 'event'}})",
-                style="background: #FFF5F5; color: #E53E3E; border: 1.5px solid #FEB2B2; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer; display: inline-flex; align-items: center;"
-            )
-            action_buttons.append(btn_hapus_memo)
-
-            cards.append(ui.div(
-                ui.div(
-                    ui.div(
-                        ui.div(
-                            ui.span(m_id, style="font-weight: 800; font-size: 14px; color: #1A202C; margin-right: 8px;"),
-                            ui.span(stat, style=f"background: {badge_bg}; color: {badge_col}; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 4px;"),
-                            style="display: flex; align-items: center; margin-bottom: 4px;"
-                        ),
-                        ui.p(f"Divisi: {divisi} • Jenis: {jenis} • Tanggal: {m.get('tanggal')}", style="margin: 0; font-size: 12px; color: #718096;")
-                    ),
-                    ui.div(
-                        ui.span(f"Total: Rp {m.get('nominal', 0):,}", style="font-weight: 800; font-size: 16px; color: #E50914; margin-right: 12px;"),
-                        *action_buttons,
-                        style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"
-                    ),
-                    style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;"
-                ),
-                ui.div(
-                    ui.span(f"📌 Tujuan: {m.get('tujuan')}", style="font-size: 12px; color: #4A5568; display: block; margin-top: 8px;"),
-                    ui.span(f"👤 Diajukan: {m.get('diajukan_oleh')} | 📦 Logistik: {m.get('diproses_oleh')} ({m.get('status_logistik')}) | 🛡️ SPV: {m.get('diperiksa_oleh')} ({m.get('status_spv')})", style="font-size: 11px; color: #A0AEC0; margin-top: 4px; display: block;"),
-                    style="border-top: 1px dashed #E2E8F0; padding-top: 8px; margin-top: 8px;"
-                ),
-                style="background: white; border: 1.5px solid #CBD5E0; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 0.85rem; box-shadow: 0 2px 6px rgba(0,0,0,0.02);"
-            ))
-
-        return ui.div(
-            ui.div(
-                ui.h4("📋 Riwayat & Status Approval Memo Pengajuan", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 1rem;"),
-                *cards
-            ),
-            ui.output_ui("memo_pdf_downloader_container_ui")
-        )
-
-    # 6A. Pop-up Modal Input Nama Petugas Logistik Sebelum Approval
-    @reactive.Effect
-    @reactive.event(input.btn_open_approve_logistik_modal)
-    def _open_logistik_modal():
-        m_id = input.btn_open_approve_logistik_modal()
-        ui.modal_show(ui.modal(
-            ui.div(
-                ui.h4(f"Proses Memo: {m_id}", style="font-weight: 800; color: #1A202C; margin-bottom: 8px; font-size: 15px;"),
-                ui.p("Wajib mengisi nama petugas Logistik yang memproses pengeluaran barang ini sebelum mengirimkan notifikasi ke SPV.", style="font-size: 13px; color: #4A5568; margin-bottom: 12px;"),
-                ui.div(
-                    ui.span("Nama Petugas Logistik (Wajib):", style="font-weight: 700; font-size: 12px; display: block; margin-bottom: 4px; color: #2D3748;"),
-                    ui.tags.input(
-                        id="input_nama_logistik_modal",
-                        type="text",
-                        placeholder="Masukkan nama Anda (misal: Yudi / Danar)...",
-                        class_="form-control",
-                        style="width: 100%; border: 1.5px solid #CBD5E0; border-radius: 6px; padding: 8px 12px; font-size: 13px;"
-                    ),
-                    style="margin-bottom: 1rem;"
-                ),
-                style="padding: 0.5rem 0;"
-            ),
-            title="📦 Input PIC Logistik",
-            easy_close=True,
-            footer=ui.div(
-                ui.modal_button("Batal"),
-                ui.tags.button(
-                    "Proses & Kirim WA ke SPV",
-                    onclick=f"""
-                        let nama = document.getElementById('input_nama_logistik_modal') ? document.getElementById('input_nama_logistik_modal').value.trim() : '';
-                        if (!nama) {{
-                            alert('Nama Petugas Logistik wajib diisi!');
-                            return;
-                        }}
-                        Shiny.setInputValue('btn_confirm_approve_logistik', {{id: '{m_id}', nama: nama}}, {{priority: 'event'}});
-                    """,
-                    class_="btn-red-gradient",
-                    style="padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 800; margin-left: 8px;"
-                ),
-                style="display: flex; justify-content: flex-end;"
-            )
-        ))
-
-    # 6B. Eksekusi Approval Logistik
-    @reactive.Effect
-    @reactive.event(input.btn_confirm_approve_logistik)
-    def _on_confirm_approve_logistik():
-        data = input.btn_confirm_approve_logistik() or {}
-        m_id = data.get("id", "")
-        nama = data.get("nama", "")
-
-        if not nama.strip():
-            ui.notification_show("⚠️ Nama Petugas Logistik wajib diisi!", type="warning", duration=4)
-            return
-
-        ui.modal_remove()
-        succ, msg, wa_url = state.approve_memo_by_logistik(m_id, nama)
-        if succ:
-            ui.insert_ui(
-                ui.tags.script(f"""
-                    if (window.hideGlobalSpinner) window.hideGlobalSpinner();
-                    document.body.classList.remove('process-running');
-                    window.open('{wa_url}', '_blank');
-                """),
-                selector="head",
-                where="beforeEnd"
-            )
-            ui.notification_show(f"✅ {msg} Membuka WhatsApp SPV...", type="message", duration=5)
-        else:
-            ui.notification_show(f"⚠️ {msg}", type="warning", duration=4)
-
-    # 7A. Pop-up Modal Input Nama SPV Sebelum Verifikasi
-    @reactive.Effect
-    @reactive.event(input.btn_open_approve_spv_modal)
-    def _open_spv_modal():
-        m_id = input.btn_open_approve_spv_modal()
-        ui.modal_show(ui.modal(
-            ui.div(
-                ui.h4(f"Verifikasi SPV: {m_id}", style="font-weight: 800; color: #1A202C; margin-bottom: 8px; font-size: 15px;"),
-                ui.p("Wajib mengisi nama SPV / Verifikator untuk menyelesaikan status memo ini dan membuka akses download PDF.", style="font-size: 13px; color: #4A5568; margin-bottom: 12px;"),
-                ui.div(
-                    ui.span("Nama SPV / Verifikator (Wajib):", style="font-weight: 700; font-size: 12px; display: block; margin-bottom: 4px; color: #2D3748;"),
-                    ui.tags.input(
-                        id="input_nama_spv_modal",
-                        type="text",
-                        placeholder="Masukkan nama SPV (misal: Bintang)...",
-                        class_="form-control",
-                        style="width: 100%; border: 1.5px solid #CBD5E0; border-radius: 6px; padding: 8px 12px; font-size: 13px;"
-                    ),
-                    style="margin-bottom: 1rem;"
-                ),
-                style="padding: 0.5rem 0;"
-            ),
-            title="🛡️ Input PIC SPV Warehouse",
-            easy_close=True,
-            footer=ui.div(
-                ui.modal_button("Batal"),
-                ui.tags.button(
-                    "Setujui & Selesaikan Memo",
-                    onclick=f"""
-                        let nama = document.getElementById('input_nama_spv_modal') ? document.getElementById('input_nama_spv_modal').value.trim() : '';
-                        if (!nama) {{
-                            alert('Nama SPV wajib diisi!');
-                            return;
-                        }}
-                        Shiny.setInputValue('btn_confirm_approve_spv', {{id: '{m_id}', nama: nama}}, {{priority: 'event'}});
-                    """,
-                    style="background: #10B981; color: white; border: none; padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 800; cursor: pointer; margin-left: 8px;"
-                ),
-                style="display: flex; justify-content: flex-end;"
-            )
-        ))
-
-    # 7B. Eksekusi Approval SPV
-    @reactive.Effect
-    @reactive.event(input.btn_confirm_approve_spv)
-    def _on_confirm_approve_spv():
-        data = input.btn_confirm_approve_spv() or {}
-        m_id = data.get("id", "")
-        nama = data.get("nama", "")
-
-        if not nama.strip():
-            ui.notification_show("⚠️ Nama SPV wajib diisi!", type="warning", duration=4)
-            return
-
-        ui.modal_remove()
-        succ, msg = state.approve_memo_by_spv(m_id, nama)
-        if succ:
-            state.show_success_modal.set(True)
-            ui.notification_show(f"✅ {msg}", type="message", duration=4)
-        else:
-            state.error_modal_message.set(msg)
-            state.show_error_modal.set(True)
-
-    # 8A. Pop-up Modal Konfirmasi Hapus Memo
-    @reactive.Effect
-    @reactive.event(input.btn_open_del_memo_modal)
-    def _open_del_memo_modal():
-        m_id = input.btn_open_del_memo_modal()
-        ui.modal_show(ui.modal(
-            ui.div(
-                ui.tags.i(class_="fa-solid fa-triangle-exclamation", style="font-size: 40px; color: #E53E3E; margin-bottom: 8px;"),
-                ui.h4(f"Hapus Memo {m_id}?", style="font-weight: 800; color: #1A202C; margin: 0 0 6px 0;"),
-                ui.p("Apakah Anda yakin ingin menghapus data memo ini secara permanen dari database Supabase?", style="color: #718096; font-size: 13px; margin: 0;"),
-                style="text-align: center; padding: 1rem 0;"
-            ),
-            title="🗑️ Konfirmasi Hapus Memo",
-            easy_close=True,
-            footer=ui.div(
-                ui.modal_button("Batal"),
-                ui.tags.button(
-                    "Ya, Hapus Permanen",
-                    onclick=f"Shiny.setInputValue('btn_confirm_del_memo', '{m_id}', {{priority: 'event'}})",
-                    style="background: #E53E3E; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-left: 8px;"
-                ),
-                style="display: flex; justify-content: flex-end;"
-            )
-        ))
-
-    # 8B. Eksekusi Hapus Memo
-    @reactive.Effect
-    @reactive.event(input.btn_confirm_del_memo)
-    def _on_confirm_del_memo():
-        m_id = input.btn_confirm_del_memo()
-        ui.modal_remove()
-        succ, msg = state.delete_memo(m_id)
-        ui.notification_show(f"🗑️ {msg}", type="message", duration=4)
-
-    # 9. Handler Download PDF
-    @reactive.Effect
-    @reactive.event(input.btn_prepare_pdf_memo)
-    def _on_prep_pdf():
-        m_id = input.btn_prepare_pdf_memo()
-        memos = [m for m in state.memo_list() if m["id"] == m_id]
-        if memos:
-            state.memo_selected_for_pdf.set(memos[0])
-            ui.notification_show("Dokumen PDF siap diunduh! Klik tombol download hijau di bawah.", type="message", duration=4)
-
-    @render.ui
-    def memo_pdf_downloader_container_ui():
-        sel = state.memo_selected_for_pdf()
-        if not sel:
-            return ui.div()
-        return ui.div(
-            ui.div(
-                ui.span(f"📄 Dokumen Memo {sel.get('id')} Siap Diunduh:", style="font-weight: 700; font-size: 13px; color: #065F46;"),
-                ui.download_button(
-                    "btn_dl_memo_pdf_file",
-                    ui.tags.span(ui.tags.i(class_="fa-solid fa-file-pdf", style="margin-right: 6px;"), f"DOWNLOAD {sel.get('id').replace('/', '_')}.PDF"),
-                    style="background: #10B981; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer;"
-                ),
-                style="display: flex; justify-content: space-between; align-items: center; width: 100%;"
-            ),
-            style="background: #D1FAE5; border: 1.5px solid #6EE7B7; border-radius: 8px; padding: 10px 14px; margin-top: 1rem;"
-        )
-
-    @render.download(filename=lambda: f"{state.memo_selected_for_pdf().get('id', 'MEMO').replace('/', '_')}.pdf" if state.memo_selected_for_pdf() else "MEMO.pdf")
-    def btn_dl_memo_pdf_file():
-        from config import generate_memo_pdf_bytes
-        sel = state.memo_selected_for_pdf()
-        if not sel:
-            yield b""
-        else:
-            yield generate_memo_pdf_bytes(sel)
-
-# A. Buka Pop-up Modal Bulk Upload
-    @reactive.Effect
-    @reactive.event(input.btn_open_memo_bulk_modal)
-    def _open_bulk_memo_modal():
-        ui.modal_show(ui.modal(
-            ui.div(
-                ui.div(
-                    ui.p(
-                        ui.strong("📋 Ketentuan File: "),
-                        "Upload file Excel (.xlsx, .xls) atau CSV dengan urutan 4 kolom: ",
-                        ui.tags.code("SKU"), ", ",
-                        ui.tags.code("ITEM NAME"), ", ",
-                        ui.tags.code("COGS"), ", dan ",
-                        ui.tags.code("QTY"), ".",
-                        style="color: #2D3748; font-size: 13px; margin-bottom: 8px;"
-                    ),
-                    ui.div(
-                        ui.download_button(
-                            "btn_dl_template_bulk_memo",
-                            ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px;"), "Download Contoh Template (.xlsx)"),
-                            style="background: #10B981; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer; text-decoration: none;"
-                        ),
-                        style="margin-bottom: 0.5rem;"
-                    ),
-                    style="background: #F8FAFC; border: 1px solid #E2E8F0; padding: 12px 14px; border-radius: 8px; margin-bottom: 1rem;"
-                ),
-                ui.input_file(
-                    "upload_memo_bulk_items", "Pilih File List Barang:",
-                    accept=[".xlsx", ".xls", ".csv"], multiple=False,
-                    placeholder="Pilih file Excel / CSV..."
-                ),
-                ui.div(
-                    ui.tags.button(
-                        ui.tags.span(ui.tags.i(class_="fa-solid fa-cloud-arrow-up", style="margin-right: 6px;"), "PROSES & IMPORT KE MEMO"),
-                        onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_execute_memo_bulk', Math.random(), {priority: 'event'});",
-                        class_="btn-red-gradient",
-                        style="padding: 10px 20px; font-size: 13px; font-weight: 800; cursor: pointer;"
-                    ),
-                    style="display: flex; justify-content: flex-end; width: 100%; margin-top: 1rem;"
-                )
-            ),
-            title="📥 Bulk Upload Item Barang ke Memo",
-            easy_close=True,
-            footer=ui.modal_button("Tutup", class_="btn-locked")
-        ))
-
-    # B. Eksekusi Proses File Bulk Upload
-    @reactive.Effect
-    @reactive.event(input.btn_execute_memo_bulk)
-    def _execute_bulk_memo():
-        f = input.upload_memo_bulk_items() if "upload_memo_bulk_items" in input else None
-        if not f:
-            ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner(); document.body.classList.remove('process-running');"), selector="head", where="beforeEnd")
-            ui.notification_show("Pilih file Excel/CSV terlebih dahulu!", type="warning", duration=4)
-            return
-
-        succ, msg = state.process_bulk_memo_items(f)
-        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner(); document.body.classList.remove('process-running');"), selector="head", where="beforeEnd")
-        
-        if succ:
-            ui.modal_remove()
-            ui.notification_show(f"✅ {msg}", type="message", duration=5)
-        else:
-            ui.notification_show(f"⚠️ {msg}", type="error", duration=5)
-
-    # C. Download Template Excel Bawaan untuk Bulk Upload
-    @render.download(filename="TEMPLATE_BULK_ITEM_MEMO.xlsx")
-    def btn_dl_template_bulk_memo():
-        buf = io.BytesIO()
-        df_tpl = pd.DataFrame([
-            {"SKU": "SPT-SPE-42-01", "ITEM NAME": "SPECS LIGHTSPEED 42", "COGS": 250000, "QTY": 2},
-            {"SKU": "JSY-MIL-L-05", "ITEM NAME": "JERSEY TIMNAS HOME L", "COGS": 150000, "QTY": 5},
-            {"SKU": "ACC-AVO-M-11", "ITEM NAME": "KAOS KAKI AVO GRIP M", "COGS": 25000, "QTY": 10}
-        ])
-        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-            df_tpl.to_excel(writer, sheet_name='ITEMS', index=False)
-        buf.seek(0)
-        yield buf.getvalue()
-
-
+    
 # ==========================================================================
     # WAREHOUSE ACTIVITY MONITOR (LL01) EVENT HANDLERS
     # ==========================================================================
@@ -5307,4 +4787,234 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="margin-top: 1rem;"
         )
 
+    # ==========================================================================
+    # MEMO PENGAJUAN: DIRECT SCRAPING & 2 MODEL PDF (TANPA APPROVAL)
+    # ==========================================================================
+
+    # 1. TIMER OTOMATIS SCRAPING SETIAP 5 MENIT (300 DETIK)
+    @reactive.Effect
+    def _auto_scrape_markom_timer():
+        reactive.invalidate_later(300)
+        with reactive.isolate():
+            if state.logged_in():
+                state.sync_markom_event_requests(silent=True)
+
+    # 2. TRIGGER MANUAL SYNC DARI TOMBOL TAB 1
+    @reactive.Effect
+    @reactive.event(input.btn_trigger_sync_markom_event)
+    def _manual_sync_markom_event():
+        succ, msg = state.sync_markom_event_requests(silent=False)
+        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+        if succ:
+            state.show_success_modal.set(True)
+            ui.notification_show(f"✅ {msg}", type="message", duration=4)
+        else:
+            ui.notification_show(f"ℹ️ {msg}", type="warning", duration=4)
+
+    # 3. RENDER TABEL RINCIAN ITEM SCRAPING DI TAB 1
+    @render.ui
+    def memo_scraped_items_detail_table_ui():
+        items = state.memo_scraped_event_items()
+        if not items:
+            return ui.div(
+                ui.p("Belum ada data permintaan barang dengan Note 'EVENT'. Klik tombol sync di atas untuk menarik data dari spreadsheet.", style="color: #718096; font-style: italic; text-align: center; padding: 2rem;"),
+                style="background: white; border-radius: 10px; border: 1px dashed #CBD5E0;"
+            )
+
+        headers = ["NO", "UNIQUE ID", "TANGGAL (M)", "PIC (A)", "KETERANGAN (B)", "BIN PICK (O)", "SKU", "ITEM NAME (SUPABASE)", "QTY (D)", "HARGA BELI", "SUBTOTAL"]
+        th_list = [ui.tags.th(h, style="background: #1A365D; color: white; padding: 8px 10px; font-size: 11px; text-align: center;" if h in ["NO","QTY (D)","TANGGAL (M)"] else "background: #1A365D; color: white; padding: 8px 10px; font-size: 11px;") for h in headers]
+
+        tr_list = []
+        tot_qty = 0
+        tot_nominal = 0
+
+        for idx, it in enumerate(items, start=1):
+            q = it.get("qty", 1)
+            cogs = it.get("cogs", 0)
+            subtot = it.get("subtotal", 0)
+            tot_qty += q
+            tot_nominal += subtot
+
+            tr_list.append(ui.tags.tr(
+                ui.tags.td(str(idx), style="text-align: center; font-weight: bold;"),
+                ui.tags.td(ui.tags.code(str(it.get("id")), style="font-weight: bold; color: #2B6CB0; font-size: 11px;")),
+                ui.tags.td(str(it.get("tanggal", "-")), style="font-size: 11.5px;"),
+                ui.tags.td(str(it.get("pic", "-")), style="font-weight: 700;"),
+                ui.tags.td(str(it.get("keterangan", "-")), style="font-weight: 700; color: #C53030; font-size: 11.5px;"),
+                ui.tags.td(ui.tags.code(str(it.get("bin", "-")), style="color: #4A5568; font-weight: bold;")),
+                ui.tags.td(str(it.get("sku", "-")), style="font-weight: 700;"),
+                ui.tags.td(str(it.get("item_name", "-")), style="max-width: 200px; white-space: normal; font-size: 11.5px;"),
+                ui.tags.td(str(q), style="text-align: center; font-weight: 800;"),
+                ui.tags.td(f"Rp {cogs:,}", style="text-align: right;"),
+                ui.tags.td(f"Rp {subtot:,}", style="text-align: right; font-weight: 800; color: #10B981;")
+            ))
+
+        return ui.div(
+            ui.div(
+                dark_metric_box("📦 TOTAL BARIS EVENT", f"{len(items):,} ITEM", "#3182CE"),
+                dark_metric_box("🔢 TOTAL QTY BARANG", f"{tot_qty:,} PCS", "#C5A059"),
+                dark_metric_box("💰 TOTAL VALUASI HARGA BELI", f"Rp {tot_nominal:,}", "#10B981"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+            ),
+            ui.div(
+                ui.tags.table(
+                    ui.tags.thead(ui.tags.tr(*th_list)),
+                    ui.tags.tbody(*tr_list),
+                    class_="custom-clean-table", style="width: 100%; border: 1px solid #CBD5E0;"
+                ),
+                style="background: white; border-radius: 12px; border: 1px solid #E2E8F0; padding: 1rem; overflow-x: auto;"
+            )
+        )
+
+    # 4. RENDER TAB 2: CARD MEMO DENGAN LANGSUNG 2 TOMBOL PDF
+    @render.ui
+    def memo_history_table_ui():
+        memos = state.memo_list()
+        if not memos:
+            return ui.div(
+                ui.p("Belum ada riwayat dokumen memo yang tersimpan.", style="color: #718096; font-style: italic; text-align: center; padding: 2rem;"),
+                style="background: white; border-radius: 10px; border: 1px solid #E2E8F0;"
+            )
+
+        cards = []
+        for m in memos:
+            m_id = m.get("id", "-")
+            divisi = m.get("divisi", "Markom SBY")
+            tujuan = m.get("tujuan", "-")
+            nominal = m.get("nominal", 0)
+            items_cnt = len(m.get("items", []))
+
+            cards.append(ui.div(
+                ui.div(
+                    ui.div(
+                        ui.div(
+                            ui.span(m_id, style="font-weight: 800; font-size: 14px; color: #1A202C; margin-right: 8px;"),
+                            ui.span(f"Tanggal: {m.get('tanggal')}", style="background: #EDF2F7; color: #4A5568; font-weight: 700; font-size: 11px; padding: 2px 6px; border-radius: 4px;"),
+                            style="display: flex; align-items: center; margin-bottom: 4px;"
+                        ),
+                        ui.p(f"Pengaju: {m.get('diajukan_oleh')} • Divisi: {divisi} • Keterangan: {tujuan} ({items_cnt} Barang)", style="margin: 0; font-size: 12px; color: #718096;"),
+                        style="flex: 1;"
+                    ),
+                    ui.div(
+                        ui.span(f"Total: Rp {nominal:,}", style="font-weight: 800; font-size: 15px; color: #E50914; margin-right: 12px;"),
+                        
+                        # TOMBOL 1: MEMO KAS (PDF)
+                        ui.tags.button(
+                            ui.tags.i(class_="fa-solid fa-file-invoice-dollar", style="margin-right: 4px;"), "MEMO KAS (PDF)",
+                            onclick=f"Shiny.setInputValue('btn_prepare_pdf_memo_kas', '{m_id}', {{priority: 'event'}})",
+                            style="background: linear-gradient(135deg, #E50914 0%, #B20710 100%); color: white; border: none; padding: 7px 13px; border-radius: 6px; font-weight: 800; font-size: 11.5px; cursor: pointer; box-shadow: 0 4px 10px rgba(229,9,20,0.3);"
+                        ),
+                        # TOMBOL 2: MEMO PENGAJUAN (PDF)
+                        ui.tags.button(
+                            ui.tags.i(class_="fa-solid fa-file-lines", style="margin-right: 4px;"), "MEMO PENGAJUAN (PDF)",
+                            onclick=f"Shiny.setInputValue('btn_prepare_pdf_memo_std', '{m_id}', {{priority: 'event'}})",
+                            style="background: #2D3748; color: white; border: none; padding: 7px 13px; border-radius: 6px; font-weight: 700; font-size: 11.5px; cursor: pointer;"
+                        ),
+                        # TOMBOL 3: HAPUS
+                        ui.tags.button(
+                            ui.tags.i(class_="fa-solid fa-trash", style="color: #E53E3E;"),
+                            onclick=f"Shiny.setInputValue('btn_open_del_memo_modal', '{m_id}', {{priority: 'event'}})",
+                            style="background: #FFF5F5; border: 1px solid #FEB2B2; padding: 7px 10px; border-radius: 6px; cursor: pointer;"
+                        ),
+                        style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;"
+                    ),
+                    style="display: flex; justify-content: space-between; align-items: center; background: white; border: 1.5px solid #CBD5E0; border-radius: 8px; padding: 12px 16px; margin-bottom: 0.75rem;"
+                )
+            ))
+
+        return ui.div(
+            ui.h4("📋 Riwayat Dokumen Memo (Pilih Model PDF untuk Diunduh)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 1rem;"),
+            *cards,
+            ui.output_ui("memo_pdf_downloader_container_ui")
+        )
+
+    # 5. LISTENER DOWNLOAD DUA MODEL PDF
+    @reactive.Effect
+    @reactive.event(input.btn_prepare_pdf_memo_kas)
+    def _prep_memo_kas():
+        m_id = input.btn_prepare_pdf_memo_kas()
+        matches = [m for m in state.memo_list() if m.get("id") == m_id]
+        if matches:
+            state.memo_selected_for_pdf.set({**matches[0], "_pdf_mode": "KAS"})
+            ui.notification_show(f"📄 MEMO KAS ({m_id}) siap diunduh pada bar hijau di bawah!", type="message", duration=3)
+
+    @reactive.Effect
+    @reactive.event(input.btn_prepare_pdf_memo_std)
+    def _prep_memo_std():
+        m_id = input.btn_prepare_pdf_memo_std()
+        matches = [m for m in state.memo_list() if m.get("id") == m_id]
+        if matches:
+            state.memo_selected_for_pdf.set({**matches[0], "_pdf_mode": "STD"})
+            ui.notification_show(f"📄 MEMO PENGAJUAN ({m_id}) siap diunduh pada bar hijau di bawah!", type="message", duration=3)
+
+    # BAR HIJAU TEMPAT DOWNLOAD PDF
+    @render.ui
+    def memo_pdf_downloader_container_ui():
+        sel = state.memo_selected_for_pdf()
+        if not sel: return ui.div()
+        
+        mode = sel.get("_pdf_mode", "KAS")
+        btn_label = f"DOWNLOAD {sel.get('id').replace('/', '_')}_MEMO_KAS.PDF" if mode == "KAS" else f"DOWNLOAD {sel.get('id').replace('/', '_')}_PENGAJUAN.PDF"
+
+        return ui.div(
+            ui.div(
+                ui.span(f"📄 Siap Diunduh ({'Model Memo Kas' if mode == 'KAS' else 'Model Standar'}):", style="font-weight: 700; font-size: 13px; color: #065F46;"),
+                ui.download_button(
+                    "btn_dl_memo_pdf_file",
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-file-pdf", style="margin-right: 6px;"), btn_label),
+                    style="background: #10B981; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer;"
+                ),
+                style="display: flex; justify-content: space-between; align-items: center; width: 100%;"
+            ),
+            style="background: #D1FAE5; border: 1.5px solid #6EE7B7; border-radius: 8px; padding: 12px 16px; margin-top: 1rem;"
+        )
+
+    @render.download(
+        filename=lambda: f"MEMO_KAS_{state.memo_selected_for_pdf().get('id', 'DOC').replace('/', '_')}.pdf" if state.memo_selected_for_pdf() and state.memo_selected_for_pdf().get("_pdf_mode") == "KAS" else f"MEMO_PENGAJUAN_{state.memo_selected_for_pdf().get('id', 'DOC').replace('/', '_')}.pdf"
+    )
+    def btn_dl_memo_pdf_file():
+        sel = state.memo_selected_for_pdf()
+        if not sel:
+            yield b""
+        else:
+            if sel.get("_pdf_mode") == "KAS":
+                from config import generate_memo_kas_pdf_bytes
+                yield generate_memo_kas_pdf_bytes(sel)
+            else:
+                from config import generate_memo_pdf_bytes
+                yield generate_memo_pdf_bytes(sel)
+
+    # 6. MODAL & HANDLER HAPUS MEMO
+    @reactive.Effect
+    @reactive.event(input.btn_open_del_memo_modal)
+    def _open_del_memo_modal():
+        m_id = input.btn_open_del_memo_modal()
+        ui.modal_show(ui.modal(
+            ui.div(
+                ui.tags.i(class_="fa-solid fa-trash", style="font-size: 36px; color: #E53E3E; margin-bottom: 8px;"),
+                ui.h4(f"Hapus Memo {m_id}?", style="font-weight: 800; color: #1A202C; margin: 0 0 6px 0;"),
+                ui.p("Data memo ini akan dihapus dari sistem.", style="color: #718096; font-size: 13px; margin: 0;"),
+                style="text-align: center; padding: 1rem 0;"
+            ),
+            title="Konfirmasi Hapus Memo", easy_close=True,
+            footer=ui.div(
+                ui.modal_button("Batal"),
+                ui.tags.button(
+                    "Ya, Hapus",
+                    onclick=f"Shiny.setInputValue('btn_confirm_del_memo', '{m_id}', {{priority: 'event'}})",
+                    style="background: #E53E3E; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-left: 8px;"
+                ),
+                style="display: flex; justify-content: flex-end;"
+            )
+        ))
+
+    @reactive.Effect
+    @reactive.event(input.btn_confirm_del_memo)
+    def _on_confirm_del_memo():
+        m_id = input.btn_confirm_del_memo()
+        ui.modal_remove()
+        succ, msg = state.delete_memo(m_id)
+        ui.notification_show(f"🗑️ {msg}", type="message", duration=3)
+
+        
 app = App(app_ui, server)
