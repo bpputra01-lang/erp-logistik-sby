@@ -1,0 +1,33 @@
+name: Sync Markom Event Scraper
+
+on:
+  schedule:
+    # Berjalan otomatis setiap 5 menit
+    - cron: '*/5 * * * *'
+  workflow_dispatch: # Memungkinkan tombol 'Run workflow' manual di tab Actions GitHub
+
+jobs:
+  scrape-and-sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: |
+          pip install --upgrade pip
+          pip install pandas openpyxl requests
+
+      - name: Run Scraper Script
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          SPREADSHEET_URL: ${{ secrets.SPREADSHEET_URL }}
+        run: |
+          python scripts/sync_markom_event.py
