@@ -12,7 +12,7 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 JEZPRO_EMAIL = os.environ.get("JEZPRO_EMAIL", "fajarbintang786@jez.co.id")
 JEZPRO_PASSWORD = os.environ.get("JEZPRO_PASSWORD", "")
 
-# DAFTAR SEMUA CABANG DAN ID JEZPRO
+# DAFTAR SEMUA CABANG DAN ID JEZPRO (SUDAH DITAMBAHKAN HUB JAKARTA, ONL SBY & ONL MLG)
 BRANCH_MAP = {
     "JEZ SURABAYA": {"st_id": 3, "db_id": "SURABAYA_LATEST"},
     "JEZ MALANG": {"st_id": 2, "db_id": "MALANG_LATEST"},
@@ -20,6 +20,9 @@ BRANCH_MAP = {
     "JEZ KEDIRI": {"st_id": 5, "db_id": "KEDIRI_LATEST"},
     "JEZ JEMBER": {"st_id": 40, "db_id": "JEMBER_LATEST"},
     "JEZ SEMARANG": {"st_id": 53, "db_id": "SEMARANG_LATEST"},
+    "HUB JAKARTA": {"st_id": 55, "db_id": "JAKARTA_LATEST"},           # 🌟 Baru: value="55"
+    "ONLINE HUB SURABAYA": {"st_id": 30, "db_id": "ONL_SBY_LATEST"},   # 🌟 Baru: value="30"
+    "ONLINE HUB MALANG": {"st_id": 20, "db_id": "ONL_MLG_LATEST"},     # 🌟 Baru: value="20"
 }
 
 def run_sync():
