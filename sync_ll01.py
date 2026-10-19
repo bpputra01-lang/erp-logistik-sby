@@ -190,18 +190,21 @@ def fetch_staging_from_stock_tracking(session):
 
     date_range = "2026-01-01|2030-12-31"
 
-    # 🌟 TARGET QUERY: Tambahkan "DONE ONLINE"
+    # 🌟 TARGET QUERY LENGKAP: Menembak via parameter status & pencarian kolom DataTables
     query_targets = [
         {"status": "REFUND", "status_search": ""},
+        {"status": "", "status_search": "REFUND"},            # 🌟 WAJIB: Tangkap REFUND via DataTables Search
         {"status": "WAITING OFFLINE", "status_search": ""},
         {"status": "WAITING CHECKOUT", "status_search": ""},
         {"status": "CHECKOUT", "status_search": ""},
         {"status": "WAITING NAMESET", "status_search": ""},
         {"status": "NAMESET", "status_search": ""},
         {"status": "WAITING ONLINE", "status_search": ""},
-        {"status": "DONE ONLINE", "status_search": ""},       # 🌟 BARU: Tarik status Done Online
+        {"status": "DONE ONLINE", "status_search": ""},
+        {"status": "", "status_search": "DONE ONLINE"},       # 🌟 WAJIB: Tangkap DONE ONLINE via DataTables Search
         {"status": "WAITING", "status_search": ""},
-        {"status": "", "status_search": "WAITING"}
+        {"status": "", "status_search": "WAITING"},
+        {"status": "", "status_search": ""}                   # 🌟 Tarik data umum store (disaring di Python)
     ]
 
     all_clean_records = []
@@ -214,7 +217,8 @@ def fetch_staging_from_stock_tracking(session):
         for q in query_targets:
             params = {
                 "draw": "1",
-                "columns[0][data]": "DT_RowIndex", "columns[0][name]": "plst_id", "columns[0][orderable]": "true",
+                "columns[0][data]": "DT_RowIndex", "columns[0][name]": "plst_id", "columns[0][orderable]": "false",
+                # 🌟 Kolom 1 adalah datetime (waktu scan pergerakan stock)
                 "columns[1][data]": "datetime", "columns[1][name]": "plst_created", "columns[1][orderable]": "true",
                 "columns[2][data]": "ps_barcode", "columns[2][name]": "ps_barcode", "columns[2][orderable]": "true",
                 "columns[3][data]": "article", "columns[3][name]": "p_name", "columns[3][orderable]": "true",
@@ -229,9 +233,11 @@ def fetch_staging_from_stock_tracking(session):
                 "columns[8][search][regex]": "false",
                 "columns[8][orderable]": "true",
                 "columns[9][data]": "instock_source", "columns[9][name]": "instock_source_status", "columns[9][orderable]": "false",
-                "order[0][column]": "0", "order[0][dir]": "desc",
+                # 🌟 URUTKAN BERDASARKAN KOLOM 1 (TANGGAL TERBARU), BUKAN KOLOM 0
+                "order[0][column]": "1", 
+                "order[0][dir]": "desc",
                 "start": "0",
-                "length": "-1",
+                "length": "500",
                 "search[value]": "",
                 "search": "",
                 "status": q["status"],
@@ -242,7 +248,6 @@ def fetch_staging_from_stock_tracking(session):
                 "st_id": str(st_id),
                 "date": date_range
             }
-
             try:
                 res = session.get(url, params=params, headers=headers)
                 if res.status_code != 200:
@@ -285,13 +290,21 @@ def fetch_staging_from_stock_tracking(session):
                 if doc_year is not None and doc_year < 2026:
                     continue
 
-                # Label kategori
+                # Label kategori diselaraskan langsung dengan Status Jezpro
                 if is_refund:
                     kategori_label = "REFUND"
                 elif is_done_online:
-                    kategori_label = "DONE_ONLINE"
+                    kategori_label = "DONE ONLINE"
+                elif "NAMESET" in status_raw:
+                    kategori_label = "WAITING NAMESET"
+                elif "CHECKOUT" in status_raw:
+                    kategori_label = "WAITING CHECKOUT"
+                elif "ONLINE" in status_raw:
+                    kategori_label = "WAITING ONLINE"
+                elif "RECEIPT" in status_raw:
+                    kategori_label = "WAITING RECEIPT"
                 else:
-                    kategori_label = "MASUK_RAK"
+                    kategori_label = "WAITING OFFLINE"
 
                 # ID Unik
                 raw_id = item.get("plst_id") or item.get("id")
