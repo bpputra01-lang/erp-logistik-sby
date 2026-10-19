@@ -1256,7 +1256,8 @@ def validation_barcode_sku_view(state: AppState):
 def percentage_display_view(state: AppState):
     branch_choices = [
         "JEZ SURABAYA", "JEZ MALANG", "JEZ SIDOARJO", 
-        "JEZ KEDIRI", "JEZ JEMBER", "JEZ SEMARANG"
+        "JEZ KEDIRI", "JEZ JEMBER", "JEZ SEMARANG",
+        "HUB JAKARTA", "ONLINE HUB SURABAYA", "ONLINE HUB MALANG"
     ]
 
     upload_section = ui.div(

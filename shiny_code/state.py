@@ -4465,6 +4465,9 @@ class AppState:
                 "JEZ KEDIRI": "KEDIRI_LATEST",
                 "JEZ JEMBER": "JEMBER_LATEST",
                 "JEZ SEMARANG": "SEMARANG_LATEST",
+                "HUB JAKARTA": "JAKARTA_LATEST",
+                "ONLINE HUB SURABAYA": "ONL_SBY_LATEST",
+                "ONLINE HUB MALANG": "ONL_MLG_LATEST",
             }
 
             target_branch = branch_name if branch_name else self.pd_selected_branch()
