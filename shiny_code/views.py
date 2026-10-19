@@ -2355,7 +2355,7 @@ def warehouse_activity_monitor_view(state: AppState):
         style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap; background: #FFFFFF; padding: 15px 20px; border-radius: 12px; border: 2px solid #CBD5E0; margin-bottom: 1.25rem; width: 100%; box-shadow: 0 4px 12px rgba(0,0,0,0.03);"
     )
     # ==========================================================================
-    # TAB 1: ALL WAITING (STAGING TRANSIT)
+    # TAB 1: ALL WAITING (STAGING TRANSIT) - ACUAN STATUS JEZPRO
     # ==========================================================================
     filtered_items = state.get_filtered_ll01()
     table_rows = []
@@ -2366,16 +2366,29 @@ def warehouse_activity_monitor_view(state: AppState):
             if is_crit else
             ui.span("🟢 NORMAL", style="background: #C6F6D5; color: #22543D; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 4px;")
         )
-        kat_label = "MASUK RAK" if r.get("kategori") == "MASUK_RAK" else "REFUND"
-        kat_color = "#3182CE" if r.get("kategori") == "MASUK_RAK" else "#D69E2E"
+        
+        # 🌟 Acuan Tunggal: Status Jezpro Asli dengan Badge Warna Khusus
+        raw_status = str(r.get("waiting_status", r.get("kategori", "-"))).upper()
+        if "REFUND" in raw_status:
+            badge_jezpro = ui.span("REFUND", style="background: #FED7D7; color: #E53E3E; font-weight: 800; font-size: 11.5px; padding: 3px 10px; border-radius: 4px; border: 1px solid #FEB2B2;")
+        elif "DONE" in raw_status and "ONLINE" in raw_status:
+            badge_jezpro = ui.span("DONE ONLINE", style="background: #C6F6D5; color: #22543D; font-weight: 800; font-size: 11.5px; padding: 3px 10px; border-radius: 4px; border: 1px solid #9AE6B4;")
+        elif "NAMESET" in raw_status:
+            badge_jezpro = ui.span(raw_status, style="background: #E9D8FD; color: #6B46C1; font-weight: 800; font-size: 11.5px; padding: 3px 10px; border-radius: 4px;")
+        elif "CHECKOUT" in raw_status:
+            badge_jezpro = ui.span(raw_status, style="background: #FEEBC8; color: #C05621; font-weight: 800; font-size: 11.5px; padding: 3px 10px; border-radius: 4px;")
+        elif "ONLINE" in raw_status:
+            badge_jezpro = ui.span(raw_status, style="background: #BEE3F8; color: #2B6CB0; font-weight: 800; font-size: 11.5px; padding: 3px 10px; border-radius: 4px;")
+        else:
+            badge_jezpro = ui.span(raw_status, style="background: #EDF2F7; color: #4A5568; font-weight: 800; font-size: 11.5px; padding: 3px 10px; border-radius: 4px;")
+
         clean_art = clean_jezpro_card_text(r.get("article_name", "-"))
 
         table_rows.append(ui.tags.tr(
             ui.tags.td(str(idx), style="text-align: center; font-weight: bold;"),
             ui.tags.td(status_badge, style="text-align: center;"),
-            ui.tags.td(ui.span(kat_label, style=f"font-weight: 800; color: {kat_color};")),
-            ui.tags.td(str(r.get("waiting_status", "-")), style="font-weight: 600; color: #4A5568;"),
-            ui.tags.td(clean_art, style="font-weight: 700; color: #1A202C; max-width: 320px; white-space: normal;"),
+            ui.tags.td(badge_jezpro, style="text-align: center;"),   # 🌟 Acuan utama menggantikan 2 kolom lama
+            ui.tags.td(clean_art, style="font-weight: 700; color: #1A202C; max-width: 340px; white-space: normal;"),
             ui.tags.td(str(r.get("qty", 1)), style="text-align: center; font-weight: 800;"),
             ui.tags.td(ui.tags.code(str(r.get("bin_target", "-")), style="font-weight: bold; color: #2B6CB0;")),
             ui.tags.td(str(r.get("pic_name", "-")), style="color: #4A5568;"),
@@ -2383,9 +2396,9 @@ def warehouse_activity_monitor_view(state: AppState):
             ui.tags.td(str(r.get("durasi_aging", "-")), style=f"font-weight: 800; text-align: center; color: {'#E53E3E' if is_crit else '#2F855A'};")
         ))
 
-    headers_stg = ["NO", "STATUS LL01", "KATEGORI", "STATUS JEZPRO", "NAMA ARTIKEL", "QTY", "BIN TUJUAN", "PIC SCAN", "WAKTU SCAN", "AGING"]
-    th_stg = [ui.tags.th(h, style="text-align: center;" if h in ["NO", "STATUS LL01", "QTY", "AGING"] else "") for h in headers_stg]
-
+    # 🌟 Header Baru: Kolom "KATEGORI" yang redundant resmi dihilangkan
+    headers_stg = ["NO", "STATUS LL01", "STATUS JEZPRO", "NAMA ARTIKEL", "QTY", "BIN TUJUAN", "PIC SCAN", "WAKTU SCAN", "AGING"]
+    th_stg = [ui.tags.th(h, style="text-align: center;" if h in ["NO", "STATUS LL01", "STATUS JEZPRO", "QTY", "AGING"] else "") for h in headers_stg]
     tab1_staging = ui.div(
         ui.div(
             dark_metric_box("📦 TOTAL WAITING STAGING", f"{state.ll01_metric_total_antrean():,} PCS", "#3182CE"),
