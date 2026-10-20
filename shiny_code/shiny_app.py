@@ -2,6 +2,7 @@ import io
 import time
 from datetime import datetime
 import pandas as pd
+from config import get_supabase, safe_int
 from shiny import App, Inputs, Outputs, Session, reactive, render, ui
 from state import AppState
 from views import (
@@ -4350,6 +4351,9 @@ def server(input: Inputs, output: Outputs, session: Session):
             print("Gagal render modal:", err_modal)
             ui.notification_show(f"Gagal menampilkan pop-up: {err_modal}", type="error")
             # Pop-Up Modal Detail Item Multiple Adjustment (Anti-Freeze & Bebas Limit)
+    # ==========================================================================
+    # POP-UP MODAL DETAIL ITEM MULTIPLE ADJUSTMENT (FIXED QUERY & AMAN DARI BLOKIR)
+    # ==========================================================================
     @reactive.Effect
     @reactive.event(input.btn_open_ma_items_modal)
     def _open_ma_detail():
@@ -4357,57 +4361,71 @@ def server(input: Inputs, output: Outputs, session: Session):
         import traceback
 
         raw_id = input.btn_open_ma_items_modal()
-        ma_id = safe_int(raw_id)
+        ma_id = safe_int(raw_id) if raw_id else 0
 
         matched_items = []
         try:
             client = get_supabase()
-            tbl = client.table("jezpro_adjustment_items").select("*")
-            tbl.params.append(f"ma_id=eq.{ma_id}")
-            tbl.params.append("limit=10000")
-            res_items = tbl.execute()
-            if res_items and hasattr(res_items, 'data') and res_items.data:
-                matched_items = res_items.data
+            if client and ma_id > 0:
+                # 🌟 SINTAKS RESMI SUPABASE PYTHON (.eq dan .limit)
+                res_items = client.table("jezpro_adjustment_items") \
+                                  .select("*") \
+                                  .eq("ma_id", ma_id) \
+                                  .limit(1000) \
+                                  .execute()
+                if res_items and hasattr(res_items, 'data') and res_items.data:
+                    matched_items = res_items.data
         except Exception as e:
-            print("Gagal ambil item MA:", e)
+            print(f"⚠️ Gagal ambil item MADJ #{ma_id} dari Supabase:", e)
             traceback.print_exc()
 
         rows = []
         for idx, it in enumerate(matched_items, start=1):
-            diff = it.get('diff_qty', 0)
+            diff = safe_int(it.get('diff_qty', 0))
             diff_col = "#10B981" if diff > 0 else "#E53E3E"
             rows.append(ui.tags.tr(
                 ui.tags.td(str(idx), style="text-align: center; font-weight: bold;"),
                 ui.tags.td(ui.tags.code(str(it.get("bin_code", "-")), style="font-weight: bold; color: #2B6CB0;")),
                 ui.tags.td(str(it.get("barcode_sku", "-")), style="font-weight: 700;"),
-                ui.tags.td(str(it.get("article_name", "-")), style="max-width: 250px; white-space: normal;"),
-                ui.tags.td(f"{it.get('color', '-')} / {it.get('size_variant', '-')}", style="text-align: center;"),
-                ui.tags.td(str(it.get("qty_system", 0)), style="text-align: right;"),
-                ui.tags.td(str(it.get("qty_so", 0)), style="text-align: right; font-weight: 700;"),
+                ui.tags.td(str(it.get("article_name", "-")), style="max-width: 250px; white-space: normal; font-size: 12px;"),
+                ui.tags.td(f"{it.get('color', '-')} / {it.get('size_variant', '-')}", style="text-align: center; font-size: 12px;"),
+                ui.tags.td(str(safe_int(it.get("qty_system", 0))), style="text-align: right;"),
+                ui.tags.td(str(safe_int(it.get("qty_so", 0))), style="text-align: right; font-weight: 700;"),
                 ui.tags.td(f"{diff:+d}", style=f"text-align: right; font-weight: 800; color: {diff_col};")
             ))
 
+        # Bungkus tabel dengan tbody yang benar (mencegah HTML parser error)
+        tbody_content = ui.tags.tbody(*rows) if rows else ui.tags.tbody(
+            ui.tags.tr(
+                ui.tags.td("Rincian barang adjustment kosong atau tidak ditemukan pada dokumen ini.", colspan="8", style="text-align: center; padding: 1.5rem; color: #718096; font-style: italic;")
+            )
+        )
+
         ui.modal_show(ui.modal(
             ui.div(
-                ui.h4(f"📋 Rincian Item Multiple Adjustment: ID #{ma_id}", style="font-weight: 800; color: #1A202C; margin-bottom: 4px; font-size: 15px;"),
-                ui.p(f"Ditemukan total {len(matched_items)} baris barang pada dokumen adjustment ini.", style="color: #718096; font-size: 12px; margin-bottom: 12px;"),
-                ui.tags.table(
-                    ui.tags.thead(ui.tags.tr(
-                        ui.tags.th("NO", style="text-align: center;"),
-                        ui.tags.th("BIN"),
-                        ui.tags.th("SKU"),
-                        ui.tags.th("NAMA ARTIKEL"),
-                        ui.tags.th("WARNA / SIZE", style="text-align: center;"),
-                        ui.tags.th("QTY SYS", style="text-align: right;"),
-                        ui.tags.th("QTY SO", style="text-align: right;"),
-                        ui.tags.th("SELISIH", style="text-align: right;")
-                    )),
-                    ui.tags.tbody(*rows) if rows else ui.tags.tr(
-                        ui.tags.td("Rincian barang adjustment kosong pada dokumen ini.", colspan=8, style="text-align: center; padding: 1.5rem; color: #718096; font-style: italic;")
-                    ),
-                    class_="custom-clean-table", style="width: 100%; border: 1px solid #CBD5E0; border-radius: 8px;"
+                ui.div(
+                    ui.h4(f"📋 Rincian Item Multiple Adjustment: ID #{ma_id}", style="font-weight: 800; color: #1A202C; margin-bottom: 4px; font-size: 15px;"),
+                    ui.p(f"Ditemukan total {len(matched_items):,} baris barang pada dokumen adjustment ini.", style="color: #718096; font-size: 12px; margin: 0;"),
+                    style="margin-bottom: 12px;"
                 ),
-                style="max-height: 480px; overflow-y: auto; padding: 0.5rem 0;"
+                ui.div(
+                    ui.tags.table(
+                        ui.tags.thead(ui.tags.tr(
+                            ui.tags.th("NO", style="text-align: center;"),
+                            ui.tags.th("BIN"),
+                            ui.tags.th("SKU"),
+                            ui.tags.th("NAMA ARTIKEL"),
+                            ui.tags.th("WARNA / SIZE", style="text-align: center;"),
+                            ui.tags.th("QTY SYS", style="text-align: right;"),
+                            ui.tags.th("QTY SO", style="text-align: right;"),
+                            ui.tags.th("SELISIH", style="text-align: right;")
+                        )),
+                        tbody_content,
+                        class_="custom-clean-table", style="width: 100%; border: 1px solid #CBD5E0; border-radius: 8px;"
+                    ),
+                    style="max-height: 480px; overflow-y: auto;"
+                ),
+                style="padding: 0.5rem 0;"
             ),
             title=f"⚖️ Detail Dokumen Adjustment #{ma_id}",
             size="l",
