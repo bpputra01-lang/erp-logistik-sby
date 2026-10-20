@@ -2671,7 +2671,7 @@ def compliance_audit_view(state: AppState):
             ui.div(
                 ui.span("🏬 Cabang / Toko / DC:", style="font-size: 12px; font-weight: 800;"),
                 ui.tags.select(
-                    *[ui.tags.option(c, value=c) for c in ["Surabaya", "Malang", "Sidoarjo", "Kediri", "Jember", "Semarang", "Kantor Pusat / Lainnya"]],
+                    *[ui.tags.option(c, value=c) for c in ["Surabaya", "Malang", "Sidoarjo", "Kediri", "Jember", "Semarang", "Hub Jakarta"]],
                     id="comp_branch", class_="form-control"
                 ), style="flex: 1; min-width: 180px;"
             ),
