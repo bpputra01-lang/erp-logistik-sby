@@ -2147,6 +2147,63 @@ def server(input: Inputs, output: Outputs, session: Session):
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
     # ==========================================================================
+    # HANDLER DOWNLOAD EXCEL UNTUK STOCK OPNAME STEP 4 (FINAL ADJUSTMENT +)
+    # ==========================================================================
+    @render.download(filename="Multiple_Adj_Plus_SO.xlsx")
+    def btn_dl_so_mult():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            df = getattr(state, "_raw_df_so_mult", pd.DataFrame())
+            df.to_excel(writer, sheet_name='MULTIPLE_ADJ_PLUS', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    @render.download(filename="Single_Adj_Plus_SO.xlsx")
+    def btn_dl_so_sing():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            df = getattr(state, "_raw_df_so_sing", pd.DataFrame())
+            df.to_excel(writer, sheet_name='SINGLE_ADJ_PLUS', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    @render.download(filename="Hasil_Cek_Adj_Plus_SO.xlsx")
+    def btn_dl_so_res4():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            df = getattr(state, "_raw_df_so_res4", pd.DataFrame())
+            df.to_excel(writer, sheet_name='HASIL_CEK_ADJ_PLUS', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    @render.download(filename="Set_Up_Real_Plus_SO.xlsx")
+    def btn_dl_so_setup4():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            df = getattr(state, "_raw_df_so_setup4", pd.DataFrame())
+            df.to_excel(writer, sheet_name='SET_UP_REAL_PLUS', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    @render.download(filename="Miss_Lookup_SKU_SO.xlsx")
+    def btn_dl_so_miss4():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            df = getattr(state, "_raw_df_so_miss4", pd.DataFrame())
+            df.to_excel(writer, sheet_name='MISS_LOOKUP_SKU', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    # 🌟 Sekalian lengkapi untuk Step 5 (Karantina) yang tombolnya juga belum ada handlernya:
+    @render.download(filename="Hasil_Karantina_SO.xlsx")
+    def btn_dl_so_karantina():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            df = getattr(state, "_raw_df_so_karantina", pd.DataFrame())
+            df.to_excel(writer, sheet_name='KARANTINA_SO', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+    # ==========================================================================
     # STOCK OPNAME CONTROLLER (STEP 4, 5, & 6)
     # ==========================================================================
     # --- STEP 4 STOCK OPNAME ---
@@ -2167,19 +2224,22 @@ def server(input: Inputs, output: Outputs, session: Session):
             )
 
         # JIKA ADA DATA: Tampilkan 3 uploader dan hasil tab normal
+        # JIKA ADA DATA: Tampilkan 3 uploader dan hasil tab normal
         step4_results = ui.div()
+        btn_green_style = "background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 6px 14px; cursor: pointer; font-size: 12px;"
+        btn_red_style = "background-color: #E53E3E; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 6px 14px; cursor: pointer; font-size: 12px;"
+
         if state.so_step4_done():
             step4_results = ui.div(
                 ui.hr(style="margin: 1rem 0; border-color: #E2E8F0;"),
                 ui.navset_card_tab(
-                    ui.nav_panel("📦 MULTIPLE ADJ +", ui.div(ui.div(ui.download_button("btn_dl_so_mult", "Download Multiple Adj + (.xlsx)", class_="btn-download-green"), style="display: flex; justify-content: flex-end; margin-bottom: 0.5rem;"), render_clean_table(state.df_so_mult_headers(), state.df_so_mult_rows(), "tbl_so_mult"))),
-                    ui.nav_panel("⚠️ SINGLE ADJ +", ui.div(ui.div(ui.download_button("btn_dl_so_sing", "Download Single Adj + (.xlsx)", class_="btn-download-green"), style="display: flex; justify-content: flex-end; margin-bottom: 0.5rem;"), render_clean_table(state.df_so_sing_headers(), state.df_so_sing_rows(), "tbl_so_sing"))),
-                    ui.nav_panel("🔍 CEK ADJ + RESULT", ui.div(ui.div(ui.download_button("btn_dl_so_res4", "Download Hasil Cek Adj + (.xlsx)", class_="btn-download-green"), style="display: flex; justify-content: flex-end; margin-bottom: 0.5rem;"), render_clean_table(state.df_so_res4_headers(), state.df_so_res4_rows(), "tbl_so_res4"))),
-                    ui.nav_panel("➡️ SET UP REAL +", ui.div(ui.div(ui.download_button("btn_dl_so_setup4", "Download Set Up Real + (.xlsx)", class_="btn-download-green"), style="display: flex; justify-content: flex-end; margin-bottom: 0.5rem;"), render_clean_table(state.df_so_setup4_headers(), state.df_so_setup4_rows(), "tbl_so_setup4"))),
-                    ui.nav_panel("❌ Miss Lookup SKU on BIN", ui.div(ui.div(ui.download_button("btn_dl_so_miss4", "Download Missing Items (.xlsx)", class_="btn-download-red"), style="display: flex; justify-content: flex-end; margin-bottom: 0.5rem;"), render_clean_table(state.df_so_miss4_headers(), state.df_so_miss4_rows(), "tbl_so_miss4")))
+                    ui.nav_panel("📦 MULTIPLE ADJ +", ui.div(ui.div(ui.download_button("btn_dl_so_mult", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px;"), "Download Multiple Adj + (.xlsx)"), style=btn_green_style), style="display: flex; justify-content: flex-end; margin-bottom: 0.5rem;"), render_clean_table(state.df_so_mult_headers(), state.df_so_mult_rows(), "tbl_so_mult"))),
+                    ui.nav_panel("⚠️ SINGLE ADJ +", ui.div(ui.div(ui.download_button("btn_dl_so_sing", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px;"), "Download Single Adj + (.xlsx)"), style=btn_green_style), style="display: flex; justify-content: flex-end; margin-bottom: 0.5rem;"), render_clean_table(state.df_so_sing_headers(), state.df_so_sing_rows(), "tbl_so_sing"))),
+                    ui.nav_panel("🔍 CEK ADJ + RESULT", ui.div(ui.div(ui.download_button("btn_dl_so_res4", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px;"), "Download Hasil Cek Adj + (.xlsx)"), style=btn_green_style), style="display: flex; justify-content: flex-end; margin-bottom: 0.5rem;"), render_clean_table(state.df_so_res4_headers(), state.df_so_res4_rows(), "tbl_so_res4"))),
+                    ui.nav_panel("➡️ SET UP REAL +", ui.div(ui.div(ui.download_button("btn_dl_so_setup4", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px;"), "Download Set Up Real + (.xlsx)"), style=btn_green_style), style="display: flex; justify-content: flex-end; margin-bottom: 0.5rem;"), render_clean_table(state.df_so_setup4_headers(), state.df_so_setup4_rows(), "tbl_so_setup4"))),
+                    ui.nav_panel("❌ Miss Lookup SKU on BIN", ui.div(ui.div(ui.download_button("btn_dl_so_miss4", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px;"), "Download Missing Items (.xlsx)"), style=btn_red_style), style="display: flex; justify-content: flex-end; margin-bottom: 0.5rem;"), render_clean_table(state.df_so_miss4_headers(), state.df_so_miss4_rows(), "tbl_so_miss4")))
                 )
             )
-
         return ui.div(
             ui.h4("3️⃣ Final Adjustment + Process (3 File Upload)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
             ui.div(
