@@ -1411,7 +1411,9 @@ def server(input: Inputs, output: Outputs, session: Session):
         f = input.cca_up_cov()
         bin_cov = input.cca_bin_cov() if "cca_bin_cov" in input else []
         succ, msg = state.run_cca_step2(f, bin_cov)
-        if succ: state.show_success_modal.set(True)
+        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+        if succ: 
+            state.show_success_modal.set(True)
         else:
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)

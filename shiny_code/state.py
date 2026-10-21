@@ -1676,7 +1676,7 @@ class AppState:
             return False, f"Gagal Compare Step 1: {e}"
 
     # ==========================================================================
-    # CYCLE COUNT ANALYZER - STEP 2: ALLOCATION BERPRIORITAS & RECON AUTO-GEN
+    # CYCLE COUNT ANALYZER - STEP 2: ALLOCATION (SUPER FAST & ANTI-CRASH)
     # ==========================================================================
     def run_cca_step2(self, f_bin_cov, selected_bin_cov):
         try:
@@ -1687,73 +1687,82 @@ class AppState:
             if df_cov_raw is None or df_cov_raw.empty:
                 return False, "File BIN Coverage tidak boleh kosong!"
 
+            # 1. Filter BIN Coverage Cepat
             import re
+            col_b_idx = 1
+            col_s_idx = 2
+            col_q_idx = 9 if df_cov_raw.shape[1] > 9 else (df_cov_raw.shape[1] - 1)
+
             if selected_bin_cov and len(selected_bin_cov) > 0:
                 pattern = "|".join([re.escape(str(b).strip().upper()) for b in selected_bin_cov])
-                mask = df_cov_raw.iloc[:, 1].astype(str).str.strip().str.upper().str.contains(pattern, na=False)
+                mask = df_cov_raw.iloc[:, col_b_idx].astype(str).str.strip().str.upper().str.contains(pattern, na=False)
                 df_cov = df_cov_raw[mask].copy()
             else:
                 df_cov = df_cov_raw.copy()
 
-            # Helper Penentu Ranking Prioritas BIN
             def get_bin_tier(bin_name):
                 b = str(bin_name).strip().upper()
-                if "KARANTINA" in b:
-                    return 1  # Prioritas 2 (Coverage Karantina)
-                elif "STAG" in b:
-                    return 2  # Prioritas 3 (Coverage Staging/Stagging)
-                else:
-                    return 3  # Prioritas 4 (Coverage Lainnya)
+                if "KARANTINA" in b: return 1
+                elif "STAG" in b: return 2
+                return 3
 
-            # 1. Pool Stok System +
+            # 2. Pool Stok System + (Instan tanpa iterrows)
             system_by_sku = {}
             if not self._raw_df_cca_sys_plus.empty:
-                for _, row in self._raw_df_cca_sys_plus.iterrows():
-                    b, s = str(row['BIN']).strip().upper(), str(row['SKU']).strip().upper()
-                    q = float(row.get('DIFF', 0))
-                    if q > 0:
-                        if s not in system_by_sku: system_by_sku[s] = {}
-                        system_by_sku[s][b] = system_by_sku[s].get(b, 0) + q
+                df_sys_p = self._raw_df_cca_sys_plus[self._raw_df_cca_sys_plus['DIFF'] > 0]
+                for row in df_sys_p.itertuples(index=False):
+                    b = str(getattr(row, 'BIN', '')).strip().upper()
+                    s = str(getattr(row, 'SKU', '')).strip().upper()
+                    q = float(getattr(row, 'DIFF', 0))
+                    if s not in system_by_sku: system_by_sku[s] = {}
+                    system_by_sku[s][b] = system_by_sku[s].get(b, 0) + q
 
-            # 2. Pool Stok BIN Coverage
-            selected_bins = set(df_cov.iloc[:, 1].astype(str).str.strip().str.upper().unique())
+            # 3. Pool Stok BIN Coverage Cepat via GroupBy (0.05 detik vs 30 detik iterrows)
+            s_bin_cov = df_cov.iloc[:, col_b_idx].astype(str).str.strip().str.upper()
+            s_sku_cov = df_cov.iloc[:, col_s_idx].astype(str).str.strip().str.upper()
+            s_qty_cov = pd.to_numeric(df_cov.iloc[:, col_q_idx], errors='coerce').fillna(0)
+
+            mask_pos = s_qty_cov > 0
+            df_cov_clean = pd.DataFrame({
+                'BIN': s_bin_cov[mask_pos],
+                'SKU': s_sku_cov[mask_pos],
+                'QTY': s_qty_cov[mask_pos]
+            })
+
             coverage_by_sku = {}
-            for _, row in df_cov.iterrows():
-                b_val, s_val = str(row.iloc[1]).strip().upper(), str(row.iloc[2]).strip().upper()
-                if b_val in selected_bins:
-                    try: val = float(row.iloc[9])
-                    except: val = 0
-                    if val > 0:
-                        if s_val not in coverage_by_sku: coverage_by_sku[s_val] = {}
-                        coverage_by_sku[s_val][b_val] = coverage_by_sku[s_val].get(b_val, 0) + val
+            if not df_cov_clean.empty:
+                cov_grouped = df_cov_clean.groupby(['SKU', 'BIN'])['QTY'].sum()
+                for (s_val, b_val), val in cov_grouped.items():
+                    if s_val not in coverage_by_sku: coverage_by_sku[s_val] = {}
+                    coverage_by_sku[s_val][b_val] = val
 
             new_rows = []
             df_sys_updated = self._raw_df_cca_sys_plus.copy() if not self._raw_df_cca_sys_plus.empty else pd.DataFrame(columns=['BIN', 'SKU', 'DIFF', 'ITEM NAME'])
             sys_reduction = {}
 
-            # Proses Real + Jika Ada (Tetap aman jika _raw_df_cca_real_plus kosong)
+            # 4. Alokasi Stok Berdasarkan Prioritas
             if not self._raw_df_cca_real_plus.empty:
-                for _, row in self._raw_df_cca_real_plus.iterrows():
+                real_records = self._raw_df_cca_real_plus.to_dict(orient='records')
+                for row in real_records:
                     sku = str(row['SKU']).strip().upper()
-                    diff_needed = float(row['DIFF'])
+                    diff_needed = float(row.get('DIFF', 0))
                     if diff_needed <= 0:
-                        r_copy = row.to_dict()
+                        r_copy = dict(row)
                         r_copy.update({'BIN ALOKASI': '', 'QTY ALLOCATION': 0, 'STATUS': 'NO DIFF'})
                         new_rows.append(r_copy)
                         continue
 
                     remaining = diff_needed
 
-                    # --- PRIORITAS 1: SYSTEM + ---
+                    # Prioritas 1: System +
                     if sku in system_by_sku:
-                        # Urutkan bin system+ berdasarkan prioritasnya jika ada multiple bin
                         sorted_sys_bins = sorted(system_by_sku[sku].keys(), key=lambda b: (get_bin_tier(b), b))
                         for bin_src in sorted_sys_bins:
                             qty_avail = system_by_sku[sku][bin_src]
                             if remaining <= 0: break
                             if qty_avail > 0:
                                 alloc = min(qty_avail, remaining)
-                                r_alloc = row.to_dict()
+                                r_alloc = dict(row)
                                 r_alloc.update({
                                     'BIN ALOKASI': bin_src,
                                     'QTY ALLOCATION': alloc,
@@ -1761,10 +1770,11 @@ class AppState:
                                 })
                                 new_rows.append(r_alloc)
                                 system_by_sku[sku][bin_src] -= alloc
-                                sys_reduction[(bin_src, sku)] = sys_reduction.get((bin_src, sku), 0) + alloc
+                                key_pair = f"{bin_src}|{sku}"
+                                sys_reduction[key_pair] = sys_reduction.get(key_pair, 0) + alloc
                                 remaining -= alloc
 
-                    # --- PRIORITAS 2, 3, & 4: BIN COVERAGE (KARANTINA -> STAGING -> LAINNYA) ---
+                    # Prioritas 2, 3, 4: BIN Coverage (Karantina -> Staging -> Lainnya)
                     if remaining > 0 and sku in coverage_by_sku:
                         sorted_cov_bins = sorted(coverage_by_sku[sku].keys(), key=lambda b: (get_bin_tier(b), b))
                         for bin_src in sorted_cov_bins:
@@ -1772,7 +1782,7 @@ class AppState:
                             if remaining <= 0: break
                             if qty_avail > 0:
                                 alloc = min(qty_avail, remaining)
-                                r_alloc = row.to_dict()
+                                r_alloc = dict(row)
                                 r_alloc.update({
                                     'BIN ALOKASI': bin_src,
                                     'QTY ALLOCATION': alloc,
@@ -1782,23 +1792,23 @@ class AppState:
                                 coverage_by_sku[sku][bin_src] -= alloc
                                 remaining -= alloc
 
-                    # Sisa yang tidak teralokasi
                     if remaining > 0:
-                        r_no = row.to_dict()
+                        r_no = dict(row)
                         r_no.update({'DIFF': remaining, 'BIN ALOKASI': '', 'QTY ALLOCATION': 0, 'STATUS': 'NO ALLOCATION'})
                         new_rows.append(r_no)
 
             allocated = pd.DataFrame(new_rows) if new_rows else pd.DataFrame(columns=['BIN', 'SKU', 'QTY_SCAN', 'QTY_SYSTEM', 'DIFF', 'NOTE', 'BIN ALOKASI', 'QTY ALLOCATION', 'STATUS'])
-            
-            for (b, s), q in sys_reduction.items():
-                if not df_sys_updated.empty and 'BIN' in df_sys_updated.columns and 'SKU' in df_sys_updated.columns:
-                    mask = (df_sys_updated['BIN'].astype(str).str.upper() == b) & (df_sys_updated['SKU'].astype(str).str.upper() == s)
-                    if mask.any(): df_sys_updated.loc[mask, 'DIFF'] -= q
+
+            # 5. Update df_sys_updated dalam O(1) Vectorized Mapping (Gantikan loop 30 juta operasi)
+            if not df_sys_updated.empty and 'BIN' in df_sys_updated.columns and 'SKU' in df_sys_updated.columns:
+                keys_series = df_sys_updated['BIN'].astype(str).str.strip().str.upper() + "|" + df_sys_updated['SKU'].astype(str).str.strip().str.upper()
+                deductions = keys_series.map(sys_reduction).fillna(0)
+                df_sys_updated['DIFF'] = pd.to_numeric(df_sys_updated['DIFF'], errors='coerce').fillna(0) - deductions
 
             if 'SKU' in allocated.columns:
                 allocated['ITEM NAME'] = allocated['SKU'].map(self._cca_map_dict).fillna("-")
 
-            # Template Set Up Real +
+            # 6. Template Setup Real +
             filtered_setup = allocated[allocated['STATUS'].isin(['FULL ALLOCATION', 'PARTIAL ALLOCATION'])].copy() if not allocated.empty else pd.DataFrame()
             if not filtered_setup.empty:
                 filtered_setup['BIN AWAL'] = filtered_setup['BIN ALOKASI']
@@ -1809,7 +1819,7 @@ class AppState:
             else:
                 df_setup_real = pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
 
-            # Recon Real + (Item NO ALLOCATION)
+            # 7. Recon Real + & Recon System +
             filtered_no_alloc = allocated[allocated['STATUS'] == "NO ALLOCATION"].copy() if not allocated.empty else pd.DataFrame()
             if not filtered_no_alloc.empty:
                 cols_r = [c for c in ['BIN', 'SKU', 'ITEM NAME', 'QTY_SCAN', 'QTY_SYSTEM', 'DIFF'] if c in filtered_no_alloc.columns]
@@ -1818,36 +1828,34 @@ class AppState:
             else:
                 recon_real = pd.DataFrame(columns=['BIN', 'SKU', 'ITEM NAME', 'QTY_SCAN', 'QTY_SYSTEM', 'DIFF', 'HASIL RECONCILIATION'])
 
-            # Recon System + Outstanding
             if not df_sys_updated.empty and 'DIFF' in df_sys_updated.columns:
                 outstanding = df_sys_updated[df_sys_updated['DIFF'] != 0].copy()
                 outstanding['HASIL REKONSILIASI'] = ""
             else:
                 outstanding = pd.DataFrame(columns=['BIN', 'SKU', 'QTY SYSTEM', 'DIFF', 'HASIL REKONSILIASI'])
 
+            # Simpan RAW Data Utuh 100% untuk Download Excel
             self._raw_df_cca_alloc = allocated.copy()
             self._raw_df_cca_sys_upd = df_sys_updated.copy()
             self._raw_df_cca_setup_real = df_setup_real.copy()
             self._raw_df_cca_rec_real = recon_real.copy()
             self._raw_df_cca_rec_sys = outstanding.copy()
 
+            # 8. Proteksi Payload WebSocket (Batasi preview di layar maks 500 baris agar browser tidak freeze/disconnect)
             self.df_cca_alloc_headers.set(allocated.columns.tolist())
-            self.df_cca_alloc_rows.set(allocated.fillna("").astype(str).values.tolist())
+            self.df_cca_alloc_rows.set(allocated.head(500).fillna("").astype(str).values.tolist())
             self.df_cca_sys_upd_headers.set(df_sys_updated.columns.tolist())
-            self.df_cca_sys_upd_rows.set(df_sys_updated.fillna("").astype(str).values.tolist())
+            self.df_cca_sys_upd_rows.set(df_sys_updated.head(500).fillna("").astype(str).values.tolist())
             self.df_cca_setup_real_headers.set(df_setup_real.columns.tolist())
-            self.df_cca_setup_real_rows.set(df_setup_real.fillna("").astype(str).values.tolist())
+            self.df_cca_setup_real_rows.set(df_setup_real.head(500).fillna("").astype(str).values.tolist())
             self.df_cca_rec_real_headers.set(recon_real.columns.tolist())
-            self.df_cca_rec_real_rows.set(recon_real.fillna("").astype(str).values.tolist())
+            self.df_cca_rec_real_rows.set(recon_real.head(500).fillna("").astype(str).values.tolist())
             self.df_cca_rec_sys_headers.set(outstanding.columns.tolist())
-            self.df_cca_rec_sys_rows.set(outstanding.fillna("").astype(str).values.tolist())
-
+            self.df_cca_rec_sys_rows.set(outstanding.head(500).fillna("").astype(str).values.tolist())
 
             self.cca_step2_done.set(True)
             self.cca_step3_done.set(True)
 
-            # --- TAMBAHAN OTOMATISASI JIKA RECON KOSONG ---
-            # Jika tidak ada item Real+ yang perlu direkon, otomatis selesaikan Step 4
             if recon_real.empty:
                 self.cca_step4_done.set(True)
                 self.cca_qty_need_adj.set(0)
@@ -1856,7 +1864,6 @@ class AppState:
             else:
                 self.cca_step4_done.set(False)
 
-            # Jika tidak ada item System+ yang outstanding, otomatis selesaikan Step 5
             if outstanding.empty:
                 self.cca_step5_done.set(True)
                 self.cca_qty_karantina.set(0)
@@ -1868,6 +1875,7 @@ class AppState:
             return True, "Allocation Step 2 & Recon Step 3 Selesai!"
         except Exception as e:
             return False, f"Gagal Allocation Step 2: {e}"
+            
     # --- CCA STEP 4: RECON REAL + ANALYSIS (ANTI ERROR BILA KOSONG) ---
     def run_cca_step4(self, f_recon_real=None):
         try:
