@@ -7061,8 +7061,34 @@ class AppState:
             res.append(m)
         return res
 
+    # ==========================================================================
+    # WORKFLOW 2-TAHAP: REQUEST ADJUSTMENT -> DONE ADJUSTMENT
+    # ==========================================================================
+    def mark_memo_adjustment_requested(self, memo_id: str):
+        """Tahap 1: Tandai REQUEST ADJUSTMENT dan aktifkan tombol DONE"""
+        try:
+            memos = list(self.memo_list())
+            now_req = datetime.now().strftime("%Y-%m-%d %H:%M")
+            for m in memos:
+                if m.get("id") == memo_id:
+                    m["status_adj"] = "REQUESTED"
+                    m["requested_at"] = now_req
+                    break
+
+            client = get_supabase()
+            if client:
+                client.table("memo_pengajuan").update({
+                    "status_adj": "REQUESTED",
+                    "requested_at": now_req
+                }).in_("id", [memo_id]).execute()
+
+            self.memo_list.set(memos)
+            return True, f"Memo {memo_id} berhasil diajukan (REQUEST ADJUSTMENT). Tombol DONE ADJUSTMENT sekarang aktif!"
+        except Exception as e:
+            return False, f"Gagal request adjustment: {e}"
+
     def mark_memo_adjustment_done(self, memo_id: str):
-        """Pindahkan memo ke Tab 3 (Done Adjustment) dan update Supabase"""
+        """Tahap 2: Selesaikan memo dan pindahkan ke Tab 3"""
         try:
             memos = list(self.memo_list())
             now_done = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -7072,7 +7098,6 @@ class AppState:
                     m["done_at"] = now_done
                     break
 
-            # 🌟 Gunakan in_ agar 100% kompatibel dengan SimpleSupabaseTable
             client = get_supabase()
             if client:
                 client.table("memo_pengajuan").update({
@@ -7081,28 +7106,30 @@ class AppState:
                 }).in_("id", [memo_id]).execute()
 
             self.memo_list.set(memos)
-            return True, f"Memo {memo_id} berhasil ditandai DONE ADJUSTMENT dan dipindahkan ke Tab 3!"
+            return True, f"Memo {memo_id} telah SELESAI (DONE ADJUSTMENT) dan dipindahkan ke Tab 3!"
         except Exception as e:
-            return False, f"Gagal update status: {e}"
+            return False, f"Gagal menyelesaikan memo: {e}"
 
     def revert_memo_adjustment(self, memo_id: str):
-        """Kembalikan memo dari Tab 3 ke Tab 2 (Pending)"""
+        """Kembalikan memo dari Tab 3 ke Tab 2 (Reset status)"""
         try:
             memos = list(self.memo_list())
             for m in memos:
                 if m.get("id") == memo_id:
                     m["status_adj"] = "PENDING"
                     m["done_at"] = None
+                    m["requested_at"] = None
                     break
 
             client = get_supabase()
             if client:
                 client.table("memo_pengajuan").update({
                     "status_adj": "PENDING",
-                    "done_at": None
+                    "done_at": None,
+                    "requested_at": None
                 }).in_("id", [memo_id]).execute()
 
             self.memo_list.set(memos)
-            return True, f"Memo {memo_id} dikembalikan ke Tab 2 (Pending Adjustment)!"
+            return True, f"Memo {memo_id} dikembalikan ke Tab 2 (Pending)!"
         except Exception as e:
             return False, f"Gagal mengembalikan memo: {e}"
