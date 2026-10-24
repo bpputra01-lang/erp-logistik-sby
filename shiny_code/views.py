@@ -2990,6 +2990,76 @@ def compliance_audit_view(state: AppState):
         style="width: 100%; padding: 1rem;"
     )
 
+# ==============================================================================
+# VIEW: INSTOCK VALIDATION (DIRECT PUTAWAY & TRANSIT TO INSTOCK)
+# ==============================================================================
+def instock_validation_view(state: AppState):
+    cur_mode = state.iv_mode()
+
+    # Dropdown Cara Alokasi
+    mode_selector = ui.div(
+        ui.div(
+            ui.div(
+                ui.span("🎯 PILIH METODE INSTOCK VALIDATION:", style="font-weight: 800; color: #1A202C; font-size: 13px; margin-bottom: 6px; display: block;"),
+                ui.tags.select(
+                    ui.tags.option("1. DIRECT PUTAWAY (DENGAN DATA SCAN)", value="DIRECT_PUTAWAY", selected=(cur_mode == "DIRECT_PUTAWAY")),
+                    ui.tags.option("2. TRANSIT TO BIN INSTOCK (GL1-INSTOCK)", value="TRANSIT_TO_INSTOCK", selected=(cur_mode == "TRANSIT_TO_INSTOCK")),
+                    id="select_iv_mode",
+                    onchange="Shiny.setInputValue('change_iv_mode', this.value, {priority: 'event'})",
+                    style="width: 100%; padding: 10px 14px; background: white; color: #1A202C; font-weight: 800; font-size: 14px; border: 2px solid #CBD5E0; border-radius: 8px; cursor: pointer; outline: none;"
+                ),
+                style="flex: 1; min-width: 260px;"
+            ),
+            ui.div(
+                ui.tags.button(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-arrows-rotate", style="margin-right: 6px;"), "REFRESH INSTOCK SUPABASE"),
+                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_refresh_iv_supabase', Math.random(), {priority: 'event'});",
+                    style="background: #EDF2F7; color: #2D3748; border: 1.5px solid #CBD5E0; padding: 10px 16px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; height: 42px; margin-top: 24px;"
+                )
+            ),
+            style="display: flex; gap: 1rem; align-items: flex-start; flex-wrap: wrap;"
+        ),
+        style="background: white; padding: 1.25rem 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+    )
+
+    # Form Aksi Berdasarkan Mode
+    if cur_mode == "DIRECT_PUTAWAY":
+        action_section = ui.div(
+            ui.h4("📥 Upload File Data Scan", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
+            ui.p("Format file wajib 3 kolom: Kolom A = BIN TUJUAN, Kolom B = SKU, Kolom C = QTY SCAN.", style="color: #718096; font-size: 12.5px; margin-bottom: 0.75rem;"),
+            custom_uploader_box("upload_iv_scan", "1. File Data Scan (Excel / CSV)"),
+            ui.div(
+                ui.tags.button(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px;"), "PROSES ALOKASI DIRECT PUTAWAY"),
+                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_run_direct_putaway', Math.random(), {priority: 'event'});",
+                    class_="btn-red-gradient"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.75rem;"
+            ),
+            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+        )
+    else:
+        action_section = ui.div(
+            ui.h4("🔄 Transit to Bin Instock (GL1-INSTOCK)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
+            ui.p("Seluruh barang Instock harian otomatis dibuatkan format mutasi ke BIN 'GL1-INSTOCK' tanpa perlu upload file scan.", style="color: #718096; font-size: 12.5px; margin-bottom: 1rem;"),
+            ui.div(
+                ui.tags.button(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-dolly", style="margin-right: 6px;"), "GENERATE MUTASI KE GL1-INSTOCK"),
+                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_run_transit_instock', Math.random(), {priority: 'event'});",
+                    class_="btn-red-gradient"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%;"
+            ),
+            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+        )
+
+    return ui.div(
+        mode_selector,
+        action_section,
+        ui.output_ui("instock_validation_results_container"),
+        style="width: 100%; padding: 1rem;"
+    )
+
 def menu_item(label: str, target_menu: str, current_menu: str):
     import re
     is_active = (current_menu == target_menu)

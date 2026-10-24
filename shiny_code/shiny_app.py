@@ -13,7 +13,7 @@ from views import (
     justification_so_view, cycle_count_view, login_page, ppa_audit_view, 
     cycle_count_analyzer_view, global_header, cross_check_real_system_view,
     balancing_stock_view, physical_inventory_list_view, validation_barcode_sku_view, percentage_display_view,excel_practice_view,
-    auditor_view, memo_pengajuan_view, warehouse_activity_monitor_view, compliance_audit_view 
+    auditor_view, memo_pengajuan_view, warehouse_activity_monitor_view, compliance_audit_view, instock_validation_view
 )
 
 app_ui = ui.page_fluid(
@@ -131,7 +131,9 @@ def server(input: Inputs, output: Outputs, session: Session):
         "warehouse-activity-monitor": "Warehouse Activity Monitor",
         "warehouse-monitoring": "Warehouse Activity Monitor",
         "ll01-monitor": "Warehouse Activity Monitor",
-        "warehouse-compliance-audit": "Warehouse Compliance Audit"
+        "warehouse-compliance-audit": "Warehouse Compliance Audit",
+        "instock-validation": "Instock Validation",
+        "instock_validation": "Instock Validation"
     }
 
     # 1. Saat menu diklik di sidebar -> URL di browser otomatis berubah
@@ -5514,6 +5516,133 @@ def server(input: Inputs, output: Outputs, session: Session):
         ui.modal_remove()
         succ, msg = state.delete_memo(m_id)
         ui.notification_show(f"🗑️ {msg}", type="message", duration=3)
+
+        @reactive.Effect
+    @reactive.event(input.change_iv_mode)
+    def _on_change_iv_mode():
+        state.iv_mode.set(input.change_iv_mode())
+        state.iv_processed.set(False)
+
+    # Listener Refresh Instock Supabase
+    @reactive.Effect
+    @reactive.event(input.btn_refresh_iv_supabase)
+    def _on_refresh_iv():
+        succ, msg = state.load_instock_daily_from_supabase()
+        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+        if succ:
+            ui.notification_show(f"✅ {msg}", type="message", duration=4)
+        else:
+            ui.notification_show(f"⚠️ {msg}", type="error", duration=4)
+
+    # Eksekusi Cara 1: Direct Putaway
+    @reactive.Effect
+    @reactive.event(input.btn_run_direct_putaway)
+    def _on_run_direct_putaway():
+        f = input.upload_iv_scan() if "upload_iv_scan" in input else None
+        if not f:
+            ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+            state.error_modal_message.set("Upload file Data Scan terlebih dahulu!")
+            state.show_error_modal.set(True)
+            return
+
+        succ, msg = state.process_direct_putaway(f)
+        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+        if succ:
+            state.show_success_modal.set(True)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+
+    # Eksekusi Cara 2: Transit Instock
+    @reactive.Effect
+    @reactive.event(input.btn_run_transit_instock)
+    def _on_run_transit_instock():
+        succ, msg = state.process_transit_to_instock()
+        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+        if succ:
+            state.show_success_modal.set(True)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+
+    # Output Container Hasil
+    @render.ui
+    def instock_validation_results_container():
+        if not state.iv_processed():
+            return ui.div()
+
+        is_direct = (state.iv_mode() == "DIRECT_PUTAWAY")
+
+        # Metrik Cards
+        if is_direct:
+            metric_ui = ui.div(
+                dark_metric_box("📦 TOTAL QTY SCAN", f"{state.iv_total_scan_qty():,} PCS", "#3182CE"),
+                dark_metric_box("✅ TERALOKASI (SET UP)", f"{state.iv_total_allocated_qty():,} PCS", "#10B981"),
+                dark_metric_box("⚠️ SISA INSTOCK", f"{state.iv_total_unallocated_instock_qty():,} PCS", "#DD6B20"),
+                dark_metric_box("❌ SCAN TANPA ALOKASI", f"{state.iv_total_unallocated_scan_qty():,} PCS", "#E53E3E"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+            )
+            tab3_content = ui.div(
+                ui.h5("1. Sisa Instock Belum Teralokasi", style="font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
+                render_clean_table(state.df_iv_sisa_instock_headers(), state.df_iv_sisa_instock_rows(), "tbl_iv_sisa_in"),
+                ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
+                ui.h5("2. Data Scan Tanpa Alokasi (Stok Kurang / Tidak Ada)", style="font-weight: 800; color: #C53030; margin-bottom: 0.5rem;"),
+                render_clean_table(state.df_iv_sisa_scan_headers(), state.df_iv_sisa_scan_rows(), "tbl_iv_sisa_sc"),
+                style="padding: 0.75rem 0;"
+            )
+        else:
+            metric_ui = ui.div(
+                dark_metric_box("📦 TOTAL BARIS MUTASI", f"{len(state.df_iv_setup_rows()):,} BARIS", "#3182CE"),
+                dark_metric_box("🚚 TOTAL QTY TRANSIT", f"{state.iv_total_allocated_qty():,} PCS", "#10B981"),
+                dark_metric_box("🎯 BIN TUJUAN", "GL1-INSTOCK", "#C5A059"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+            )
+            tab3_content = ui.div("Mode Transit to Instock memindahkan 100% data instock tanpa ada sisa.", style="color: #718096; font-style: italic; padding: 1rem;")
+
+        # Tab Paneling
+        return ui.div(
+            ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
+            ui.h4("📋 RINGKASAN HASIL INSTOCK VALIDATION", style="font-size: 16px; color: #010B13; font-weight: 800; margin-bottom: 1rem;"),
+            metric_ui,
+            ui.navset_card_tab(
+                ui.nav_panel(
+                    "📝 TAB 2: FORMAT MUTASI / SET UP",
+                    ui.div(
+                        ui.div(
+                            ui.p("Format mutasi siap upload ke Jezpro (BIN AWAL | BIN TUJUAN | SKU | QUANTITY | NOTES):", style="font-size: 13px; color: #718096; margin: 0;"),
+                            ui.download_button(
+                                "btn_dl_iv_setup",
+                                ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px;"), "DOWNLOAD TEMPLATE MUTASI (.XLSX)"),
+                                style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
+                            ),
+                            style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 8px;"
+                        ),
+                        render_clean_table(state.df_iv_setup_headers(), state.df_iv_setup_rows(), "tbl_iv_setup"),
+                        style="padding: 0.75rem 0;"
+                    )
+                ),
+                ui.nav_panel(
+                    "⚠️ TAB 3: SISA STOK & UNALLOCATED",
+                    tab3_content
+                )
+            ),
+            style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
+        )
+
+    # Download Handler Mutasi Excel
+    @render.download(
+        filename=lambda: f"TEMPLATE_MUTASI_{state.iv_mode()}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    )
+    def btn_dl_iv_setup():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_iv_setup.to_excel(writer, sheet_name='TEMPLATE_MUTASI', index=False)
+            if not state._raw_df_iv_sisa_instock.empty:
+                state._raw_df_iv_sisa_instock.to_excel(writer, sheet_name='SISA_INSTOCK', index=False)
+            if not state._raw_df_iv_sisa_scan.empty:
+                state._raw_df_iv_sisa_scan.to_excel(writer, sheet_name='SCAN_UNALLOCATED', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
 
         
 app = App(app_ui, server)
