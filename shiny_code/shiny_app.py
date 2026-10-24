@@ -4946,7 +4946,82 @@ def server(input: Inputs, output: Outputs, session: Session):
             )
         )
 
-    # 4. RENDER TAB 2: CARD MEMO DENGAN LANGSUNG 2 TOMBOL PDF
+    # ==========================================================================
+    # MODAL DETAIL RINCIAN MEMO DI WEB (AGAR BISA BUKA DETAIL)
+    # ==========================================================================
+    @reactive.Effect
+    @reactive.event(input.btn_open_memo_detail_modal)
+    def _open_memo_detail():
+        m_id = input.btn_open_memo_detail_modal()
+        target = next((m for m in state.memo_list() if m.get("id") == m_id), None)
+        if not target:
+            ui.notification_show("Data memo tidak ditemukan!", type="error")
+            return
+
+        items = target.get("items", [])
+        if isinstance(items, str):
+            import json
+            try: items = json.loads(items)
+            except: items = []
+
+        item_rows = []
+        tot_qty = 0
+        tot_sub = 0
+        for idx, it in enumerate(items, start=1):
+            q = safe_int(it.get("qty", 1), 1)
+            cogs = safe_int(it.get("cogs", it.get("harga_beli", 0)), 0)
+            subtot = safe_int(it.get("subtotal", q * cogs), q * cogs)
+            tot_qty += q
+            tot_sub += subtot
+
+            item_rows.append(ui.tags.tr(
+                ui.tags.td(str(idx), style="text-align: center; font-weight: bold;"),
+                ui.tags.td(ui.tags.code(str(it.get("sku", "-")), style="font-weight: bold; color: #2B6CB0;")),
+                ui.tags.td(str(it.get("item_name", it.get("nama", "-"))), style="max-width: 280px; white-space: normal;"),
+                ui.tags.td(str(q), style="text-align: center; font-weight: bold;"),
+                ui.tags.td(f"Rp {cogs:,}", style="text-align: right;"),
+                ui.tags.td(f"Rp {subtot:,}", style="text-align: right; font-weight: 800; color: #10B981;")
+            ))
+
+        ui.modal_show(ui.modal(
+            ui.div(
+                ui.div(
+                    ui.span(f"📄 Nomor Memo: {target.get('id')}", style="font-size: 14px; font-weight: 800; color: #1A202C; display: block;"),
+                    ui.span(f"👤 Pengaju: {target.get('diajukan_oleh')} • Divisi: {target.get('divisi', 'MARKOM')} • Tanggal: {target.get('tanggal')}", style="font-size: 12px; color: #4A5568; display: block; margin-top: 2px;"),
+                    ui.span(f"📌 Keperluan: {target.get('tujuan')}", style="font-size: 12px; font-weight: 700; color: #C53030; display: block; margin-top: 2px;"),
+                    style="background: #EDF2F7; padding: 12px 16px; border-radius: 8px; margin-bottom: 1rem;"
+                ),
+                ui.div(
+                    ui.tags.table(
+                        ui.tags.thead(ui.tags.tr(
+                            ui.tags.th("NO", style="text-align: center;"),
+                            ui.tags.th("SKU"),
+                            ui.tags.th("NAMA ARTIKEL"),
+                            ui.tags.th("QTY", style="text-align: center;"),
+                            ui.tags.th("HARGA BELI", style="text-align: right;"),
+                            ui.tags.th("SUBTOTAL", style="text-align: right;")
+                        )),
+                        ui.tags.tbody(*item_rows) if item_rows else ui.tags.tr(
+                            ui.tags.td("Rincian barang memo ini kosong.", colspan=6, style="text-align: center; padding: 1.5rem; color: #718096;")
+                        ),
+                        class_="custom-clean-table", style="width: 100%; border: 1px solid #CBD5E0; border-radius: 8px;"
+                    ),
+                    style="max-height: 400px; overflow-y: auto;"
+                ),
+                ui.div(
+                    ui.span(f"Total Qty: {tot_qty:,} Pcs | Grand Total: Rp {tot_sub:,}", style="font-weight: 800; font-size: 14px; color: #E50914;"),
+                    style="display: flex; justify-content: flex-end; margin-top: 10px;"
+                )
+            ),
+            title=f"📋 Detail Memo Pengajuan: {m_id}",
+            size="l",
+            easy_close=True,
+            footer=ui.modal_button("Tutup", class_="btn-page-nav")
+        ))
+
+    # ==========================================================================
+    # RENDER CARD MEMO DENGAN TOMBOL "DETAIL" LENGKAP
+    # ==========================================================================
     @render.ui
     def memo_history_table_ui():
         memos = state.memo_list()
@@ -4961,8 +5036,13 @@ def server(input: Inputs, output: Outputs, session: Session):
             m_id = m.get("id", "-")
             divisi = m.get("divisi", "Markom SBY")
             tujuan = m.get("tujuan", "-")
-            nominal = m.get("nominal", 0)
-            items_cnt = len(m.get("items", []))
+            nominal = safe_int(m.get("nominal", 0), 0)
+            items = m.get("items", [])
+            if isinstance(items, str):
+                import json
+                try: items = json.loads(items)
+                except: items = []
+            items_cnt = len(items)
 
             cards.append(ui.div(
                 ui.div(
@@ -4972,25 +5052,31 @@ def server(input: Inputs, output: Outputs, session: Session):
                             ui.span(f"Tanggal: {m.get('tanggal')}", style="background: #EDF2F7; color: #4A5568; font-weight: 700; font-size: 11px; padding: 2px 6px; border-radius: 4px;"),
                             style="display: flex; align-items: center; margin-bottom: 4px;"
                         ),
-                        ui.p(f"Pengaju: {m.get('diajukan_oleh')} • Divisi: {divisi} • Keterangan: {tujuan} ({items_cnt} Barang)", style="margin: 0; font-size: 12px; color: #718096;"),
+                        ui.p(f"Pengaju: {m.get('diajukan_oleh')} • Divisi: {divisi} • Keperluan: {tujuan} ({items_cnt} Barang)", style="margin: 0; font-size: 12px; color: #718096;"),
                         style="flex: 1;"
                     ),
                     ui.div(
-                        ui.span(f"Total: Rp {nominal:,}", style="font-weight: 800; font-size: 15px; color: #E50914; margin-right: 12px;"),
+                        ui.span(f"Total: Rp {nominal:,}", style="font-weight: 800; font-size: 14px; color: #E50914; margin-right: 10px;"),
                         
-                        # TOMBOL 1: MEMO KAS (PDF)
+                        # 🌟 TOMBOL BARU: BUKA DETAIL
+                        ui.tags.button(
+                            ui.tags.i(class_="fa-solid fa-eye", style="margin-right: 4px;"), "DETAIL",
+                            onclick=f"Shiny.setInputValue('btn_open_memo_detail_modal', '{m_id}', {{priority: 'event'}})",
+                            style="background: #3182CE; color: white; border: none; padding: 7px 12px; border-radius: 6px; font-weight: 800; font-size: 11.5px; cursor: pointer;"
+                        ),
+                        # TOMBOL MEMO KAS (PDF)
                         ui.tags.button(
                             ui.tags.i(class_="fa-solid fa-file-invoice-dollar", style="margin-right: 4px;"), "MEMO KAS (PDF)",
                             onclick=f"Shiny.setInputValue('btn_prepare_pdf_memo_kas', '{m_id}', {{priority: 'event'}})",
-                            style="background: linear-gradient(135deg, #E50914 0%, #B20710 100%); color: white; border: none; padding: 7px 13px; border-radius: 6px; font-weight: 800; font-size: 11.5px; cursor: pointer; box-shadow: 0 4px 10px rgba(229,9,20,0.3);"
+                            style="background: linear-gradient(135deg, #E50914 0%, #B20710 100%); color: white; border: none; padding: 7px 12px; border-radius: 6px; font-weight: 800; font-size: 11.5px; cursor: pointer;"
                         ),
-                        # TOMBOL 2: MEMO PENGAJUAN (PDF)
+                        # TOMBOL MEMO PENGAJUAN (PDF)
                         ui.tags.button(
                             ui.tags.i(class_="fa-solid fa-file-lines", style="margin-right: 4px;"), "MEMO PENGAJUAN (PDF)",
                             onclick=f"Shiny.setInputValue('btn_prepare_pdf_memo_std', '{m_id}', {{priority: 'event'}})",
-                            style="background: #2D3748; color: white; border: none; padding: 7px 13px; border-radius: 6px; font-weight: 700; font-size: 11.5px; cursor: pointer;"
+                            style="background: #2D3748; color: white; border: none; padding: 7px 12px; border-radius: 6px; font-weight: 700; font-size: 11.5px; cursor: pointer;"
                         ),
-                        # TOMBOL 3: HAPUS
+                        # TOMBOL HAPUS
                         ui.tags.button(
                             ui.tags.i(class_="fa-solid fa-trash", style="color: #E53E3E;"),
                             onclick=f"Shiny.setInputValue('btn_open_del_memo_modal', '{m_id}', {{priority: 'event'}})",
@@ -5003,10 +5089,48 @@ def server(input: Inputs, output: Outputs, session: Session):
             ))
 
         return ui.div(
-            ui.h4("📋 Riwayat Dokumen Memo (Pilih Model PDF untuk Diunduh)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 1rem;"),
+            ui.h4("📋 Riwayat Dokumen Memo", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 1rem;"),
             *cards,
             ui.output_ui("memo_pdf_downloader_container_ui")
         )
+
+    # ==========================================================================
+    # DOWNLOAD PDF AMAN (ANTI ERROR CORRUPT)
+    # ==========================================================================
+    @render.download(
+        filename=lambda: f"MEMO_KAS_{state.memo_selected_for_pdf().get('id', 'DOC').replace('/', '_')}.pdf" if state.memo_selected_for_pdf() and state.memo_selected_for_pdf().get("_pdf_mode") == "KAS" else f"MEMO_PENGAJUAN_{state.memo_selected_for_pdf().get('id', 'DOC').replace('/', '_')}.pdf"
+    )
+    def btn_dl_memo_pdf_file():
+        sel = state.memo_selected_for_pdf()
+        if not sel:
+            yield b""
+            return
+
+        import json
+        memo_clean = dict(sel)
+        # Pastikan items bertipe list
+        items = memo_clean.get("items", [])
+        if isinstance(items, str):
+            try: items = json.loads(items)
+            except: items = []
+        memo_clean["items"] = items
+
+        try:
+            if memo_clean.get("_pdf_mode") == "KAS":
+                from config import generate_memo_kas_pdf_bytes
+                content = generate_memo_kas_pdf_bytes(memo_clean)
+            else:
+                from config import generate_memo_pdf_bytes
+                content = generate_memo_pdf_bytes(memo_clean)
+
+            if content:
+                yield content
+            else:
+                yield b""
+        except Exception as e_pdf:
+            print("Gagal generate PDF memo:", e_pdf)
+            ui.notification_show(f"Gagal memproses file PDF: {e_pdf}", type="error")
+            yield b""
 
     # 5. LISTENER DOWNLOAD DUA MODEL PDF
     @reactive.Effect

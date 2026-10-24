@@ -2026,7 +2026,7 @@ def memo_pengajuan_view(state: AppState):
             ui.div(
                 ui.div(
                     ui.h4("🔄 Detail Scraping Permintaan Event (Spreadsheet)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
-                    ui.span(f"Filter: Kolom B mengandung 'EVENT' • Last Sync: {state.memo_last_sync_time()} (Auto-refresh tiap 5 menit)", style="color: #059669; font-weight: 700; font-size: 12px;"),
+                    ui.span("Filter: Kolom B mengandung 'EVENT', 'HADIAH', atau 'GIFT' • Auto-refresh tiap 5 menit", style="color: #059669; font-weight: 700; font-size: 12px;"),
                 ),
                 ui.tags.button(
                     ui.tags.span(ui.tags.i(class_="fa-solid fa-arrows-rotate", style="margin-right: 6px;"), "SYNC SPREADSHEET EVENT SEKARANG"),
