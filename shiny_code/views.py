@@ -2020,7 +2020,7 @@ def show_audit_detail_modal(target: dict):
 # VIEW: MEMO PENGAJUAN (TAB 1: DETAIL SCRAPING EVENT | TAB 2: LIST & 2 PDF)
 # ==============================================================================
 def memo_pengajuan_view(state: AppState):
-    # --- TAB 1: DETAIL SCRAPING SPREADSHEET (EVENT ONLY) ---
+    # --- TAB 1: DETAIL SCRAPING SPREADSHEET (10 DATA PER HALAMAN + DOWNLOAD) ---
     tab1_scraping_detail = ui.div(
         ui.div(
             ui.div(
@@ -2035,27 +2035,34 @@ def memo_pengajuan_view(state: AppState):
                 ),
                 style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 1.25rem 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 10px;"
             ),
-            # Wadah tabel detail scraping Event
             ui.output_ui("memo_scraped_items_detail_table_ui"),
             style="width: 100%;"
         ),
         style="padding: 0.5rem 0;"
     )
 
-    # --- TAB 2: LIST CARD MEMO DENGAN 2 TOMBOL PDF LANGSUNG ---
-    tab2_cards_download = ui.div(
-        ui.output_ui("memo_history_table_ui"),
+    # --- TAB 2: PENDING ADJUSTMENT (MEMO AKTIF + FILTER TANGGAL) ---
+    tab2_pending_memos = ui.div(
+        ui.output_ui("memo_pending_table_ui"),
+        style="padding: 0.5rem 0;"
+    )
+
+    # --- TAB 3: DONE ADJUSTMENT (RIWAYAT YANG SUDAH DIEKSEKUSI) ---
+    tab3_done_memos = ui.div(
+        ui.output_ui("memo_done_table_ui"),
         style="padding: 0.5rem 0;"
     )
 
     return ui.div(
         ui.navset_card_tab(
             ui.nav_panel("📋 1. DETAIL SCRAPING EVENT (MARKOM)", tab1_scraping_detail, value="tab_memo_scraped"),
-            ui.nav_panel("📄 2. LIST MEMO & DOWNLOAD 2 PDF", tab2_cards_download, value="tab_memo_cards"),
+            ui.nav_panel("⏳ 2. PENDING ADJUSTMENT (MEMO AKTIF)", tab2_pending_memos, value="tab_memo_pending"),
+            ui.nav_panel("✅ 3. DONE ADJUSTMENT", tab3_done_memos, value="tab_memo_done"),
             id="memo_navset"
         ),
         style="width: 100%; padding: 1rem;"
     )
+    
 # ==============================================================================
 # VIEW: WAREHOUSE ACTIVITY MONITOR (3 TAB LENGKAP: STAGING, TF, & ADJUSTMENT)
 # ==============================================================================

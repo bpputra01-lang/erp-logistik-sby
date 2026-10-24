@@ -526,7 +526,10 @@ class AppState:
         self.memo_current_items = reactive.Value([])    # List item barang di form draft
         self.memo_selected_for_pdf = reactive.Value(None)
         self.memo_scraped_event_items = reactive.Value([]) # [BARU] Rincian detail item hasil scraping Event
-        self.memo_last_sync_time = reactive.Value("-")     # [BARU] Waktu sync terakhir
+        self.memo_last_sync_time = reactive.Value("-")  
+        # --- STATE TAMBAHAN MEMO PENGAJUAN ---
+        self.memo_filter_tgl_start = reactive.Value("")
+        self.memo_filter_tgl_end = reactive.Value("")   # [BARU] Waktu sync terakhir
 
         # Tambahkan 2 baris ini di dalam def __init__(self):
         self.pd_selected_branch = reactive.Value("JEZ SURABAYA")
@@ -7014,3 +7017,92 @@ class AppState:
             cur_list = [m for m in self.memo_list() if m.get("id") != memo_id]
             self.memo_list.set(cur_list)
             return True, f"Memo {memo_id} berhasil dihapus!"
+
+# ==========================================================================
+    # LOGIKA WORKFLOW STATUS ADJUSTMENT MEMO (TAB 2 & TAB 3)
+    # ==========================================================================
+    def get_pending_memos(self):
+        """Mengambil memo yang BELUM di-adjustment (Pending) sesuai filter tanggal"""
+        memos = self.memo_list()
+        start = str(self.memo_filter_tgl_start()).strip()
+        end = str(self.memo_filter_tgl_end()).strip()
+
+        res = []
+        for m in memos:
+            st = str(m.get("status_adj", "PENDING")).upper().strip()
+            if st == "DONE":
+                continue  # Lewati yang sudah selesai
+
+            tgl = str(m.get("tanggal", ""))[:10]
+            if start and tgl < start:
+                continue
+            if end and tgl > end:
+                continue
+            res.append(m)
+        return res
+
+    def get_done_memos(self):
+        """Mengambil memo yang SUDAH di-adjustment (Done) sesuai filter tanggal"""
+        memos = self.memo_list()
+        start = str(self.memo_filter_tgl_start()).strip()
+        end = str(self.memo_filter_tgl_end()).strip()
+
+        res = []
+        for m in memos:
+            st = str(m.get("status_adj", "PENDING")).upper().strip()
+            if st != "DONE":
+                continue  # Hanya yang sudah selesai
+
+            tgl = str(m.get("tanggal", ""))[:10]
+            if start and tgl < start:
+                continue
+            if end and tgl > end:
+                continue
+            res.append(m)
+        return res
+
+    def mark_memo_adjustment_done(self, memo_id: str):
+        """Pindahkan memo ke Tab 3 (Done Adjustment) dan update Supabase"""
+        try:
+            memos = list(self.memo_list())
+            now_done = datetime.now().strftime("%Y-%m-%d %H:%M")
+            for m in memos:
+                if m.get("id") == memo_id:
+                    m["status_adj"] = "DONE"
+                    m["done_at"] = now_done
+                    break
+
+            # Update ke Supabase
+            client = get_supabase()
+            if client:
+                client.table("memo_pengajuan").update({
+                    "status_adj": "DONE",
+                    "done_at": now_done
+                }).eq("id", memo_id).execute()
+
+            self.memo_list.set(memos)
+            return True, f"Memo {memo_id} berhasil ditandai DONE ADJUSTMENT dan dipindahkan ke Tab 3!"
+        except Exception as e:
+            return False, f"Gagal update status: {e}"
+
+    def revert_memo_adjustment(self, memo_id: str):
+        """Kembalikan memo dari Tab 3 ke Tab 2 (Pending)"""
+        try:
+            memos = list(self.memo_list())
+            for m in memos:
+                if m.get("id") == memo_id:
+                    m["status_adj"] = "PENDING"
+                    m["done_at"] = None
+                    break
+
+            client = get_supabase()
+            if client:
+                client.table("memo_pengajuan").update({
+                    "status_adj": "PENDING",
+                    "done_at": None
+                }).eq("id", memo_id).execute()
+
+            self.memo_list.set(memos)
+            return True, f"Memo {memo_id} dikembalikan ke Tab 2 (Pending Adjustment)!"
+        except Exception as e:
+            return False, f"Gagal mengembalikan memo: {e}"
