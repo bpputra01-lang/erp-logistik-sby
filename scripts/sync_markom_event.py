@@ -18,7 +18,6 @@ HEADERS = {
     "Prefer": "return=representation"
 }
 
-# 🌟 PERBAIKAN FATAL: safe_int yang TIDAK merusak angka float (1.0 tetap 1, BUKAN 10)
 def safe_int(val, default=0):
     try:
         if pd.isna(val) or val is None:
@@ -26,7 +25,6 @@ def safe_int(val, default=0):
         if isinstance(val, (int, float)):
             return int(round(val))
         s = str(val).replace("Rp", "").strip()
-        # Jika format angka menggunakan koma desimal, ubah ke titik
         if "," in s and "." in s:
             s = s.replace(".", "").replace(",", ".")
         elif "," in s:
@@ -35,21 +33,8 @@ def safe_int(val, default=0):
     except Exception:
         return default
 
-# 🌟 POIN 1: FUNGSI HAPUS SEMUA DATA LAMA DI SUPABASE
-def clear_all_supabase_memos():
-    print("🧹 [POIN 1] Menghapus seluruh data memo lama di Supabase agar bersih...")
-    try:
-        url_del = f"{SUPABASE_URL}/rest/v1/memo_pengajuan?id=not.is.null"
-        res = requests.delete(url_del, headers=HEADERS)
-        if res.status_code in [200, 204]:
-            print("✅ Seluruh data memo lama di Supabase BERHASIL DIKOSONGKAN!")
-        else:
-            print(f"⚠️ Respon hapus: {res.status_code} - {res.text}")
-    except Exception as e:
-        print(f"⚠️ Gagal menghapus database lama: {e}")
-
 def get_stock_cache():
-    """Tarik master harga beli satuan dan nama barang dari Supabase"""
+    """Tarik master harga beli dan nama barang dari Supabase"""
     lookup = {}
     try:
         url = f"{SUPABASE_URL}/rest/v1/stock_live_cache?select=*"
@@ -71,13 +56,30 @@ def get_stock_cache():
         print(f"⚠️ Gagal load stock_live_cache: {e}")
     return lookup
 
+def get_existing_database_memos():
+    """Mengambil memo yang sudah ada di Supabase untuk dicek statusnya"""
+    existing_map = {}
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/memo_pengajuan?select=id,tanggal,tujuan,status_adj,nominal"
+        res = requests.get(url, headers=HEADERS, timeout=30)
+        if res.status_code == 200:
+            for m in res.json():
+                tgl = str(m.get("tanggal", ""))[:10]
+                tujuan = str(m.get("tujuan", "")).strip().upper()
+                # Kunci unik: (tanggal, nama_tujuan)
+                existing_map[(tgl, tujuan)] = m
+    except Exception as e:
+        print(f"⚠️ Gagal membaca memo eksisting: {e}")
+    return existing_map
+
 def run_sync():
     if not SPREADSHEET_URL:
         print("❌ SPREADSHEET_URL belum diatur!")
         return
 
-    # Jalankan pembersihan data lama di awal
-    clear_all_supabase_memos()
+    # 🌟 1. AMBIL DATA MEMO DI SUPABASE LEBIH DULU UNTUK PENGECEKAN ANTI-DUPLIKASI
+    existing_db_memos = get_existing_database_memos()
+    print(f"📂 Ditemukan {len(existing_db_memos)} riwayat memo yang sudah tercatat di database.")
 
     download_url = SPREADSHEET_URL
     match = re.search(r'/spreadsheets/d/([a-zA-Z0-9-_]+)', SPREADSHEET_URL)
@@ -89,8 +91,6 @@ def run_sync():
     try:
         xl = pd.ExcelFile(download_url)
         all_sheets = xl.sheet_names
-        print(f"📑 Daftar Sheet: {all_sheets}")
-
         target_sheet = None
         for s in all_sheets:
             if "PERMINTAAN MARKOM" in s.strip().upper():
@@ -100,7 +100,7 @@ def run_sync():
         if not target_sheet:
             target_sheet = all_sheets[1] if len(all_sheets) > 1 else all_sheets[0]
 
-        print(f"🎯 MEMBACA SHEET: '{target_sheet}'")
+        print(f"🎯 Membaca Sheet: '{target_sheet}'")
         df = xl.parse(target_sheet)
 
     except Exception as e:
@@ -111,13 +111,7 @@ def run_sync():
         print("⚠️ Sheet kosong atau kolom kurang!")
         return
 
-    # 🌟 POIN 5: PEMETAAN KOLOM RESMI SESUAI URUTAN ANDA (KOLOM A S/D P)
-    # Col 0 (A): PIC
-    # Col 1 (B): NOTE MARKOM (ops)
-    # Col 2 (C): SKU
-    # Col 3 (D): QTY
-    # Col 12 (M): TANGGAL REQ
-    # Col 14 (O): BIN PICK
+    # Pemetaan Kolom A s/d P
     col_pic = df.columns[0]
     col_note = df.columns[1]
     col_sku = df.columns[2]
@@ -125,36 +119,32 @@ def run_sync():
     col_tgl = df.columns[12] if df.shape[1] > 12 else df.columns[-2]
     col_bin = df.columns[14] if df.shape[1] > 14 else df.columns[-1]
 
-    # Filter kata kunci Kolom B
+    # Filter Baris EVENT, HADIAH, GIFT
     KEYWORDS = ["EVENT", "HADIAH", "GIFT"]
     pattern = "|".join(KEYWORDS)
     mask = df[col_note].fillna("").astype(str).str.contains(pattern, case=False, na=False)
     df_filtered = df[mask].copy()
 
     if df_filtered.empty:
-        print("ℹ️ Tidak ditemukan baris EVENT, HADIAH, atau GIFT.")
+        print("ℹ️ Tidak ada baris EVENT, HADIAH, atau GIFT.")
         return
 
-    print(f"✅ Ditemukan {len(df_filtered)} baris permintaan barang!")
     stock_lookup = get_stock_cache()
 
-    # 🌟 POIN 3: PENGELOMPOKAN BERDASARKAN (TANGGAL PENGAJUAN & NOTE MARKOM)
+    # Grouping Data: (Tanggal Pengajuan, Note Markom)
     grouped_events = {}
 
     for row_idx, (_, r) in enumerate(df_filtered.iterrows(), start=1):
         pic_val = str(r[col_pic]).strip() if pd.notna(r[col_pic]) else "MARKOM"
         note_val = str(r[col_note]).strip().upper() if pd.notna(r[col_note]) else "EVENT"
 
-        # Tanggal Pengajuan (YYYY-MM-DD)
         raw_tgl = str(r[col_tgl]).strip() if pd.notna(r[col_tgl]) else ""
         tgl_val = raw_tgl[:10] if len(raw_tgl) >= 10 else datetime.now().strftime("%Y-%m-%d")
 
-        # SKU
         sku_val = str(r[col_sku]).split('.')[0].strip().upper() if pd.notna(r[col_sku]) else ""
         if not sku_val or sku_val in ["", "NAN", "NONE", "SKU"]:
             continue
 
-        # 🌟 POIN 4: QTY AKURAT 100% (Tidak melonjak)
         qty_val = safe_int(r[col_qty], 1)
         bin_val = str(r[col_bin]).strip() if pd.notna(r[col_bin]) else "GL1-DC-OUT"
 
@@ -176,7 +166,6 @@ def run_sync():
             "subtotal": subtotal
         }
 
-        # Kunci Pengelompokan: (Tanggal Pengajuan, Note Markom)
         group_key = (tgl_val, note_val)
         if group_key not in grouped_events:
             grouped_events[group_key] = {
@@ -185,36 +174,72 @@ def run_sync():
             }
         grouped_events[group_key]["items"].append(item_entry)
 
-    # Simpan Hasil Grouping ke Supabase
-    memos_payload = []
+    # 🌟 2. LOGIKA SINKRONISASI PINTAR (ANTI SCRAPING ULANG)
+    new_memos_to_insert = []
+    skipped_count = 0
+
     for (tgl_doc, event_name), grp_data in grouped_events.items():
         items_list = grp_data["items"]
         pic_doc = grp_data["pic"]
         tot_nom = sum(x["subtotal"] for x in items_list)
 
+        db_match_key = (tgl_doc, event_name)
+
+        # CEK 1: APAKAH TANGGAL & ACARA INI SUDAH ADA DI DATABASE?
+        if db_match_key in existing_db_memos:
+            exist = existing_db_memos[db_match_key]
+            st = str(exist.get("status_adj", "PENDING")).upper()
+
+            # JIKA SUDAH SELESAI (DONE ADJUSTMENT) -> JANGAN PERNAH DI-SCRAPE ULANG!
+            if st == "DONE":
+                print(f"⏩ [SKIP] Tgl {tgl_doc} - '{event_name}' SUDAH DONE ADJUSTMENT. Tidak di-scrape ulang.")
+                skipped_count += 1
+                continue
+
+            # JIKA MASIH PENDING & JUMLAH NOMINAL PERSIS SAMA -> LEWATI (HEMAT KUOTA)
+            if exist.get("nominal") == tot_nom:
+                print(f"⏩ [SKIP] Tgl {tgl_doc} - '{event_name}' sudah ada di database dan datanya identik.")
+                skipped_count += 1
+                continue
+
+            # JIKA MASIH PENDING TAPI ADA TAMBAHAN BARANG DI GOOGLE SHEET -> UPDATE
+            print(f"🔄 [UPDATE] Tgl {tgl_doc} - '{event_name}' diperbarui dengan {len(items_list)} barang...")
+            url_update = f"{SUPABASE_URL}/rest/v1/memo_pengajuan?id=eq.{exist['id']}"
+            requests.patch(url_update, headers=HEADERS, json={
+                "nominal": tot_nom,
+                "diajukan_oleh": pic_doc,
+                "items": items_list
+            })
+            continue
+
+        # CEK 2: JIKA BENAR-BENAR BARU -> BUATKAN MEMO BARU
         memo_id = f"MEMO/ZKN/{tgl_doc.replace('-', '')}/{random.randint(100, 999)}"
-        memos_payload.append({
+        new_memos_to_insert.append({
             "id": memo_id,
             "tanggal": tgl_doc,
             "divisi": "MARKOM",
             "jenis": "Pengajuan Adjustment untuk Hadiah",
-            "tujuan": event_name,  # Murni nama note (tidak ada teks dobel)
+            "tujuan": event_name,
             "nominal": tot_nom,
             "diajukan_oleh": pic_doc,
             "diproses_oleh": "Tim Purchasing",
             "diperiksa_oleh": "Tim Finance",
+            "status_adj": "PENDING",
             "items": items_list
         })
 
-    if memos_payload:
+    # Simpan hanya memo yang benar-benar baru
+    if new_memos_to_insert:
         url_insert = f"{SUPABASE_URL}/rest/v1/memo_pengajuan"
-        res_insert = requests.post(url_insert, headers=HEADERS, json=memos_payload)
+        res_insert = requests.post(url_insert, headers=HEADERS, json=new_memos_to_insert)
         if res_insert.status_code in [200, 201]:
-            print(f"🚀 BERHASIL MEMBUAT {len(memos_payload)} KELOMPOK MEMO RESMI DI SUPABASE!")
-            for m in memos_payload:
-                print(f"   ➔ [{m['id']}] Tgl: {m['tanggal']} | Note: {m['tujuan']} | {len(m['items'])} Barang | Total: Rp {m['nominal']:,}")
+            print(f"🚀 BERHASIL MEMBUAT {len(new_memos_to_insert)} MEMO BARU DI SUPABASE!")
+            for m in new_memos_to_insert:
+                print(f"   ➔ [{m['id']}] Tgl: {m['tanggal']} | {m['tujuan']} (Rp {m['nominal']:,})")
         else:
-            print(f"❌ Gagal insert memo: {res_insert.text}")
+            print(f"❌ Gagal insert: {res_insert.text}")
+    else:
+        print(f"✅ Selesai! Tidak ada data baru ({skipped_count} tanggal/memo lama berhasil dilewati).")
 
 if __name__ == "__main__":
     run_sync()
