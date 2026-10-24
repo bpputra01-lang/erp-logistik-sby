@@ -112,9 +112,9 @@ def create_jezpro_session():
 # 4. SCRAPING DATA INSTOCK (KHUSUS SURABAYA HARI INI)
 # ==============================================================================
 def fetch_instock_daily_surabaya(session):
-    now_wib = datetime.now(timezone(timedelta(hours=7)))
-    today_str = now_wib.strftime("%Y-%m-%d")
-    date_range = f"{today_str}|{today_str}"
+    yesterday_wib = now_wib - timedelta(days=1)
+    yesterday_str = yesterday_wib.strftime("%Y-%m-%d")
+    date_range = f"{yesterday_str}|{yesterday_str}"
 
     print(f"📥 [2/3] Menarik data Stock Tracking INSTOCK untuk {BRANCH_NAME} (Tanggal: {today_str})...")
 
