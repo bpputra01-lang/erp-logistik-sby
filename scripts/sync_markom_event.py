@@ -57,16 +57,15 @@ def get_stock_cache():
     return lookup
 
 def get_existing_database_memos():
-    """Mengambil memo yang sudah ada di Supabase untuk dicek statusnya"""
+    """Mengambil memo yang sudah ada di Supabase secara aman (select=*)"""
     existing_map = {}
     try:
-        url = f"{SUPABASE_URL}/rest/v1/memo_pengajuan?select=id,tanggal,tujuan,status_adj,nominal"
+        url = f"{SUPABASE_URL}/rest/v1/memo_pengajuan?select=*"
         res = requests.get(url, headers=HEADERS, timeout=30)
         if res.status_code == 200:
             for m in res.json():
                 tgl = str(m.get("tanggal", ""))[:10]
                 tujuan = str(m.get("tujuan", "")).strip().upper()
-                # Kunci unik: (tanggal, nama_tujuan)
                 existing_map[(tgl, tujuan)] = m
     except Exception as e:
         print(f"⚠️ Gagal membaca memo eksisting: {e}")
@@ -77,7 +76,6 @@ def run_sync():
         print("❌ SPREADSHEET_URL belum diatur!")
         return
 
-    # 🌟 1. AMBIL DATA MEMO DI SUPABASE LEBIH DULU UNTUK PENGECEKAN ANTI-DUPLIKASI
     existing_db_memos = get_existing_database_memos()
     print(f"📂 Ditemukan {len(existing_db_memos)} riwayat memo yang sudah tercatat di database.")
 
@@ -101,7 +99,8 @@ def run_sync():
             target_sheet = all_sheets[1] if len(all_sheets) > 1 else all_sheets[0]
 
         print(f"🎯 Membaca Sheet: '{target_sheet}'")
-        df = xl.parse(target_sheet)
+        # 🌟 PERBAIKAN: Menggunakan pd.read_excel agar tidak memicu Pandas4Warning
+        df = pd.read_excel(xl, sheet_name=target_sheet)
 
     except Exception as e:
         print(f"❌ Gagal membaca sheet: {e}")
@@ -174,7 +173,7 @@ def run_sync():
             }
         grouped_events[group_key]["items"].append(item_entry)
 
-    # 🌟 2. LOGIKA SINKRONISASI PINTAR (ANTI SCRAPING ULANG)
+    # Sinkronisasi Pintar (Anti Scraping Ulang)
     new_memos_to_insert = []
     skipped_count = 0
 
@@ -185,34 +184,32 @@ def run_sync():
 
         db_match_key = (tgl_doc, event_name)
 
-        # CEK 1: APAKAH TANGGAL & ACARA INI SUDAH ADA DI DATABASE?
         if db_match_key in existing_db_memos:
             exist = existing_db_memos[db_match_key]
             st = str(exist.get("status_adj", "PENDING")).upper()
 
-            # JIKA SUDAH SELESAI (DONE ADJUSTMENT) -> JANGAN PERNAH DI-SCRAPE ULANG!
+            # Lewati jika sudah selesai di-adjustment
             if st == "DONE":
-                print(f"⏩ [SKIP] Tgl {tgl_doc} - '{event_name}' SUDAH DONE ADJUSTMENT. Tidak di-scrape ulang.")
+                print(f"⏩ [SKIP] Tgl {tgl_doc} - '{event_name}' SUDAH DONE ADJUSTMENT.")
                 skipped_count += 1
                 continue
 
-            # JIKA MASIH PENDING & JUMLAH NOMINAL PERSIS SAMA -> LEWATI (HEMAT KUOTA)
             if exist.get("nominal") == tot_nom:
-                print(f"⏩ [SKIP] Tgl {tgl_doc} - '{event_name}' sudah ada di database dan datanya identik.")
+                print(f"⏩ [SKIP] Tgl {tgl_doc} - '{event_name}' identik (tidak ada perubahan).")
                 skipped_count += 1
                 continue
 
-            # JIKA MASIH PENDING TAPI ADA TAMBAHAN BARANG DI GOOGLE SHEET -> UPDATE
+            # Update jika ada perubahan data
             print(f"🔄 [UPDATE] Tgl {tgl_doc} - '{event_name}' diperbarui dengan {len(items_list)} barang...")
             url_update = f"{SUPABASE_URL}/rest/v1/memo_pengajuan?id=eq.{exist['id']}"
-            requests.patch(url_update, headers=HEADERS, json={
+            update_payload = {
                 "nominal": tot_nom,
                 "diajukan_oleh": pic_doc,
                 "items": items_list
-            })
+            }
+            requests.patch(url_update, headers=HEADERS, json=update_payload)
             continue
 
-        # CEK 2: JIKA BENAR-BENAR BARU -> BUATKAN MEMO BARU
         memo_id = f"MEMO/ZKN/{tgl_doc.replace('-', '')}/{random.randint(100, 999)}"
         new_memos_to_insert.append({
             "id": memo_id,
@@ -228,10 +225,17 @@ def run_sync():
             "items": items_list
         })
 
-    # Simpan hanya memo yang benar-benar baru
     if new_memos_to_insert:
         url_insert = f"{SUPABASE_URL}/rest/v1/memo_pengajuan"
         res_insert = requests.post(url_insert, headers=HEADERS, json=new_memos_to_insert)
+
+        # 🌟 PELINDUNG OTOMATIS: Jika kolom status_adj belum sempat ditambahkan di SQL Supabase
+        if res_insert.status_code not in [200, 201] and "status_adj" in res_insert.text:
+            print("⚠️ Kolom 'status_adj' belum dibuat di database, mencoba insert tanpa kolom tersebut...")
+            for m in new_memos_to_insert:
+                m.pop("status_adj", None)
+            res_insert = requests.post(url_insert, headers=HEADERS, json=new_memos_to_insert)
+
         if res_insert.status_code in [200, 201]:
             print(f"🚀 BERHASIL MEMBUAT {len(new_memos_to_insert)} MEMO BARU DI SUPABASE!")
             for m in new_memos_to_insert:
