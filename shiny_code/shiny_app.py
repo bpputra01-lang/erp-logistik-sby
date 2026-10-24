@@ -4938,10 +4938,10 @@ def server(input: Inputs, output: Outputs, session: Session):
             ),
             ui.div(
                 ui.div(
-                    ui.h4("📋 Daftar Rincian Barang Hasil Scraping", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0;"),
+                    ui.h4("📋 Daftar Rincian Barang Markom", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0;"),
                     ui.download_button(
                         "btn_dl_memo_scraped_excel",
-                        ui.tags.span(ui.tags.i(class_="fa-solid fa-file-excel", style="margin-right: 6px; font-size: 13px;"), "DOWNLOAD EXCEL SCRAPING (.XLSX)"),
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-file-excel", style="margin-right: 6px; font-size: 13px;"), "DOWNLOAD EXCEL (.XLSX)"),
                         style="background: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 7px 14px; cursor: pointer; font-size: 12px;"
                     ),
                     style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 8px;"
