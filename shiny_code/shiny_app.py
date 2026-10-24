@@ -5239,7 +5239,6 @@ def server(input: Inputs, output: Outputs, session: Session):
         if hasattr(state, "mark_memo_adjustment_done"):
             succ, msg = state.mark_memo_adjustment_done(m_id)
         else:
-            # Fallback jika fungsi di state belum dipasang
             try:
                 memos = list(state.memo_list())
                 now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -5250,7 +5249,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                         break
                 client = get_supabase()
                 if client:
-                    client.table("memo_pengajuan").update({"status_adj": "DONE", "done_at": now_str}).eq("id", m_id).execute()
+                    client.table("memo_pengajuan").update({"status_adj": "DONE", "done_at": now_str}).in_("id", [m_id]).execute()
                 state.memo_list.set(memos)
                 succ, msg = True, f"Memo {m_id} berhasil dipindahkan ke Tab 3 (Done)!"
             except Exception as e:
@@ -5278,7 +5277,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                         break
                 client = get_supabase()
                 if client:
-                    client.table("memo_pengajuan").update({"status_adj": "PENDING", "done_at": None}).eq("id", m_id).execute()
+                    client.table("memo_pengajuan").update({"status_adj": "PENDING", "done_at": None}).in_("id", [m_id]).execute()
                 state.memo_list.set(memos)
                 succ, msg = True, f"Memo {m_id} dikembalikan ke Tab 2 (Pending)!"
             except Exception as e:

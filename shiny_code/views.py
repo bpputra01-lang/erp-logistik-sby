@@ -2055,14 +2055,14 @@ def memo_pengajuan_view(state: AppState):
 
     return ui.div(
         ui.navset_card_tab(
-            ui.nav_panel("📋 1. DETAIL SCRAPING EVENT (MARKOM)", tab1_scraping_detail, value="tab_memo_scraped"),
-            ui.nav_panel("⏳ 2. PENDING ADJUSTMENT (MEMO AKTIF)", tab2_pending_memos, value="tab_memo_pending"),
+            ui.nav_panel("📋 1. DETAIL PERMINTAAN HADIAH & EVENT (MARKOM)", tab1_scraping_detail, value="tab_memo_scraped"),
+            ui.nav_panel("⏳ 2. MEMO KAS (NEED CONFIRMATION)", tab2_pending_memos, value="tab_memo_pending"),
             ui.nav_panel("✅ 3. DONE ADJUSTMENT", tab3_done_memos, value="tab_memo_done"),
             id="memo_navset"
         ),
         style="width: 100%; padding: 1rem;"
     )
-    
+
 # ==============================================================================
 # VIEW: WAREHOUSE ACTIVITY MONITOR (3 TAB LENGKAP: STAGING, TF, & ADJUSTMENT)
 # ==============================================================================

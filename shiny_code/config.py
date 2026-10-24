@@ -64,6 +64,11 @@ class SimpleSupabaseTable:
         self.params.append(f"{column}=in.({val_str})")
         return self
 
+    # 🌟 TAMBAHKAN INI DI BAWAH def in_ :
+    def eq(self, column, value):
+        self.params.append(f"{column}=eq.{value}")
+        return self
+
     def execute(self):
         full_url = self.url
         if self.params:

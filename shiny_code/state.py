@@ -7072,13 +7072,13 @@ class AppState:
                     m["done_at"] = now_done
                     break
 
-            # Update ke Supabase
+            # 🌟 Gunakan in_ agar 100% kompatibel dengan SimpleSupabaseTable
             client = get_supabase()
             if client:
                 client.table("memo_pengajuan").update({
                     "status_adj": "DONE",
                     "done_at": now_done
-                }).eq("id", memo_id).execute()
+                }).in_("id", [memo_id]).execute()
 
             self.memo_list.set(memos)
             return True, f"Memo {memo_id} berhasil ditandai DONE ADJUSTMENT dan dipindahkan ke Tab 3!"
@@ -7100,7 +7100,7 @@ class AppState:
                 client.table("memo_pengajuan").update({
                     "status_adj": "PENDING",
                     "done_at": None
-                }).eq("id", memo_id).execute()
+                }).in_("id", [memo_id]).execute()
 
             self.memo_list.set(memos)
             return True, f"Memo {memo_id} dikembalikan ke Tab 2 (Pending Adjustment)!"
