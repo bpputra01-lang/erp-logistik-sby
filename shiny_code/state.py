@@ -6961,24 +6961,41 @@ class AppState:
             return False, f"Gagal sinkronisasi: {str(e)}"
 
     def load_memo_data(self):
-        """Memuat riwayat memo dari tabel Supabase memo_pengajuan"""
+        """Memuat riwayat memo dari Supabase dan menggabungkan SEMUA item ke Tab 1"""
         try:
+            import json
             client = get_supabase()
             if client:
                 res = client.table("memo_pengajuan").select("*").order("tanggal", desc=True).execute()
                 if res and hasattr(res, 'data') and res.data:
-                    self.memo_list.set(res.data)
-                    
-                    # Otomatis isi Tab 1 (Detail Scraping) dari memo event terbaru
-                    latest_memo = res.data[0]
-                    items = latest_memo.get("items", [])
-                    if isinstance(items, str):
-                        try: items = json.loads(items)
-                        except Exception: items = []
-                    
-                    if items:
-                        self.memo_scraped_event_items.set(items)
-                        self.memo_last_sync_time.set(datetime.now().strftime("%d/%m/%Y %H:%M") + " WIB")
+                    sanitized_memos = []
+                    all_scraped_items = []  # 🌟 Wadah untuk menampung SEMUA item dari SEMUA memo
+
+                    for m in res.data:
+                        items = m.get("items", [])
+                        if isinstance(items, str):
+                            try:
+                                items = json.loads(items)
+                            except Exception:
+                                items = []
+                        m["items"] = items
+                        sanitized_memos.append(m)
+
+                        # 🌟 GABUNGKAN SEMUA BARANG DARI SETIAP MEMO KE TAB 1
+                        if isinstance(items, list):
+                            for it in items:
+                                it_entry = dict(it)
+                                # Tambahkan info nomor memo jika belum ada
+                                if "memo_id" not in it_entry:
+                                    it_entry["memo_id"] = m.get("id", "-")
+                                all_scraped_items.append(it_entry)
+
+                    # Simpan list memo untuk Tab 2
+                    self.memo_list.set(sanitized_memos)
+
+                    # 🌟 TAB 1 SEKARANG BERISI SELURUH ITEM DARI SEMUA ACARA / SPREADSHEET
+                    self.memo_scraped_event_items.set(all_scraped_items)
+                    self.memo_last_sync_time.set(datetime.now().strftime("%d/%m/%Y %H:%M") + " WIB")
                 else:
                     self.memo_list.set([])
                     self.memo_scraped_event_items.set([])
