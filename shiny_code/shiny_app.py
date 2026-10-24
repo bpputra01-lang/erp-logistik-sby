@@ -1026,6 +1026,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         elif content_type in ["memo_pengajuan", "memo-pengajuan"]: page_content = memo_pengajuan_view(state)
         elif content_type == "warehouse_activity_monitor": page_content = warehouse_activity_monitor_view(state)
         elif content_type == "compliance_audit": page_content = compliance_audit_view(state)  # <-- TAMBAHKAN ROUTE INI
+        elif content_type in ["instock_validation", "instock-validation"]: page_content = instock_validation_view(state)
         elif content_type == "access_denied":
             page_content = ui.div(ui.h2("⛔ Akses Ditolak", style="font-size: 28px; color: #E53E3E; font-weight: bold;"), ui.p("Maaf, halaman ini dibatasi hak aksesnya.", style="color: #718096; font-size: 15px;"), style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;")
         else:
