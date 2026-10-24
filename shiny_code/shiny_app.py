@@ -5517,7 +5517,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         succ, msg = state.delete_memo(m_id)
         ui.notification_show(f"🗑️ {msg}", type="message", duration=3)
 
-        @reactive.Effect
+    @reactive.Effect
     @reactive.event(input.change_iv_mode)
     def _on_change_iv_mode():
         state.iv_mode.set(input.change_iv_mode())
