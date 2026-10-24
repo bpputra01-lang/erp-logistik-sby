@@ -4947,7 +4947,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         )
 
     # ==========================================================================
-    # MODAL DETAIL RINCIAN MEMO DI WEB (AGAR BISA BUKA DETAIL)
+    # MODAL BUKA DETAIL MEMO DI WEB
     # ==========================================================================
     @reactive.Effect
     @reactive.event(input.btn_open_memo_detail_modal)
@@ -4968,16 +4968,16 @@ def server(input: Inputs, output: Outputs, session: Session):
         tot_qty = 0
         tot_sub = 0
         for idx, it in enumerate(items, start=1):
-            q = safe_int(it.get("qty", 1), 1)
-            cogs = safe_int(it.get("cogs", it.get("harga_beli", 0)), 0)
-            subtot = safe_int(it.get("subtotal", q * cogs), q * cogs)
+            q = int(it.get("qty", 1))
+            cogs = int(it.get("cogs", 0))
+            subtot = q * cogs
             tot_qty += q
             tot_sub += subtot
 
             item_rows.append(ui.tags.tr(
                 ui.tags.td(str(idx), style="text-align: center; font-weight: bold;"),
                 ui.tags.td(ui.tags.code(str(it.get("sku", "-")), style="font-weight: bold; color: #2B6CB0;")),
-                ui.tags.td(str(it.get("item_name", it.get("nama", "-"))), style="max-width: 280px; white-space: normal;"),
+                ui.tags.td(str(it.get("item_name", "-")), style="max-width: 280px; white-space: normal;"),
                 ui.tags.td(str(q), style="text-align: center; font-weight: bold;"),
                 ui.tags.td(f"Rp {cogs:,}", style="text-align: right;"),
                 ui.tags.td(f"Rp {subtot:,}", style="text-align: right; font-weight: 800; color: #10B981;")
@@ -4987,7 +4987,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             ui.div(
                 ui.div(
                     ui.span(f"📄 Nomor Memo: {target.get('id')}", style="font-size: 14px; font-weight: 800; color: #1A202C; display: block;"),
-                    ui.span(f"👤 Pengaju: {target.get('diajukan_oleh')} • Divisi: {target.get('divisi', 'MARKOM')} • Tanggal: {target.get('tanggal')}", style="font-size: 12px; color: #4A5568; display: block; margin-top: 2px;"),
+                    ui.span(f"👤 Pengaju: {target.get('diajukan_oleh')} • Tanggal: {target.get('tanggal')}", style="font-size: 12px; color: #4A5568; display: block; margin-top: 2px;"),
                     ui.span(f"📌 Keperluan: {target.get('tujuan')}", style="font-size: 12px; font-weight: 700; color: #C53030; display: block; margin-top: 2px;"),
                     style="background: #EDF2F7; padding: 12px 16px; border-radius: 8px; margin-bottom: 1rem;"
                 ),
@@ -5002,7 +5002,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                             ui.tags.th("SUBTOTAL", style="text-align: right;")
                         )),
                         ui.tags.tbody(*item_rows) if item_rows else ui.tags.tr(
-                            ui.tags.td("Rincian barang memo ini kosong.", colspan=6, style="text-align: center; padding: 1.5rem; color: #718096;")
+                            ui.tags.td("Rincian barang kosong.", colspan=6, style="text-align: center; padding: 1.5rem; color: #718096;")
                         ),
                         class_="custom-clean-table", style="width: 100%; border: 1px solid #CBD5E0; border-radius: 8px;"
                     ),
@@ -5020,7 +5020,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         ))
 
     # ==========================================================================
-    # RENDER CARD MEMO DENGAN TOMBOL "DETAIL" LENGKAP
+    # CARD MEMO DENGAN TOMBOL "DETAIL" & PERBAIKAN TEKS DOBEL
     # ==========================================================================
     @render.ui
     def memo_history_table_ui():
@@ -5034,9 +5034,9 @@ def server(input: Inputs, output: Outputs, session: Session):
         cards = []
         for m in memos:
             m_id = m.get("id", "-")
-            divisi = m.get("divisi", "Markom SBY")
+            divisi = m.get("divisi", "MARKOM")
             tujuan = m.get("tujuan", "-")
-            nominal = safe_int(m.get("nominal", 0), 0)
+            nominal = int(m.get("nominal", 0))
             items = m.get("items", [])
             if isinstance(items, str):
                 import json
@@ -5052,13 +5052,14 @@ def server(input: Inputs, output: Outputs, session: Session):
                             ui.span(f"Tanggal: {m.get('tanggal')}", style="background: #EDF2F7; color: #4A5568; font-weight: 700; font-size: 11px; padding: 2px 6px; border-radius: 4px;"),
                             style="display: flex; align-items: center; margin-bottom: 4px;"
                         ),
+                        # 🌟 Teks tujuan bersih (tidak dobel)
                         ui.p(f"Pengaju: {m.get('diajukan_oleh')} • Divisi: {divisi} • Keperluan: {tujuan} ({items_cnt} Barang)", style="margin: 0; font-size: 12px; color: #718096;"),
                         style="flex: 1;"
                     ),
                     ui.div(
                         ui.span(f"Total: Rp {nominal:,}", style="font-weight: 800; font-size: 14px; color: #E50914; margin-right: 10px;"),
                         
-                        # 🌟 TOMBOL BARU: BUKA DETAIL
+                        # 🌟 TOMBOL LIHAT DETAIL LANGSUNG DI WEB
                         ui.tags.button(
                             ui.tags.i(class_="fa-solid fa-eye", style="margin-right: 4px;"), "DETAIL",
                             onclick=f"Shiny.setInputValue('btn_open_memo_detail_modal', '{m_id}', {{priority: 'event'}})",
@@ -5093,7 +5094,6 @@ def server(input: Inputs, output: Outputs, session: Session):
             *cards,
             ui.output_ui("memo_pdf_downloader_container_ui")
         )
-
     # ==========================================================================
     # DOWNLOAD PDF AMAN (ANTI ERROR CORRUPT)
     # ==========================================================================
