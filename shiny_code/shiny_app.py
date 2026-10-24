@@ -4892,7 +4892,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             ui.notification_show(f"ℹ️ {msg}", type="warning", duration=4)
 
 # ==========================================================================
-    # 1. TAB 1: DETAIL SCRAPING (LOAD 10 DATA + TOMBOL DOWNLOAD EXCEL)
+    # 1. TAB 1: DETAIL SCRAPING (FAST PAGINATION 10 DATA + DOWNLOAD EXCEL)
     # ==========================================================================
     @render.ui
     def memo_scraped_items_detail_table_ui():
@@ -4946,7 +4946,6 @@ def server(input: Inputs, output: Outputs, session: Session):
                     ),
                     style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 8px;"
                 ),
-                # 🌟 Load 10 data per halaman (Fast Pagination)
                 render_clean_table(headers, rows, "tbl_memo_scraped_fast"),
                 style="background: white; border-radius: 12px; border: 1px solid #E2E8F0; padding: 1.25rem;"
             )
@@ -4972,7 +4971,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         yield buf.getvalue()
 
     # ==========================================================================
-    # 2. FILTER TANGGAL MEMO (TAB 2 & TAB 3)
+    # 2. FILTER TANGGAL MEMO
     # ==========================================================================
     @reactive.Effect
     @reactive.event(input.change_memo_filter_tgl_start)
@@ -5028,7 +5027,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 10px 16px; border-radius: 8px; border: 1.5px solid #CBD5E0; margin-bottom: 1rem; flex-wrap: wrap; gap: 8px;"
         )
 
-    # Helper filter memo (Pending vs Done)
+    # Helper pembaca data (Pending vs Done)
     def _get_memos_by_status(is_done=False):
         memos = state.memo_list()
         start = str(state.memo_filter_tgl_start()).strip() if hasattr(state, "memo_filter_tgl_start") else ""
@@ -5050,7 +5049,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         return res
 
     # ==========================================================================
-    # 3. TAB 2: PENDING ADJUSTMENT (TOMBOL DINAMIS: REQUEST -> DONE)
+    # 3. TAB 2: PENDING ADJUSTMENT (MEMO AKTIF DENGAN TOMBOL REQUEST & DONE)
     # ==========================================================================
     @render.ui
     def memo_pending_table_ui():
@@ -5079,14 +5078,11 @@ def server(input: Inputs, output: Outputs, session: Session):
                 except: items = []
             items_cnt = len(items)
 
-            # Cek status tahapan (REQUESTED atau PENDING)
             cur_status = str(m.get("status_adj", "PENDING")).upper().strip()
             is_requested = (cur_status == "REQUESTED")
 
-            # Badge status dinamis
             if is_requested:
                 badge_status = ui.span("MENUNGGU EKSEKUSI ADJUSTMENT", style="background: #BEE3F8; color: #2B6CB0; font-weight: 800; font-size: 10.5px; padding: 2px 8px; border-radius: 4px;")
-                # 🌟 TAHAP 2: Tombol berubah jadi DONE ADJUSTMENT
                 btn_action_adj = ui.tags.button(
                     ui.tags.i(class_="fa-solid fa-check-double", style="margin-right: 5px;"), "DONE ADJUSTMENT",
                     onclick=f"window.showGlobalSpinner(); Shiny.setInputValue('btn_mark_memo_done', '{m_id}', {{priority: 'event'}})",
@@ -5094,7 +5090,6 @@ def server(input: Inputs, output: Outputs, session: Session):
                 )
             else:
                 badge_status = ui.span("BELUM REQUEST", style="background: #FEFCBF; color: #744210; font-weight: 800; font-size: 10.5px; padding: 2px 8px; border-radius: 4px;")
-                # 🌟 TAHAP 1: Tombol awal adalah REQUEST ADJUSTMENT
                 btn_action_adj = ui.tags.button(
                     ui.tags.i(class_="fa-solid fa-paper-plane", style="margin-right: 5px;"), "REQUEST ADJUSTMENT",
                     onclick=f"window.showGlobalSpinner(); Shiny.setInputValue('btn_request_memo_adj', '{m_id}', {{priority: 'event'}})",
@@ -5116,7 +5111,96 @@ def server(input: Inputs, output: Outputs, session: Session):
                     ui.div(
                         ui.span(f"Total: Rp {nominal:,}", style="font-weight: 800; font-size: 14px; color: #E50914; margin-right: 10px;"),
                         
-                        # 1. Detail Modal
+                        # Detail
+                        ui.tags.button(
+                            ui.tags.i(class_="fa-solid fa-eye", style="margin-right: 4px;"), "DETAIL",
+                            onclick=f"Shiny.setInputValue('btn_open_memo_detail_modal', '{m_id}', {{priority: 'event'}})",
+                            style="background: #3182CE; color: white; border: none; padding: 7px 11px; border-radius: 6px; font-weight: 800; font-size: 11.5px; cursor: pointer;"
+                        ),
+                        # PDF Kas
+                        ui.tags.button(
+                            ui.tags.i(class_="fa-solid fa-file-invoice-dollar", style="margin-right: 4px;"), "MEMO KAS (PDF)",
+                            onclick=f"Shiny.setInputValue('btn_prepare_pdf_memo_kas', '{m_id}', {{priority: 'event'}})",
+                            style="background: linear-gradient(135deg, #E50914 0%, #B20710 100%); color: white; border: none; padding: 7px 11px; border-radius: 6px; font-weight: 800; font-size: 11.5px; cursor: pointer;"
+                        ),
+                        # PDF Pengajuan
+                        ui.tags.button(
+                            ui.tags.i(class_="fa-solid fa-file-lines", style="margin-right: 4px;"), "PENGAJUAN (PDF)",
+                            onclick=f"Shiny.setInputValue('btn_prepare_pdf_memo_std', '{m_id}', {{priority: 'event'}})",
+                            style="background: #2D3748; color: white; border: none; padding: 7px 11px; border-radius: 6px; font-weight: 700; font-size: 11.5px; cursor: pointer;"
+                        ),
+                        # Tombol Dinamis (REQUEST -> DONE)
+                        btn_action_adj,
+                        # Hapus
+                        ui.tags.button(
+                            ui.tags.i(class_="fa-solid fa-trash", style="color: #E53E3E;"),
+                            onclick=f"Shiny.setInputValue('btn_open_del_memo_modal', '{m_id}', {{priority: 'event'}})",
+                            style="background: #FFF5F5; border: 1px solid #FEB2B2; padding: 7px 10px; border-radius: 6px; cursor: pointer;"
+                        ),
+                        style="display: flex; align-items: center; gap: 5px; flex-wrap: wrap;"
+                    ),
+                    style="display: flex; justify-content: space-between; align-items: center; background: white; border: 1.5px solid #CBD5E0; border-radius: 8px; padding: 12px 16px; margin-bottom: 0.75rem;"
+                )
+            ))
+
+        return ui.div(
+            filter_bar,
+            *cards,
+            ui.output_ui("memo_pdf_downloader_container_ui")
+        )
+
+    # Alias agar tetap aman jika views.py masih menggunakan memo_history_table_ui
+    @render.ui
+    def memo_history_table_ui():
+        return memo_pending_table_ui()
+
+    # ==========================================================================
+    # 4. TAB 3: DONE ADJUSTMENT (🌟 INI YANG SEBELUMNYA HILANG 🌟)
+    # ==========================================================================
+    @render.ui
+    def memo_done_table_ui():
+        done_memos = _get_memos_by_status(is_done=True)
+        filter_bar = _render_memo_date_filter_bar(len(done_memos), "Selesai (Done)")
+
+        if not done_memos:
+            return ui.div(
+                filter_bar,
+                ui.div(
+                    ui.p("Belum ada memo yang ditandai Done Adjustment. Klik tombol 'DONE ADJUSTMENT' pada Tab 2 untuk memindahkan dokumen ke sini.", style="color: #718096; font-style: italic; text-align: center; padding: 2rem;"),
+                    style="background: white; border-radius: 10px; border: 1px dashed #CBD5E0;"
+                )
+            )
+
+        cards = []
+        for m in done_memos:
+            m_id = m.get("id", "-")
+            divisi = m.get("divisi", "MARKOM")
+            tujuan = m.get("tujuan", "-")
+            nominal = safe_int(m.get("nominal", 0), 0)
+            done_at_str = m.get("done_at", "-")
+            items = m.get("items", [])
+            if isinstance(items, str):
+                import json
+                try: items = json.loads(items)
+                except: items = []
+            items_cnt = len(items)
+
+            cards.append(ui.div(
+                ui.div(
+                    ui.div(
+                        ui.div(
+                            ui.span(m_id, style="font-weight: 800; font-size: 14px; color: #1A202C; margin-right: 8px;"),
+                            ui.span(f"Tanggal: {m.get('tanggal')}", style="background: #EDF2F7; color: #4A5568; font-weight: 700; font-size: 11px; padding: 2px 6px; border-radius: 4px; margin-right: 6px;"),
+                            ui.span(f"✅ DONE ({done_at_str})", style="background: #C6F6D5; color: #22543D; font-weight: 800; font-size: 10.5px; padding: 2px 6px; border-radius: 4px;"),
+                            style="display: flex; align-items: center; margin-bottom: 4px; flex-wrap: wrap; gap: 4px;"
+                        ),
+                        ui.p(f"Pengaju: {m.get('diajukan_oleh')} • Divisi: {divisi} • Keperluan: {tujuan} ({items_cnt} Barang)", style="margin: 0; font-size: 12px; color: #718096;"),
+                        style="flex: 1;"
+                    ),
+                    ui.div(
+                        ui.span(f"Total: Rp {nominal:,}", style="font-weight: 800; font-size: 14px; color: #10B981; margin-right: 10px;"),
+                        
+                        # 1. Detail
                         ui.tags.button(
                             ui.tags.i(class_="fa-solid fa-eye", style="margin-right: 4px;"), "DETAIL",
                             onclick=f"Shiny.setInputValue('btn_open_memo_detail_modal', '{m_id}', {{priority: 'event'}})",
@@ -5134,9 +5218,13 @@ def server(input: Inputs, output: Outputs, session: Session):
                             onclick=f"Shiny.setInputValue('btn_prepare_pdf_memo_std', '{m_id}', {{priority: 'event'}})",
                             style="background: #2D3748; color: white; border: none; padding: 7px 11px; border-radius: 6px; font-weight: 700; font-size: 11.5px; cursor: pointer;"
                         ),
-                        # 🌟 4. TOMBOL DINAMIS (REQUEST ADJ -> DONE ADJ)
-                        btn_action_adj,
-                        # 5. Tombol Hapus
+                        # 🌟 4. TOMBOL BUKA KEMBALI KE TAB 2
+                        ui.tags.button(
+                            ui.tags.i(class_="fa-solid fa-rotate-left", style="margin-right: 4px;"), "Buka Kembali",
+                            onclick=f"window.showGlobalSpinner(); Shiny.setInputValue('btn_revert_memo_done', '{m_id}', {{priority: 'event'}})",
+                            style="background: #EDF2F7; color: #4A5568; border: 1.5px solid #CBD5E0; padding: 6px 11px; border-radius: 6px; font-weight: 700; font-size: 11.5px; cursor: pointer;"
+                        ),
+                        # 5. Hapus
                         ui.tags.button(
                             ui.tags.i(class_="fa-solid fa-trash", style="color: #E53E3E;"),
                             onclick=f"Shiny.setInputValue('btn_open_del_memo_modal', '{m_id}', {{priority: 'event'}})",
@@ -5155,9 +5243,8 @@ def server(input: Inputs, output: Outputs, session: Session):
         )
 
     # ==========================================================================
-    # LISTENERS: REQUEST ADJ, DONE ADJ, & REVERT
+    # 5. LISTENERS PINDAH STATUS (REQUEST, DONE, & REVERT)
     # ==========================================================================
-    # 🌟 Listener Tahap 1: REQUEST ADJUSTMENT
     @reactive.Effect
     @reactive.event(input.btn_request_memo_adj)
     def _on_request_memo_adj():
@@ -5187,7 +5274,6 @@ def server(input: Inputs, output: Outputs, session: Session):
         else:
             ui.notification_show(f"⚠️ {msg}", type="warning", duration=4)
 
-    # 🌟 Listener Tahap 2: DONE ADJUSTMENT (Pindah ke Tab 3)
     @reactive.Effect
     @reactive.event(input.btn_mark_memo_done)
     def _on_mark_memo_done():
@@ -5217,7 +5303,6 @@ def server(input: Inputs, output: Outputs, session: Session):
         else:
             ui.notification_show(f"⚠️ {msg}", type="warning", duration=4)
 
-    # 🌟 Listener Revert (Buka Kembali dari Tab 3 ke Tab 2)
     @reactive.Effect
     @reactive.event(input.btn_revert_memo_done)
     def _on_revert_memo_done():
@@ -5246,6 +5331,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             ui.notification_show(f"↩️ {msg}", type="message", duration=3)
         else:
             ui.notification_show(f"⚠️ {msg}", type="warning", duration=4)
+
     # ==========================================================================
     # 6. MODAL BUKA DETAIL MEMO DI WEB
     # ==========================================================================
@@ -5287,7 +5373,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             ui.div(
                 ui.div(
                     ui.span(f"📄 Nomor Memo: {target.get('id')}", style="font-size: 14px; font-weight: 800; color: #1A202C; display: block;"),
-                    ui.span(f"👤 Pengaju: {target.get('diajukan_oleh')} • Divisi: {target.get('divisi', 'MARKOM')} • Tanggal: {target.get('tanggal')}", style="font-size: 12px; color: #4A5568; display: block; margin-top: 2px;"),
+                    ui.span(f"👤 Pengaju: {target.get('diajukan_oleh')} • Tanggal: {target.get('tanggal')}", style="font-size: 12px; color: #4A5568; display: block; margin-top: 2px;"),
                     ui.span(f"📌 Keperluan: {target.get('tujuan')}", style="font-size: 12px; font-weight: 700; color: #C53030; display: block; margin-top: 2px;"),
                     style="background: #EDF2F7; padding: 12px 16px; border-radius: 8px; margin-bottom: 1rem;"
                 ),
@@ -5320,7 +5406,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         ))
 
     # ==========================================================================
-    # 7. DOWNLOAD PDF HANDLER (BERSIH DARI DUPLIKASI KODE)
+    # 7. DOWNLOAD PDF HANDLER
     # ==========================================================================
     @reactive.Effect
     @reactive.event(input.btn_prepare_pdf_memo_kas)
