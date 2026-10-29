@@ -112,11 +112,20 @@ def create_jezpro_session():
 # 4. SCRAPING DATA INSTOCK (KHUSUS SURABAYA HARI INI)
 # ==============================================================================
 def fetch_instock_daily_surabaya(session):
-    yesterday_wib = now_wib - timedelta(days=1)
-    yesterday_str = yesterday_wib.strftime("%Y-%m-%d")
-    date_range = f"{yesterday_str}|{yesterday_str}"
+    # Inisialisasi zona waktu WIB dan tanggal
+    wib = timezone(timedelta(hours=7))
+    now_wib = datetime.now(wib)
+    today_str = now_wib.strftime("%Y-%m-%d")
+    
+    # Jika ingin menarik data HARI INI:
+    target_date_str = today_str
+    # (Jika ingin menarik data KEMARIN, un-comment 2 baris di bawah):
+    # yesterday_wib = now_wib - timedelta(days=1)
+    # target_date_str = yesterday_wib.strftime("%Y-%m-%d")
 
-    print(f"📥 [2/3] Menarik data Stock Tracking INSTOCK untuk {BRANCH_NAME} (Tanggal: {today_str})...")
+    date_range = f"{target_date_str}|{target_date_str}"
+
+    print(f"📥 [2/3] Menarik data Stock Tracking INSTOCK untuk {BRANCH_NAME} (Tanggal: {target_date_str})...")
 
     url = "https://jezpro.id/stock_tracking_datatables"
     headers = {
@@ -184,7 +193,7 @@ def fetch_instock_daily_surabaya(session):
             p_id = safe_int_val(raw_id)
             if not p_id or p_id == 0:
                 bar = strip_html(item.get("ps_barcode") or "")
-                p_id = abs(hash(f"{STORE_ID}_{bar}_{today_str}_{len(seen_ids)}")) % 2147483647
+                p_id = abs(hash(f"{STORE_ID}_{bar}_{target_date_str}_{len(seen_ids)}")) % 2147483647
 
             if p_id in seen_ids:
                 continue
@@ -207,24 +216,24 @@ def fetch_instock_daily_surabaya(session):
                 "scanned_at": parse_to_iso_timestamp(dt_raw),
                 "store_id": int(STORE_ID),
                 "store_name": BRANCH_NAME,
-                "sync_date": today_str,
+                "sync_date": target_date_str,
                 "created_at": now_wib.isoformat()
             })
 
         time.sleep(0.05)
 
-    print(f"✅ Selesai! Ditemukan {len(all_instock_records)} item INSTOCK untuk {BRANCH_NAME} hari ini ({today_str}).")
-    return all_instock_records, today_str
+    print(f"✅ Selesai! Ditemukan {len(all_instock_records)} item INSTOCK untuk {BRANCH_NAME} (Tanggal: {target_date_str}).")
+    return all_instock_records, target_date_str
 
 
 # ==============================================================================
 # 5. SYNC KE SUPABASE (AUTO-CLEAN HARI SEBELUMNYA)
 # ==============================================================================
-def push_instock_to_supabase(records, today_str):
+def push_instock_to_supabase(records, target_date_str):
     if not SUPABASE_URL or not SUPABASE_KEY:
         raise ValueError("Environment SUPABASE_URL dan SUPABASE_KEY wajib diset!")
 
-    print(f"🚀 [3/3] Mengosongkan data kemarin & memperbarui data ({today_str}) ke Supabase...")
+    print(f"🚀 [3/3] Mengosongkan data lama & memperbarui data ({target_date_str}) ke Supabase...")
     headers = {
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}",
@@ -232,21 +241,21 @@ def push_instock_to_supabase(records, today_str):
         "Prefer": "resolution=merge-duplicates"
     }
 
-    # 1. Hapus transaksi tanggal kemarin / sebelum hari ini
+    # 1. Hapus transaksi yang bukan tanggal target
     del_old = requests.delete(
-        f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?sync_date=neq.{today_str}",
+        f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?sync_date=neq.{target_date_str}",
         headers=headers
     )
     if del_old.status_code in [200, 204]:
-        print("   🧹 Data tanggal kemarin berhasil dibersihkan dari database.")
+        print("   🧹 Data tanggal lain berhasil dibersihkan dari database.")
 
-    # 2. Hapus data hari ini sebelum insert ulang agar tidak duplikat
+    # 2. Hapus data target hari ini sebelum insert ulang agar tidak duplikat
     requests.delete(
-        f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?sync_date=eq.{today_str}",
+        f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?sync_date=eq.{target_date_str}",
         headers=headers
     )
 
-    # 3. Masukkan data terbaru hari ini
+    # 3. Masukkan data terbaru
     if records:
         total_inserted = 0
         for i in range(0, len(records), 100):
@@ -261,9 +270,9 @@ def push_instock_to_supabase(records, today_str):
             else:
                 print(f"   ❌ Gagal simpan batch {i}: Status {res.status_code} - {res.text}")
 
-        print(f"   ✅ Berhasil menyimpan {total_inserted} dari {len(records)} baris data Instock Surabaya hari ini.")
+        print(f"   ✅ Berhasil menyimpan {total_inserted} dari {len(records)} baris data Instock Surabaya.")
     else:
-        print("   ℹ️ Tidak ada transaksi Instock Surabaya pada tanggal hari ini.")
+        print(f"   ℹ️ Tidak ada transaksi Instock Surabaya pada tanggal {target_date_str}.")
 
 
 # ==============================================================================
