@@ -7187,9 +7187,9 @@ class AppState:
             return False, f"Gagal memuat data: {e}"
 
     def process_transit_to_instock(self):
-        """Otomatis refresh data Supabase lalu buat format mutasi GL1-INSTOCK dalam 1 aksi"""
+        """Otomatis refresh data Supabase lalu buat format mutasi GL1-INSTOCK (Bersih tanpa kurung siku)"""
         try:
-            # 1. Selalu tarik data paling baru dari Supabase terlebih dahulu
+            # 1. Tarik data paling baru dari Supabase
             succ, msg = self.load_instock_daily_from_supabase()
             if not succ or not self.iv_instock_data():
                 return False, "Data antrean kosong di database Supabase!"
@@ -7199,8 +7199,11 @@ class AppState:
             for r in self.iv_instock_data():
                 q = safe_int(r.get("qty", 1))
                 if q > 0:
+                    # 🌟 HILANGKAN KURUNG SIKU [ ] PADA NAMA BIN
+                    raw_bin = str(r.get("bin_code", "-")).replace('[', '').replace(']', '').strip().upper()
+
                     transit_records.append({
-                        "BIN AWAL": str(r.get("bin_code", "-")).strip().upper(),
+                        "BIN AWAL": raw_bin,
                         "BIN TUJUAN": "GL1-INSTOCK",
                         "SKU": str(r.get("barcode_sku", "-")).split('.')[0].strip().upper(),
                         "QUANTITY": q,
