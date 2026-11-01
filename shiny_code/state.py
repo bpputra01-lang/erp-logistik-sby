@@ -604,29 +604,15 @@ class AppState:
         self.comp_audit_scope = reactive.Value("Gudang Pusat (DC)")
 
         # --- INSTOCK VALIDATION STATE ---
-        self.iv_mode = reactive.Value("DIRECT_PUTAWAY") # "DIRECT_PUTAWAY" atau "TRANSIT_TO_INSTOCK"
         self.iv_processed = reactive.Value(False)
         self.iv_instock_data = reactive.Value([])
-        
-        # Metrik
         self.iv_total_instock_qty = reactive.Value(0)
-        self.iv_total_scan_qty = reactive.Value(0)
         self.iv_total_allocated_qty = reactive.Value(0)
-        self.iv_total_unallocated_instock_qty = reactive.Value(0)
-        self.iv_total_unallocated_scan_qty = reactive.Value(0)
 
-        # Tab 2: Template Mutasi / Set Up
+        # Tab Template Mutasi / Set Up
         self.df_iv_setup_headers = reactive.Value([])
         self.df_iv_setup_rows = reactive.Value([])
         self._raw_df_iv_setup = pd.DataFrame()
-
-        # Tab 3: Sisa Instock & Unallocated Scan
-        self.df_iv_sisa_instock_headers = reactive.Value([])
-        self.df_iv_sisa_instock_rows = reactive.Value([])
-        self.df_iv_sisa_scan_headers = reactive.Value([])
-        self.df_iv_sisa_scan_rows = reactive.Value([])
-        self._raw_df_iv_sisa_instock = pd.DataFrame()
-        self._raw_df_iv_sisa_scan = pd.DataFrame()
 
         # Master Checklist 27 Kriteria dari PDF
         self.COMPLIANCE_DEFAULT_ITEMS = [
@@ -7181,121 +7167,32 @@ class AppState:
         except Exception as e:
             return False, f"Gagal memuat Instock: {e}"
 
-    # CARA 1: DIRECT PUTAWAY (ALOKASI PROPORSIONAL)
-    def process_direct_putaway(self, f_scan):
+    # --------------------------------------------------------------------------
+    # METODE INSTOCK VALIDATION (TRANSIT TO GL1-INSTOCK)
+    # --------------------------------------------------------------------------
+    def load_instock_daily_from_supabase(self):
+        """Memuat data instock/waiting offline harian dari Supabase"""
         try:
-            df_scan_raw = load_data_from_info(f_scan)
-            if df_scan_raw.empty or df_scan_raw.shape[1] < 3:
-                return False, "File Data Scan minimal harus 3 kolom: BIN | SKU | QTY SCAN!"
-
-            # Pastikan data instock harian sudah ada
-            if not self.iv_instock_data():
-                succ, msg = self.load_instock_daily_from_supabase()
-                if not succ or not self.iv_instock_data():
-                    return False, "Data Instock hari ini kosong di database Supabase!"
-
-            # Bersihkan Data Scan
-            df_scan = pd.DataFrame({
-                "BIN_TUJUAN": df_scan_raw.iloc[:, 0].astype(str).str.strip().str.upper(),
-                "SKU": df_scan_raw.iloc[:, 1].astype(str).str.split('.').str[0].str.strip().str.upper(),
-                "QTY_SCAN": pd.to_numeric(df_scan_raw.iloc[:, 2], errors='coerce').fillna(0).astype(int)
-            })
-            df_scan = df_scan[(df_scan["SKU"] != "") & (df_scan["QTY_SCAN"] > 0)]
-
-            # Pool Stok Instock per SKU & BIN AWAL
-            instock_pool = []
-            for r in self.iv_instock_data():
-                instock_pool.append({
-                    "BIN_AWAL": str(r.get("bin_code", "-")).strip().upper(),
-                    "SKU": str(r.get("barcode_sku", "-")).split('.')[0].strip().upper(),
-                    "QTY_SISA": safe_int(r.get("qty", 1)),
-                    "ARTICLE": str(r.get("article_name", "-")).strip()
-                })
-
-            setup_records = []
-            unallocated_scan = []
-
-            # Loop Alokasi Proporsional
-            for _, scan_row in df_scan.iterrows():
-                target_bin = scan_row["BIN_TUJUAN"]
-                sku = scan_row["SKU"]
-                rem_scan = scan_row["QTY_SCAN"]
-
-                # Cari stok instock yang cocok dengan SKU
-                for pool_item in instock_pool:
-                    if rem_scan <= 0:
-                        break
-                    if pool_item["SKU"] == sku and pool_item["QTY_SISA"] > 0:
-                        take = min(rem_scan, pool_item["QTY_SISA"])
-                        setup_records.append({
-                            "BIN AWAL": pool_item["BIN_AWAL"],
-                            "BIN TUJUAN": target_bin,
-                            "SKU": sku,
-                            "QUANTITY": take,
-                            "NOTES": "WAITING OFFLINE"
-                        })
-                        pool_item["QTY_SISA"] -= take
-                        rem_scan -= take
-
-                # Jika ada sisa scan yang tidak dapat alokasi
-                if rem_scan > 0:
-                    unallocated_scan.append({
-                        "BIN TUJUAN": target_bin,
-                        "SKU": sku,
-                        "SISA QTY SCAN": rem_scan,
-                        "KETERANGAN": "Stok Instock Kurang / Habis"
-                    })
-
-            # Sisa Instock yang belum teralokasi sama sekali
-            sisa_instock = [
-                {
-                    "BIN INSTOCK": p["BIN_AWAL"],
-                    "SKU": p["SKU"],
-                    "NAMA ARTIKEL": p["ARTICLE"],
-                    "SISA QTY": p["QTY_SISA"]
-                }
-                for p in instock_pool if p["QTY_SISA"] > 0
-            ]
-
-            # Siapkan DataFrames
-            df_setup = pd.DataFrame(setup_records)
-            df_sisa_instock = pd.DataFrame(sisa_instock)
-            df_sisa_scan = pd.DataFrame(unallocated_scan)
-
-            # Set Metrik
-            tot_scan = int(df_scan["QTY_SCAN"].sum())
-            tot_alloc = int(df_setup["QUANTITY"].sum()) if not df_setup.empty else 0
-            tot_sisa_in = int(df_sisa_instock["SISA QTY"].sum()) if not df_sisa_instock.empty else 0
-            tot_sisa_sc = int(df_sisa_scan["SISA QTY SCAN"].sum()) if not df_sisa_scan.empty else 0
-
-            self.iv_total_scan_qty.set(tot_scan)
-            self.iv_total_allocated_qty.set(tot_alloc)
-            self.iv_total_unallocated_instock_qty.set(tot_sisa_in)
-            self.iv_total_unallocated_scan_qty.set(tot_sisa_sc)
-
-            self._raw_df_iv_setup = df_setup
-            self._raw_df_iv_sisa_instock = df_sisa_instock
-            self._raw_df_iv_sisa_scan = df_sisa_scan
-
-            self.df_iv_setup_headers.set(df_setup.columns.tolist() if not df_setup.empty else [])
-            self.df_iv_setup_rows.set(df_setup.fillna("").astype(str).values.tolist() if not df_setup.empty else [])
-            self.df_iv_sisa_instock_headers.set(df_sisa_instock.columns.tolist() if not df_sisa_instock.empty else [])
-            self.df_iv_sisa_instock_rows.set(df_sisa_instock.fillna("").astype(str).values.tolist() if not df_sisa_instock.empty else [])
-            self.df_iv_sisa_scan_headers.set(df_sisa_scan.columns.tolist() if not df_sisa_scan.empty else [])
-            self.df_iv_sisa_scan_rows.set(df_sisa_scan.fillna("").astype(str).values.tolist() if not df_sisa_scan.empty else [])
-
-            self.iv_processed.set(True)
-            return True, f"Alokasi Direct Putaway Selesai! ({tot_alloc} Pcs berhasil dialokasikan)"
+            client = get_supabase()
+            if not client:
+                return False, "Koneksi ke Supabase gagal!"
+            
+            # Tarik data dari tabel jezpro_instock_daily
+            res = client.table("jezpro_instock_daily").select("*").execute()
+            data = res.data if res and hasattr(res, "data") and res.data else []
+            self.iv_instock_data.set(data)
+            self.iv_total_instock_qty.set(sum(safe_int(x.get("qty", 1)) for x in data))
+            return True, f"Berhasil memuat {len(data)} baris data antrean dari Supabase."
         except Exception as e:
-            return False, f"Gagal Direct Putaway: {e}"
+            return False, f"Gagal memuat data: {e}"
 
-    # CARA 2: TRANSIT TO BIN INSTOCK (TANPA ALOKASI SCAN)
     def process_transit_to_instock(self):
+        """Membuat format mutasi langsung ke GL1-INSTOCK untuk seluruh item"""
         try:
             if not self.iv_instock_data():
                 succ, msg = self.load_instock_daily_from_supabase()
                 if not succ or not self.iv_instock_data():
-                    return False, "Data Instock hari ini kosong di database Supabase!"
+                    return False, "Data antrean kosong di database Supabase! Klik Refresh Supabase terlebih dahulu."
 
             transit_records = []
             for r in self.iv_instock_data():
@@ -7317,15 +7214,7 @@ class AppState:
             self.df_iv_setup_headers.set(df_setup.columns.tolist() if not df_setup.empty else [])
             self.df_iv_setup_rows.set(df_setup.fillna("").astype(str).values.tolist() if not df_setup.empty else [])
 
-            # Reset sisa karena mode transit langsung memindahkan semuanya
-            self._raw_df_iv_sisa_instock = pd.DataFrame()
-            self._raw_df_iv_sisa_scan = pd.DataFrame()
-            self.df_iv_sisa_instock_headers.set([])
-            self.df_iv_sisa_instock_rows.set([])
-            self.df_iv_sisa_scan_headers.set([])
-            self.df_iv_sisa_scan_rows.set([])
-
             self.iv_processed.set(True)
-            return True, f"Format Mutasi Transit Instock Berhasil Dibuat! (Total: {tot_transit} Pcs)"
+            return True, f"Format Mutasi Transit ke GL1-INSTOCK Berhasil Dibuat! (Total: {tot_transit} Pcs)"
         except Exception as e:
             return False, f"Gagal membuat Transit Instock: {e}"
