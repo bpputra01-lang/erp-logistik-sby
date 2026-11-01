@@ -5544,17 +5544,30 @@ def server(input: Inputs, output: Outputs, session: Session):
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
 
-    # 3. Output Container Hasil Mutasi
+    # ==========================================================================
+    # INSTOCK VALIDATION CONTROLLER (1 TOMBOL & 2 METRIC CARDS)
+    # ==========================================================================
+    @reactive.Effect
+    @reactive.event(input.btn_run_transit_instock)
+    def _on_run_transit_instock():
+        succ, msg = state.process_transit_to_instock()
+        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+        if succ:
+            state.show_success_modal.set(True)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+
     @render.ui
     def instock_validation_results_container():
         if not state.iv_processed():
             return ui.div()
 
+        # 🌟 Kartu Metrik hanya 2 (BIN TUJUAN sudah dihapus)
         metric_ui = ui.div(
             dark_metric_box("📦 TOTAL BARIS MUTASI", f"{len(state.df_iv_setup_rows()):,} BARIS", "#3182CE"),
             dark_metric_box("🚚 TOTAL QTY TRANSIT", f"{state.iv_total_allocated_qty():,} PCS", "#10B981"),
-            dark_metric_box("🎯 BIN TUJUAN", "GL1-INSTOCK", "#C5A059"),
-            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
         )
 
         return ui.div(
@@ -5577,7 +5590,6 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
         )
 
-    # 4. Download Handler Mutasi Excel
     @render.download(
         filename=lambda: f"TEMPLATE_MUTASI_TRANSIT_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
     )
@@ -5587,6 +5599,5 @@ def server(input: Inputs, output: Outputs, session: Session):
             state._raw_df_iv_setup.to_excel(writer, sheet_name='TEMPLATE_MUTASI', index=False)
         buf.seek(0)
         yield buf.getvalue()
-
         
 app = App(app_ui, server)

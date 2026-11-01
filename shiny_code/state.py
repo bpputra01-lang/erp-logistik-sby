@@ -7187,13 +7187,14 @@ class AppState:
             return False, f"Gagal memuat data: {e}"
 
     def process_transit_to_instock(self):
-        """Membuat format mutasi langsung ke GL1-INSTOCK untuk seluruh item"""
+        """Otomatis refresh data Supabase lalu buat format mutasi GL1-INSTOCK dalam 1 aksi"""
         try:
-            if not self.iv_instock_data():
-                succ, msg = self.load_instock_daily_from_supabase()
-                if not succ or not self.iv_instock_data():
-                    return False, "Data antrean kosong di database Supabase! Klik Refresh Supabase terlebih dahulu."
+            # 1. Selalu tarik data paling baru dari Supabase terlebih dahulu
+            succ, msg = self.load_instock_daily_from_supabase()
+            if not succ or not self.iv_instock_data():
+                return False, "Data antrean kosong di database Supabase!"
 
+            # 2. Susun data mutasi ke GL1-INSTOCK
             transit_records = []
             for r in self.iv_instock_data():
                 q = safe_int(r.get("qty", 1))
@@ -7215,6 +7216,6 @@ class AppState:
             self.df_iv_setup_rows.set(df_setup.fillna("").astype(str).values.tolist() if not df_setup.empty else [])
 
             self.iv_processed.set(True)
-            return True, f"Format Mutasi Transit ke GL1-INSTOCK Berhasil Dibuat! (Total: {tot_transit} Pcs)"
+            return True, f"Format Mutasi ke GL1-INSTOCK Berhasil Dibuat! (Total: {tot_transit} Pcs)"
         except Exception as e:
             return False, f"Gagal membuat Transit Instock: {e}"
