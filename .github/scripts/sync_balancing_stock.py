@@ -16,7 +16,7 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 JEZPRO_EMAIL = os.environ.get("JEZPRO_EMAIL", "fajarbintang786@jez.co.id")
 JEZPRO_PASSWORD = os.environ.get("JEZPRO_PASSWORD", "")
 
-# Surabaya: Kasir Toko & DC Fisik (st_id: 3) serta Online Hub (st_id: 30)
+# Toko Fisik / Kasir (st_id: 3) dan Online Hub (st_id: 30)
 SURABAYA_STORES = [
     {"st_id": 3, "name": "JEZ SURABAYA (STORE & DC)", "status_filter": "DONE"},
     {"st_id": 30, "name": "ONLINE HUB SURABAYA", "status_filter": "DONE ONLINE"}
@@ -121,15 +121,70 @@ def fetch_surabaya_stock(session):
     return records_stock
 
 # ==============================================================================
-# 3. TARIK SALES / STOCK TRACKING DONE (PERSIS NETWORK TAB BROWSER)
+# DETEKTOR FORMAT TANGGAL RESMI JEZPRO (AUTO-PROBE)
 # ==============================================================================
-def fetch_surabaya_sales_3months(session):
+def find_working_date_param(session, st_id, status_val, start_dt, end_dt):
+    url_dt = "https://jezpro.id/stock_tracking_datatables"
+    headers_dt = {
+        "Accept": "application/json, text/javascript, */*; q=0.01",
+        "X-Requested-With": "XMLHttpRequest",
+        "Referer": "https://jezpro.id/stock_tracking"
+    }
+
+    # Format-format yang biasa dipakai plugin daterangepicker di Jezpro
+    candidates = [
+        f"{start_dt.strftime('%d %b %Y')} - {end_dt.strftime('%d %b %Y')}",  # Persis seperti di input screenshot: 04 Aug 2026 - 02 Nov 2026
+        f"{start_dt.strftime('%Y-%m-%d')}|{end_dt.strftime('%Y-%m-%d')}",
+        f"{start_dt.strftime('%Y-%m-%d')} - {end_dt.strftime('%Y-%m-%d')}",
+        f"{start_dt.strftime('%d/%m/%Y')} - {end_dt.strftime('%d/%m/%Y')}"
+    ]
+
+    base_params = {
+        "draw": "1",
+        "columns[0][data]": "DT_RowIndex", "columns[0][name]": "plst_id", "columns[0][searchable]": "false", "columns[0][orderable]": "true",
+        "columns[1][data]": "datetime", "columns[1][name]": "plst_created", "columns[1][searchable]": "false", "columns[1][orderable]": "true",
+        "columns[2][data]": "ps_barcode", "columns[2][name]": "ps_barcode", "columns[2][searchable]": "true", "columns[2][orderable]": "true",
+        "columns[3][data]": "article", "columns[3][name]": "p_name", "columns[3][searchable]": "false", "columns[3][orderable]": "true",
+        "columns[4][data]": "invoice", "columns[4][name]": "p_name", "columns[4][searchable]": "false", "columns[4][orderable]": "true",
+        "columns[5][data]": "cust_name", "columns[5][name]": "cust_name", "columns[5][searchable]": "false", "columns[5][orderable]": "true",
+        "columns[6][data]": "qty", "columns[6][name]": "p_name", "columns[6][searchable]": "false", "columns[6][orderable]": "true",
+        "columns[7][data]": "product_location", "columns[7][name]": "pl_code", "columns[7][searchable]": "false", "columns[7][orderable]": "true",
+        "columns[8][data]": "status", "columns[8][name]": "plst_status", "columns[8][searchable]": "false", "columns[8][orderable]": "true",
+        "columns[9][data]": "instock_source", "columns[9][name]": "instock_source_status", "columns[9][searchable]": "false", "columns[9][orderable]": "false",
+        "order[0][column]": "0", "order[0][dir]": "desc",
+        "start": "0", "length": "1", "search": "", "status": status_val,
+        "instock_source": "", "psc_id": "", "std_id": "", "br_id": "",
+        "st_id": str(st_id)
+    }
+
+    print("   🔍 Menguji format parameter tanggal daterangepicker...")
+    for fmt_str in candidates:
+        test_p = dict(base_params)
+        test_p["date"] = fmt_str
+        try:
+            r = session.get(url_dt, params=test_p, headers=headers_dt, timeout=30)
+            if r.status_code == 200:
+                js = r.json()
+                total = js.get("recordsFiltered", js.get("recordsTotal", 0))
+                print(f"      -> Uji format '{fmt_str}': Ditemukan {total:,} data.")
+                if total > 500:  # Format yang valid akan langsung merespons ribuan data
+                    return fmt_str
+        except Exception:
+            pass
+
+    return candidates[0]
+
+# ==============================================================================
+# 3. TARIK SALES / STOCK TRACKING DONE (2 BULAN TERAKHIR)
+# ==============================================================================
+def fetch_surabaya_sales_2months(session):
     now = datetime.now()
-    start_date = now - timedelta(days=90)
+    # 🌟 2 Bulan terakhir terhitung dari bulan berjalan (60 hari)
+    start_date = now - timedelta(days=60)
     date_cutoff = start_date.replace(hour=0, minute=0, second=0, microsecond=0)
 
-    print(f"\n📊 [2/2] Menarik Transaksi Penjualan DONE (3 Bulan Terakhir)...")
-    print(f"   📅 Target Cutoff 90 Hari: Transaksi sejak {start_date.strftime('%d-%m-%Y')} s/d Sekarang")
+    print(f"\n📊 [2/2] Menarik Transaksi Penjualan DONE (2 Bulan Terakhir)...")
+    print(f"   📅 Periode: {start_date.strftime('%d-%m-%Y')} s/d {now.strftime('%d-%m-%Y')}")
 
     url_dt = "https://jezpro.id/stock_tracking_datatables"
     headers_dt = {
@@ -147,15 +202,18 @@ def fetch_surabaya_sales_3months(session):
         status_to_query = store_info["status_filter"]
         print(f"\n   🏬 Menarik data dari: {st_name} (st_id: {st_id}, status: {status_to_query})...")
 
+        # 1. Cari format string tanggal yang diterima server Jezpro
+        date_param_valid = find_working_date_param(session, st_id, status_to_query, start_date, now)
+        print(f"   🎯 Format tanggal aktif: '{date_param_valid}'")
+
         start_row = 0
-        batch_size = 500
+        batch_size = 1000  # Tarik 1.000 row sekaligus per request agar cepat
         total_expected = 999999
         stop_store = False
         store_done_count = 0
         draw_count = 1
 
         while start_row < total_expected and not stop_store:
-            # 🌟 PARAMETER PERSIS SESUAI REQUEST NETWORK TAB FIREFOX ANDA
             params = {
                 "draw": str(draw_count),
                 "columns[0][data]": "DT_RowIndex", "columns[0][name]": "plst_id", "columns[0][searchable]": "false", "columns[0][orderable]": "true", "columns[0][search][value]": "", "columns[0][search][regex]": "false",
@@ -179,7 +237,7 @@ def fetch_surabaya_sales_3months(session):
                 "std_id": "",
                 "br_id": "",
                 "st_id": str(st_id),
-                "date": ""  # 🌟 Sengaja dikosongkan agar server tidak membatasi ke hari ini saja
+                "date": date_param_valid
             }
 
             try:
@@ -194,7 +252,6 @@ def fetch_surabaya_sales_3months(session):
                 total_expected = total_server
 
                 if not raw_chunk:
-                    print(f"      ℹ️ Tidak ada data lagi dari server di offset {start_row}.")
                     break
 
                 start_row += len(raw_chunk)
@@ -204,13 +261,12 @@ def fetch_surabaya_sales_3months(session):
                 for item in raw_chunk:
                     status_raw = strip_html(item.get("status") or item.get("plst_status") or "").upper()
                     
-                    # Verifikasi status DONE
                     if "DONE" not in status_raw:
                         continue
 
                     dt_clean = strip_html(item.get("datetime") or item.get("plst_created") or "")
 
-                    # Filter Tanggal 90 Hari di Python
+                    # Validasi batas tanggal di Python
                     dt_obj = None
                     for fmt in ("%d/%m/%Y %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%d-%m-%Y %H:%M:%S", "%d/%m/%Y", "%Y-%m-%d"):
                         try:
@@ -219,7 +275,6 @@ def fetch_surabaya_sales_3months(session):
                         except Exception:
                             pass
 
-                    # Jika urutan transaksi sudah tembus lebih tua dari 90 hari yang lalu, stop loop
                     if dt_obj and dt_obj < date_cutoff:
                         stop_store = True
                         break
@@ -238,7 +293,6 @@ def fetch_surabaya_sales_3months(session):
                     cust_name = strip_html(item.get("cust_name") or "-")
                     loc_bin = strip_html(item.get("product_location") or item.get("pl_code") or "-")
 
-                    # Identifikasi Penjualan Online vs Kasir Toko Offline
                     inv_upper = inv_clean.upper()
                     cust_upper = cust_name.upper()
                     is_online = (st_id == 30) or any(k in inv_upper or k in cust_upper for k in ["ONL", "ONLINE", "SHOPEE", "TIKTOK", "TOKOPEDIA", "LAZADA", "WEB"])
@@ -259,20 +313,20 @@ def fetch_surabaya_sales_3months(session):
                     chunk_matched += 1
                     store_done_count += 1
 
-                print(f"      -> Chunk {start_row}/{total_expected}: Berhasil menyaring {chunk_matched} transaksi DONE.")
-                time.sleep(0.08)
+                print(f"      -> Terbaca {start_row:,}/{total_expected:,} data... (+{chunk_matched:,} DONE diserap)")
+                time.sleep(0.05)
 
             except Exception as e:
-                print(f"      ⚠️ Error saat membaca data: {e}")
+                print(f"      ⚠️ Kendala koneksi batch: {e}")
                 break
 
-        print(f"   ✅ Selesai {st_name}: Total {store_done_count} transaksi DONE 90 hari terkumpul.")
+        print(f"   ✅ Selesai {st_name}: Total {store_done_count:,} transaksi DONE terkumpul.")
 
-    print(f"\n🎉 TOTAL GABUNGAN: {len(all_done_records):,} baris transaksi DONE berhasil dikumpulkan!")
+    print(f"\n🎉 TOTAL GABUNGAN: {len(all_done_records):,} baris transaksi DONE (2 bulan terakhir) berhasil ditarik!")
     return all_done_records, start_date.strftime('%Y-%m-%d'), now.strftime('%Y-%m-%d')
 
 # ==============================================================================
-# 4. PUSH KE SUPABASE
+# 4. PUSH KEDUA HASIL KE SUPABASE
 # ==============================================================================
 def push_to_supabase(stock_records, sales_records, period_start, period_end):
     print(f"\n🚀 Mengirim Data Balancing Stock ke Supabase...")
@@ -298,7 +352,7 @@ def push_to_supabase(stock_records, sales_records, period_start, period_end):
     else:
         print(f"   ❌ Gagal simpan stok ke Supabase ({res_stk.status_code}): {res_stk.text}")
 
-    # 2. Simpan Data Sales Tracking DONE 3 Bulan Terakhir
+    # 2. Simpan Data Sales Tracking DONE 2 Bulan Terakhir
     body_sales = {
         "id": "SURABAYA_SALES_90D",
         "branch": BRANCH_NAME,
@@ -316,7 +370,7 @@ def push_to_supabase(stock_records, sales_records, period_start, period_end):
         timeout=120
     )
     if res_sls.status_code in [200, 201]:
-        print(f"   ✅ Sales 90 Hari ({len(sales_records):,} baris) Berhasil Disimpan!")
+        print(f"   ✅ Sales 2 Bulan ({len(sales_records):,} baris) Berhasil Disimpan!")
     else:
         print(f"   ❌ Gagal simpan sales ke Supabase ({res_sls.status_code}): {res_sls.text}")
 
@@ -332,8 +386,8 @@ def run_sync():
     # 1. Tarik Stok Surabaya
     stock_data = fetch_surabaya_stock(session)
 
-    # 2. Tarik Sales DONE 3 Bulan Terakhir
-    sales_data, p_start, p_end = fetch_surabaya_sales_3months(session)
+    # 2. Tarik Sales DONE 2 Bulan Terakhir (Kasir Toko + Online Hub Surabaya)
+    sales_data, p_start, p_end = fetch_surabaya_sales_2months(session)
 
     # 3. Simpan Keduanya ke Supabase
     push_to_supabase(stock_data, sales_data, p_start, p_end)
