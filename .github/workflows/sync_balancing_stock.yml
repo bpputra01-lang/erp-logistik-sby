@@ -1,10 +1,9 @@
-name: Sync Balancing Stock Surabaya (Stock & Sales 90D)
+name: Sync Balancing Stock Surabaya
 
 on:
   schedule:
-    # Berjalan otomatis setiap 60 menit sekali
     - cron: '0 * * * *'
-  workflow_dispatch: # Tombol Run manual
+  workflow_dispatch:
 
 jobs:
   sync-balancing:
