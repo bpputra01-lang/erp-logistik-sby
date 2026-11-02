@@ -99,7 +99,6 @@ def run_sync():
             target_sheet = all_sheets[1] if len(all_sheets) > 1 else all_sheets[0]
 
         print(f"🎯 Membaca Sheet: '{target_sheet}'")
-        # 🌟 PERBAIKAN: Menggunakan pd.read_excel agar tidak memicu Pandas4Warning
         df = pd.read_excel(xl, sheet_name=target_sheet)
 
     except Exception as e:
@@ -173,7 +172,7 @@ def run_sync():
             }
         grouped_events[group_key]["items"].append(item_entry)
 
-    # Sinkronisasi Pintar (Anti Scraping Ulang)
+    # Sinkronisasi Pintar (Anti Duplikat Card)
     new_memos_to_insert = []
     skipped_count = 0
 
@@ -188,19 +187,29 @@ def run_sync():
             exist = existing_db_memos[db_match_key]
             st = str(exist.get("status_adj", "PENDING")).upper()
 
-            # Lewati jika sudah selesai di-adjustment
+            # Lewati jika sudah selesai di-adjustment di gudang
             if st == "DONE":
                 print(f"⏩ [SKIP] Tgl {tgl_doc} - '{event_name}' SUDAH DONE ADJUSTMENT.")
                 skipped_count += 1
                 continue
 
-            if exist.get("nominal") == tot_nom:
+            # Cek apakah items atau nominalnya benar-benar ada yang berubah
+            existing_items = exist.get("items", [])
+            if isinstance(existing_items, str):
+                try: existing_items = json.loads(existing_items)
+                except: existing_items = []
+
+            # Buat signature ringkas perbandingan (SKU + QTY)
+            sig_new = sorted([(x['sku'], x['qty'], x['subtotal']) for x in items_list])
+            sig_old = sorted([(x.get('sku'), x.get('qty'), x.get('subtotal')) for x in existing_items])
+
+            if sig_new == sig_old and exist.get("nominal") == tot_nom and exist.get("diajukan_oleh") == pic_doc:
                 print(f"⏩ [SKIP] Tgl {tgl_doc} - '{event_name}' identik (tidak ada perubahan).")
                 skipped_count += 1
                 continue
 
-            # Update jika ada perubahan data
-            print(f"🔄 [UPDATE] Tgl {tgl_doc} - '{event_name}' diperbarui dengan {len(items_list)} barang...")
+            # 🌟 JIKA ADA PERUBAHAN: UPDATE MEMO YANG SUDAH ADA (TIDAK BUAT CARD BARU)
+            print(f"🔄 [UPDATE CARD] Tgl {tgl_doc} - '{event_name}' (ID: {exist['id']}) diperbarui dengan QTY/Item terbaru...")
             url_update = f"{SUPABASE_URL}/rest/v1/memo_pengajuan?id=eq.{exist['id']}"
             update_payload = {
                 "nominal": tot_nom,
@@ -210,6 +219,7 @@ def run_sync():
             requests.patch(url_update, headers=HEADERS, json=update_payload)
             continue
 
+        # JIKA BELUM PERNAH ADA SAMA SEKALI: BARU BUAT CARD BARU
         memo_id = f"MEMO/ZKN/{tgl_doc.replace('-', '')}/{random.randint(100, 999)}"
         new_memos_to_insert.append({
             "id": memo_id,
@@ -229,9 +239,7 @@ def run_sync():
         url_insert = f"{SUPABASE_URL}/rest/v1/memo_pengajuan"
         res_insert = requests.post(url_insert, headers=HEADERS, json=new_memos_to_insert)
 
-        # 🌟 PELINDUNG OTOMATIS: Jika kolom status_adj belum sempat ditambahkan di SQL Supabase
         if res_insert.status_code not in [200, 201] and "status_adj" in res_insert.text:
-            print("⚠️ Kolom 'status_adj' belum dibuat di database, mencoba insert tanpa kolom tersebut...")
             for m in new_memos_to_insert:
                 m.pop("status_adj", None)
             res_insert = requests.post(url_insert, headers=HEADERS, json=new_memos_to_insert)
@@ -243,7 +251,7 @@ def run_sync():
         else:
             print(f"❌ Gagal insert: {res_insert.text}")
     else:
-        print(f"✅ Selesai! Tidak ada data baru ({skipped_count} tanggal/memo lama berhasil dilewati).")
+        print(f"✅ Selesai! Sinkronisasi tuntas ({skipped_count} memo tidak berubah / dilewati).")
 
 if __name__ == "__main__":
     run_sync()
