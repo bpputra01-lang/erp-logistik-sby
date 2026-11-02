@@ -1143,41 +1143,48 @@ def cross_check_real_system_view(state: AppState):
     )
 
 # ==============================================================================
-# VIEW: BALANCING STOCK & DYNAMIC ALLOCATION
+# VIEW: BALANCING STOCK (2 TAB SEDERHANA + FILTER KATEGORI SUPABASE)
 # ==============================================================================
 def balancing_stock_view(state: AppState):
-    list_sub_kat = [
-        "BAG", "BALL", "BASELAYER", "BOTTLE", "CLEANNING & CARE", "EXTRA SHOES", 
-        "HARDWARE", "JACKET", "JERSEY", "LOWER BODY", "NUTRITION", "OTHER", 
-        "OTHERS", "PANTS", "RACKET", "SANDALS", "SET APPAREL", "SHIRT", 
-        "SHOES", "SHORT", "SWLM", "UKNOWN SC", "UNDERLAYER", "UPPER BODY"
-    ]
-
-    filter_section = ui.div(
-        ui.h4("🔍 Filter Sub Kategori (Opsional)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
-        ui.input_selectize(
-            "bs_filter_sub", "📁 Pilih Sub Kategori (Kolom G):", 
-            choices=list_sub_kat, multiple=True, width="100%"
-        ),
-        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
-    )
-
-    upload_section = ui.div(
-        ui.h4("📥 Upload Data All Stock & Histori Penjualan (Sales)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+    # Top Action Banner: Tombol Sync dari Supabase & Opsi Upload Manual
+    top_control_bar = ui.div(
         ui.div(
-            custom_uploader_box("uploader_bs_stock", "1. File ALL DATA STOCK (Multiple Adj.)"),
-            custom_uploader_box("uploader_bs_sales", "2. File SALES REPORT (90 Hari Terakhir)"),
-            style="display: flex; gap: 1rem; width: 100%; margin-bottom: 0.5rem; flex-wrap: wrap;"
+            ui.div(
+                ui.h4("Balancing Stock & Dynamic Distribution", style="font-size: 16px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
+                ui.p("Data diambil langsung dari Supabase ('balancing_stock_cache' & 'balancing_sales_cache') dengan pengecualian BIN Defect, Reject, Karantina, dan Perbaikan.", style="color: #718096; font-size: 12.5px; margin: 0;"),
+            ),
+            ui.div(
+                ui.tags.button(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-cloud-arrow-down", style="margin-right: 6px; font-size: 14px;"), "SYNC DATA SUPABASE"),
+                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_sync_balancing_supabase', Math.random(), {priority: 'event'});",
+                    style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; font-weight: 800; border: none; padding: 10px 18px; border-radius: 8px; cursor: pointer; font-size: 13px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);"
+                ),
+                style="display: flex; gap: 8px; align-items: center;"
+            ),
+            style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 10px;"
         ),
-        ui.output_ui("balancing_stock_action_btn_ui"),
-        style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+        # Wadah Filter Kategori Dinamis dari Supabase
+        ui.output_ui("bs_category_filter_container_ui"),
+        ui.hr(style="margin: 1rem 0; border-color: #CBD5E0;"),
+        ui.tags.details(
+            ui.tags.summary("📁 Atau Upload File Manual (All Stock & Sales Report)"),
+            ui.div(
+                ui.div(
+                    custom_uploader_box("uploader_bs_stock", "1. File All Stock (.xlsx / .csv)"),
+                    custom_uploader_box("uploader_bs_sales", "2. File Sales Report (.xlsx / .csv)"),
+                    style="display: flex; gap: 1rem; width: 100%; margin-top: 0.75rem; flex-wrap: wrap;"
+                ),
+                ui.output_ui("balancing_stock_action_btn_ui")
+            ),
+            style="background: #F8FAFC; border: 1px dashed #CBD5E0; border-radius: 8px; padding: 6px 12px;"
+        ),
+        style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem; box-shadow: 0 2px 8px rgba(0,0,0,0.02);"
     )
 
     results_section = ui.output_ui("balancing_stock_results_container")
 
     return ui.div(
-        filter_section,
-        upload_section,
+        top_control_bar,
         results_section,
         style="width: 100%; padding: 1rem;"
     )

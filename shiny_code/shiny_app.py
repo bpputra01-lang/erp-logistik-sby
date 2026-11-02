@@ -2934,18 +2934,29 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         yield buf.getvalue()
 
-        # ==========================================================================
-    # BALANCING STOCK CONTROLLER & HANDLERS
     # ==========================================================================
+    # BALANCING STOCK: 2 TAB CONTROLLER (SYNC SUPABASE & PROGRESSIVE REFILL)
+    # ==========================================================================
+    @reactive.Effect
+    @reactive.event(input.btn_sync_balancing_supabase)
+    def _on_sync_balancing_supabase():
+        succ, msg = state.load_balancing_data_from_supabase()
+        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+        if succ:
+            state.show_success_modal.set(True)
+            ui.notification_show(f"✅ {msg}", type="message", duration=4)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+
     @render.ui
     def balancing_stock_action_btn_ui():
         f1 = input.uploader_bs_stock() if "uploader_bs_stock" in input else None
         f2 = input.uploader_bs_sales() if "uploader_bs_sales" in input else None
-
-        if (f1 and len(f1) > 0) and (f2 and len(f2) > 0):
+        if (f1 and len(f1) > 0):
             return ui.div(
                 ui.tags.button(
-                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "RUN BALANCING PROCESS"),
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "RUN PROSES BALANCING FILE"),
                     onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_run_balancing_stock', Math.random(), {priority: 'event'});",
                     class_="btn-red-gradient"
                 ),
@@ -2954,27 +2965,51 @@ def server(input: Inputs, output: Outputs, session: Session):
         return ui.div(
             ui.tags.button(
                 ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"),
-                "UPLOAD KEDUA FILE UNTUK MEMULAI",
-                disabled=True,
-                class_="btn-locked"
+                "UPLOAD FILE ALL STOCK UNTUK MEMULAI", disabled=True, class_="btn-locked"
             ),
             style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
         )
 
+# ==========================================================================
+    # BALANCING STOCK: FILTER KATEGORI DINAMIS DARI SUPABASE
+    # ==========================================================================
+    @render.ui
+    def bs_category_filter_container_ui():
+        # Hanya muncul setelah data diproses / di-sync
+        if not state.bs_processed():
+            return ui.div()
+
+        choices = state.bs_category_list()
+        return ui.div(
+            ui.div(
+                ui.span("📁 Filter Sub Kategori (Category):", style="font-size: 12px; font-weight: 800; color: #1A202C; margin-bottom: 4px; display: block;"),
+                ui.input_selectize(
+                    "bs_filter_category_select",
+                    None,
+                    choices=choices,
+                    multiple=True,
+                    width="100%"
+                ),
+                style="width: 100%;"
+            ),
+            style="background: #F8FAFC; border: 1px solid #CBD5E0; padding: 12px 16px; border-radius: 8px; margin-top: 1rem;"
+        )
+
+    # Listener saat user memilih / mengubah Sub Kategori
+    @reactive.Effect
+    def _on_bs_category_filter_change():
+        if state.bs_processed() and "bs_filter_category_select" in input:
+            sel = input.bs_filter_category_select()
+            cats = list(sel) if sel is not None else []
+            state.apply_bs_category_filter(cats)
+            
     @reactive.Effect
     @reactive.event(input.btn_run_balancing_stock)
     def _proc_balancing_stock():
         f_stock = input.uploader_bs_stock()
-        f_sales = input.uploader_bs_sales()
-        if not f_stock or not f_sales:
-            state.error_modal_message.set("Pilih kedua file (All Stock & Sales Report) terlebih dahulu!")
-            state.show_error_modal.set(True)
-            return
-
-        # Ambil filter Sub Kategori dari input UI
-        sub_filter = input.bs_filter_sub() if "bs_filter_sub" in input else []
-
-        succ, msg = state.process_balancing_stock(f_stock, f_sales, sub_filter)
+        f_sales = input.uploader_bs_sales() if "uploader_bs_sales" in input else None
+        succ, msg = state.process_balancing_stock(f_stock, f_sales)
+        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
         if succ:
             state.show_success_modal.set(True)
         else:
@@ -2986,57 +3021,74 @@ def server(input: Inputs, output: Outputs, session: Session):
         if not state.bs_processed():
             return ui.div()
 
-        color_off = "#10B981" if state.bs_perc_offline() >= 98.0 else "#DD6B20"
-        color_on = "#10B981" if state.bs_perc_online() >= 95.0 else "#DD6B20"
+        # Ringkasan 4 Kartu Metrik
+        metrics_ui = ui.div(
+            dark_metric_box("📦 TOTAL UNIQUE SKU", f"{state.bs_total_sku():,} SKU", "#3182CE"),
+            dark_metric_box("🔢 TOTAL STOK AKTIF", f"{state.bs_total_stock():,} PCS", "#C5A059"),
+            dark_metric_box("🏬 REFILL OFFLINE", f"{state.bs_sku_need_off():,} SKU", "#DD6B20"),
+            dark_metric_box("🌐 REFILL ONLINE", f"{state.bs_sku_need_on():,} SKU", "#10B981"),
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+        )
+
+        # TAB 1: COMPARE UNIQUE SKU DENGAN SALES
+        tab1_content = ui.div(
+            ui.div(
+                ui.div(
+                    ui.h4("📊 Ringkasan Compare QTY LOG, OFF, ONL vs Sales per Unique SKU", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 2px 0;"),
+                    ui.p("Pengecualian otomatis terhadap BIN Defect, Reject, Karantina, dan Perbaikan.", style="color: #718096; font-size: 12px; margin: 0;"),
+                ),
+                ui.download_button(
+                    "btn_dl_bs_tab1",
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-file-excel", style="margin-right: 6px; font-size: 13px;"), "DOWNLOAD TAB 1 (.XLSX)"),
+                    style="background: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer; font-size: 12px;"
+                ),
+                style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 8px;"
+            ),
+            render_clean_table(state.df_bs_alloc_headers(), state.df_bs_alloc_rows(), "tbl_bs_tab1"),
+            style="padding: 0.75rem 0;"
+        )
+
+        # TAB 2: LIST REFILL BERTINGKAT / PROGRESIF (BIN | SKU | QTY LOG | QTY OFF | QTY ONL)
+        tab2_content = ui.div(
+            ui.div(
+                ui.div(
+                    ui.h4("🔄 List Refill Bertingkat / Progresif per BIN", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 2px 0;"),
+                    ui.p("Format: BIN | SKU | QTY LOG | QTY OFF | QTY ONL. Kategori yang sudah cukup otomatis terisi 'NO REFILL'. Jika stok BIN awal tidak cukup, pemenuhan dilanjutkan secara progresif ke baris BIN berikutnya.", style="color: #718096; font-size: 12px; margin: 0;"),
+                ),
+                ui.download_button(
+                    "btn_dl_bs_tab2",
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-file-excel", style="margin-right: 6px; font-size: 13px;"), "DOWNLOAD TEMPLATE REFILL (.XLSX)"),
+                    style="background: #3182CE; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer; font-size: 12px;"
+                ),
+                style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 8px;"
+            ),
+            render_clean_table(state.df_bs_refill_headers(), state.df_bs_refill_rows(), "tbl_bs_tab2"),
+            style="padding: 0.75rem 0;"
+        )
 
         return ui.div(
             ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
-            ui.h4("📋 RINGKASAN DISTRIBUSI & BALANCING STOCK", style="font-size: 16px; color: #010B13; font-weight: 800; margin-bottom: 1rem;"),
-            
-            # --- 4 KOTAK METRIK UTAMA ---
-            ui.div(
-                dark_metric_box("📦 TOTAL SKU AKTIF", f"{state.bs_total_sku():,} SKU", "#C5A059"),
-                dark_metric_box("🏬 REFILL TO STORE / OFFLINE", f"{state.bs_sku_need_off():,} SKU", "#E53E3E"),
-                dark_metric_box("🌐 REFILL TO ONLINE / HUB", f"{state.bs_sku_need_on():,} SKU", "#3182CE"),
-                dark_metric_box("🔄 TOTAL QTY REFILL RECOM.", f"{state.bs_qty_refill_total():,} PCS", "#10B981"),
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
-            ),
-
-            # --- 2 KOTAK COMPLIANCE PERSENTASE ---
-            ui.div(
-                dark_metric_box("🏪 COMPLIANCE OFFLINE STOCK", f"{state.bs_perc_offline():.1f}% TERSEDIA", color_off),
-                dark_metric_box("🌐 COMPLIANCE ONLINE STOCK", f"{state.bs_perc_online():.1f}% TERSEDIA", color_on),
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
-            ),
-
-            # --- TOMBOL DOWNLOAD LAPORAN LENGKAP ---
-            ui.div(
-                ui.download_button(
-                    "btn_dl_balancing_stock_all",
-                    ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD HASIL BALANCING (.XLSX)"),
-                    style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
-                ),
-                style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
-            ),
-
-            # --- 4 TAB DETAIL HASIL ---
+            metrics_ui,
             ui.navset_card_tab(
-                ui.nav_panel("📝 TEMPLATE REFILL MUTASI", ui.div(render_clean_table(state.df_bs_refill_headers(), state.df_bs_refill_rows()), style="padding: 0.75rem 0;")),
-                ui.nav_panel("📊 DYNAMIC ALLOCATION MATRIX", ui.div(render_clean_table(state.df_bs_alloc_headers(), state.df_bs_alloc_rows()), style="padding: 0.75rem 0;")),
-                ui.nav_panel("🏪 DEFISIT OFFLINE (STORE)", ui.div(render_clean_table(state.df_bs_off_missing_headers(), state.df_bs_off_missing_rows()), style="padding: 0.75rem 0;")),
-                ui.nav_panel("🌐 DEFISIT ONLINE (HUB)", ui.div(render_clean_table(state.df_bs_on_missing_headers(), state.df_bs_on_missing_rows()), style="padding: 0.75rem 0;"))
+                ui.nav_panel("1. COMPARE STOK & SALES (UNIQUE SKU)", tab1_content),
+                ui.nav_panel("2. LIST REFILL PROGRESIF", tab2_content)
             ),
             style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
         )
 
-    @render.download(filename="REPORT_BALANCING_STOCK.xlsx")
-    def btn_dl_balancing_stock_all():
+    @render.download(filename="BALANCING_COMPARE_UNIQUE_SKU.xlsx")
+    def btn_dl_bs_tab1():
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-            state._raw_df_bs_refill.to_excel(writer, sheet_name='TEMPLATE_REFILL', index=False)
-            state._raw_df_bs_alloc.to_excel(writer, sheet_name='ALLOCATION_MATRIX', index=False)
-            state._raw_df_bs_off_missing.to_excel(writer, sheet_name='DEFISIT_OFFLINE', index=False)
-            state._raw_df_bs_on_missing.to_excel(writer, sheet_name='DEFISIT_ONLINE', index=False)
+            state._raw_df_bs_alloc.to_excel(writer, sheet_name='COMPARE_SKU', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    @render.download(filename="TEMPLATE_LIST_REFILL_PROGRESIF.xlsx")
+    def btn_dl_bs_tab2():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_bs_refill.to_excel(writer, sheet_name='LIST_REFILL', index=False)
         buf.seek(0)
         yield buf.getvalue()
 
