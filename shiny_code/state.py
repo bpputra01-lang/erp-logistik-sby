@@ -3680,7 +3680,6 @@ class AppState:
             stk_records = []
             if res_stk and res_stk.data:
                 for row in res_stk.data:
-                    # Cek jika data tersimpan sebagai list dict di kolom json atau record langsung
                     if "stock_data" in row and isinstance(row["stock_data"], (list, str)):
                         raw_items = json.loads(row["stock_data"]) if isinstance(row["stock_data"], str) else row["stock_data"]
                         stk_records.extend(raw_items)
@@ -3714,66 +3713,73 @@ class AppState:
         except Exception as e:
             return False, f"Gagal sinkronisasi data Supabase: {str(e)}"
 
-    def process_balancing_stock(self, f_stock=None, f_sales=None):
-        """Memproses data upload file manual atau fallback dari file lokal"""
-        try:
-            if not f_stock:
-                # Jika tombol proses ditekan tanpa upload file, otomatis ambil dari Supabase
-                return self.load_balancing_data_from_supabase()
-
-            def fast_read(file_info):
-                if not file_info: return pd.DataFrame()
-                path = file_info[0]["datapath"]
-                name = file_info[0]["name"].lower()
-                if name.endswith(('.xlsx', '.xls', '.xlsm')):
-                    try: return pd.read_excel(path, engine='calamine')
-                    except Exception: return pd.read_excel(path, engine='openpyxl')
-                elif name.endswith('.csv'):
-                    try: return pd.read_csv(path, sep=None, engine='python')
-                    except Exception: return pd.read_csv(path)
-                return pd.DataFrame()
-
-            df_stk = fast_read(f_stock)
-            df_sls = fast_read(f_sales) if f_sales else pd.DataFrame()
-
-            if df_stk.empty:
-                return False, "File All Stock kosong atau tidak valid!"
-
-            return self._compute_balancing_stock(df_stk, df_sls, source_label="File Upload")
-        except Exception as e:
-            return False, f"Gagal membaca file: {str(e)}"
-
     def _compute_balancing_stock(self, df_stk_raw, df_sls_raw, source_label=""):
         try:
             import re
+            import numpy as np
+            import pandas as pd
 
             def to_int(v):
                 try:
                     if pd.isna(v) or v is None: return 0
-                    s = str(v).strip().upper()
+                    s = str(v).strip().upper().replace(',', '')
                     if s in ('NAN', 'NONE', '', '-', 'NULL'): return 0
-                    return int(round(float(v)))
+                    return int(round(float(s)))
                 except Exception:
                     return 0
 
-            # ------------------------------------------------------------------
-            # 1. PARSING & PEMBERSIHAN DATA STOK
-            # ------------------------------------------------------------------
-            def find_col_by_kw(df, kws, default_idx):
-                for col in df.columns:
-                    c_up = str(col).strip().upper()
-                    if any(k in c_up for k in kws): return col
-                return df.columns[default_idx] if df.shape[1] > default_idx else df.columns[-1]
+            def clean_sku_str(val):
+                if pd.isna(val) or val is None: return ""
+                s = str(val).strip().upper()
+                if s.endswith('.0'): s = s[:-2]
+                return s
 
-            col_b_name = find_col_by_kw(df_stk_raw, ['BIN', 'LOKASI', 'RAK'], 1)
-            col_s_name = find_col_by_kw(df_stk_raw, ['SKU', 'ITEM CODE', 'BARCODE'], 2)
-            col_desc_name = find_col_by_kw(df_stk_raw, ['ITEM NAME', 'ARTIKEL', 'DESCRIPTION', 'NAMA'], 4)
-            col_sub_name = find_col_by_kw(df_stk_raw, ['SUB KATEGORI', 'SUB CATEGORY', 'KATEGORI'], 6)
-            col_q_name = find_col_by_kw(df_stk_raw, ['QTY SYSTEM', 'QTY SYS', 'QUANTITY', 'QTY', 'STOK'], 9)
+            def normalize_sku_key(val):
+                s = clean_sku_str(val)
+                s_lstrip = s.lstrip('0')
+                return s_lstrip if s_lstrip != "" else "0"
 
-            bin_series = df_stk_raw[col_b_name].fillna('').astype(str).str.strip().str.upper()
-            sku_series = df_stk_raw[col_s_name].fillna('').astype(str).str.split('.').str[0].str.strip().str.upper()
-            qty_series = pd.to_numeric(df_stk_raw[col_q_name], errors='coerce').fillna(0)
+            # Helper membaca kolom cerdas: utamakan nama persis, lalu indeks posisi
+            def get_col_series(df, fixed_idx, exact_names, fallback_kws, default_val=""):
+                col_map = {str(c).strip().upper(): c for c in df.columns}
+                # 1. Cek nama persis
+                for name in exact_names:
+                    if name.upper() in col_map:
+                        return df[col_map[name.upper()]]
+                # 2. Cek keyword
+                for kw in fallback_kws:
+                    for c_up, orig_col in col_map.items():
+                        if kw.upper() in c_up:
+                            if 'SO' in c_up and 'SYSTEM' not in c_up and 'QTY SYSTEM' in [x.upper() for x in exact_names]:
+                                continue
+                            return df[orig_col]
+                # 3. Indeks Posisi
+                if df.shape[1] > fixed_idx:
+                    return df.iloc[:, fixed_idx]
+                return pd.Series(default_val, index=df.index)
+
+            # ------------------------------------------------------------------
+            # 1. BACA DATA STOK (LOCK FIXED COLUMNS)
+            # Kolom B (Index 1) = BIN
+            # Kolom C (Index 2) = SKU
+            # Kolom E (Index 4) = ITEM NAME
+            # Kolom G (Index 6) = SUB KATEGORI
+            # Kolom J (Index 9) = QTY SYSTEM
+            # ------------------------------------------------------------------
+            if df_stk_raw.shape[1] < 10:
+                return False, f"File Stok hanya memiliki {df_stk_raw.shape[1]} kolom! Wajib minimal 10 kolom (hingga Kolom J)."
+
+            bin_raw = get_col_series(df_stk_raw, 1, ['BIN', 'BIN_CODE', 'LOKASI'], ['BIN', 'LOKASI', 'RAK'], "")
+            sku_raw = get_col_series(df_stk_raw, 2, ['SKU', 'BARCODE_SKU', 'BARCODE'], ['SKU', 'BARCODE', 'ITEM CODE'], "")
+            desc_raw = get_col_series(df_stk_raw, 4, ['ITEM NAME', 'ITEM_NAME', 'ARTIKEL'], ['ITEM NAME', 'ARTIKEL', 'DESCRIPTION', 'NAMA'], "-")
+            sub_raw = get_col_series(df_stk_raw, 6, ['SUB KATEGORI', 'SUB_KATEGORI', 'SUB CATEGORY'], ['SUB KATEGORI', 'KATEGORI', 'CATEGORY'], "UNKNOWN")
+            
+            # Kunci Kolom J (Index 9) untuk QTY SYSTEM (bukan Kolom K yang berisi QTY SO)
+            qty_raw = get_col_series(df_stk_raw, 9, ['QTY SYSTEM', 'QTY_SYSTEM', 'QTY SYS', 'STOK'], ['QTY SYSTEM', 'QTY SYS', 'STOK', 'QUANTITY'], 0)
+
+            bin_series = bin_raw.fillna('').astype(str).str.strip().str.upper()
+            sku_series = sku_raw.apply(clean_sku_str)
+            qty_series = pd.to_numeric(qty_raw, errors='coerce').fillna(0)
 
             # 🛑 PENGECUALIAN BIN: DEFECT, REJECT, KARANTINA, PERBAIKAN
             excl_pattern = "DEFECT|REJECT|KARANTINA|PERBAIKAN"
@@ -3782,8 +3788,8 @@ class AppState:
             df_stk = pd.DataFrame({
                 'BIN': bin_series[mask_valid].values,
                 'SKU': sku_series[mask_valid].values,
-                'ITEM_NAME': df_stk_raw[col_desc_name][mask_valid].fillna('-').astype(str).str.strip().values if col_desc_name in df_stk_raw.columns else "-",
-                'SUB_KATEGORI': df_stk_raw[col_sub_name][mask_valid].fillna('UNKNOWN').astype(str).str.strip().str.upper().values if col_sub_name in df_stk_raw.columns else "UNKNOWN",
+                'ITEM_NAME': desc_raw[mask_valid].fillna('-').astype(str).str.strip().values,
+                'SUB_KATEGORI': sub_raw[mask_valid].fillna('UNKNOWN').astype(str).str.strip().str.upper().values,
                 'QTY': qty_series[mask_valid].values
             })
 
@@ -3791,35 +3797,63 @@ class AppState:
                 return False, "Data stok kosong setelah mengecualikan BIN Defect/Reject/Karantina/Perbaikan!"
 
             # ------------------------------------------------------------------
-            # 2. PARSING & PEMBERSIHAN DATA SALES
+            # 2. BACA DATA SALES (LOCK FIXED COLUMNS SESUAI INSTRUKSI)
+            # Kolom A (Index 0)  = INVOICE
+            # Kolom B (Index 1)  = SKU
+            # Kolom L (Index 11) = QTY SALES
             # ------------------------------------------------------------------
-            sales_dict = {}
+            sales_agg = {}
             if not df_sls_raw.empty:
-                c_st_sls = find_col_by_kw(df_sls_raw, ['STORE', 'TOKO', 'CABANG'], 0)
-                c_sku_sls = find_col_by_kw(df_sls_raw, ['SKU', 'BARCODE'], 27 if df_sls_raw.shape[1] > 27 else 2)
-                c_qty_sls = find_col_by_kw(df_sls_raw, ['QTY SALES', 'QUANTITY', 'QTY'], 18 if df_sls_raw.shape[1] > 18 else 3)
+                inv_raw = get_col_series(df_sls_raw, 0, ['INVOICE', 'NO_INVOICE', 'NO_INV'], ['INVOICE', 'INV', 'FAKTUR', 'TRANSAKSI'], "")
+                sku_sls_raw = get_col_series(df_sls_raw, 1, ['SKU', 'BARCODE_SKU', 'BARCODE'], ['SKU', 'BARCODE', 'ITEM CODE'], "")
+                qty_sls_raw = get_col_series(df_sls_raw, 11, ['QTY', 'QTY_SALES', 'QUANTITY', 'QTY SALES'], ['QTY', 'QUANTITY', 'JUMLAH', 'TOTAL'], 0)
 
-                for _, r_sls in df_sls_raw.iterrows():
-                    s_code = str(r_sls.get(c_sku_sls, "")).split('.')[0].strip().upper()
+                df_sls_clean = pd.DataFrame({
+                    'INVOICE': inv_raw.fillna('').astype(str).str.strip().str.upper(),
+                    'SKU': sku_sls_raw.apply(clean_sku_str),
+                    'QTY': pd.to_numeric(qty_sls_raw, errors='coerce').fillna(0)
+                })
+
+                for idx, r_sls in df_sls_clean.iterrows():
+                    s_code = r_sls['SKU']
                     if not s_code or s_code in ('', 'NAN', 'NONE', 'SKU'):
                         continue
-                    q_val = to_int(r_sls.get(c_qty_sls, 0))
-                    st_val = str(r_sls.get(c_st_sls, "")).upper()
+                    q_val = to_int(r_sls['QTY'])
+                    if q_val == 0:
+                        continue
 
-                    if s_code not in sales_dict:
-                        sales_dict[s_code] = {'SALES_OFF': 0, 'SALES_ONL': 0, 'TOTAL_SALES': 0}
+                    inv_str = r_sls['INVOICE']
+                    row_full_text = " ".join([str(v) for v in df_sls_raw.iloc[idx].values if pd.notna(v)]).upper()
 
-                    is_onl = any(x in st_val for x in ['ONLINE', 'ONL', 'WEB', 'SHOPEE', 'TOKOPEDIA', 'TIKTOK', 'LAZADA'])
+                    # Klasifikasi Online vs Offline
+                    is_onl = any(k in inv_str for k in ['INV/', 'ONL', 'ONLINE', 'SHOPEE', 'TOKOPEDIA', 'TIKTOK', 'LAZADA', 'BLIBLI', 'WEB', 'MP/']) or \
+                             any(k in row_full_text for k in ['ONLINE', 'ONL', 'SHOPEE', 'TOKOPEDIA', 'TIKTOK', 'LAZADA', 'WEB', 'HUB SURABAYA', 'HUB MALANG', 'HUB JAKARTA'])
+
+                    if s_code not in sales_agg:
+                        sales_agg[s_code] = {'SALES_OFF': 0, 'SALES_ONL': 0, 'TOTAL_SALES': 0}
+
                     if is_onl:
-                        sales_dict[s_code]['SALES_ONL'] += q_val
+                        sales_agg[s_code]['SALES_ONL'] += q_val
                     else:
-                        sales_dict[s_code]['SALES_OFF'] += q_val
-                    sales_dict[s_code]['TOTAL_SALES'] += q_val
+                        sales_agg[s_code]['SALES_OFF'] += q_val
+                    sales_agg[s_code]['TOTAL_SALES'] += q_val
+
+            # Normalisasi fallback key untuk SKU tanpa leading zero (contoh 00009048 <-> 9048)
+            sales_norm_map = {}
+            for s_code, data in sales_agg.items():
+                s_norm = normalize_sku_key(s_code)
+                if s_norm not in sales_norm_map:
+                    sales_norm_map[s_norm] = {'SALES_OFF': 0, 'SALES_ONL': 0, 'TOTAL_SALES': 0}
+                sales_norm_map[s_norm]['SALES_OFF'] += data['SALES_OFF']
+                sales_norm_map[s_norm]['SALES_ONL'] += data['SALES_ONL']
+                sales_norm_map[s_norm]['TOTAL_SALES'] += data['TOTAL_SALES']
 
             # ------------------------------------------------------------------
             # 3. COMPARE QTY LOG, QTY OFF, QTY ONL PER UNIQUE SKU
             # ------------------------------------------------------------------
             df_stk['QTY_POS'] = df_stk['QTY'].clip(lower=0)
+
+            # BIN Classification: LOG, OFF, ONL
             df_stk['IS_LOG'] = df_stk['BIN'].str.contains('LOG', na=False)
             df_stk['IS_OFF'] = df_stk['BIN'].str.contains('OFF', na=False)
             df_stk['IS_ONL'] = df_stk['BIN'].str.contains('ONL', na=False)
@@ -3838,7 +3872,7 @@ class AppState:
                 TOTAL_STOK=('QTY_POS', 'sum')
             )
 
-            # Master stok per BIN per SKU (untuk alokasi progresif)
+            # Master stok per BIN per SKU untuk progresif refill Tab 2
             bin_sku_grouped = df_stk[df_stk['QTY_POS'] > 0].groupby(['SKU', 'BIN'], as_index=False)['QTY_POS'].sum()
             sku_bins_map = {}
             for _, r in bin_sku_grouped.iterrows():
@@ -3849,7 +3883,6 @@ class AppState:
 
             tab1_rows = []
             tab2_rows = []
-            total_refill_count = 0
 
             for _, r_sku in sku_grouped.iterrows():
                 sku = str(r_sku['SKU'])
@@ -3858,12 +3891,18 @@ class AppState:
                 q_onl = to_int(r_sku['QTY_ONL'])
                 tot_stk = to_int(r_sku['TOTAL_STOK'])
 
-                sls = sales_dict.get(sku, {'SALES_OFF': 0, 'SALES_ONL': 0, 'TOTAL_SALES': 0})
+                # Lookup Sales (prioritaskan exact match, fallback ke strip zero)
+                sls = sales_agg.get(sku)
+                if not sls:
+                    sls = sales_norm_map.get(normalize_sku_key(sku))
+                if not sls:
+                    sls = {'SALES_OFF': 0, 'SALES_ONL': 0, 'TOTAL_SALES': 0}
+
                 s_off = to_int(sls['SALES_OFF'])
                 s_onl = to_int(sls['SALES_ONL'])
                 s_tot = to_int(sls['TOTAL_SALES'])
 
-                # Logika Klasifikasi Alokasi Dinamis
+                # Klasifikasi Alokasi Berdasarkan Sales
                 if s_tot == 0:
                     pct_on, pct_off, pct_log = 0.10, 0.10, 0.80
                     klasifikasi = "NO SALES (10% ONL | 10% OFF | 80% LOG)"
@@ -3885,8 +3924,7 @@ class AppState:
                 tgt_off = to_int(np.ceil(tot_stk * pct_off))
                 tgt_log = max(0, tot_stk - tgt_onl - tgt_off)
 
-                # Defisit / Kebutuhan Refill
-                # Jika stok aktual sudah memenuhi target ideal, maka tidak butuh refill
+                # Kebutuhan Refill
                 need_log = max(0, tgt_log - q_log)
                 need_off = max(0, tgt_off - q_off)
                 need_onl = max(0, tgt_onl - q_onl)
@@ -3913,14 +3951,11 @@ class AppState:
                 # --------------------------------------------------------------
                 # 4. TAB 2: PROGRESSIVE REFILL ALLOCATION PER BIN
                 # --------------------------------------------------------------
-                # Status awal kolom: Jika tidak perlu refill -> "NO REFILL"
                 rem_log = need_log if need_log > 0 else "NO REFILL"
                 rem_off = need_off if need_off > 0 else "NO REFILL"
                 rem_onl = need_onl if need_onl > 0 else "NO REFILL"
 
-                # Cari BIN sumber yang punya stok untuk SKU ini (utamakan BIN LOG / Buffer)
                 bins_available = sku_bins_map.get(sku, [])
-                # Urutkan: dahulukan BIN yang mengandung LOG, lalu BIN non-OFF/non-ONL
                 def bin_priority(b_dict):
                     bn = b_dict['BIN']
                     if 'LOG' in bn: return 1
@@ -3934,17 +3969,15 @@ class AppState:
                         b_name = b_info['BIN']
                         avail_qty = to_int(b_info['QTY'])
 
-                        # Cek apakah masih ada kebutuhan angka yang tersisa
                         has_num_rem = any(isinstance(v, (int, float)) and v > 0 for v in [rem_log, rem_off, rem_onl])
                         if not has_num_rem:
                             break
 
-                        # Alokasi progresif untuk baris BIN ini
                         alloc_log = "NO REFILL" if rem_log == "NO REFILL" else 0
                         alloc_off = "NO REFILL" if rem_off == "NO REFILL" else 0
                         alloc_onl = "NO REFILL" if rem_onl == "NO REFILL" else 0
 
-                        # 1. Alokasi ke OFF
+                        # Alokasi OFF
                         if isinstance(rem_off, (int, float)) and rem_off > 0 and avail_qty > 0:
                             take = min(avail_qty, rem_off)
                             alloc_off = take
@@ -3953,7 +3986,7 @@ class AppState:
                         elif isinstance(rem_off, (int, float)):
                             alloc_off = 0
 
-                        # 2. Alokasi ke ONL
+                        # Alokasi ONL
                         if isinstance(rem_onl, (int, float)) and rem_onl > 0 and avail_qty > 0:
                             take = min(avail_qty, rem_onl)
                             alloc_onl = take
@@ -3962,7 +3995,7 @@ class AppState:
                         elif isinstance(rem_onl, (int, float)):
                             alloc_onl = 0
 
-                        # 3. Alokasi ke LOG (Buffer)
+                        # Alokasi LOG
                         if isinstance(rem_log, (int, float)) and rem_log > 0 and avail_qty > 0:
                             take = min(avail_qty, rem_log)
                             alloc_log = take
@@ -3978,10 +4011,7 @@ class AppState:
                             "QTY OFF": alloc_off,
                             "QTY ONL": alloc_onl
                         })
-                        total_refill_count += 1
-
                 elif rem_log == "NO REFILL" and rem_off == "NO REFILL" and rem_onl == "NO REFILL":
-                    # Jika semua kategori sudah seimbang (NO REFILL), tampilkan BIN pertama dengan status NO REFILL
                     default_bin = bins_available[0]['BIN'] if bins_available else "BIN TOKO / RAK"
                     tab2_rows.append({
                         "BIN": default_bin,
@@ -3991,13 +4021,9 @@ class AppState:
                         "QTY ONL": "NO REFILL"
                     })
 
-            # ------------------------------------------------------------------
-            # SIMPAN LIST KATEGORI UNIK DARI SUPABASE & MASTER DATA
-            # ------------------------------------------------------------------
             df_tab1 = pd.DataFrame(tab1_rows)
             df_tab2 = pd.DataFrame(tab2_rows)
 
-            # Ambil seluruh kategori unik dari data stok yang valid
             unique_cats = sorted([
                 str(c).strip().upper() 
                 for c in df_tab1["SUB KATEGORI"].unique() 
@@ -4005,11 +4031,9 @@ class AppState:
             ])
             self.bs_category_list.set(unique_cats)
 
-            # Simpan data master dasar
             self._raw_df_bs_alloc_base = df_tab1.copy()
             self._raw_df_bs_refill_base = df_tab2.copy()
 
-            # Terapkan filter awal (semua kategori)
             self.apply_bs_category_filter([])
 
             self.bs_processed.set(True)
@@ -4018,7 +4042,7 @@ class AppState:
             import traceback
             traceback.print_exc()
             return False, f"Terjadi kesalahan saat kalkulasi: {str(e)}"
-
+            
     def apply_bs_category_filter(self, selected_cats):
         """Memfilter Tab 1 dan Tab 2 berdasarkan Sub Kategori yang dipilih"""
         if self._raw_df_bs_alloc_base.empty:
