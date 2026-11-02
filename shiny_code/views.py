@@ -453,22 +453,6 @@ CUSTOM_HEAD = ui.head_content(
         .accordion-content { padding: 14px; font-size: 13px; color: #4A5568; background: #F7FAFC; }
     """),
 
-ui.tags.script("""
-        document.addEventListener('click', function(e) {
-            let target = e.target.closest('#btn_dl_audit_pdf_file_hidden, #btn_dl_memo_pdf_file');
-            if (target) {
-                setTimeout(function() {
-                    if (window.Shiny && window.Shiny.setInputValue) {
-                        if (target.id === 'btn_dl_audit_pdf_file_hidden') {
-                            Shiny.setInputValue('btn_clear_audit_pdf_state', Math.random(), {priority: 'event'});
-                        } else if (target.id === 'btn_dl_memo_pdf_file') {
-                            Shiny.setInputValue('btn_clear_memo_pdf_state', Math.random(), {priority: 'event'});
-                        }
-                    }
-                }, 600);
-            }
-        });
-    """),
     # --- 5. SCRIPT LIVE TIMER ---
     ui.tags.script("""
         setInterval(function() {
@@ -2017,10 +2001,10 @@ def show_audit_detail_modal(target: dict):
 
 
 # ==============================================================================
-# VIEW: MEMO PENGAJUAN (TAB 1: DETAIL SCRAPING EVENT | TAB 2: LIST & 2 PDF)
+# VIEW: MEMO PENGAJUAN (DENGAN SUB-TAB MARKOM & LOGISTIK DI TAB 2)
 # ==============================================================================
 def memo_pengajuan_view(state: AppState):
-    # --- TAB 1: DETAIL SCRAPING SPREADSHEET (10 DATA PER HALAMAN + DOWNLOAD) ---
+    # --- TAB 1: DETAIL SCRAPING SPREADSHEET ---
     tab1_scraping_detail = ui.div(
         ui.div(
             ui.div(
@@ -2040,13 +2024,13 @@ def memo_pengajuan_view(state: AppState):
         style="padding: 0.5rem 0;"
     )
 
-    # --- TAB 2: PENDING ADJUSTMENT (MEMO AKTIF + FILTER TANGGAL) ---
+    # --- TAB 2: MEMO KAS (MEMILIKI 2 SUB-TAB: MARKOM & LOGISTIK) ---
     tab2_pending_memos = ui.div(
-        ui.output_ui("memo_pending_table_ui"),
+        ui.output_ui("memo_tab2_subtabs_container_ui"),
         style="padding: 0.5rem 0;"
     )
 
-    # --- TAB 3: DONE ADJUSTMENT (RIWAYAT YANG SUDAH DIEKSEKUSI) ---
+    # --- TAB 3: DONE ADJUSTMENT (HANYA DETAIL & BUKA KEMBALI, TANPA PDF) ---
     tab3_done_memos = ui.div(
         ui.output_ui("memo_done_table_ui"),
         style="padding: 0.5rem 0;"
