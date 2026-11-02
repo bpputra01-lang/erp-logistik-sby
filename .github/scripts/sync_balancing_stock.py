@@ -16,8 +16,12 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 JEZPRO_EMAIL = os.environ.get("JEZPRO_EMAIL", "fajarbintang786@jez.co.id")
 JEZPRO_PASSWORD = os.environ.get("JEZPRO_PASSWORD", "")
 
-# Target Khusus Surabaya
-SURABAYA_ST_ID = 3
+# Surabaya: Kasir Toko & DC Fisik (st_id: 3) serta Online Hub (st_id: 30)
+SURABAYA_STORES = [
+    {"st_id": 3, "name": "JEZ SURABAYA (STORE & DC)", "status_filter": "DONE"},
+    {"st_id": 30, "name": "ONLINE HUB SURABAYA", "status_filter": "DONE ONLINE"}
+]
+
 BRANCH_NAME = "JEZ SURABAYA"
 
 HEADERS_SB = {
@@ -64,14 +68,11 @@ def create_jezpro_session():
         raise Exception("Gagal mendapatkan CSRF Token dari halaman login Jezpro.")
     token = token_tag["value"]
 
-    r_login = session.post("https://jezpro.id/user_login", data={
+    session.post("https://jezpro.id/user_login", data={
         "_token": token,
         "u_email": JEZPRO_EMAIL,
         "password": JEZPRO_PASSWORD
     }, headers={"Referer": "https://jezpro.id/"}, timeout=60)
-
-    if "user_login" in r_login.url and "Dashboard" not in r_login.text:
-        print("⚠️ Cek login: pastikan kredensial JEZPRO_EMAIL dan JEZPRO_PASSWORD benar!")
 
     print("✅ Berhasil login ke Jezpro!")
     session.get("https://jezpro.id/helper_backup", timeout=30)
@@ -83,9 +84,9 @@ def create_jezpro_session():
 # 2. TARIK DATA STOK SURABAYA (ALL STOCK TEMPLATE)
 # ==============================================================================
 def fetch_surabaya_stock(session):
-    print(f"\n📦 [1/2] Menarik Master Stok: {BRANCH_NAME} (st_id = {SURABAYA_ST_ID})...")
+    print(f"\n📦 [1/2] Menarik Master Stok: {BRANCH_NAME} (st_id = 3)...")
     
-    url_export = f"https://jezpro.id/export_mass_adjustment_template?st_id={SURABAYA_ST_ID}&psc_id=&br_id=&pl_id=&qty_filter=1"
+    url_export = "https://jezpro.id/export_mass_adjustment_template?st_id=3&psc_id=&br_id=&pl_id=&qty_filter=1"
     r_exp = session.get(url_export, headers={"Referer": "https://jezpro.id/mass_adjustment"}, timeout=300)
 
     excel_bytes = None
@@ -115,23 +116,20 @@ def fetch_surabaya_stock(session):
 
     df_stock = pd.read_excel(io.BytesIO(excel_bytes))
     df_stock["STORE_NAME"] = BRANCH_NAME
-    
-    # Standarisasi Kolom agar siap dipakai balancing stock
-    # Col 1: BIN | Col 2: SKU | Col 4: ITEM NAME | Col 6: SUB KATEGORI | Col 9: QTY SYSTEM
     records_stock = df_stock.fillna("").to_dict(orient="records")
     print(f"✅ Berhasil memuat {len(records_stock):,} baris stok untuk {BRANCH_NAME}.")
     return records_stock
 
 # ==============================================================================
-# 3. TARIK SALES / STOCK TRACKING SURABAYA (STATUS DONE, 3 BULAN TERAKHIR)
+# 3. TARIK SALES / STOCK TRACKING DONE (PERSIS NETWORK TAB BROWSER)
 # ==============================================================================
 def fetch_surabaya_sales_3months(session):
     now = datetime.now()
     start_date = now - timedelta(days=90)
-    date_range = f"{start_date.strftime('%Y-%m-%d')}|{now.strftime('%Y-%m-%d')}"
+    date_cutoff = start_date.replace(hour=0, minute=0, second=0, microsecond=0)
 
-    print(f"\n📊 [2/2] Menarik Stock Tracking DONE: {BRANCH_NAME}...")
-    print(f"   📅 Periode 3 Bulan Terakhir: {date_range}")
+    print(f"\n📊 [2/2] Menarik Transaksi Penjualan DONE (3 Bulan Terakhir)...")
+    print(f"   📅 Target Cutoff 90 Hari: Transaksi sejak {start_date.strftime('%d-%m-%Y')} s/d Sekarang")
 
     url_dt = "https://jezpro.id/stock_tracking_datatables"
     headers_dt = {
@@ -140,69 +138,95 @@ def fetch_surabaya_sales_3months(session):
         "Referer": "https://jezpro.id/stock_tracking"
     }
 
-    # Query target status DONE (Offline & Online)
-    status_queries = [
-        {"status": "DONE", "status_search": ""},
-        {"status": "DONE ONLINE", "status_search": ""},
-        {"status": "", "status_search": "DONE"}
-    ]
-
     all_done_records = []
     seen_ids = set()
 
-    for sq in status_queries:
+    for store_info in SURABAYA_STORES:
+        st_id = store_info["st_id"]
+        st_name = store_info["name"]
+        status_to_query = store_info["status_filter"]
+        print(f"\n   🏬 Menarik data dari: {st_name} (st_id: {st_id}, status: {status_to_query})...")
+
         start_row = 0
         batch_size = 500
         total_expected = 999999
+        stop_store = False
+        store_done_count = 0
+        draw_count = 1
 
-        while start_row < total_expected:
+        while start_row < total_expected and not stop_store:
+            # 🌟 PARAMETER PERSIS SESUAI REQUEST NETWORK TAB FIREFOX ANDA
             params = {
-                "draw": "1",
-                "columns[0][data]": "DT_RowIndex", "columns[0][name]": "plst_id", "columns[0][orderable]": "false",
-                "columns[1][data]": "datetime", "columns[1][name]": "plst_created", "columns[1][orderable]": "true",
-                "columns[2][data]": "ps_barcode", "columns[2][name]": "ps_barcode", "columns[2][orderable]": "true",
-                "columns[3][data]": "article", "columns[3][name]": "p_name", "columns[3][orderable]": "true",
-                "columns[4][data]": "invoice", "columns[4][name]": "p_name", "columns[4][orderable]": "true",
-                "columns[5][data]": "cust_name", "columns[5][name]": "cust_name", "columns[5][orderable]": "true",
-                "columns[6][data]": "qty", "columns[6][name]": "p_name", "columns[6][orderable]": "true",
-                "columns[7][data]": "product_location", "columns[7][name]": "pl_code", "columns[7][orderable]": "true",
-                "columns[8][data]": "status", "columns[8][name]": "plst_status", "columns[8][orderable]": "true",
-                "columns[8][search][value]": sq["status_search"],
-                "columns[9][data]": "instock_source", "columns[9][name]": "instock_source_status", "columns[9][orderable]": "false",
-                "order[0][column]": "1",
+                "draw": str(draw_count),
+                "columns[0][data]": "DT_RowIndex", "columns[0][name]": "plst_id", "columns[0][searchable]": "false", "columns[0][orderable]": "true", "columns[0][search][value]": "", "columns[0][search][regex]": "false",
+                "columns[1][data]": "datetime", "columns[1][name]": "plst_created", "columns[1][searchable]": "false", "columns[1][orderable]": "true", "columns[1][search][value]": "", "columns[1][search][regex]": "false",
+                "columns[2][data]": "ps_barcode", "columns[2][name]": "ps_barcode", "columns[2][searchable]": "true", "columns[2][orderable]": "true", "columns[2][search][value]": "", "columns[2][search][regex]": "false",
+                "columns[3][data]": "article", "columns[3][name]": "p_name", "columns[3][searchable]": "false", "columns[3][orderable]": "true", "columns[3][search][value]": "", "columns[3][search][regex]": "false",
+                "columns[4][data]": "invoice", "columns[4][name]": "p_name", "columns[4][searchable]": "false", "columns[4][orderable]": "true", "columns[4][search][value]": "", "columns[4][search][regex]": "false",
+                "columns[5][data]": "cust_name", "columns[5][name]": "cust_name", "columns[5][searchable]": "false", "columns[5][orderable]": "true", "columns[5][search][value]": "", "columns[5][search][regex]": "false",
+                "columns[6][data]": "qty", "columns[6][name]": "p_name", "columns[6][searchable]": "false", "columns[6][orderable]": "true", "columns[6][search][value]": "", "columns[6][search][regex]": "false",
+                "columns[7][data]": "product_location", "columns[7][name]": "pl_code", "columns[7][searchable]": "false", "columns[7][orderable]": "true", "columns[7][search][value]": "", "columns[7][search][regex]": "false",
+                "columns[8][data]": "status", "columns[8][name]": "plst_status", "columns[8][searchable]": "false", "columns[8][orderable]": "true", "columns[8][search][value]": "", "columns[8][search][regex]": "false",
+                "columns[9][data]": "instock_source", "columns[9][name]": "instock_source_status", "columns[9][searchable]": "false", "columns[9][orderable]": "false", "columns[9][search][value]": "", "columns[9][search][regex]": "false",
+                "order[0][column]": "0",
                 "order[0][dir]": "desc",
                 "start": str(start_row),
                 "length": str(batch_size),
-                "search[value]": "",
-                "status": sq["status"],
-                "st_id": str(SURABAYA_ST_ID),
-                "date": date_range
+                "search": "",
+                "status": status_to_query,
+                "instock_source": "",
+                "psc_id": "",
+                "std_id": "",
+                "br_id": "",
+                "st_id": str(st_id),
+                "date": ""  # 🌟 Sengaja dikosongkan agar server tidak membatasi ke hari ini saja
             }
 
             try:
                 res = session.get(url_dt, params=params, headers=headers_dt, timeout=60)
                 if res.status_code != 200:
-                    break
-                json_data = res.json()
-                raw_chunk = json_data.get("data", [])
-                if not raw_chunk:
+                    print(f"      ⚠️ Gagal request HTTP {res.status_code}")
                     break
 
-                total_expected = json_data.get("recordsTotal", total_expected)
+                json_data = res.json()
+                raw_chunk = json_data.get("data", [])
+                total_server = json_data.get("recordsFiltered", json_data.get("recordsTotal", 0))
+                total_expected = total_server
+
+                if not raw_chunk:
+                    print(f"      ℹ️ Tidak ada data lagi dari server di offset {start_row}.")
+                    break
+
                 start_row += len(raw_chunk)
+                draw_count += 1
+                chunk_matched = 0
 
                 for item in raw_chunk:
                     status_raw = strip_html(item.get("status") or item.get("plst_status") or "").upper()
                     
-                    # Pastikan status benar-benar memuat 'DONE'
+                    # Verifikasi status DONE
                     if "DONE" not in status_raw:
                         continue
 
-                    # ID Unik untuk hindari duplikat
-                    raw_id = item.get("plst_id") or item.get("id")
+                    dt_clean = strip_html(item.get("datetime") or item.get("plst_created") or "")
+
+                    # Filter Tanggal 90 Hari di Python
+                    dt_obj = None
+                    for fmt in ("%d/%m/%Y %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%d-%m-%Y %H:%M:%S", "%d/%m/%Y", "%Y-%m-%d"):
+                        try:
+                            dt_obj = datetime.strptime(dt_clean[:19].strip(), fmt)
+                            break
+                        except Exception:
+                            pass
+
+                    # Jika urutan transaksi sudah tembus lebih tua dari 90 hari yang lalu, stop loop
+                    if dt_obj and dt_obj < date_cutoff:
+                        stop_store = True
+                        break
+
                     barcode_clean = strip_html(item.get("ps_barcode") or "").split('.')[0].strip().upper()
                     inv_clean = strip_html(item.get("invoice") or "")
-                    dt_clean = strip_html(item.get("datetime") or item.get("plst_created") or "")
+                    raw_id = item.get("plst_id") or item.get("id")
 
                     p_key = f"{raw_id}_{barcode_clean}_{inv_clean}_{dt_clean}"
                     if p_key in seen_ids:
@@ -212,12 +236,12 @@ def fetch_surabaya_sales_3months(session):
                     qty_val = safe_int(item.get("qty"), 1)
                     raw_art = strip_html(item.get("article") or item.get("p_name") or "-")
                     cust_name = strip_html(item.get("cust_name") or "-")
-                    
-                    # Deteksi Channel Online vs Offline untuk matriks balancing stock
+                    loc_bin = strip_html(item.get("product_location") or item.get("pl_code") or "-")
+
+                    # Identifikasi Penjualan Online vs Kasir Toko Offline
                     inv_upper = inv_clean.upper()
                     cust_upper = cust_name.upper()
-                    
-                    is_online = any(k in inv_upper or k in cust_upper for k in ["ONL", "ONLINE", "SHOPEE", "TIKTOK", "TOKOPEDIA", "LAZADA", "BLIBLI", "WEB"])
+                    is_online = (st_id == 30) or any(k in inv_upper or k in cust_upper for k in ["ONL", "ONLINE", "SHOPEE", "TIKTOK", "TOKOPEDIA", "LAZADA", "WEB"])
                     channel_label = "ONLINE" if is_online else "OFFLINE"
 
                     all_done_records.append({
@@ -228,26 +252,30 @@ def fetch_surabaya_sales_3months(session):
                         "INVOICE": inv_clean,
                         "CUST_NAME": cust_name,
                         "QTY_SALES": qty_val,
-                        "BIN": strip_html(item.get("product_location") or item.get("pl_code") or "-"),
+                        "BIN": loc_bin,
                         "STATUS": status_raw,
                         "CHANNEL": channel_label
                     })
+                    chunk_matched += 1
+                    store_done_count += 1
 
+                print(f"      -> Chunk {start_row}/{total_expected}: Berhasil menyaring {chunk_matched} transaksi DONE.")
                 time.sleep(0.08)
 
             except Exception as e:
-                print(f"   ⚠️ Error membaca batch: {e}")
+                print(f"      ⚠️ Error saat membaca data: {e}")
                 break
 
-    print(f"✅ Selesai! Terkumpul total {len(all_done_records):,} transaksi DONE 3 bulan terakhir.")
+        print(f"   ✅ Selesai {st_name}: Total {store_done_count} transaksi DONE 90 hari terkumpul.")
+
+    print(f"\n🎉 TOTAL GABUNGAN: {len(all_done_records):,} baris transaksi DONE berhasil dikumpulkan!")
     return all_done_records, start_date.strftime('%Y-%m-%d'), now.strftime('%Y-%m-%d')
 
 # ==============================================================================
-# 4. PUSH KEDUA HASIL KE SUPABASE
+# 4. PUSH KE SUPABASE
 # ==============================================================================
 def push_to_supabase(stock_records, sales_records, period_start, period_end):
     print(f"\n🚀 Mengirim Data Balancing Stock ke Supabase...")
-
     now_iso = datetime.now(timezone(timedelta(hours=7))).isoformat()
 
     # 1. Simpan Data Master Stok Surabaya
@@ -297,14 +325,14 @@ def push_to_supabase(stock_records, sales_records, period_start, period_end):
 # ==============================================================================
 def run_sync():
     if not JEZPRO_PASSWORD or not SUPABASE_KEY:
-        raise ValueError("JEZPRO_PASSWORD atau SUPABASE_KEY belum disetel di Environment / GitHub Secrets!")
+        raise ValueError("JEZPRO_PASSWORD atau SUPABASE_KEY belum disetel di GitHub Secrets!")
 
     session = create_jezpro_session()
 
     # 1. Tarik Stok Surabaya
     stock_data = fetch_surabaya_stock(session)
 
-    # 2. Tarik Sales DONE 3 Bulan Terakhir Surabaya
+    # 2. Tarik Sales DONE 3 Bulan Terakhir
     sales_data, p_start, p_end = fetch_surabaya_sales_3months(session)
 
     # 3. Simpan Keduanya ke Supabase
