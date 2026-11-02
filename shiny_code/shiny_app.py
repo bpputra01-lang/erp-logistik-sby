@@ -4356,6 +4356,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             print("Gagal render modal:", err_modal)
             ui.notification_show(f"Gagal menampilkan pop-up: {err_modal}", type="error")
             # Pop-Up Modal Detail Item Multiple Adjustment (Anti-Freeze & Bebas Limit)
+
     # ==========================================================================
     # POP-UP MODAL DETAIL ITEM MULTIPLE ADJUSTMENT (FIXED QUERY & AMAN DARI BLOKIR)
     # ==========================================================================
@@ -5322,7 +5323,78 @@ def server(input: Inputs, output: Outputs, session: Session):
             ui.notification_show(f"↩️ {msg}", type="message", duration=3)
         else:
             ui.notification_show(f"⚠️ {msg}", type="warning", duration=4)
+# ==========================================================================
+    # MODAL BUKA DETAIL MEMO DI WEB (YANG SEBELUMNYA HILANG)
+    # ==========================================================================
+    @reactive.Effect
+    @reactive.event(input.btn_open_memo_detail_modal)
+    def _open_memo_detail():
+        m_id = input.btn_open_memo_detail_modal()
+        target = next((m for m in state.memo_list() if m.get("id") == m_id), None)
+        if not target:
+            ui.notification_show("Data memo tidak ditemukan!", type="error")
+            return
 
+        items = target.get("items", [])
+        if isinstance(items, str):
+            import json
+            try: items = json.loads(items)
+            except: items = []
+
+        item_rows = []
+        tot_qty = 0
+        tot_sub = 0
+        for idx, it in enumerate(items, start=1):
+            q = safe_int(it.get("qty", 1), 1)
+            cogs = safe_int(it.get("cogs", 0), 0)
+            subtot = safe_int(it.get("subtotal", q * cogs), q * cogs)
+            tot_qty += q
+            tot_sub += subtot
+
+            item_rows.append(ui.tags.tr(
+                ui.tags.td(str(idx), style="text-align: center; font-weight: bold;"),
+                ui.tags.td(ui.tags.code(str(it.get("sku", "-")), style="font-weight: bold; color: #2B6CB0;")),
+                ui.tags.td(str(it.get("item_name", "-")), style="max-width: 280px; white-space: normal;"),
+                ui.tags.td(str(q), style="text-align: center; font-weight: bold;"),
+                ui.tags.td(f"Rp {cogs:,}", style="text-align: right;"),
+                ui.tags.td(f"Rp {subtot:,}", style="text-align: right; font-weight: 800; color: #10B981;")
+            ))
+
+        ui.modal_show(ui.modal(
+            ui.div(
+                ui.div(
+                    ui.span(f"📄 Nomor Memo: {target.get('id')}", style="font-size: 14px; font-weight: 800; color: #1A202C; display: block;"),
+                    ui.span(f"👤 Pengaju: {target.get('diajukan_oleh')} • Tanggal: {target.get('tanggal')}", style="font-size: 12px; color: #4A5568; display: block; margin-top: 2px;"),
+                    ui.span(f"📌 Keperluan: {target.get('tujuan')}", style="font-size: 12px; font-weight: 700; color: #C53030; display: block; margin-top: 2px;"),
+                    style="background: #EDF2F7; padding: 12px 16px; border-radius: 8px; margin-bottom: 1rem;"
+                ),
+                ui.div(
+                    ui.tags.table(
+                        ui.tags.thead(ui.tags.tr(
+                            ui.tags.th("NO", style="text-align: center;"),
+                            ui.tags.th("SKU"),
+                            ui.tags.th("NAMA ARTIKEL"),
+                            ui.tags.th("QTY", style="text-align: center;"),
+                            ui.tags.th("HARGA BELI", style="text-align: right;"),
+                            ui.tags.th("SUBTOTAL", style="text-align: right;")
+                        )),
+                        ui.tags.tbody(*item_rows) if item_rows else ui.tags.tr(
+                            ui.tags.td("Rincian barang memo ini kosong.", colspan=6, style="text-align: center; padding: 1.5rem; color: #718096;")
+                        ),
+                        class_="custom-clean-table", style="width: 100%; border: 1px solid #CBD5E0; border-radius: 8px;"
+                    ),
+                    style="max-height: 400px; overflow-y: auto;"
+                ),
+                ui.div(
+                    ui.span(f"Total Qty: {tot_qty:,} Pcs | Grand Total: Rp {tot_sub:,}", style="font-weight: 800; font-size: 14px; color: #E50914;"),
+                    style="display: flex; justify-content: flex-end; margin-top: 10px;"
+                )
+            ),
+            title=f"📋 Detail Memo Pengajuan: {m_id}",
+            size="l",
+            easy_close=True,
+            footer=ui.modal_button("Tutup", class_="btn-page-nav")
+        ))
     # ==========================================================================
     # 6. POP-UP MODAL DOWNLOAD PDF (ANTI-GAGAL / ANTI-KORUP)
     # ==========================================================================
