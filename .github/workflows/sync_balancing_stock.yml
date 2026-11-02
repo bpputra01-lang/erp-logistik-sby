@@ -2,9 +2,9 @@ name: Sync Balancing Stock Surabaya (Stock & Sales 90D)
 
 on:
   schedule:
-    # Berjalan otomatis setiap 60 menit sekali (pada menit ke-0 tiap jam)
+    # Berjalan otomatis setiap 60 menit sekali
     - cron: '0 * * * *'
-  workflow_dispatch: # Memungkinkan tombol 'Run workflow' manual di GitHub Actions
+  workflow_dispatch: # Tombol Run manual
 
 jobs:
   sync-balancing:
@@ -30,4 +30,4 @@ jobs:
           JEZPRO_EMAIL: ${{ secrets.JEZPRO_EMAIL }}
           JEZPRO_PASSWORD: ${{ secrets.JEZPRO_PASSWORD }}
         run: |
-          python sync_balancing_stock.py
+          python .github/scripts/sync_balancing_stock.py
