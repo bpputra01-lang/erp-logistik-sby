@@ -274,10 +274,8 @@ def push_to_supabase(stock_records, sales_summary, period_start, period_end, tot
         "period_end": period_end,
         "updated_at": now_iso,
         "total_rows": total_raw_sales,
-        "total_skus": len(sales_summary),
         "sales_data": sales_summary
     }
-
     res_sls = requests.post(
         f"{SUPABASE_URL}/rest/v1/balancing_sales_cache",
         headers=HEADERS_SB,
