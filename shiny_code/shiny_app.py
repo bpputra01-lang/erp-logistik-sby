@@ -3019,8 +3019,33 @@ def server(input: Inputs, output: Outputs, session: Session):
         val = input.change_bs_filter_area()
         state.apply_bs_area_filter(val)
 
+    # ==========================================================================
+    # BALANCING STOCK: WADAH TAB STATIS (ANTI-RESET / ANTI-LONCAT KE TAB 1)
+    # ==========================================================================
     @render.ui
     def balancing_stock_results_container():
+        # HANYA bergantung pada status proses (Render sekali saja saat data siap)
+        if not state.bs_processed():
+            return ui.div()
+
+        return ui.div(
+            ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
+            # 1. Metrik diisolasi di output_ui tersendiri
+            ui.output_ui("bs_metrics_container_ui"),
+            # 2. Kerangka Tab dibuat statis (Tidak akan di-recreate saat filter berubah)
+            ui.navset_card_tab(
+                ui.nav_panel("1. COMPARE STOK & SALES (UNIQUE SKU)", ui.output_ui("bs_tab1_content_ui")),
+                ui.nav_panel("2. LIST REFILL PROGRESIF", ui.output_ui("bs_tab2_content_ui")),
+                id="bs_navset_tab"
+            ),
+            style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
+        )
+
+    # --------------------------------------------------------------------------
+    # 1. OUTPUT REAKTIF METRIK (UPDATE OTOMATIS TANPA MENGGANGGU TAB)
+    # --------------------------------------------------------------------------
+    @render.ui
+    def bs_metrics_container_ui():
         if not state.bs_processed():
             return ui.div()
 
@@ -3033,30 +3058,38 @@ def server(input: Inputs, output: Outputs, session: Session):
         c_off = get_balance_color(state.bs_perc_offline())
         c_on = get_balance_color(state.bs_perc_online())
 
-        # 🌟 BARIS 1: PERSENTASE KESEIMBANGAN (HANYA LOGISTIK, OFFLINE, ONLINE)
-        balance_metrics_ui = ui.div(
-            dark_metric_box("📦 BALANCE AREA LOGISTIK", f"{state.bs_perc_logistik():.1f}%", c_log),
-            dark_metric_box("🏪 BALANCE AREA OFFLINE", f"{state.bs_perc_offline():.1f}%", c_off),
-            dark_metric_box("🌐 BALANCE AREA ONLINE", f"{state.bs_perc_online():.1f}%", c_on),
-            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
+        return ui.div(
+            # BARIS 1: PERSENTASE KESEIMBANGAN (% BALANCE RATE)
+            ui.div(
+                dark_metric_box("📦 BALANCE AREA LOGISTIK", f"{state.bs_perc_logistik():.1f}%", c_log),
+                dark_metric_box("🏪 BALANCE AREA OFFLINE", f"{state.bs_perc_offline():.1f}%", c_off),
+                dark_metric_box("🌐 BALANCE AREA ONLINE", f"{state.bs_perc_online():.1f}%", c_on),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
+            ),
+            # BARIS 2: VOLUME TOTAL & DEFISIT SKU YANG PERLU REFILL
+            ui.div(
+                dark_metric_box("📦 TOTAL UNIQUE SKU", f"{state.bs_total_sku():,} SKU", "#3182CE"),
+                dark_metric_box("🔢 TOTAL QTY STOCK", f"{state.bs_total_stock():,} PCS", "#C5A059"),
+                dark_metric_box("🏪 DEFISIT OFFLINE", f"{state.bs_sku_need_off():,} SKU", "#DD6B20"),
+                dark_metric_box("💻 DEFISIT ONLINE", f"{state.bs_sku_need_on():,} SKU", "#3182CE"),
+                dark_metric_box("🚚 DEFISIT LOGISTIK", f"{state.bs_sku_need_log():,} SKU", "#805AD5"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+            )
         )
 
-        # 🌟 BARIS 2: VOLUME TOTAL & DEFISIT SKU YANG PERLU REFILL
-        volume_metrics_ui = ui.div(
-            dark_metric_box("📦 TOTAL UNIQUE SKU", f"{state.bs_total_sku():,} SKU", "#3182CE"),
-            dark_metric_box("🔢 TOTAL QTY STOCK", f"{state.bs_total_stock():,} PCS", "#C5A059"),
-            dark_metric_box("🏪 DEFISIT OFFLINE", f"{state.bs_sku_need_off():,} SKU", "#DD6B20"),
-            dark_metric_box("💻 DEFISIT ONLINE", f"{state.bs_sku_need_on():,} SKU", "#3182CE"),
-            dark_metric_box("🚚 DEFISIT LOGISTIK", f"{state.bs_sku_need_log():,} SKU", "#805AD5"),
-            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
-        )
+    # --------------------------------------------------------------------------
+    # 2. OUTPUT REAKTIF KONTEN TAB 1 (COMPARE SKU)
+    # --------------------------------------------------------------------------
+    @render.ui
+    def bs_tab1_content_ui():
+        if not state.bs_processed():
+            return ui.div()
 
-        # TAB 1: COMPARE UNIQUE SKU DENGAN SALES
-        tab1_content = ui.div(
+        return ui.div(
             ui.div(
                 ui.div(
                     ui.h4("📊 Summary Comparation Total Stock to Stock Area", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 2px 0;"),
-                    ui.p("Pengecualian otomatis terhadap BIN Defect, Reject, Karantina, Perbaikan, Toko, Live, Putaway.", style="color: #718096; font-size: 12px; margin: 0;"),
+                    ui.p("Pengecualian otomatis terhadap BIN Defect, Reject, Karantina, Perbaikan, dan Toko.", style="color: #718096; font-size: 12px; margin: 0;"),
                 ),
                 ui.download_button(
                     "btn_dl_bs_tab1",
@@ -3069,15 +3102,24 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="padding: 0.75rem 0;"
         )
 
-        # TAB 2: LIST REFILL BERTINGKAT / PROGRESIF (DENGAN FILTER AREA)
+    # --------------------------------------------------------------------------
+    # 3. OUTPUT REAKTIF KONTEN TAB 2 (LIST REFILL & FILTER AREA)
+    # --------------------------------------------------------------------------
+    @render.ui
+    def bs_tab2_content_ui():
+        if not state.bs_processed():
+            return ui.div()
+
         cur_area = state.bs_selected_area()
-        tab2_content = ui.div(
+
+        return ui.div(
             ui.div(
                 ui.div(
                     ui.h4("🔄 List Refill Area Logistik | Offline | Online", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
+                    ui.p(f"Menampilkan instruksi refill untuk: {cur_area}. Baris tanpa alokasi refill disembunyikan otomatis.", style="color: #718096; font-size: 12px; margin: 0;"),
                 ),
                 ui.div(
-                    # 🌟 DROPDOWN FILTER AREA TAB 2
+                    # 🌟 FILTER AREA KHUSUS TAB 2
                     ui.div(
                         ui.span("🎯 Filter Area Refill:", style="font-size: 12px; font-weight: 800; color: #1A202C; margin-right: 6px;"),
                         ui.tags.select(
@@ -3103,7 +3145,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             render_clean_table(state.df_bs_refill_headers(), state.df_bs_refill_rows(), "tbl_bs_tab2"),
             style="padding: 0.75rem 0;"
         )
-
+        
         return ui.div(
             ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
             balance_metrics_ui,
