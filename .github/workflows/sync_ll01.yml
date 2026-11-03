@@ -2,14 +2,14 @@ name: Sync LL01 Waiting Jezpro to Supabase
 
 on:
   schedule:
-    # 1. Berjalan reguler tiap 15 menit (:00, :15, :30, :45) dari jam 06:00 - 22:00 WIB
-    - cron: '*/15 23,0-15 * * *'
+    # 1. Jam 10:00 WIB (03:00 UTC)
+    - cron: '0 3 * * *'
 
-    # 2. Tambahan spesifik jam 15:25 WIB (08:25 UTC) dan 21:25 WIB (14:25 UTC)
-    - cron: '25 8,14 * * *'
+    # 2. Jam 15:35 WIB (08:35 UTC)
+    - cron: '35 8 * * *'
 
-    # 3. Tambahan spesifik jam 21:55 WIB (14:55 UTC)
-    - cron: '55 14 * * *'
+    # 3. Jam 21:20 WIB dan 21:50 WIB (14:20 & 14:50 UTC)
+    - cron: '20,50 14 * * *'
 
   # Memungkinkan tombol "Run workflow" manual kapan saja
   workflow_dispatch:
