@@ -1143,15 +1143,14 @@ def cross_check_real_system_view(state: AppState):
     )
 
 # ==============================================================================
-# VIEW: BALANCING STOCK (2 TAB SEDERHANA + FILTER KATEGORI SUPABASE)
+# VIEW: BALANCING STOCK (2 TAB MURNI DATABASE SUPABASE - TANPA UPLOADER MANUAL)
 # ==============================================================================
 def balancing_stock_view(state: AppState):
-    # Top Action Banner: Tombol Sync dari Supabase & Opsi Upload Manual
     top_control_bar = ui.div(
         ui.div(
             ui.div(
                 ui.h4("Balancing Stock & Dynamic Distribution", style="font-size: 16px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
-                ui.p("Data diambil langsung dari Supabase ('balancing_stock_cache' & 'balancing_sales_cache') dengan pengecualian BIN Defect, Reject, Karantina, dan Perbaikan.", style="color: #718096; font-size: 12.5px; margin: 0;"),
+                ui.p("Data disinkronkan otomatis dari database Supabase ('balancing_stock_cache' & 'balancing_sales_cache') dengan pengecualian BIN Defect, Reject, Karantina, Perbaikan, dan Toko.", style="color: #718096; font-size: 12.5px; margin: 0;"),
             ),
             ui.div(
                 ui.tags.button(
@@ -1163,21 +1162,8 @@ def balancing_stock_view(state: AppState):
             ),
             style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 10px;"
         ),
-        # Wadah Filter Kategori Dinamis dari Supabase
+        # Filter Kategori Otomatis dari Supabase
         ui.output_ui("bs_category_filter_container_ui"),
-        ui.hr(style="margin: 1rem 0; border-color: #CBD5E0;"),
-        ui.tags.details(
-            ui.tags.summary("📁 Atau Upload File Manual (All Stock & Sales Report)"),
-            ui.div(
-                ui.div(
-                    custom_uploader_box("uploader_bs_stock", "1. File All Stock (.xlsx / .csv)"),
-                    custom_uploader_box("uploader_bs_sales", "2. File Sales Report (.xlsx / .csv)"),
-                    style="display: flex; gap: 1rem; width: 100%; margin-top: 0.75rem; flex-wrap: wrap;"
-                ),
-                ui.output_ui("balancing_stock_action_btn_ui")
-            ),
-            style="background: #F8FAFC; border: 1px dashed #CBD5E0; border-radius: 8px; padding: 6px 12px;"
-        ),
         style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem; box-shadow: 0 2px 8px rgba(0,0,0,0.02);"
     )
 

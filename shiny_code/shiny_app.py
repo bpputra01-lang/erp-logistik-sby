@@ -2935,7 +2935,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         yield buf.getvalue()
 
     # ==========================================================================
-    # BALANCING STOCK: 2 TAB CONTROLLER (SYNC SUPABASE & PROGRESSIVE REFILL)
+    # BALANCING STOCK: CONTROLLER MURNI SUPABASE (TANPA UPLOADER MANUAL)
     # ==========================================================================
     @reactive.Effect
     @reactive.event(input.btn_sync_balancing_supabase)
@@ -2950,32 +2950,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             state.show_error_modal.set(True)
 
     @render.ui
-    def balancing_stock_action_btn_ui():
-        f1 = input.uploader_bs_stock() if "uploader_bs_stock" in input else None
-        f2 = input.uploader_bs_sales() if "uploader_bs_sales" in input else None
-        if (f1 and len(f1) > 0):
-            return ui.div(
-                ui.tags.button(
-                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "RUN PROSES BALANCING FILE"),
-                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_run_balancing_stock', Math.random(), {priority: 'event'});",
-                    class_="btn-red-gradient"
-                ),
-                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
-            )
-        return ui.div(
-            ui.tags.button(
-                ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"),
-                "UPLOAD FILE ALL STOCK UNTUK MEMULAI", disabled=True, class_="btn-locked"
-            ),
-            style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
-        )
-
-# ==========================================================================
-    # BALANCING STOCK: FILTER KATEGORI DINAMIS DARI SUPABASE
-    # ==========================================================================
-    @render.ui
     def bs_category_filter_container_ui():
-        # Hanya muncul setelah data diproses / di-sync
         if not state.bs_processed():
             return ui.div()
 
@@ -2995,33 +2970,18 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="background: #F8FAFC; border: 1px solid #CBD5E0; padding: 12px 16px; border-radius: 8px; margin-top: 1rem;"
         )
 
-    # Listener saat user memilih / mengubah Sub Kategori
     @reactive.Effect
     def _on_bs_category_filter_change():
         if state.bs_processed() and "bs_filter_category_select" in input:
             sel = input.bs_filter_category_select()
             cats = list(sel) if sel is not None else []
             state.apply_bs_category_filter(cats)
-            
-    @reactive.Effect
-    @reactive.event(input.btn_run_balancing_stock)
-    def _proc_balancing_stock():
-        f_stock = input.uploader_bs_stock()
-        f_sales = input.uploader_bs_sales() if "uploader_bs_sales" in input else None
-        succ, msg = state.process_balancing_stock(f_stock, f_sales)
-        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
-        if succ:
-            state.show_success_modal.set(True)
-        else:
-            state.error_modal_message.set(msg)
-            state.show_error_modal.set(True)
 
     @render.ui
     def balancing_stock_results_container():
         if not state.bs_processed():
             return ui.div()
 
-        # Warna Dinamis: Hijau (>=90%), Oranye (70-89%), Merah (<70%)
         def get_balance_color(pct):
             if pct >= 90.0: return "#10B981"
             elif pct >= 70.0: return "#DD6B20"
@@ -3032,15 +2992,16 @@ def server(input: Inputs, output: Outputs, session: Session):
         c_off = get_balance_color(state.bs_perc_offline())
         c_on = get_balance_color(state.bs_perc_online())
 
-        # 🌟 BARIS 1: PERSENTASE KESEIMBANGAN (% BALANCE RATE)
+        # BARIS 1: PERSENTASE KESEIMBANGAN (% BALANCE RATE)
         balance_metrics_ui = ui.div(
+            dark_metric_box("⚖️ OVERALL BALANCED (ALL AREA)", f"{state.bs_perc_overall():.1f}%", c_all),
             dark_metric_box("📦 BALANCE AREA LOGISTIK", f"{state.bs_perc_logistik():.1f}%", c_log),
             dark_metric_box("🏪 BALANCE AREA OFFLINE", f"{state.bs_perc_offline():.1f}%", c_off),
             dark_metric_box("🌐 BALANCE AREA ONLINE", f"{state.bs_perc_online():.1f}%", c_on),
             style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
         )
 
-        # 🌟 BARIS 2: VOLUME TOTAL & DEFISIT SKU YANG PERLU REFILL
+        # BARIS 2: VOLUME TOTAL & DEFISIT SKU YANG PERLU REFILL
         volume_metrics_ui = ui.div(
             dark_metric_box("📦 TOTAL UNIQUE SKU", f"{state.bs_total_sku():,} SKU", "#3182CE"),
             dark_metric_box("🔢 TOTAL QTY STOCK", f"{state.bs_total_stock():,} PCS", "#C5A059"),
