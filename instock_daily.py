@@ -211,12 +211,12 @@ def sync_cycle(session):
         k = f"{it['barcode_sku']}_{it['invoice']}"
         current_helper_keys.add(k)
         
-        # 🛑 ATURAN PENTING: 
-        # Jika SKU+Invoice ini BELUM PERNAH ADA SAMA SEKALI di database hari ini 
-        # (baik status WAITING, NEED_SETUP, maupun DONE_SETUP), barulah masukkan sebagai data baru.
-        # Jika sudah pernah ada, JANGAN di-insert ulang!
         if k not in existing_records_map:
+            # 🌟 BUAT ID UNIK BERBASIS HASH SKU + INVOICE (Mencegah error kolom id NULL)
+            unique_id = abs(hash(f"{it['barcode_sku']}_{it['invoice']}_{time.time()}")) % 2147483647
+
             new_inserts.append({
+                "id": unique_id,  # <-- ID UNIK DITAMBAHKAN DI SINI
                 "barcode_sku": it["barcode_sku"],
                 "article_name": it["article_name"],
                 "bin_code": it["bin_code"],
@@ -233,7 +233,6 @@ def sync_cycle(session):
             print(f"   📥 {len(new_inserts)} barang baru masuk antrean WAITING OFFLINE.")
         else:
             print(f"   ❌ Gagal insert data baru: {res_ins.text}")
-
     # ==========================================================================
     # LANGKAH 3: DETEKSI BARANG HILANG DARI HELPER (UPDATE STATUS KE NEED_SETUP - TANPA HAPUS)
     # ==========================================================================
