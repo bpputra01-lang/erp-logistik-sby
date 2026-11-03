@@ -4749,7 +4749,7 @@ class AppState:
             is_toko_disp = df['BIN_CLEAN'].str.contains('TOKO|DISPLAY', na=False)
 
             # 🛑 PENGECUALIAN SUMBER DISPLAY: EVENT, REJECT, DEFECT, KARANTINA, PERBAIKAN, RESELLER
-            excl_display_src = "EVENT|REJECT|DEFECT|KARANTINA|PERBAIKAN|RESELLER"
+            excl_display_src = "EVENT|REJECT|DEFECT|KARANTINA|PERBAIKAN|RESELLER|GARAGE|LIVE"
             is_valid_source = (~is_toko_disp) & (~df['BIN_CLEAN'].str.contains(excl_display_src, na=False))
 
             df['QTY_GUDANG_SRC'] = np.where(is_valid_source, df['QTY_NUM'], 0)
