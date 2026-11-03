@@ -281,13 +281,37 @@ def sync_cycle(session):
                 print(f"   🎉 MATCH VALID! SKU: {t_sku} (Hilang: {target.get('disappeared_at')[11:19]} ➔ Mutasi: {matched_mutasi['raw_time']}) ➔ DIGESER KE DONE SETUP!")
 
 # ==============================================================================
-# EKSEKUSI PROGRAM
+# EKSEKUSI PROGRAM REAL-TIME LOOPING
 # ==============================================================================
 if __name__ == "__main__":
+    # Baca durasi kerja dari environment variable GitHub Actions
+    # Default: loop 28 menit (1680 detik) dengan jeda 15 detik sekali cek
+    max_duration = int(os.environ.get("WORKER_DURATION_SECONDS", "1680"))
+    poll_interval = int(os.environ.get("POLL_INTERVAL_SECONDS", "15"))
+
     print("=" * 65)
-    print("🚀 MENJALANKAN SYNC INSTOCK DAILY (WIB NATIVE - NO PYTZ)")
+    print(f"🚀 WORKER REAL-TIME AKTIF: Cek Jezpro setiap {poll_interval} detik")
+    print(f"⏱️ Durasi sesi runner: {max_duration // 60} menit")
     print("=" * 65)
 
     jez_session = create_jezpro_session()
-    sync_cycle(jez_session)
-    print("🏁 Selesai!")
+    start_time = time.time()
+    cycle_count = 1
+
+    while (time.time() - start_time) < max_duration:
+        try:
+            print(f"\n🔄 [Cycle #{cycle_count}] Pengecekan data Jezpro: {datetime.now(WIB).strftime('%H:%M:%S')} WIB")
+            sync_cycle(jez_session)
+            cycle_count += 1
+        except Exception as e:
+            print(f"❌ Terjadi kesalahan pada cycle #{cycle_count}: {e}")
+            # Jika session login expired, coba login ulang
+            time.sleep(3)
+            try:
+                jez_session = create_jezpro_session()
+            except Exception:
+                pass
+
+        time.sleep(poll_interval)
+
+    print("\n🏁 Sesi runner 28 menit selesai. Akan dilanjutkan oleh jadwal berikutnya.")
