@@ -2953,29 +2953,27 @@ def compliance_audit_view(state: AppState):
     )
 
 # ==============================================================================
-# VIEW: INSTOCK VALIDATION (1 TOMBOL LANGSUNG PROSES)
+# VIEW: INSTOCK VALIDATION (DENGAN 2 TAB & TRACKING WAKTU NYATA)
 # ==============================================================================
 def instock_validation_view(state: AppState):
-    action_section = ui.div(
+    header_section = ui.div(
         ui.div(
             ui.div(
-                ui.h4("🔄 Transit to Bin Instock (GL1-INSTOCK)", style="font-size: 16px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
-                ui.p("Klik tombol di sebelah kanan untuk menarik data terbaru dari database dan membuat format mutasi ke 'GL1-INSTOCK' secara otomatis.", style="color: #718096; font-size: 13px; margin: 0;"),
+                ui.h4("🔄 Instock Validation & Realtime Setup Tracking", style="font-size: 16px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
+                ui.p("Barang yang hilang dari Helper Jezpro otomatis masuk ke Tab 1 (List Setup). Begitu mutasi ke GL1-INSTOCK dieksekusi di Jezpro pada jam yang sesuai, barang otomatis pindah ke Tab 2 (Done Setup).", style="color: #718096; font-size: 12.5px; margin: 0;")
             ),
-            ui.div(
-                ui.tags.button(
-                    ui.tags.span(ui.tags.i(class_="fa-solid fa-dolly", style="margin-right: 6px;"), "GENERATE MUTASI KE GL1-INSTOCK"),
-                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_run_transit_instock', Math.random(), {priority: 'event'});",
-                    class_="btn-red-gradient"
-                )
+            ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-arrows-rotate", style="margin-right: 6px;"), "REFRESH SEKARANG",
+                onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_run_transit_instock', Math.random(), {priority: 'event'});",
+                style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; font-weight: 800; border: none; padding: 8px 16px; border-radius: 6px; font-size: 12px; cursor: pointer; box-shadow: 0 2px 6px rgba(16,185,129,0.3);"
             ),
-            style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;"
+            style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 10px;"
         ),
-        style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+        style="background: white; padding: 1.25rem 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
     )
 
     return ui.div(
-        action_section,
+        header_section,
         ui.output_ui("instock_validation_results_container"),
         style="width: 100%; padding: 1rem;"
     )

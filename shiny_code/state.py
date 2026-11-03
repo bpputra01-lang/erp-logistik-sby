@@ -623,16 +623,23 @@ class AppState:
         self.comp_audit_trading_period = reactive.Value("Reguler / All Season")
         self.comp_audit_scope = reactive.Value("Gudang Pusat (DC)")
 
-        # --- INSTOCK VALIDATION STATE ---
+        # --- INSTOCK VALIDATION STATE (VERSI BARU DENGAN 2 TAB & TIMESTAMP) ---
         self.iv_processed = reactive.Value(False)
-        self.iv_instock_data = reactive.Value([])
+        self.iv_instock_data = reactive.Value([])       # Menampung status NEED_SETUP
+        self.iv_done_data = reactive.Value([])          # Menampung status DONE_SETUP
         self.iv_total_instock_qty = reactive.Value(0)
         self.iv_total_allocated_qty = reactive.Value(0)
+        self.iv_total_done_qty = reactive.Value(0)
 
-        # Tab Template Mutasi / Set Up
+        # Tab 1: Template Mutasi / Set Up (Yang belum dimutasi di Jezpro)
         self.df_iv_setup_headers = reactive.Value([])
         self.df_iv_setup_rows = reactive.Value([])
         self._raw_df_iv_setup = pd.DataFrame()
+
+        # Tab 2: Riwayat Selesai (Yang mutasinya sudah cocok secara tanggal & jam)
+        self.df_iv_done_headers = reactive.Value([])
+        self.df_iv_done_rows = reactive.Value([])
+        self._raw_df_iv_done = pd.DataFrame()
 
         # Master Checklist 27 Kriteria dari PDF
         self.COMPLIANCE_DEFAULT_ITEMS = [
@@ -7318,77 +7325,87 @@ class AppState:
             return False, f"Gagal mengembalikan memo: {e}"
 
 
-            # --------------------------------------------------------------------------
-    # METODE INSTOCK VALIDATION
+    # --------------------------------------------------------------------------
+    # METODE INSTOCK VALIDATION (DENGAN PEMISAHAN WAKTU & STATUS MUTASI)
     # --------------------------------------------------------------------------
     def load_instock_daily_from_supabase(self):
-        """Memuat data instock harian dari Supabase"""
+        """Memuat antrean barang berdasarkan status 'NEED_SETUP' vs 'DONE_SETUP'"""
         try:
             client = get_supabase()
             if not client:
                 return False, "Koneksi ke Supabase gagal!"
             
             today_str = datetime.now().strftime("%Y-%m-%d")
-            res = client.table("jezpro_instock_daily").select("*").eq("sync_date", today_str).execute()
-            data = res.data if res and hasattr(res, "data") and res.data else []
-            self.iv_instock_data.set(data)
-            self.iv_total_instock_qty.set(sum(safe_int(x.get("qty", 1)) for x in data))
-            return True, f"Berhasil memuat {len(data)} baris data Instock hari ini."
-        except Exception as e:
-            return False, f"Gagal memuat Instock: {e}"
-
-    # --------------------------------------------------------------------------
-    # METODE INSTOCK VALIDATION (TRANSIT TO GL1-INSTOCK)
-    # --------------------------------------------------------------------------
-    def load_instock_daily_from_supabase(self):
-        """Memuat data instock/waiting offline harian dari Supabase"""
-        try:
-            client = get_supabase()
-            if not client:
-                return False, "Koneksi ke Supabase gagal!"
+            # Tarik data hari ini
+            res = client.table("jezpro_instock_daily")\
+                        .select("*")\
+                        .eq("sync_date", today_str)\
+                        .order("id", desc=True)\
+                        .execute()
             
-            # Tarik data dari tabel jezpro_instock_daily
-            res = client.table("jezpro_instock_daily").select("*").execute()
-            data = res.data if res and hasattr(res, "data") and res.data else []
-            self.iv_instock_data.set(data)
-            self.iv_total_instock_qty.set(sum(safe_int(x.get("qty", 1)) for x in data))
-            return True, f"Berhasil memuat {len(data)} baris data antrean dari Supabase."
-        except Exception as e:
-            return False, f"Gagal memuat data: {e}"
+            all_data = res.data if res and hasattr(res, "data") and res.data else []
 
-    def process_transit_to_instock(self):
-        """Otomatis refresh data Supabase lalu buat format mutasi GL1-INSTOCK (Bersih tanpa kurung siku)"""
-        try:
-            # 1. Tarik data paling baru dari Supabase
-            succ, msg = self.load_instock_daily_from_supabase()
-            if not succ or not self.iv_instock_data():
-                return False, "Data antrean kosong di database Supabase!"
+            # 1. PISAHKAN BERDASARKAN STATUS
+            need_setup = [x for x in all_data if x.get("status") == "NEED_SETUP"]
+            done_setup = [x for x in all_data if x.get("status") == "DONE_SETUP"]
 
-            # 2. Susun data mutasi ke GL1-INSTOCK
+            self.iv_instock_data.set(need_setup)
+            self.iv_done_data.set(done_setup)
+
+            # 2. SUSUN TAB 1: LIST SETUP (BARANG YANG HILANG DARI HELPER & PERLU DIMUTASI)
             transit_records = []
-            for r in self.iv_instock_data():
-                q = safe_int(r.get("qty", 1))
-                if q > 0:
-                    # 🌟 HILANGKAN KURUNG SIKU [ ] PADA NAMA BIN
-                    raw_bin = str(r.get("bin_code", "-")).replace('[', '').replace(']', '').strip().upper()
+            for r in need_setup:
+                q = safe_int(r.get("qty", 1), 1)
+                raw_bin = str(r.get("bin_code", "-")).replace('[', '').replace(']', '').strip().upper()
+                disappeared_time = str(r.get("disappeared_at", "-"))[11:19]  # Format jam HH:MM:SS
 
-                    transit_records.append({
-                        "BIN AWAL": raw_bin,
-                        "BIN TUJUAN": "GL1-INSTOCK",
-                        "SKU": str(r.get("barcode_sku", "-")).split('.')[0].strip().upper(),
-                        "QUANTITY": q,
-                        "NOTES": "TRANSIT INSTOCK"
-                    })
+                transit_records.append({
+                    "JAM HILANG": disappeared_time if disappeared_time else "-",
+                    "BIN AWAL": raw_bin if raw_bin != "WAITING OFFLINE" else "STAGING INBOUND",
+                    "BIN TUJUAN": "GL1-INSTOCK",
+                    "SKU": str(r.get("barcode_sku", "-")).split('.')[0].strip().upper(),
+                    "NAMA ARTIKEL": str(r.get("article_name", "-")),
+                    "QUANTITY": q,
+                    "NOTES": "TRANSIT INSTOCK"
+                })
 
             df_setup = pd.DataFrame(transit_records)
-            tot_transit = int(df_setup["QUANTITY"].sum()) if not df_setup.empty else 0
-
+            tot_transit = sum(safe_int(x.get("qty", 1), 1) for x in need_setup)
             self.iv_total_allocated_qty.set(tot_transit)
             self._raw_df_iv_setup = df_setup
             self.df_iv_setup_headers.set(df_setup.columns.tolist() if not df_setup.empty else [])
             self.df_iv_setup_rows.set(df_setup.fillna("").astype(str).values.tolist() if not df_setup.empty else [])
 
+            # 3. SUSUN TAB 2: DONE SETUP (MUTASI SUDAH COCOK DENGAN JEZPRO SECARA JAM & MENIT)
+            done_records = []
+            for r in done_setup:
+                q_done = safe_int(r.get("qty", 1), 1)
+                done_time = str(r.get("setup_done_at", "-"))
+                dis_time = str(r.get("disappeared_at", "-"))[11:19]
+
+                done_records.append({
+                    "JAM REQUEST": dis_time if dis_time else "-",
+                    "JAM MUTASI SELESAI": done_time if done_time else "-",
+                    "SKU": str(r.get("barcode_sku", "-")).split('.')[0].strip().upper(),
+                    "NAMA ARTIKEL": str(r.get("article_name", "-")),
+                    "BIN AWAL": str(r.get("bin_code", "-")).replace('[', '').replace(']', '').strip().upper(),
+                    "BIN TUJUAN": "GL1-INSTOCK",
+                    "QUANTITY": q_done,
+                    "STATUS": "✅ TERVERIFIKASI JEZPRO"
+                })
+
+            df_done = pd.DataFrame(done_records)
+            tot_done = sum(safe_int(x.get("qty", 1), 1) for x in done_setup)
+            self.iv_total_done_qty.set(tot_done)
+            self._raw_df_iv_done = df_done
+            self.df_iv_done_headers.set(df_done.columns.tolist() if not df_done.empty else [])
+            self.df_iv_done_rows.set(df_done.fillna("").astype(str).values.tolist() if not df_done.empty else [])
+
             self.iv_processed.set(True)
-            return True, f"Format Mutasi ke GL1-INSTOCK Berhasil Dibuat! (Total: {tot_transit} Pcs)"
+            return True, f"Sinkronisasi berhasil! ({len(need_setup)} Butuh Setup, {len(done_setup)} Selesai)"
         except Exception as e:
-            return False, f"Gagal membuat Transit Instock: {e}"
+            return False, f"Gagal memuat data: {e}"
+
+    def process_transit_to_instock(self):
+        """Trigger pembaruan data instock"""
+        return self.load_instock_daily_from_supabase()

@@ -5614,7 +5614,9 @@ def server(input: Inputs, output: Outputs, session: Session):
         else:
             ui.notification_show(f"⚠️ {msg}", type="error", duration=4)
 
-    # 2. Eksekusi Transit Instock
+    # ==========================================================================
+    # INSTOCK VALIDATION CONTROLLER (TAB 1 NEED SETUP VS TAB 2 DONE SETUP)
+    # ==========================================================================
     @reactive.Effect
     @reactive.event(input.btn_run_transit_instock)
     def _on_run_transit_instock():
@@ -5626,59 +5628,96 @@ def server(input: Inputs, output: Outputs, session: Session):
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
 
-    # ==========================================================================
-    # INSTOCK VALIDATION CONTROLLER (1 TOMBOL & 2 METRIC CARDS)
-    # ==========================================================================
+    # 🌟 AUTO-REFRESH OTOMATIS TIAP 10 DETIK (TIDAK PERLU KLIK TOMBOL MANUAL)
     @reactive.Effect
-    @reactive.event(input.btn_run_transit_instock)
-    def _on_run_transit_instock():
-        succ, msg = state.process_transit_to_instock()
-        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
-        if succ:
-            state.show_success_modal.set(True)
-        else:
-            state.error_modal_message.set(msg)
-            state.show_error_modal.set(True)
+    def _auto_refresh_instock_page():
+        reactive.invalidate_later(10)
+        with reactive.isolate():
+            if state.logged_in() and state.main_menu() == "Instock Validation":
+                state.load_instock_daily_from_supabase()
 
     @render.ui
     def instock_validation_results_container():
         if not state.iv_processed():
-            return ui.div()
+            state.load_instock_daily_from_supabase()
 
-        # 🌟 Kartu Metrik hanya 2 (BIN TUJUAN sudah dihapus)
+        tot_need_rows = len(state.df_iv_setup_rows())
+        tot_need_qty = state.iv_total_allocated_qty()
+        tot_done_rows = len(state.df_iv_done_rows())
+        tot_done_qty = state.iv_total_done_qty()
+
+        # 3 KARTU METRIK UTAMA
         metric_ui = ui.div(
-            dark_metric_box("📦 TOTAL BARIS MUTASI", f"{len(state.df_iv_setup_rows()):,} BARIS", "#3182CE"),
-            dark_metric_box("🚚 TOTAL QTY TRANSIT", f"{state.iv_total_allocated_qty():,} PCS", "#10B981"),
-            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+            dark_metric_box("⏳ PERLU DI-SETUP (GL1)", f"{tot_need_rows:,} BARIS ({tot_need_qty:,} PCS)", "#E53E3E"),
+            dark_metric_box("✅ DONE SETUP (VALID HARI INI)", f"{tot_done_rows:,} BARIS ({tot_done_qty:,} PCS)", "#10B981"),
+            dark_metric_box("📍 LOKASI TUJUAN", "GL1-INSTOCK", "#3182CE"),
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+        )
+
+        # TAB 1: TEMPLATE MUTASI UNTUK JEZPRO
+        tab1_need = ui.div(
+            ui.div(
+                ui.div(
+                    ui.h4("📋 Antrean Barang Belum Dimutasi", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 2px 0;"),
+                    ui.p("Barang ini sudah hilang dari Helper Jezpro dan menunggu dimutasi ke GL1-INSTOCK.", style="color: #718096; font-size: 12px; margin: 0;")
+                ),
+                ui.download_button(
+                    "btn_dl_iv_setup",
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px;"), "DOWNLOAD TEMPLATE MUTASI (.XLSX)"),
+                    style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer; font-size: 12px;"
+                ),
+                style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 8px;"
+            ),
+            render_clean_table(state.df_iv_setup_headers(), state.df_iv_setup_rows(), "tbl_iv_setup"),
+            style="padding: 0.75rem 0;"
+        )
+
+        # TAB 2: RIWAYAT SUDAH SELESAI MUTASI
+        tab2_done = ui.div(
+            ui.div(
+                ui.div(
+                    ui.h4("✅ Riwayat Mutasi Sukses Tervalidasi", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 2px 0;"),
+                    ui.p("Barang yang mutasinya sudah diverifikasi cocok dengan riwayat Jezpro pada jam yang sesuai.", style="color: #718096; font-size: 12px; margin: 0;")
+                ),
+                ui.download_button(
+                    "btn_dl_iv_done",
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-file-excel", style="margin-right: 6px;"), "DOWNLOAD RIWAYAT DONE (.XLSX)"),
+                    style="background-color: #3182CE; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer; font-size: 12px;"
+                ),
+                style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 8px;"
+            ),
+            render_clean_table(state.df_iv_done_headers(), state.df_iv_done_rows(), "tbl_iv_done"),
+            style="padding: 0.75rem 0;"
         )
 
         return ui.div(
             ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
-            ui.h4("📋 RINGKASAN FORMAT MUTASI KE GL1-INSTOCK", style="font-size: 16px; color: #010B13; font-weight: 800; margin-bottom: 1rem;"),
             metric_ui,
-            ui.div(
-                ui.div(
-                    ui.p("Format mutasi siap upload ke Jezpro (BIN AWAL | BIN TUJUAN | SKU | QUANTITY | NOTES):", style="font-size: 13px; color: #718096; margin: 0;"),
-                    ui.download_button(
-                        "btn_dl_iv_setup",
-                        ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px;"), "DOWNLOAD TEMPLATE MUTASI (.XLSX)"),
-                        style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
-                    ),
-                    style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 8px;"
-                ),
-                render_clean_table(state.df_iv_setup_headers(), state.df_iv_setup_rows(), "tbl_iv_setup"),
-                style="padding: 0.75rem 0;"
+            ui.navset_card_tab(
+                ui.nav_panel(f"⏳ 1. LIST SETUP ({tot_need_rows})", tab1_need),
+                ui.nav_panel(f"✅ 2. DONE SETUP ({tot_done_rows})", tab2_done)
             ),
             style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
         )
 
+    # DOWNLOAD HANDLERS
     @render.download(
-        filename=lambda: f"TEMPLATE_MUTASI_TRANSIT_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+        filename=lambda: f"TEMPLATE_MUTASI_GL1_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
     )
     def btn_dl_iv_setup():
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine='openpyxl') as writer:
             state._raw_df_iv_setup.to_excel(writer, sheet_name='TEMPLATE_MUTASI', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    @render.download(
+        filename=lambda: f"DONE_SETUP_INSTOCK_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    )
+    def btn_dl_iv_done():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_iv_done.to_excel(writer, sheet_name='DONE_SETUP', index=False)
         buf.seek(0)
         yield buf.getvalue()
         
