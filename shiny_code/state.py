@@ -411,6 +411,10 @@ class AppState:
         self.bs_perc_offline = reactive.Value(0.0)
         self.bs_perc_online = reactive.Value(0.0)
 
+        self.bs_perc_overall = reactive.Value(0.0)
+        self.bs_perc_logistik = reactive.Value(0.0)
+        self.bs_perc_offline = reactive.Value(0.0)
+        self.bs_perc_online = reactive.Value(0.0)
 
         self.bs_category_list = reactive.Value([])     
         self.bs_selected_categories = reactive.Value([]) 
@@ -3759,10 +3763,12 @@ class AppState:
                 return pd.Series(default_val, index=df.index)
 
             # ------------------------------------------------------------------
-            # 1. BACA DATA STOK (LOCK FIXED COLUMNS)
+            # 1. BACA DATA STOK (LOCK FIXED COLUMNS):
             # Kolom B (Index 1) = BIN
             # Kolom C (Index 2) = SKU
+            # Kolom D (Index 3) = BRAND
             # Kolom E (Index 4) = ITEM NAME
+            # Kolom F (Index 5) = VARIANT / SIZE
             # Kolom G (Index 6) = SUB KATEGORI
             # Kolom J (Index 9) = QTY SYSTEM
             # ------------------------------------------------------------------
@@ -3771,24 +3777,26 @@ class AppState:
 
             bin_raw = get_col_series(df_stk_raw, 1, ['BIN', 'BIN_CODE', 'LOKASI'], ['BIN', 'LOKASI', 'RAK'], "")
             sku_raw = get_col_series(df_stk_raw, 2, ['SKU', 'BARCODE_SKU', 'BARCODE'], ['SKU', 'BARCODE', 'ITEM CODE'], "")
+            brand_raw = get_col_series(df_stk_raw, 3, ['BRAND', 'MERK'], ['BRAND', 'MERK'], "-")
             desc_raw = get_col_series(df_stk_raw, 4, ['ITEM NAME', 'ITEM_NAME', 'ARTIKEL'], ['ITEM NAME', 'ARTIKEL', 'DESCRIPTION', 'NAMA'], "-")
+            size_raw = get_col_series(df_stk_raw, 5, ['VARIANT', 'SIZE', 'UKURAN'], ['VARIANT', 'VARIAN', 'SIZE', 'UKURAN'], "-")
             sub_raw = get_col_series(df_stk_raw, 6, ['SUB KATEGORI', 'SUB_KATEGORI', 'SUB CATEGORY'], ['SUB KATEGORI', 'KATEGORI', 'CATEGORY'], "UNKNOWN")
-            
-            # Kunci Kolom J (Index 9) untuk QTY SYSTEM (bukan Kolom K yang berisi QTY SO)
             qty_raw = get_col_series(df_stk_raw, 9, ['QTY SYSTEM', 'QTY_SYSTEM', 'QTY SYS', 'STOK'], ['QTY SYSTEM', 'QTY SYS', 'STOK', 'QUANTITY'], 0)
 
             bin_series = bin_raw.fillna('').astype(str).str.strip().str.upper()
             sku_series = sku_raw.apply(clean_sku_str)
             qty_series = pd.to_numeric(qty_raw, errors='coerce').fillna(0)
 
-            # 🛑 PENGECUALIAN BIN: DEFECT, REJECT, KARANTINA, PERBAIKAN
-            excl_pattern = "DEFECT|REJECT|KARANTINA|PERBAIKAN"
+            # 🛑 PENGECUALIAN BIN: DEFECT, REJECT, KARANTINA, PERBAIKAN, DAN TOKO
+            excl_pattern = "DEFECT|REJECT|KARANTINA|PERBAIKAN|TOKO"
             mask_valid = ~bin_series.str.contains(excl_pattern, na=False) & (sku_series != "") & (sku_series != "NAN")
 
             df_stk = pd.DataFrame({
                 'BIN': bin_series[mask_valid].values,
                 'SKU': sku_series[mask_valid].values,
+                'BRAND': brand_raw[mask_valid].fillna('-').astype(str).str.strip().str.upper().values,
                 'ITEM_NAME': desc_raw[mask_valid].fillna('-').astype(str).str.strip().values,
+                'SIZE': size_raw[mask_valid].fillna('-').astype(str).str.strip().str.upper().values,
                 'SUB_KATEGORI': sub_raw[mask_valid].fillna('UNKNOWN').astype(str).str.strip().str.upper().values,
                 'QTY': qty_series[mask_valid].values
             })
@@ -3862,7 +3870,9 @@ class AppState:
             df_stk['QTY_OFF'] = np.where(df_stk['IS_OFF'], df_stk['QTY_POS'], 0)
             df_stk['QTY_ONL'] = np.where(df_stk['IS_ONL'], df_stk['QTY_POS'], 0)
 
+            sku_meta_brand = df_stk.drop_duplicates('SKU').set_index('SKU')['BRAND'].to_dict()
             sku_meta_name = df_stk.drop_duplicates('SKU').set_index('SKU')['ITEM_NAME'].to_dict()
+            sku_meta_size = df_stk.drop_duplicates('SKU').set_index('SKU')['SIZE'].to_dict()
             sku_meta_sub = df_stk.drop_duplicates('SKU').set_index('SKU')['SUB_KATEGORI'].to_dict()
 
             sku_grouped = df_stk.groupby('SKU', as_index=False).agg(
@@ -4007,6 +4017,9 @@ class AppState:
                         tab2_rows.append({
                             "BIN": b_name,
                             "SKU": sku,
+                            "BRAND": sku_meta_brand.get(sku, "-"),
+                            "ITEM NAME": sku_meta_name.get(sku, "-"),
+                            "SIZE": sku_meta_size.get(sku, "-"),
                             "QTY LOG": alloc_log,
                             "QTY OFF": alloc_off,
                             "QTY ONL": alloc_onl
@@ -4016,6 +4029,9 @@ class AppState:
                     tab2_rows.append({
                         "BIN": default_bin,
                         "SKU": sku,
+                        "BRAND": sku_meta_brand.get(sku, "-"),
+                        "ITEM NAME": sku_meta_name.get(sku, "-"),
+                        "SIZE": sku_meta_size.get(sku, "-"),
                         "QTY LOG": "NO REFILL",
                         "QTY OFF": "NO REFILL",
                         "QTY ONL": "NO REFILL"
@@ -4044,7 +4060,7 @@ class AppState:
             return False, f"Terjadi kesalahan saat kalkulasi: {str(e)}"
             
     def apply_bs_category_filter(self, selected_cats):
-        """Memfilter Tab 1 dan Tab 2 berdasarkan Sub Kategori yang dipilih"""
+        """Memfilter Tab 1 dan Tab 2 berdasarkan Sub Kategori yang dipilih serta menghitung % Balance"""
         if self._raw_df_bs_alloc_base.empty:
             return
 
@@ -4054,20 +4070,41 @@ class AppState:
         if selected_cats and len(selected_cats) > 0:
             selected_clean = [str(x).strip().upper() for x in selected_cats]
             df_alloc = df_alloc[df_alloc["SUB KATEGORI"].isin(selected_clean)].copy()
-            # Filter Tab 2 berdasarkan SKU yang lolos di Tab 1
             skus_valid = set(df_alloc["SKU"].unique())
             df_refill = df_refill[df_refill["SKU"].isin(skus_valid)].copy()
 
-        # Update Metrik berdasarkan data terfilter
         tot_sku = len(df_alloc)
         tot_stk = int(df_alloc["TOTAL STOK"].sum()) if not df_alloc.empty else 0
+
+        # Hitung SKU yang defisit (butuh refill) per area
         need_off = sum(1 for _, r in df_alloc.iterrows() if r["TARGET OFF"] > r["QTY OFF"])
         need_on = sum(1 for _, r in df_alloc.iterrows() if r["TARGET ONL"] > r["QTY ONL"])
+        need_log = sum(1 for _, r in df_alloc.iterrows() if r["TARGET LOG"] > r["QTY LOG"])
+        
+        # SKU yang 100% seimbang di ketiga area sekaligus
+        balanced_all = sum(1 for _, r in df_alloc.iterrows() if r["STATUS"] == "SEIMBANG / OK")
 
+        # Hitung % Keseimbangan (Balance Rate)
+        ready_log = tot_sku - need_log
+        ready_off = tot_sku - need_off
+        ready_on = tot_sku - need_on
+
+        perc_overall = (balanced_all / tot_sku * 100.0) if tot_sku > 0 else 0.0
+        perc_log = (ready_log / tot_sku * 100.0) if tot_sku > 0 else 0.0
+        perc_off = (ready_off / tot_sku * 100.0) if tot_sku > 0 else 0.0
+        perc_on = (ready_on / tot_sku * 100.0) if tot_sku > 0 else 0.0
+
+        # Simpan ke state reactive
         self.bs_total_sku.set(tot_sku)
         self.bs_total_stock.set(tot_stk)
         self.bs_sku_need_off.set(need_off)
         self.bs_sku_need_on.set(need_on)
+        self.bs_sku_need_log.set(need_log)
+        
+        self.bs_perc_overall.set(perc_overall)
+        self.bs_perc_logistik.set(perc_log)
+        self.bs_perc_offline.set(perc_off)
+        self.bs_perc_online.set(perc_on)
         self.bs_qty_refill_total.set(len(df_refill))
 
         self._raw_df_bs_alloc = df_alloc.copy()

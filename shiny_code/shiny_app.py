@@ -3021,21 +3021,42 @@ def server(input: Inputs, output: Outputs, session: Session):
         if not state.bs_processed():
             return ui.div()
 
-        # Ringkasan 4 Kartu Metrik
-        metrics_ui = ui.div(
+        # Warna Dinamis: Hijau (>=90%), Oranye (70-89%), Merah (<70%)
+        def get_balance_color(pct):
+            if pct >= 90.0: return "#10B981"
+            elif pct >= 70.0: return "#DD6B20"
+            return "#E53E3E"
+
+        c_all = get_balance_color(state.bs_perc_overall())
+        c_log = get_balance_color(state.bs_perc_logistik())
+        c_off = get_balance_color(state.bs_perc_offline())
+        c_on = get_balance_color(state.bs_perc_online())
+
+        # 🌟 BARIS 1: PERSENTASE KESEIMBANGAN (% BALANCE RATE)
+        balance_metrics_ui = ui.div(
+            dark_metric_box("⚖️ OVERALL BALANCED (ALL AREA)", f"{state.bs_perc_overall():.1f}%", c_all),
+            dark_metric_box("📦 BALANCE AREA LOGISTIK", f"{state.bs_perc_logistik():.1f}%", c_log),
+            dark_metric_box("🏪 BALANCE AREA OFFLINE", f"{state.bs_perc_offline():.1f}%", c_off),
+            dark_metric_box("🌐 BALANCE AREA ONLINE", f"{state.bs_perc_online():.1f}%", c_on),
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
+        )
+
+        # 🌟 BARIS 2: VOLUME TOTAL & DEFISIT SKU YANG PERLU REFILL
+        volume_metrics_ui = ui.div(
             dark_metric_box("📦 TOTAL UNIQUE SKU", f"{state.bs_total_sku():,} SKU", "#3182CE"),
-            dark_metric_box("🔢 TOTAL STOK AKTIF", f"{state.bs_total_stock():,} PCS", "#C5A059"),
-            dark_metric_box("🏬 REFILL OFFLINE", f"{state.bs_sku_need_off():,} SKU", "#DD6B20"),
-            dark_metric_box("🌐 REFILL ONLINE", f"{state.bs_sku_need_on():,} SKU", "#10B981"),
-            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+            dark_metric_box("🔢 TOTAL QTY STOCK", f"{state.bs_total_stock():,} PCS", "#C5A059"),
+            dark_metric_box("🏪 REFILL OFFLINE", f"{state.bs_sku_need_off():,} SKU", "#DD6B20"),
+            dark_metric_box("💻 REFILL ONLINE", f"{state.bs_sku_need_on():,} SKU", "#3182CE"),
+            dark_metric_box("🚚 REFILL LOGISTIK", f"{state.bs_sku_need_log():,} SKU", "#805AD5"),
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
         )
 
         # TAB 1: COMPARE UNIQUE SKU DENGAN SALES
         tab1_content = ui.div(
             ui.div(
                 ui.div(
-                    ui.h4("📊 Ringkasan Compare QTY LOG, OFF, ONL vs Sales per Unique SKU", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 2px 0;"),
-                    ui.p("Pengecualian otomatis terhadap BIN Defect, Reject, Karantina, dan Perbaikan.", style="color: #718096; font-size: 12px; margin: 0;"),
+                    ui.h4("📊 Summary Comparation Total Stock to Stock Area", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 2px 0;"),
+                    ui.p("Pengecualian otomatis terhadap BIN Defect, Reject, Karantina, Perbaikan, dan Toko.", style="color: #718096; font-size: 12px; margin: 0;"),
                 ),
                 ui.download_button(
                     "btn_dl_bs_tab1",
@@ -3048,12 +3069,11 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="padding: 0.75rem 0;"
         )
 
-        # TAB 2: LIST REFILL BERTINGKAT / PROGRESIF (BIN | SKU | QTY LOG | QTY OFF | QTY ONL)
+        # TAB 2: LIST REFILL BERTINGKAT / PROGRESIF
         tab2_content = ui.div(
             ui.div(
                 ui.div(
-                    ui.h4("🔄 List Refill Bertingkat / Progresif per BIN", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 2px 0;"),
-                    ui.p("Format: BIN | SKU | QTY LOG | QTY OFF | QTY ONL. Kategori yang sudah cukup otomatis terisi 'NO REFILL'. Jika stok BIN awal tidak cukup, pemenuhan dilanjutkan secara progresif ke baris BIN berikutnya.", style="color: #718096; font-size: 12px; margin: 0;"),
+                    ui.h4("🔄 List Refill Area Logistik | Offline | Online", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 2px 0;"),
                 ),
                 ui.download_button(
                     "btn_dl_bs_tab2",
@@ -3068,7 +3088,8 @@ def server(input: Inputs, output: Outputs, session: Session):
 
         return ui.div(
             ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
-            metrics_ui,
+            balance_metrics_ui,
+            volume_metrics_ui,
             ui.navset_card_tab(
                 ui.nav_panel("1. COMPARE STOK & SALES (UNIQUE SKU)", tab1_content),
                 ui.nav_panel("2. LIST REFILL PROGRESIF", tab2_content)
