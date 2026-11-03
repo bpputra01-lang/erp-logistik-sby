@@ -407,6 +407,7 @@ class AppState:
         self.bs_total_stock = reactive.Value(0)
         self.bs_sku_need_off = reactive.Value(0)
         self.bs_sku_need_on = reactive.Value(0)
+        self.bs_sku_need_log = reactive.Value(0)
         self.bs_qty_refill_total = reactive.Value(0)
         self.bs_perc_offline = reactive.Value(0.0)
         self.bs_perc_online = reactive.Value(0.0)
@@ -428,6 +429,8 @@ class AppState:
         self.df_bs_on_missing_headers = reactive.Value([])
         self.df_bs_on_missing_rows = reactive.Value([])
 
+        self._raw_df_bs_alloc_base = pd.DataFrame()
+        self._raw_df_bs_refill_base = pd.DataFrame()
         self._raw_df_bs_refill = pd.DataFrame()
         self._raw_df_bs_alloc = pd.DataFrame()
         self._raw_df_bs_off_missing = pd.DataFrame()
