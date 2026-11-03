@@ -3145,7 +3145,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             render_clean_table(state.df_bs_refill_headers(), state.df_bs_refill_rows(), "tbl_bs_tab2"),
             style="padding: 0.75rem 0;"
         )
-        
+
         return ui.div(
             ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
             balance_metrics_ui,
@@ -3368,6 +3368,9 @@ def server(input: Inputs, output: Outputs, session: Session):
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
 # 1. Event saat User Mengganti Dropdown Cabang
+    # ==========================================================================
+    # CONTROLLER PERCENTAGE DISPLAY (VERSI BARU: 3 AREA & REFILL LOWER BODY)
+    # ==========================================================================
     @reactive.Effect
     @reactive.event(input.pd_branch_selector)
     def _on_pd_branch_change():
@@ -3380,7 +3383,6 @@ def server(input: Inputs, output: Outputs, session: Session):
             else:
                 ui.notification_show(f"⚠️ {msg}", type="warning", duration=4)
 
-    # 2. Event Tombol Klik Manual
     @reactive.Effect
     @reactive.event(input.btn_fetch_stock_jezpro_pd)
     def _fetch_cloud_stock_pd():
@@ -3394,58 +3396,12 @@ def server(input: Inputs, output: Outputs, session: Session):
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
 
-    # 3. Auto Refresh tiap 1 jam
-    # 3. Auto Refresh tiap 1 jam (Pakai reactive.isolate agar TIDAK download saat pindah menu)
-    @reactive.Effect
-    def _auto_refresh_pd_hourly():
-        reactive.invalidate_later(3600)  # Hanya terpicu oleh waktu 1 jam
-        
-        # 'with reactive.isolate():' mencegah efek ini jalan saat Anda mengklik menu
-        with reactive.isolate():
-            if state.logged_in() and state.get_active_content_type() in ["percentage_display", "percentage-display"]:
-                state.load_stock_from_supabase_for_percentage_display(silent=True)
-   # ==========================================================================
-    # CONTROLLER PERCENTAGE DISPLAY & REFILL TOKO (ANTI-RESET TAB)
-    # ==========================================================================
-    
-    # 1. Listener Filter Interaktif (Hanya mengubah data, tidak merusak tab)
-    @reactive.Effect
-    def _on_rt_filter_change():
-        if state.pd_processed():
-            sub = list(input.rt_filter_sub()) if "rt_filter_sub" in input and input.rt_filter_sub() is not None else []
-            state.apply_refill_filter(sub)
-
-# ==========================================================================
-    # TOMBOL AKSI PERCENTAGE DISPLAY & REFILL TOKO
-    # ==========================================================================
-    @render.ui
-    def percentage_display_action_btn_ui():
-        f = input.upload_percentage_display_file() if "upload_percentage_display_file" in input else None
-        if f and len(f) > 0:
-            return ui.div(
-                ui.tags.button(
-                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "JALANKAN ANALISIS DISPLAY & REFILL"),
-                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_process_percentage_display', Math.random(), {priority: 'event'});",
-                    class_="btn-red-gradient"
-                ),
-                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 1rem;"
-            )
-        return ui.div(
-            ui.tags.button(
-                ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"),
-                "UPLOAD FILE STOCK UNTUK MEMULAI",
-                disabled=True,
-                class_="btn-locked"
-            ),
-            style="display: flex; justify-content: flex-end; width: 100%; margin-top: 1rem;"
-        )
-    # 2. Wadah Utama Tab (Render Sekali - Tidak membaca state.rt_* agar Tab tidak loncat)
     @render.ui
     def percentage_display_results_container():
         if not state.pd_processed():
             return ui.div()
 
-        # Konten Tab 1: Percentage Display Control
+        # TAB 1: DISPLAY AVAILABILITY (3 KATEGORI AREA ASAL)
         tab1_display_content = ui.div(
             ui.div(
                 dark_metric_box("🧥 TOTAL ARTICLE", f"{state.pd_total_art():,} ART", "#7B61FF"),
@@ -3454,18 +3410,18 @@ def server(input: Inputs, output: Outputs, session: Session):
                 style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
             ),
             ui.div(
-                dark_metric_box("🏬 FROM STORE (LT. 2)", f"{state.pd_need_gudang():,} ART", "#DD6B20"),
-                dark_metric_box("🏭 FROM DC", f"{state.pd_need_dc():,} ART", "#3182CE"),
-                dark_metric_box("☣️ KARANTINA (KOSONG DI TOKO)", f"{state.pd_karantina_lock():,} ART", "#C5A059"),
+                dark_metric_box("🏪 FROM BIN AREA OFFLINE", f"{state.pd_from_offline():,} ART", "#DD6B20"),
+                dark_metric_box("📦 FROM BIN AREA LOGISTIC", f"{state.pd_from_logistic():,} ART", "#3182CE"),
+                dark_metric_box("🌐 FROM AREA ONLINE", f"{state.pd_from_online():,} ART", "#10B981"),
                 style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
             ),
             ui.div(
                 ui.div(
-                    ui.h4("📋 List Article Kosong di Toko (Wajib Refill Display)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0;"),
+                    ui.h4("📋 List Article Kosong di Toko (Wajib Dipajang)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0;"),
                     ui.download_button(
                         "btn_dl_display_refill",
                         ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "Download List Display (.xlsx)"),
-                        style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
+                        style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer; font-size: 12px;"
                     ),
                     style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem;"
                 ),
@@ -3474,74 +3430,26 @@ def server(input: Inputs, output: Outputs, session: Session):
             )
         )
 
-        # Konten Tab 2: Filter input dibuat statis di sini, datanya diarahkan ke rt_data_display_ui
+        # TAB 2: REFILL TOKO (KHUSUS LOWER BODY, TARGET 10 PCS)
         tab2_refill_content = ui.div(
             ui.div(
-                ui.h4("🔍 Filter Sub Kategori:", style="font-size: 14px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
-                ui.input_selectize("rt_filter_sub", None, choices=state.rt_sub_categories(), multiple=True, width="100%"),
-                style="background: #F8FAFC; border: 1px solid #E2E8F0; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;"
-            ),
-            # 👇 Wadah data reaktif terpisah agar tab tidak loncat:
-            ui.output_ui("rt_data_display_ui")
-        )
-
-        return ui.div(
-            ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
-            ui.navset_card_tab(
-                ui.nav_panel("📊 DISPLAY AVAILABILITY (ARTICLE BASE)", tab1_display_content),
-                ui.nav_panel("🏬 REFILL TOKO (SKU BASE)", tab2_refill_content)
-            ),
-            style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
-        )
-
-    # 3. Kontainer Data Khusus Tab 2 (Hanya ini yang me-refresh saat filter dipilih)
-    @render.ui
-    def rt_data_display_ui():
-        if not state.pd_processed():
-            return ui.div()
-
-        return ui.div(
-            ui.div(
-                dark_metric_box("📦 TOTAL SKU PERLU REFILL", f"{state.rt_total_sku():,} SKU", "#3182CE"),
+                dark_metric_box("👖 TOTAL SKU LOWER BODY PERLU REFILL", f"{state.rt_total_sku():,} SKU", "#3182CE"),
                 dark_metric_box("🔥 PRIORITY (QTY TOKO 0)", f"{state.rt_priority_sku():,} SKU", "#DD6B20"),
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
+                dark_metric_box("🔢 TOTAL QTY REFILL (TARGET 10)", f"{state.rt_total_qty_refill():,} PCS", "#10B981"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
             ),
             ui.div(
                 ui.div(
-                    ui.h4("📋 Detail List SKU Perlu Refill ke Toko", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0;"),
+                    ui.div(
+                        ui.h4("📋 Detail List Refill Toko (Khusus Lower Body - Maks 10 Pcs)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 2px 0;"),
+                        ui.p("Item masuk antrean jika stok di Toko < 10 pcs dan stok gudang > 0.", style="color: #718096; font-size: 12px; margin: 0;")
+                    ),
                     ui.download_button(
                         "btn_dl_rt_refill",
-                        ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "Download List Refill (.xlsx)"),
-                        style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "Download Refill Lower Body (.xlsx)"),
+                        style="background-color: #3182CE; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer; font-size: 12px;"
                     ),
-                    style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem;"
-                ),
-                render_clean_table(state.df_rt_headers(), state.df_rt_rows(), "tbl_rt_refill"),
-                style="padding: 0.75rem 0;"
-            )
-        )
-
-        # Tab 2 Content: Refill Toko List
-        tab2_refill_content = ui.div(
-            ui.div(
-                ui.h4("🔍 Filter Sub Kategori:", style="font-size: 14px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
-                ui.input_selectize("rt_filter_sub", None, choices=state.rt_sub_categories(), multiple=True, width="100%"),
-                style="background: #F8FAFC; border: 1px solid #E2E8F0; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;"
-            ),
-            ui.div(
-                dark_metric_box("📦 TOTAL SKU PERLU REFILL", f"{state.rt_total_sku():,} SKU", "#3182CE"),
-                dark_metric_box("🔥 PRIORITY (QTY TOKO 0)", f"{state.rt_priority_sku():,} SKU", "#DD6B20"),
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
-            ),
-            ui.div(
-                ui.div(
-                    ui.h4("📋 Detail List SKU Perlu Refill ke Toko", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0;"),
-                    ui.download_button(
-                        "btn_dl_rt_refill",
-                        ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "Download List Refill (.xlsx)"),
-                        style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
-                    ),
-                    style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem;"
+                    style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 8px;"
                 ),
                 render_clean_table(state.df_rt_headers(), state.df_rt_rows(), "tbl_rt_refill"),
                 style="padding: 0.75rem 0;"
@@ -3552,11 +3460,10 @@ def server(input: Inputs, output: Outputs, session: Session):
             ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
             ui.navset_card_tab(
                 ui.nav_panel("📊 DISPLAY AVAILABILITY (ARTICLE BASE)", tab1_display_content),
-                ui.nav_panel("🏬 REFILL TOKO (SKU BASE)", tab2_refill_content)
+                ui.nav_panel("🏬 REFILL TOKO (KHUSUS LOWER BODY)", tab2_refill_content)
             ),
             style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
         )
-
     # Handler Download Excel
     @render.download(filename="LIST_PENARIKAN_DISPLAY.xlsx")
     def btn_dl_display_refill():

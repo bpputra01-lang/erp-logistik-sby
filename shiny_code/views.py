@@ -1228,70 +1228,55 @@ def validation_barcode_sku_view(state: AppState):
     )
 
 # ==============================================================================
-# VIEW: PERCENTAGE DISPLAY CONTROL & REFILL TOKO (DUAL TAB VIEW)
+# VIEW: PERCENTAGE DISPLAY & REFILL TOKO (HANYA 6 CABANG STORE JEZ)
 # ==============================================================================
 def percentage_display_view(state: AppState):
+    # 6 Cabang Store Fisik (Hub Jakarta, Hub Online Surabaya & Malang sudah dihapus)
     branch_choices = [
         "JEZ SURABAYA", "JEZ MALANG", "JEZ SIDOARJO", 
-        "JEZ KEDIRI", "JEZ JEMBER", "JEZ SEMARANG",
-        "HUB JAKARTA", "ONLINE HUB SURABAYA", "ONLINE HUB MALANG"
+        "JEZ KEDIRI", "JEZ JEMBER", "JEZ SEMARANG"
     ]
 
-    upload_section = ui.div(
+    header_section = ui.div(
         ui.div(
-            # HEADER & KONTROL CABANG
+            ui.div(
+                ui.h4("Percentage Display & Refill Toko", style="font-size: 16px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
+                ui.span(
+                    f"Cabang Terpilih: {state.pd_selected_branch()} • Pengecualian BIN: EVENT, REJECT, DEFECT, KARANTINA, PERBAIKAN, RESELLER • Refill: Khusus LOWER BODY (Target 10 pcs).",
+                    style="color: #4A5568; font-weight: 600; font-size: 12px;"
+                ),
+            ),
+            # KONTROL PILIH CABANG + TOMBOL SYNC
             ui.div(
                 ui.div(
-                    ui.h4("Percentage Display", style="font-size: 16px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
-                    ui.span(
-                        f"Branch: {state.pd_selected_branch()} • Last Sync: {state.pd_last_sync_time()} (Auto-refresh 1 jam).",
-                        style="color: #059669; font-weight: 700; font-size: 12px;"
+                    ui.span("Pilih Cabang / Store:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
+                    ui.input_select(
+                        "pd_branch_selector", None,
+                        choices=branch_choices,
+                        selected=state.pd_selected_branch(),
+                        width="180px"
                     ),
+                    style="display: flex; flex-direction: column;"
                 ),
-                # DROPDOWN PILIH CABANG + TOMBOL TARIK
-                ui.div(
-                    ui.div(
-                        ui.span("Pilih Cabang:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
-                        ui.input_select(
-                            "pd_branch_selector", None,
-                            choices=branch_choices,
-                            selected=state.pd_selected_branch(),
-                            width="180px"
-                        ),
-                        style="display: flex; flex-direction: column;"
+                ui.tags.button(
+                    ui.tags.span(
+                        ui.tags.i(class_="fa-solid fa-cloud-arrow-down", style="margin-right: 6px; font-size: 13px;"),
+                        "SYNC DATA CABANG INI"
                     ),
-                    ui.tags.button(
-                        ui.tags.span(
-                            ui.tags.i(class_="fa-solid fa-cloud-arrow-down", style="margin-right: 6px; font-size: 13px;"),
-                            "SYNC CABANG INI"
-                        ),
-                        onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_fetch_stock_jezpro_pd', Math.random(), {priority: 'event'});",
-                        style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; font-weight: 800; border: none; padding: 9px 16px; border-radius: 8px; cursor: pointer; font-size: 12px; height: 38px; margin-top: 16px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);"
-                    ),
-                    style="display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap;"
+                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_fetch_stock_jezpro_pd', Math.random(), {priority: 'event'});",
+                    style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; font-weight: 800; border: none; padding: 9px 18px; border-radius: 8px; cursor: pointer; font-size: 12px; height: 38px; margin-top: 16px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);"
                 ),
-                style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 10px;"
+                style="display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap;"
             ),
-            ui.hr(style="margin: 0 0 1.25rem 0; border-color: #CBD5E0;"),
-
-            # ACCORDION FALLBACK MANUAL
-            ui.tags.details(
-                ui.tags.summary("📁 Atau Upload File Manual (Opsional)"),
-                ui.div(
-                    custom_uploader_box("upload_percentage_display_file", "Upload File Stock Manual (.xlsx / .csv)"),
-                    ui.output_ui("percentage_display_action_btn_ui"),
-                    style="margin-top: 0.75rem;"
-                ),
-                style="background: #F8FAFC; border: 1px dashed #CBD5E0; border-radius: 8px; padding: 6px 12px;"
-            ),
-            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
-        )
+            style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 10px;"
+        ),
+        style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.02);"
     )
 
     results_section = ui.output_ui("percentage_display_results_container")
 
     return ui.div(
-        upload_section,
+        header_section,
         results_section,
         style="width: 100%; padding: 1rem;"
     )
