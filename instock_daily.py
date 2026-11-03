@@ -3,269 +3,211 @@ import json
 import requests
 import re
 import time
-from datetime import datetime, timezone, timedelta
-from bs4 import BeautifulSoup
+from datetime import datetime
+import pytz
 
-# ==============================================================================
-# 1. KREDENSIAL & TARGET KHUSUS JEZ SURABAYA
-# ==============================================================================
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 JEZPRO_EMAIL = os.environ.get("JEZPRO_EMAIL")
 JEZPRO_PASS  = os.environ.get("JEZPRO_PASSWORD")
 
 BRANCH_NAME = "JEZ SURABAYA"
-STORE_ID = 3  # ID resmi JEZ SURABAYA
-TARGET_STATUS = "WAITING OFFLINE"
+STORE_ID = 3
+POLL_INTERVAL_SECONDS = 15
+WIB = pytz.timezone('Asia/Jakarta')
 
-# ==============================================================================
-# 2. HELPER PEMBERSIH DATA
-# ==============================================================================
 def strip_html(val):
-    if not val:
-        return ""
-    s = str(val)
-    if "<" in s:
-        s = re.sub(r'<[^>]+>', '', s)
-    return s.strip()
+    if not val: return ""
+    return re.sub(r'<[^>]+>', '', str(val)).strip()
 
 def safe_int_val(val, default=0):
-    if not val:
-        return default
-    s = strip_html(val)
-    digits = re.findall(r'-?\d+', s)
-    if digits:
-        return int(digits[0])
-    return default
+    if not val: return default
+    digits = re.findall(r'-?\d+', strip_html(val))
+    return int(digits[0]) if digits else default
 
-def clean_stock_tracking_article(raw_html):
-    if not raw_html:
-        return {"article": "-", "brand": "-"}
-    s = strip_html(str(raw_html)).strip()
-    
-    # Ambil brand di dalam kurung siku pertama
-    m_brand = re.search(r'\[(.*?)\]', s)
-    brand_val = m_brand.group(1).strip() if m_brand else "-"
-    
-    # Hapus tag [BRAND] di depan nama artikel
-    clean_name = re.sub(r'^\[.*?\]\s*', '', s)
-    # Hapus harga / pemisah di belakang nama artikel
-    clean_name = clean_name.split('|')[0].strip()
-    
-    return {"article": clean_name if clean_name else s, "brand": brand_val}
+def parse_wib_datetime(dt_str):
+    """Mengubah format tanggal Jezpro (DD-MM-YYYY HH:MM:SS atau YYYY-MM-DD HH:MM:SS) ke objek datetime WIB"""
+    if not dt_str: return None
+    clean_str = strip_html(dt_str).strip()
+    formats = [
+        "%d-%m-%Y %H:%M:%S",
+        "%d/%m/%Y %H:%M:%S",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%dT%H:%M:%S"
+    ]
+    for fmt in formats:
+        try:
+            naive = datetime.strptime(clean_str[:19], fmt)
+            return WIB.localize(naive)
+        except Exception:
+            pass
+    try:
+        # Fallback ISO format dari Supabase
+        dt = datetime.fromisoformat(clean_str.replace('Z', '+00:00'))
+        return dt.astimezone(WIB)
+    except Exception:
+        return None
 
-# ==============================================================================
-# 3. AUTENTIKASI KE JEZPRO
-# ==============================================================================
-def create_jezpro_session():
-    if not JEZPRO_EMAIL or not JEZPRO_PASS:
-        raise ValueError("Environment JEZPRO_EMAIL dan JEZPRO_PASSWORD belum diset!")
-
-    session = requests.Session()
-    session.headers.update({
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    })
-
-    print("🔐 [1/3] Melakukan login ke Jezpro...")
-    res_login_page = session.get("https://jezpro.id/")
-    soup = BeautifulSoup(res_login_page.text, "html.parser")
-    token_input = soup.find("input", {"name": "_token"})
-    if not token_input:
-        raise Exception("Gagal mendapatkan CSRF Token form login Jezpro!")
-
-    payload = {
-        "_token": token_input.get("value"),
-        "u_email": JEZPRO_EMAIL,
-        "password": JEZPRO_PASS
+def fetch_bin_history_today(session):
+    today_str = datetime.now(WIB).strftime("%Y-%m-%d")
+    url = "https://jezpro.id/bin_history_datatables"
+    params = {
+        "draw": "1",
+        "start": "0",
+        "length": "500",
+        "st_id": str(STORE_ID),
+        "date": today_str,
+        "_": int(time.time() * 1000)
     }
-    session.post("https://jezpro.id/user_login", data=payload, headers={"Referer": "https://jezpro.id/"})
-    print("✅ Berhasil login ke Jezpro!")
-
-    session.get("https://jezpro.id/stock_tracking")
-    return session
-
-# ==============================================================================
-# 4. TARIK DATA KHUSUS WAITING OFFLINE (JEZ SURABAYA)
-# ==============================================================================
-def fetch_waiting_offline_surabaya(session):
-    print(f"📥 [2/3] Menarik data KHUSUS '{TARGET_STATUS}' untuk {BRANCH_NAME} (Store ID: {STORE_ID})...")
-    url = "https://jezpro.id/stock_tracking_datatables"
     headers = {
         "Accept": "application/json, text/javascript, */*; q=0.01",
         "X-Requested-With": "XMLHttpRequest",
-        "Referer": "https://jezpro.id/stock_tracking"
+        "Referer": "https://jezpro.id/setup_lokasi_stok_v2"
     }
 
-    date_range = "2026-01-01|2030-12-31"
+    try:
+        res = session.get(url, params=params, headers=headers, timeout=15)
+        if res.status_code == 200:
+            raw_data = res.json().get("data", [])
+            history_list = []
+            for item in raw_data:
+                # Tangkap ID mutasi unik (pmt_id) dan waktu mutasi asli
+                mutasi_id = strip_html(item.get("pmt_id") or item.get("DT_RowIndex") or "")
+                raw_time = strip_html(item.get("pm_created_at") or "")
+                dt_mutasi = parse_wib_datetime(raw_time)
 
-    # Hanya menembak parameter WAITING OFFLINE
-    query_targets = [
-        {"status": "WAITING OFFLINE", "status_search": ""},
-        {"status": "", "status_search": "WAITING OFFLINE"}
-    ]
+                history_list.append({
+                    "mutasi_id": str(mutasi_id),
+                    "sku": strip_html(item.get("ps_barcode") or "").upper(),
+                    "bin_awal": strip_html(item.get("start_bin") or "").upper(),
+                    "bin_tujuan": strip_html(item.get("end_bin") or "").upper(),
+                    "qty_mts": safe_int_val(item.get("pmt_qty"), 0),
+                    "notes": strip_html(item.get("notes") or "").upper(),
+                    "dt_wib": dt_mutasi,
+                    "raw_time": raw_time
+                })
+            return history_list
+    except Exception as e:
+        print(f"⚠️ Gagal fetch bin_history: {e}")
+    return []
 
-    clean_records = []
-    seen_ids = set()
-
-    for q in query_targets:
-        params = {
-            "draw": "1",
-            "columns[0][data]": "DT_RowIndex", "columns[0][name]": "plst_id", "columns[0][orderable]": "false",
-            "columns[1][data]": "datetime", "columns[1][name]": "plst_created", "columns[1][orderable]": "true",
-            "columns[2][data]": "ps_barcode", "columns[2][name]": "ps_barcode", "columns[2][orderable]": "true",
-            "columns[3][data]": "article", "columns[3][name]": "p_name", "columns[3][orderable]": "true",
-            "columns[4][data]": "invoice", "columns[4][name]": "p_name", "columns[4][orderable]": "true",
-            "columns[5][data]": "cust_name", "columns[5][name]": "cust_name", "columns[5][orderable]": "true",
-            "columns[6][data]": "qty", "columns[6][name]": "p_name", "columns[6][orderable]": "true",
-            "columns[7][data]": "product_location", "columns[7][name]": "pl_code", "columns[7][orderable]": "true",
-            "columns[8][data]": "status", 
-            "columns[8][name]": "plst_status", 
-            "columns[8][searchable]": "true",
-            "columns[8][search][value]": q["status_search"],
-            "columns[8][search][regex]": "false",
-            "columns[8][orderable]": "true",
-            "columns[9][data]": "instock_source", "columns[9][name]": "instock_source_status", "columns[9][orderable]": "false",
-            "order[0][column]": "1", 
-            "order[0][dir]": "desc",
-            "start": "0",
-            "length": "500",
-            "search[value]": "",
-            "search": "",
-            "status": q["status"],
-            "instock_source": "",
-            "psc_id": "",
-            "std_id": "",
-            "br_id": "",
-            "st_id": str(STORE_ID),
-            "date": date_range
-        }
-
-        try:
-            res = session.get(url, params=params, headers=headers, timeout=25)
-            if res.status_code != 200:
-                continue
-            raw_list = res.json().get("data", [])
-        except Exception:
-            raw_list = []
-
-        for item in raw_list:
-            status_raw = strip_html(item.get("status") or item.get("plst_status") or "").upper()
-            loc_raw = strip_html(item.get("product_location") or item.get("pl_code") or "").upper()
-
-            # 🛑 FILTER KETAT: Hanya izinkan WAITING OFFLINE
-            if "WAITING OFFLINE" not in status_raw:
-                continue
-
-            # Abaikan jika ada embel-embel online, refund, checkout, nameset
-            if any(x in status_raw for x in ["ONLINE", "REFUND", "CHECKOUT", "NAMESET"]):
-                continue
-
-            # Filter Tahun Dokumen >= 2026
-            dt_raw = strip_html(item.get("datetime") or item.get("plst_created") or "")
-            doc_year = None
-            for fmt in ("%d/%m/%Y %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%d-%m-%Y %H:%M:%S", "%d/%m/%Y", "%Y-%m-%d"):
-                try:
-                    dt_obj = datetime.strptime(dt_raw[:19].strip(), fmt)
-                    doc_year = dt_obj.year
-                    break
-                except Exception:
-                    pass
-
-            if doc_year is None:
-                years = re.findall(r'\b(20\d{2})\b', dt_raw)
-                if years:
-                    doc_year = int(years[0])
-
-            if doc_year is not None and doc_year < 2026:
-                continue
-
-            # Primary Key unik
-            raw_id = item.get("plst_id") or item.get("id")
-            p_id = safe_int_val(raw_id)
-            if not p_id or p_id == 0:
-                bar = strip_html(item.get("ps_barcode") or "")
-                inv = strip_html(item.get("invoice") or "")
-                p_id = abs(hash(f"{STORE_ID}_{bar}_{inv}_{dt_raw}")) % 2147483647
-
-            if p_id in seen_ids:
-                continue
-            seen_ids.add(p_id)
-
-            raw_art = item.get("article") or item.get("p_name") or "-"
-            art_info = clean_stock_tracking_article(raw_art)
-
-            # Format data sesuai persis dengan kolom Supabase di screenshot
-            clean_records.append({
-                "id": int(p_id),
-                "barcode_sku": strip_html(item.get("ps_barcode") or "-").upper(),
-                "article_name": art_info["article"],
-                "brand": art_info["brand"],
-                "qty": safe_int_val(item.get("qty"), 1),
-                "bin_code": loc_raw if loc_raw else "[WAITING OFFLINE]",
-                "status": "WAITING OFFLINE",
-                "invoice": strip_html(item.get("invoice") or "-")
-            })
-
-        time.sleep(0.08)
-
-    print(f"✅ Selesai! Berhasil mengumpulkan {len(clean_records)} baris data WAITING OFFLINE JEZ SURABAYA.")
-    return clean_records
-
-# ==============================================================================
-# 5. SYNC KE SUPABASE (TABEL: jezpro_instock_daily)
-# ==============================================================================
-def push_to_supabase(records):
-    if not SUPABASE_URL or not SUPABASE_KEY:
-        raise ValueError("Environment SUPABASE_URL dan SUPABASE_KEY wajib diset!")
-
-    table_name = "jezpro_instock_daily"
-    print(f"🚀 [3/3] Mengosongkan data lama & mengunggah data WAITING OFFLINE ke tabel '{table_name}'...")
-    
+def sync_cycle(session):
     headers = {
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": "application/json",
-        "Prefer": "resolution=merge-duplicates"
+        "Content-Type": "application/json"
     }
+    now_wib = datetime.now(WIB)
+    today_date = now_wib.strftime("%Y-%m-%d")
 
-    # 1. Kosongkan tabel jezpro_instock_daily
-    del_res = requests.delete(f"{SUPABASE_URL}/rest/v1/{table_name}?id=gt.0", headers=headers)
-    if del_res.status_code in [200, 204]:
-        print(f"   🧹 Tabel '{table_name}' berhasil dibersihkan.")
+    # Ambil data hari ini dari Supabase
+    sb_url = f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?select=*&sync_date=eq.{today_date}"
+    res_sb = requests.get(sb_url, headers=headers)
+    sb_records = res_sb.json() if res_sb.status_code == 200 else []
 
-    # 2. Insert data baru
-    if records:
-        total_inserted = 0
-        for i in range(0, len(records), 100):
-            batch = records[i:i + 100]
-            res = requests.post(
-                f"{SUPABASE_URL}/rest/v1/{table_name}",
-                data=json.dumps(batch),
-                headers=headers
-            )
-            if res.status_code in [200, 201]:
-                total_inserted += len(batch)
-            else:
-                print(f"   ❌ Gagal simpan batch baris {i}: Status {res.status_code}")
-                print(f"      Detail Error Supabase: {res.text}")
+    # Filter record
+    waiting_in_sb = [x for x in sb_records if x.get("status") == "WAITING OFFLINE"]
+    need_setup_in_sb = [x for x in sb_records if x.get("status") == "NEED_SETUP"]
+    done_setup_in_sb = [x for x in sb_records if x.get("status") == "DONE_SETUP"]
 
-        print(f"   ✅ Berhasil menyimpan {total_inserted} dari {len(records)} baris data WAITING OFFLINE ke Supabase.")
-    else:
-        print("   ℹ️ Tidak ada antrean WAITING OFFLINE untuk JEZ SURABAYA saat ini (Tabel Bersih).")
+    # Kumpulkan mutasi_id yang SUDAH PERNAH terpakai hari ini (Ledger Lock)
+    used_mutasi_ids = set()
+    for d in done_setup_in_sb:
+        m_id = d.get("matched_mutasi_id")
+        if m_id:
+            used_mutasi_ids.add(str(m_id))
 
-# ==============================================================================
-# MAIN EXECUTION
-# ==============================================================================
-if __name__ == "__main__":
-    t0 = time.time()
-    print("=" * 65)
-    print("🚀 MENJALANKAN PIPELINE KHUSUS WAITING OFFLINE (JEZ SURABAYA)")
-    print("=" * 65)
+    sb_waiting_map = {f"{it['barcode_sku']}_{it.get('invoice','')}": it for it in waiting_in_sb}
 
-    jez_session = create_jezpro_session()
-    records_surabaya = fetch_waiting_offline_surabaya(jez_session)
-    push_to_supabase(records_surabaya)
+    # ==========================================================================
+    # LANGKAH 1: DETEKSI BARANG HILANG DARI HELPER
+    # ==========================================================================
+    jez_helper = fetch_helper_jezpro(session) # Dari fungsi fetch helper sebelumnya
+    current_helper_keys = set()
+    new_inserts = []
 
-    durasi = round(time.time() - t0, 2)
-    print(f"\n🏁 Selesai dalam waktu {durasi} detik!")
-    print("=" * 65)
+    for it in jez_helper:
+        k = f"{it['barcode_sku']}_{it['invoice']}"
+        current_helper_keys.add(k)
+        if k not in sb_waiting_map:
+            new_inserts.append({
+                "barcode_sku": it["barcode_sku"],
+                "article_name": it["article_name"],
+                "bin_code": it["bin_code"],
+                "qty": it["qty"],
+                "status": "WAITING OFFLINE",
+                "invoice": it["invoice"],
+                "sync_date": today_date,
+                "created_at": now_wib.isoformat()
+            })
+
+    if new_inserts:
+        requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily", headers=headers, json=new_inserts)
+        print(f"   📥 {len(new_inserts)} barang baru masuk antrean WAITING OFFLINE.")
+
+    # Jika hilang dari helper -> tandai NEED_SETUP lengkap dengan TIMESTAMP HILANG
+    for k, sb_item in sb_waiting_map.items():
+        if k not in current_helper_keys:
+            disappeared_timestamp = now_wib.isoformat()
+            patch_url = f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?id=eq.{sb_item['id']}"
+            requests.patch(patch_url, headers=headers, json={
+                "status": "NEED_SETUP",
+                "disappeared_at": disappeared_timestamp
+            })
+            print(f"   ⚠️ BARANG HILANG DARI HELPER ({now_wib.strftime('%H:%M:%S')}): {sb_item['barcode_sku']} ➔ Siap Setup!")
+
+    # ==========================================================================
+    # LANGKAH 2: MATCHING DENGAN VALIDASI WAKTU & KUNCI ID MUTASI
+    # ==========================================================================
+    if need_setup_in_sb:
+        mutasi_today = fetch_bin_history_today(session)
+        # Urutkan mutasi dari yang paling awal ke paling baru
+        mutasi_today = sorted(mutasi_today, key=lambda x: x["dt_wib"] or now_wib)
+
+        for target in need_setup_in_sb:
+            t_sku = target["barcode_sku"]
+            t_bin_awal = target["bin_code"]
+            t_qty = safe_int_val(target["qty"], 1)
+            
+            # Waktu saat barang ini HILANG dari helper
+            t_disappeared_dt = parse_wib_datetime(target.get("disappeared_at"))
+
+            matched_mutasi = None
+
+            for m in mutasi_today:
+                m_id = m["mutasi_id"]
+                # 🛑 SYARAT 1: Mutasi ID belum pernah dipakai oleh transaksi lain
+                if m_id in used_mutasi_ids:
+                    continue
+
+                # 🛑 SYARAT 2: Validasi SKU, BIN, dan QTY
+                sku_match = (m["sku"] == t_sku)
+                bin_awal_match = (m["bin_awal"] == t_bin_awal or t_bin_awal in m["bin_awal"] or m["bin_awal"] in ["STAGING INBOUND", "WAITING OFFLINE"])
+                bin_tujuan_match = ("GL1-INSTOCK" in m["bin_tujuan"] or "INSTOCK" in m["bin_tujuan"])
+                qty_match = (m["qty_mts"] >= t_qty)
+
+                # 🛑 SYARAT 3: WAKTU MUTASI HARUS >= WAKTU BARANG HILANG
+                # Beri toleransi mundur 60 detik jika jam server Jezpro dan scraper selisih sedikit
+                time_valid = True
+                if t_disappeared_dt and m["dt_wib"]:
+                    tolerance_sec = 60
+                    time_diff = (m["dt_wib"] - t_disappeared_dt).total_seconds()
+                    if time_diff < -tolerance_sec:
+                        # Waktu mutasi terjadi jauh sebelum barang hilang (misal mutasi jam 10 pagi, barang hilang jam 2 siang)
+                        time_valid = False
+
+                if sku_match and bin_awal_match and bin_tujuan_match and qty_match and time_valid:
+                    matched_mutasi = m
+                    break
+
+            if matched_mutasi:
+                # Kunci ID mutasi ini agar tidak bisa diklaim lagi
+                used_mutasi_ids.add(matched_mutasi["mutasi_id"])
+
+                patch_url = f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?id=eq.{target['id']}"
+                requests.patch(patch_url, headers=headers, json={
+                    "status": "DONE_SETUP",
+                    "matched_mutasi_id": matched_mutasi["mutasi_id"],
+                    "setup_done_at": matched_mutasi["raw_time"]
+                })
+                print(f"   🎉 MATCH VALID! SKU: {t_sku} (Hilang: {target.get('disappeared_at')[:19]} ➔ Mutasi: {matched_mutasi['raw_time']}) ➔ PINDAH KE DONE SETUP!")
