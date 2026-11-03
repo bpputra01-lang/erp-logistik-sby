@@ -5620,23 +5620,17 @@ def server(input: Inputs, output: Outputs, session: Session):
     @reactive.Effect
     @reactive.event(input.btn_run_transit_instock)
     def _on_run_transit_instock():
-        # 1. Panggil fungsi trigger GitHub API
-        from config import trigger_github_action
-        ok, msg = trigger_github_action()
+        # Langsung tarik data terbaru dari Supabase secara instan (< 0.2 detik)
+        succ, msg = state.load_instock_daily_from_supabase()
         
         # Hilangkan loading spinner global
         ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
         
-        if ok:
-            ui.notification_show(
-                "🚀 Perintah sinkronisasi terkirim ke GitHub! Mohon tunggu ±30 detik, lalu klik tombol Refresh.", 
-                type="message", 
-                duration=7
-            )
+        if succ:
+            ui.notification_show("✅ Data Instock berhasil diperbarui dari Supabase!", type="message", duration=3)
         else:
-            ui.notification_show(f"⚠️ {msg}", type="warning", duration=6)
-            # Fallback: tetap coba load data yang ada di Supabase
-            state.load_instock_daily_from_supabase()
+            ui.notification_show(f"⚠️ {msg}", type="warning", duration=4)
+
 
     @render.ui
     def instock_validation_results_container():
