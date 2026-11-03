@@ -1,15 +1,15 @@
-name: Sync Instock Daily Surabaya
+name: Sync Instock Daily Surabaya (Realtime Daemon)
 
 on:
-  # Menjalankan otomatis terjadwal (misal: setiap 30 menit)
   schedule:
+    # Trigger setiap 30 menit untuk menjaga runner selalu hidup bergantian
     - cron: '*/30 * * * *'
-  # Memunculkan tombol "Run workflow" agar bisa dijalankan manual
   workflow_dispatch:
 
 jobs:
   run-sync:
     runs-on: ubuntu-latest
+    timeout-minutes: 35
 
     steps:
       - name: Checkout Repository
@@ -24,11 +24,14 @@ jobs:
         run: |
           pip install requests beautifulsoup4
 
-      - name: Run Instock Scraper
+      - name: Run Instock Realtime Worker
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           JEZPRO_EMAIL: ${{ secrets.JEZPRO_EMAIL }}
           JEZPRO_PASSWORD: ${{ secrets.JEZPRO_PASSWORD }}
+          # Menjalankan worker selama 28 menit (1680 detik) sebelum auto-restart
+          WORKER_DURATION_SECONDS: 1680
+          POLL_INTERVAL_SECONDS: 15
         run: |
           python instock_daily.py
