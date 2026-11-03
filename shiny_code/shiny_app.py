@@ -3012,7 +3012,8 @@ def server(input: Inputs, output: Outputs, session: Session):
             sel = input.bs_filter_category_select()
             cats = list(sel) if sel is not None else []
             state.apply_bs_category_filter(cats)
-            @reactive.Effect
+    
+    @reactive.Effect
     @reactive.event(input.change_bs_filter_area)
     def _on_bs_area_filter_change():
         val = input.change_bs_filter_area()
