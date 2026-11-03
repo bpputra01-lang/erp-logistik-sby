@@ -2976,6 +2976,11 @@ def server(input: Inputs, output: Outputs, session: Session):
             sel = input.bs_filter_category_select()
             cats = list(sel) if sel is not None else []
             state.apply_bs_category_filter(cats)
+            @reactive.Effect
+    @reactive.event(input.change_bs_filter_area)
+    def _on_bs_area_filter_change():
+        val = input.change_bs_filter_area()
+        state.apply_bs_area_filter(val)
 
     @render.ui
     def balancing_stock_results_container():
@@ -3027,18 +3032,36 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="padding: 0.75rem 0;"
         )
 
-        # TAB 2: LIST REFILL BERTINGKAT / PROGRESIF
+        # TAB 2: LIST REFILL BERTINGKAT / PROGRESIF (DENGAN FILTER AREA)
+        cur_area = state.bs_selected_area()
         tab2_content = ui.div(
             ui.div(
                 ui.div(
-                    ui.h4("🔄 List Refill Area Logistik | Offline | Online", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 2px 0;"),
+                    ui.h4("🔄 List Refill Area Logistik | Offline | Online", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
                 ),
-                ui.download_button(
-                    "btn_dl_bs_tab2",
-                    ui.tags.span(ui.tags.i(class_="fa-solid fa-file-excel", style="margin-right: 6px; font-size: 13px;"), "DOWNLOAD TEMPLATE REFILL (.XLSX)"),
-                    style="background: #3182CE; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer; font-size: 12px;"
+                ui.div(
+                    # 🌟 DROPDOWN FILTER AREA TAB 2
+                    ui.div(
+                        ui.span("🎯 Filter Area Refill:", style="font-size: 12px; font-weight: 800; color: #1A202C; margin-right: 6px;"),
+                        ui.tags.select(
+                            ui.tags.option("SEMUA AREA", value="SEMUA AREA", selected=(cur_area == "SEMUA AREA")),
+                            ui.tags.option("AREA OFFLINE", value="AREA OFFLINE", selected=(cur_area == "AREA OFFLINE")),
+                            ui.tags.option("AREA ONLINE", value="AREA ONLINE", selected=(cur_area == "AREA ONLINE")),
+                            ui.tags.option("AREA LOGISTIK", value="AREA LOGISTIK", selected=(cur_area == "AREA LOGISTIK")),
+                            id="bs_filter_area_select",
+                            onchange="Shiny.setInputValue('change_bs_filter_area', this.value, {priority: 'event'})",
+                            style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; background: white; cursor: pointer; min-width: 150px;"
+                        ),
+                        style="display: flex; align-items: center;"
+                    ),
+                    ui.download_button(
+                        "btn_dl_bs_tab2",
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-file-excel", style="margin-right: 6px; font-size: 13px;"), "DOWNLOAD TEMPLATE REFILL (.XLSX)"),
+                        style="background: #3182CE; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer; font-size: 12px;"
+                    ),
+                    style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;"
                 ),
-                style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 8px;"
+                style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 10px;"
             ),
             render_clean_table(state.df_bs_refill_headers(), state.df_bs_refill_rows(), "tbl_bs_tab2"),
             style="padding: 0.75rem 0;"

@@ -418,7 +418,8 @@ class AppState:
         self.bs_perc_online = reactive.Value(0.0)
 
         self.bs_category_list = reactive.Value([])     
-        self.bs_selected_categories = reactive.Value([]) 
+        self.bs_selected_categories = reactive.Value([])
+        self.bs_selected_area = reactive.Value("SEMUA AREA")
 
         self.df_bs_refill_headers = reactive.Value([])
         self.df_bs_refill_rows = reactive.Value([])
@@ -4129,48 +4130,71 @@ class AppState:
             return False, f"Terjadi kesalahan saat kalkulasi: {str(e)}"
             
     def apply_bs_category_filter(self, selected_cats):
-        """Memfilter Tab 1 dan Tab 2 berdasarkan Sub Kategori yang dipilih serta menghitung % Balance"""
+        """Memfilter berdasarkan Sub Kategori dan mempertahankan filter Area aktif"""
+        self.bs_selected_categories.set(selected_cats if selected_cats is not None else [])
+        self._apply_combined_bs_filters()
+
+    def apply_bs_area_filter(self, selected_area):
+        """Memfilter Tab 2 berdasarkan Area (OFFLINE, ONLINE, LOGISTIK)"""
+        self.bs_selected_area.set(selected_area if selected_area else "SEMUA AREA")
+        self._apply_combined_bs_filters()
+
+    def _apply_combined_bs_filters(self):
+        """Kalkulasi gabungan filter Kategori (Tab 1 & 2) dan filter Area (khusus Tab 2)"""
         if self._raw_df_bs_alloc_base.empty:
             return
 
         df_alloc = self._raw_df_bs_alloc_base.copy()
         df_refill = self._raw_df_bs_refill_base.copy()
 
+        selected_cats = self.bs_selected_categories()
+        selected_area = self.bs_selected_area()
+
+        # 1. Filter Sub Kategori
         if selected_cats and len(selected_cats) > 0:
             selected_clean = [str(x).strip().upper() for x in selected_cats]
             df_alloc = df_alloc[df_alloc["SUB KATEGORI"].isin(selected_clean)].copy()
             skus_valid = set(df_alloc["SKU"].unique())
             df_refill = df_refill[df_refill["SKU"].isin(skus_valid)].copy()
 
+        # 2. Filter Area Khusus Tab 2 (Hanya munculkan baris yang butuh refill di area tersebut)
+        if selected_area == "AREA OFFLINE":
+            mask_off = (df_refill["QTY OFF"].astype(str).str.upper() != "NO REFILL") & \
+                       (df_refill["QTY OFF"] != 0) & (df_refill["QTY OFF"] != "0")
+            df_refill = df_refill[mask_off].copy()
+
+        elif selected_area == "AREA ONLINE":
+            mask_onl = (df_refill["QTY ONL"].astype(str).str.upper() != "NO REFILL") & \
+                       (df_refill["QTY ONL"] != 0) & (df_refill["QTY ONL"] != "0")
+            df_refill = df_refill[mask_onl].copy()
+
+        elif selected_area == "AREA LOGISTIK":
+            mask_log = (df_refill["QTY LOG"].astype(str).str.upper() != "NO REFILL") & \
+                       (df_refill["QTY LOG"] != 0) & (df_refill["QTY LOG"] != "0")
+            df_refill = df_refill[mask_log].copy()
+
+        # Kalkulasi Metrik
         tot_sku = len(df_alloc)
         tot_stk = int(df_alloc["TOTAL STOK"].sum()) if not df_alloc.empty else 0
 
-        # Hitung SKU yang defisit (butuh refill) per area
         need_off = sum(1 for _, r in df_alloc.iterrows() if r["TARGET OFF"] > r["QTY OFF"])
         need_on = sum(1 for _, r in df_alloc.iterrows() if r["TARGET ONL"] > r["QTY ONL"])
         need_log = sum(1 for _, r in df_alloc.iterrows() if r["TARGET LOG"] > r["QTY LOG"])
-        
-        # SKU yang 100% seimbang di ketiga area sekaligus
-        balanced_all = sum(1 for _, r in df_alloc.iterrows() if r["STATUS"] == "SEIMBANG / OK")
 
-        # Hitung % Keseimbangan (Balance Rate)
         ready_log = tot_sku - need_log
         ready_off = tot_sku - need_off
         ready_on = tot_sku - need_on
 
-        perc_overall = (balanced_all / tot_sku * 100.0) if tot_sku > 0 else 0.0
         perc_log = (ready_log / tot_sku * 100.0) if tot_sku > 0 else 0.0
         perc_off = (ready_off / tot_sku * 100.0) if tot_sku > 0 else 0.0
         perc_on = (ready_on / tot_sku * 100.0) if tot_sku > 0 else 0.0
 
-        # Simpan ke state reactive
         self.bs_total_sku.set(tot_sku)
         self.bs_total_stock.set(tot_stk)
         self.bs_sku_need_off.set(need_off)
         self.bs_sku_need_on.set(need_on)
         self.bs_sku_need_log.set(need_log)
-        
-        self.bs_perc_overall.set(perc_overall)
+
         self.bs_perc_logistik.set(perc_log)
         self.bs_perc_offline.set(perc_off)
         self.bs_perc_online.set(perc_on)
