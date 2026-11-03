@@ -2,8 +2,8 @@ name: Sync Markom Event Scraper
 
 on:
   schedule:
-    # Berjalan otomatis setiap 5 menit
-    - cron: '*/5 * * * *'
+    # Berjalan tiap 2 jam sekali dari jam 12:00 WIB s/d 22:00 WIB (05:00 - 15:00 UTC)
+    - cron: '0 5,7,9,11,13,15 * * *'
   workflow_dispatch: # Memungkinkan tombol 'Run workflow' manual di tab Actions GitHub
 
 jobs:

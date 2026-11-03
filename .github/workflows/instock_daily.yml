@@ -1,10 +1,9 @@
 name: Sync Instock Daily Surabaya
 
 on:
-  # Menjalankan otomatis terjadwal (misal: setiap 30 menit)
   schedule:
-    - cron: '*/30 * * * *'
-  # Memunculkan tombol "Run workflow" agar bisa dijalankan manual
+    # Berjalan tiap 5 menit sekali dari jam 10:00 WIB s/d 22:00 WIB (03:00 - 15:00 UTC)
+    - cron: '*/5 3-15 * * *'
   workflow_dispatch:
 
 jobs:

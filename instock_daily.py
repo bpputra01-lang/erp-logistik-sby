@@ -281,13 +281,17 @@ def sync_cycle(session):
                 print(f"   🎉 MATCH VALID! SKU: {t_sku} (Hilang: {target.get('disappeared_at')[11:19]} ➔ Mutasi: {matched_mutasi['raw_time']}) ➔ DIGESER KE DONE SETUP!")
 
 # ==============================================================================
-# EKSEKUSI PROGRAM
+# EKSEKUSI PROGRAM (SINGLE-RUN: JALAN SEKALI LALU KELUAR)
 # ==============================================================================
 if __name__ == "__main__":
     print("=" * 65)
-    print("🚀 MENJALANKAN SYNC INSTOCK DAILY (WIB NATIVE - NO PYTZ)")
+    print("🚀 MENJALANKAN SYNC INSTOCK DAILY (SINGLE RUN - TIAP 5 MENIT)")
     print("=" * 65)
 
-    jez_session = create_jezpro_session()
-    sync_cycle(jez_session)
-    print("🏁 Selesai!")
+    try:
+        jez_session = create_jezpro_session()
+        sync_cycle(jez_session)
+        print("🏁 Sinkronisasi Instock Selesai dengan Sukses!")
+    except Exception as e:
+        print(f"❌ Error saat sinkronisasi: {e}")
+        exit(1)
