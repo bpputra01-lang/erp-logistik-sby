@@ -623,37 +623,73 @@ def server(input: Inputs, output: Outputs, session: Session):
             )
 
             # 9. PANDUAN: BALANCING STOCK & DYNAMIC ALLOCATION
+        # 9. PANDUAN & LOGIC: BALANCING STOCK & DYNAMIC ALLOCATION (VERSI TERBARU)
         elif cur in ["Balancing Stock", "Stock Allocation"]:
             guide_body = ui.div(
+                # --- SECTION 1: SUMBER DATA & PEMETAAN KOLOM ---
                 ui.tags.details(
-                    ui.tags.summary("📋 Informasi Format Dokumen & Kolom Wajib"),
+                    ui.tags.summary("📋 1. Sumber Data & Ketentuan Kolom (Supabase Cache)"),
                     ui.div(
-                        ui.tags.strong("Format File yang Dibutuhkan:"),
+                        ui.div(
+                            ui.p(ui.strong("Sinkronisasi Otomatis Supabase:"), " Data ditarik langsung dari tabel ", ui.code("balancing_stock_cache"), " dan ", ui.code("balancing_sales_cache"), " tanpa perlu upload manual.", style="margin-bottom: 6px; color: #1A365D; font-size: 13px;"),
+                            style="background: #EBF8FF; border-left: 4px solid #3182CE; padding: 10px 14px; border-radius: 6px; margin-bottom: 0.75rem;"
+                        ),
+                        ui.tags.strong("Struktur Kolom Acuan:"),
                         ui.tags.ul(
-                            ui.tags.li(ui.strong("1. FILE ALL STOCK (Multiple Adjustment):"), " Download dari Jezpro dan pastikan mencentang ", ui.strong("'Termasuk yang sudah habis'"), ". File wajib memuat Kolom B (BIN), Kolom C (SKU), Kolom E (Item Name/Deskripsi), dan Kolom J (Qty System)."),
-                            ui.tags.li(ui.strong("2. FILE SALES REPORT (Histori Penjualan 90 Hari):"), " Download data penjualan lengkap dari Jezpro. File wajib memuat Kolom A (Nama Store/Cabang), Kolom S (Quantity Sales), dan Kolom AA (SKU).")
+                            ui.tags.li(ui.strong("Stok (All Stock):"), " Kolom B (BIN), Kolom C (SKU), Kolom D (Brand), Kolom E (Item Name), Kolom F (Size/Variant), Kolom G (Sub Kategori), dan ", ui.strong("Kolom J (Qty System)"), "."),
+                            ui.tags.li(ui.strong("Sales (Report/Tracking):"), " Kolom A (Invoice), Kolom B (SKU), dan ", ui.strong("Kolom L (Qty Sales)"), "."),
+                            ui.tags.li(ui.strong("Normalisasi SKU:"), " SKU dengan angka nol di depan (misal: 00009048) otomatis dicocokkan dengan angka murninya (9048) secara dua arah agar data penjualan terbaca akurat.")
+                        ),
+                        ui.hr(style="margin: 8px 0; border-color: #CBD5E0;"),
+                        ui.tags.strong("Pengecualian & Klasifikasi Area BIN:"),
+                        ui.tags.ul(
+                            ui.tags.li("🛑 ", ui.strong("BIN yang Dikecualikan:"), " BIN yang mengandung kata ", ui.code("DEFECT"), ", ", ui.code("REJECT"), ", ", ui.code("KARANTINA"), ", ", ui.code("PERBAIKAN"), ", dan ", ui.code("TOKO"), " otomatis dihapus dari perhitungan stok."),
+                            ui.tags.li("📦 ", ui.strong("Area Logistik (QTY LOG):"), " Dihitung dari seluruh BIN yang mengandung kata ", ui.code("LOG"), "."),
+                            ui.tags.li("🏪 ", ui.strong("Area Offline (QTY OFF):"), " Dihitung dari seluruh BIN yang mengandung kata ", ui.code("OFF"), " atau ", ui.code("RSN"), "."),
+                            ui.tags.li("🌐 ", ui.strong("Area Online (QTY ONL):"), " Dihitung dari seluruh BIN yang mengandung kata ", ui.code("ONL"), ".")
                         ),
                         class_="accordion-content"
                     ), open=True
                 ),
+
+                # --- SECTION 2: LOGIKA ALOKASI DINAMIS BERDASARKAN TURNOVER ---
                 ui.tags.details(
-                    ui.tags.summary("💡 Logic Thinking - Hybrid Balancing & Dynamic Stock Allocation"),
+                    ui.tags.summary("💡 2. Logika Alokasi Dinamis & Kuota Presisi (Turnover-Based)"),
                     ui.div(
-                        ui.tags.strong("1. Klasifikasi Performa Sales & Rasio Alokasi Dinamis:"),
-                        ui.tags.ul(
-                            ui.tags.li(ui.strong("Tanpa Histori Sales (0 Unit):"), " Alokasi 10% Online, 10% Offline, dan ", ui.strong("80% Disimpan di Buffer Logistik"), "."),
-                            ui.tags.li(ui.strong("Dominan Online (> 70% Sales):"), " Alokasi ", ui.strong("70% Online"), ", 15% Offline, 15% Logistik."),
-                            ui.tags.li(ui.strong("Dominan Offline (> 70% Sales):"), " Alokasi 15% Online, ", ui.strong("70% Offline"), ", 15% Logistik."),
-                            ui.tags.li(ui.strong("Balanced / Imbang (Rasio Normal):"), " Alokasi ", ui.strong("40% Online, 40% Offline, 20% Logistik"), ".")
+                        ui.div(
+                            ui.span("RUMUS KONTROL KUOTA: ", style="font-weight: 800; color: #744210; font-size: 12px;"),
+                            ui.span("TARGET LOG + TARGET OFF + TARGET ONL = TOTAL STOK (TIDAK BOLEH LEBIH/KURANG)", style="font-weight: bold; font-family: monospace; color: #975A16; font-size: 12px;"),
+                            style="background: #FEFCBF; border-left: 4px solid #D69E2E; padding: 10px 14px; border-radius: 6px; margin-bottom: 0.75rem;"
                         ),
-                        ui.hr(style="margin: 8px 0; border-color: #CBD5E0;"),
-                        ui.tags.strong("2. Logika Penentuan BIN Acuan & Trigger Refill:"),
+                        ui.tags.strong("Aturan Alokasi Berdasarkan Kecepatan Penjualan (Turnover Rate = Sales / Stok):"),
                         ui.tags.ol(
-                            ui.tags.li(ui.strong("BIN Acuan Sumber (Source):"), " Seluruh BIN yang mengandung kata ", ui.code("LOG"), " (Logistik/Koli) atau ", ui.code("INB"), " (Staging Inbound/Penerimaan) serta area DC Buffer."),
-                            ui.tags.li(ui.strong("BIN Target Penjualan:"), " BIN Offline (mengandung kata ", ui.code("OFF"), ", ", ui.code("TOKO"), ", ", ui.code("STORE"), ", atau ", ui.code("GUDANG LT.2"), ") dan BIN Online (mengandung kata ", ui.code("ONL"), ", ", ui.code("ONLINE"), ", atau ", ui.code("HUB"), ")."),
-                            ui.tags.li(ui.strong("Pengecekan Defisit Stok:"), " Jika suatu SKU memiliki stok di BIN Acuan Sumber (> 0), namun stok aktual di BIN Offline atau Online ", ui.strong("bernilai 0 atau kurang dari Target Ideal Alokasi"), ", maka SKU tersebut otomatis masuk ke dalam antrean ", ui.strong("Balancing Stock Need Refill"), "."),
-                            ui.tags.li(ui.strong("Kalkulasi Kuota Refill Maksimal:"), " Jumlah Qty Refill dihitung presisi berdasarkan defisit stok terhadap target ideal dan dibatasi maksimal sebanyak stok sumber yang tersedia (tidak akan over-refill)."),
-                            ui.tags.li(ui.strong("Instruksi Mutasi Otomatis:"), " Sistem otomatis membuat Template Mutasi Perpindahan (BIN Awal ➔ BIN Tujuan, SKU, dan Qty) siap pakai untuk operasional gudang.")
+                            ui.tags.li(ui.strong("Stok 1 Unit:"), " Dialokasikan utuh 1 unit ke channel yang penjualannya lebih tinggi (atau Logistik jika belum ada sales). Tidak akan pernah dibagi 1 di Offline dan 1 di Online."),
+                            ui.tags.li(ui.strong("No Sales (0 Penjualan):"), " Alokasi ", ui.strong("80% Disimpan di Buffer Logistik"), ", 10% Offline, 10% Online."),
+                            ui.tags.li(ui.strong("Slow-Moving (Penjualan <= 2 pcs atau < 40% dari Stok):"), " Karena penjualan lambat/jauh di bawah total stok, ", ui.strong("Logistik tetap memegang mayoritas (65%)"), ", channel penjualan hanya diberi kuota wajar (25% Offline atau 25% Online) agar toko tidak kebanjiran stok mati."),
+                            ui.tags.li(ui.strong("Medium Turnover (40% - 74% dari Stok):"), " Alokasi 35% Logistik, 50% Channel Dominan, 15% Channel Lain."),
+                            ui.tags.li(ui.strong("Fast-Moving (>= 75% dari Stok & Sales > 2):"), " Barang terbukti laris dan perputaran cepat, barulah channel dominan dialokasikan porsi besar ", ui.strong("70%"), ", 15% Logistik, 15% Channel Lain."),
+                            ui.tags.li(ui.strong("Metode Pembagian Pecahan:"), " Menggunakan ", ui.em("Largest Remainder Method"), " sehingga sisa desimal diberikan kepada channel dengan penjualan tertinggi. Total target dijamin pas senilai total stok fisik.")
+                        ),
+                        class_="accordion-content"
+                    ), open=True
+                ),
+
+                # --- SECTION 3: LOGIKA TAB 2 (LIST REFILL PROGRESIF) ---
+                ui.tags.details(
+                    ui.tags.summary("🔄 3. Alur Logika Tab 2 (List Refill Progresif per BIN)"),
+                    ui.div(
+                        ui.tags.strong("Format Output & Ketentuan Refill:"),
+                        ui.tags.ul(
+                            ui.tags.li("Header Tabel: ", ui.code("BIN | SKU | BRAND | ITEM NAME | SIZE | QTY LOG | QTY OFF | QTY ONL")),
+                            ui.tags.li(ui.strong("Status 'NO REFILL':"), " Jika stok aktual di suatu area sudah mencukupi target alokasinya, kolom kuotanya otomatis bertuliskan ", ui.strong("'NO REFILL'"), "."),
+                            ui.tags.li(ui.strong("Alokasi Bertingkat (Progresif):"), " Jika BIN awal tidak cukup memenuhi kuota refill, sistem otomatis memunculkan baris BIN berikutnya dan ", ui.strong("hanya mencatat sisa kekurangannya saja"), " hingga target terpenuhi."),
+                            ui.tags.li(ui.strong("Filter Area Refill:"), " Gunakan dropdown filter di Tab 2 untuk memilah instruksi kerja:"),
+                            ui.tags.ul(
+                                ui.tags.li(ui.strong("AREA OFFLINE:"), " Hanya memunculkan baris barang yang benar-benar wajib di-refill ke Offline (menyembunyikan baris NO REFILL dan 0)."),
+                                ui.tags.li(ui.strong("AREA ONLINE:"), " Hanya memunculkan baris barang yang wajib di-refill ke Online/Hub."),
+                                ui.tags.li(ui.strong("AREA LOGISTIK:"), " Hanya memunculkan baris barang yang wajib dikembalikan ke buffer Logistik.")
+                            ),
+                            ui.tags.li(ui.strong("Download Excel Dinamis:"), " Tombol unduh file Excel otomatis mengikuti filter Area dan Sub Kategori yang sedang aktif.")
                         ),
                         class_="accordion-content"
                     ), open=True
