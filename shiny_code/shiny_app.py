@@ -698,28 +698,72 @@ def server(input: Inputs, output: Outputs, session: Session):
 
         elif cur in ["Percentage Display", "Precentage Display"]:
             guide_body = ui.div(
+                # --- SECTION 1: METRIK RINGKASAN & ATURAN UMUM ---
                 ui.tags.details(
-                    ui.tags.summary("📋 Logika Penarikan Display (Article Base)"),
+                    ui.tags.summary("📊 1. Penjelasan Metrik Ringkasan & BIN Eksklusi"),
                     ui.div(
+                        ui.div(
+                            ui.p(ui.strong("Tujuan Menu:"), " Memonitor ketersediaan display toko fisik (Article Base) dan memberikan instruksi refill terarah per BIN untuk kategori Lower Body.", style="margin-bottom: 6px; color: #1A365D; font-size: 13px;"),
+                            style="background: #EBF8FF; border-left: 4px solid #3182CE; padding: 10px 14px; border-radius: 6px; margin-bottom: 0.75rem;"
+                        ),
+                        ui.tags.strong("📋 Ketentuan Metrik Box:"),
                         ui.tags.ul(
-                            ui.tags.li(ui.strong("Filter Eksklusi:"), " Mengabaikan BIN OFFLINE, ONLINE, AMP, MARKOM, DEFECT, REJECT, STAGING, KARANTINA, EVENT, INB, OUT, PUTAWAY."),
-                            ui.tags.li(ui.strong("Proteksi BIN OUT:"), " Jika SKU memiliki stok di BIN OUT > 0, otomatis dikecualikan dari list penarikan display."),
-                            ui.tags.li(ui.strong("Prioritas Sumber:"), " Diprioritaskan mengambil dari Gudang Lt. 2 (STR/STORE/GUDANG), baru kemudian dari DC.")
-                        ), class_="accordion-content"
+                            ui.tags.li(ui.strong("Total Article:"), " Total artikel unik yang terdaftar pada sistem cabang terpilih."),
+                            ui.tags.li(ui.strong("On Display (%):"), " Persentase artikel yang sudah memiliki stok pajangan di area toko (BIN Toko/Display > 0)."),
+                            ui.tags.li(ui.strong("Need Display (%):"), " Persentase artikel yang belum dipajang di toko, namun stok fisiknya tersedia di gudang."),
+                            ui.tags.li(ui.strong("Artikel Tersedia di Gudang:"), " Menghitung akumulasi artikel siap tarik dari seluruh area gudang penyimpanan (OFF / LOG / ONL / Lainnya)."),
+                            ui.tags.li(ui.strong("🚫 SKU di BIN Dikecualikan:"), " Menghitung total SKU unik yang berada di BIN non-operasional: ", ui.code("EVENT"), ", ", ui.code("REJECT"), ", ", ui.code("DEFECT"), ", ", ui.code("KARANTINA"), ", ", ui.code("PERBAIKAN"), ", ", ui.code("RESELLER"), ", ", ui.code("GARAGE"), ", dan ", ui.code("LIVE"), ".")
+                        ),
+                        class_="accordion-content"
                     ), open=True
                 ),
+
+                # --- SECTION 2: LOGIKA TAB 1 (DISPLAY AVAILABILITY) ---
                 ui.tags.details(
-                    ui.tags.summary("🏬 Logika Refill Toko (SKU Base)"),
+                    ui.tags.summary("🧥 2. Logika Tab 1: Display Availability (Article Base)"),
                     ui.div(
+                        ui.tags.strong("Kriteria Artikel Masuk List Display:"),
                         ui.tags.ul(
-                            ui.tags.li("Mengabaikan kategori: ", ui.strong("Shoes, Sandals, Footwear"), "."),
-                            ui.tags.li(ui.strong("Lower Body:"), " Wajib refill jika stok di Toko < 6."),
-                            ui.tags.li(ui.strong("Kategori Lainnya:"), " Wajib refill jika stok di Toko < 2 (minimal stok gudang > 0).")
-                        ), class_="accordion-content"
+                            ui.tags.li("Stok artikel di area Toko kosong (", ui.strong("Qty di Toko <= 0"), ")."),
+                            ui.tags.li("Memiliki stok fisik yang valid dan tersedia di gudang (", ui.strong("Qty Gudang > 0"), ")."),
+                            ui.tags.li("Terdapat kolom ", ui.strong("Qty di Toko"), " untuk memudahkan verifikasi kekosongan barang di display.")
+                        ),
+                        ui.hr(style="margin: 8px 0; border-color: #CBD5E0;"),
+                        ui.tags.strong("🎯 Alur Prioritas Pencarian Lokasi BIN Sumber:"),
+                        ui.tags.ol(
+                            ui.tags.li(ui.strong("Prioritas 1 (Area Offline):"), " Sistem memprioritaskan pencarian dari BIN yang mengandung kata ", ui.code("OFF"), " atau ", ui.code("RSN"), "."),
+                            ui.tags.li(ui.strong("Prioritas 2 (Area Logistik):"), " Jika di area Offline tidak ditemukan, sistem mencari dari BIN yang mengandung kata ", ui.code("LOG"), "."),
+                            ui.tags.li(ui.strong("Prioritas 3 (Area Online):"), " Jika di Logistik tidak ditemukan, sistem mencari dari BIN yang mengandung kata ", ui.code("ONL"), "."),
+                            ui.tags.li(ui.strong("Prioritas 4 (Area Lainnya):"), " Jika tidak ada di ketiga area di atas, sistem mengambil dari BIN penyimpanan valid lainnya di luar BIN yang dikecualikan dan di luar Toko.")
+                        ),
+                        class_="accordion-content"
+                    ), open=True
+                ),
+
+                # --- SECTION 3: LOGIKA TAB 2 (REFILL TOKO LOWER BODY) ---
+                ui.tags.details(
+                    ui.tags.summary("👖 3. Logika Tab 2: Refill Toko (Khusus Lower Body - Maks 10 Pcs)"),
+                    ui.div(
+                        ui.tags.strong("Ketentuan Syarat & Target Refill:"),
+                        ui.tags.ul(
+                            ui.tags.li("Khusus memproses sub kategori ", ui.strong("LOWER BODY"), "."),
+                            ui.tags.li("Item masuk antrean jika stok di Toko ", ui.strong("< 10 pcs"), " dan stok gudang ", ui.strong("> 0"), "."),
+                            ui.tags.li("Target refill maksimal adalah ", ui.strong("10 pcs per SKU"), " (Kebutuhan = min(10 - Qty Toko, Stok Gudang))."),
+                            ui.tags.li("Item dengan ", ui.strong("Qty Toko = 0"), " otomatis ditempatkan di urutan teratas sebagai prioritas utama (*Priority Restock*).")
+                        ),
+                        ui.hr(style="margin: 8px 0; border-color: #CBD5E0;"),
+                        ui.tags.strong("📦 Format Tabel & Sistem Progresif 1 BIN per Baris:"),
+                        ui.tags.ol(
+                            ui.tags.li(ui.strong("Posisi Kolom BIN:"), " Kolom ", ui.code("BIN"), " diletakkan di posisi ", ui.strong("paling kiri"), " (sebelah kiri kolom SKU)."),
+                            ui.tags.li(ui.strong("Tunggal per Baris:"), " Setiap baris hanya memuat ", ui.strong("1 lokasi BIN penarikan"), " (tidak digabung tanda koma)."),
+                            ui.tags.li(ui.strong("Pecah Baris Progresif (Split Defisit):"), " Jika stok di BIN pertama tidak mencukupi target kekurangan 10 pcs, sistem otomatis menduplikasi baris SKU tersebut ke BIN berikutnya dan ", ui.strong("hanya mengambil sisa kekurangannya saja"), " hingga target terpenuhi."),
+                            ui.tags.li(ui.strong("Hierarki Pengambilan:"), " Pengambilan stok per BIN tetap mematuhi urutan prioritas: ", ui.strong("OFF"), " ➔ ", ui.strong("LOG"), " ➔ ", ui.strong("ONL"), " ➔ ", ui.strong("BIN Lainnya"), ".")
+                        ),
+                        class_="accordion-content"
                     ), open=True
                 )
             )
-
+            
             # PANDUAN: PHYSICAL INVENTORY LIST (2-IN-1 MODE)
         elif cur == "Physical Inventory List":
             guide_body = ui.div(
