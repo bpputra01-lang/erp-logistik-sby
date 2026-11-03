@@ -4911,7 +4911,6 @@ class AppState:
                                 "VARIANT": r['VARIANT'],
                                 "SUB KATEGORI": r['SUB KATEGORI'],
                                 "QTY TOKO": qty_toko,
-                                "TARGET TOKO": 10,
                                 "QTY REFILL": take,        # Jumlah yang diambil dari BIN ini saja
                                 "STOK GUDANG": stok_gudang
                             })
@@ -4922,12 +4921,12 @@ class AppState:
                 else:
                     df_rt_view = pd.DataFrame(columns=[
                         "BIN", "SKU", "BRAND", "ITEM NAME", "VARIANT", 
-                        "SUB KATEGORI", "QTY TOKO", "TARGET TOKO", "QTY REFILL", "STOK GUDANG"
+                        "SUB KATEGORI", "QTY TOKO", "QTY REFILL", "STOK GUDANG"
                     ])
             else:
                 df_rt_view = pd.DataFrame(columns=[
                     "BIN", "SKU", "BRAND", "ITEM NAME", "VARIANT", 
-                    "SUB KATEGORI", "QTY TOKO", "TARGET TOKO", "QTY REFILL", "STOK GUDANG"
+                    "SUB KATEGORI", "QTY TOKO", "QTY REFILL", "STOK GUDANG"
                 ])
 
             self.rt_total_sku.set(df_rt_view['SKU'].nunique() if not df_rt_view.empty else 0)
