@@ -3855,7 +3855,7 @@ class AppState:
 
             # ------------------------------------------------------------------
             # 3. COMPARE QTY LOG, QTY OFF, QTY ONL PER UNIQUE SKU
-            # 🌟 PENTING: AREA OFFLINE MENGANDUNG KATA 'OFF' ATAU 'RSN'
+            # 🌟 AREA OFFLINE: MENCAKUP KATA 'OFF' DAN 'RSN'
             # ------------------------------------------------------------------
             df_stk['QTY_POS'] = df_stk['QTY'].clip(lower=0)
 
@@ -3907,28 +3907,69 @@ class AppState:
                 s_onl = to_int(sls['SALES_ONL'])
                 s_tot = to_int(sls['TOTAL_SALES'])
 
-                # Klasifikasi Alokasi Berdasarkan Sales
+                # --------------------------------------------------------------
+                # 🌟 LOGIKA ALOKASI BERDASARKAN TURNOVER (SALES VS STOCK RATIO)
+                # --------------------------------------------------------------
+                turnover_rate = (s_tot / tot_stk) if tot_stk > 0 else 0.0
+                r_on = (s_onl / s_tot) if s_tot > 0 else 0.0
+                r_off = (s_off / s_tot) if s_tot > 0 else 0.0
+
                 if s_tot == 0:
+                    # 1. Tidak Ada Penjualan Sama Sekali (80% Disimpan di Buffer Logistik)
                     pct_log, pct_off, pct_on = 0.80, 0.10, 0.10
-                    klasifikasi = "NO SALES (10% ONL | 10% OFF | 80% LOG)"
+                    klasifikasi = "NO SALES (80% LOG | 10% OFF | 10% ONL)"
+
+                elif s_tot <= 2 or turnover_rate < 0.40:
+                    # 2. Slow-Moving (Penjualan <= 2 pcs atau < 40% dari stok)
+                    # Mayoritas (65%) tetap di Logistik agar toko/online tidak overstock
+                    if r_off > 0.70:
+                        pct_log, pct_off, pct_on = 0.65, 0.25, 0.10
+                        klasifikasi = "SLOW MOVING - KEBUTUHAN OFFLINE (65% LOG | 25% OFF | 10% ONL)"
+                    elif r_on > 0.70:
+                        pct_log, pct_off, pct_on = 0.65, 0.10, 0.25
+                        klasifikasi = "SLOW MOVING - KEBUTUHAN ONLINE (65% LOG | 10% OFF | 25% ONL)"
+                    else:
+                        pct_log, pct_off, pct_on = 0.60, 0.20, 0.20
+                        klasifikasi = "SLOW MOVING - BALANCED (60% LOG | 20% OFF | 20% ONL)"
+
+                elif turnover_rate < 0.75:
+                    # 3. Medium Turnover (Penjualan sedang 40% - 74% dari stok)
+                    if r_off > 0.70:
+                        pct_log, pct_off, pct_on = 0.35, 0.50, 0.15
+                        klasifikasi = "MEDIUM - DOMINAN OFFLINE (35% LOG | 50% OFF | 15% ONL)"
+                    elif r_on > 0.70:
+                        pct_log, pct_off, pct_on = 0.35, 0.15, 0.50
+                        klasifikasi = "MEDIUM - DOMINAN ONLINE (35% LOG | 15% OFF | 50% ONL)"
+                    else:
+                        pct_log, pct_off, pct_on = 0.30, 0.35, 0.35
+                        klasifikasi = "MEDIUM - BALANCED (30% LOG | 35% OFF | 35% ONL)"
+
                 else:
-                    r_on = s_onl / s_tot
-                    r_off = s_off / s_tot
-                    if r_on > 0.70:
-                        pct_log, pct_off, pct_on = 0.15, 0.15, 0.70
-                        klasifikasi = "DOMINAN ONLINE (>70%)"
-                    elif r_off > 0.70:
+                    # 4. Fast-Moving (Penjualan tinggi mendekati/melebihi stok >= 75%)
+                    # Channel dominan mendapatkan kuota penuh (70%)
+                    if r_off > 0.70:
                         pct_log, pct_off, pct_on = 0.15, 0.70, 0.15
-                        klasifikasi = "DOMINAN OFFLINE (>70%)"
+                        klasifikasi = "FAST MOVING - DOMINAN OFFLINE (15% LOG | 70% OFF | 15% ONL)"
+                    elif r_on > 0.70:
+                        pct_log, pct_off, pct_on = 0.15, 0.15, 0.70
+                        klasifikasi = "FAST MOVING - DOMINAN ONLINE (15% LOG | 15% OFF | 70% ONL)"
                     else:
                         pct_log, pct_off, pct_on = 0.20, 0.40, 0.40
-                        klasifikasi = "BALANCED (40:40:20)"
+                        klasifikasi = "FAST MOVING - BALANCED (20% LOG | 40% OFF | 40% ONL)"
 
                 # --------------------------------------------------------------
-                # 🎯 KUOTA PRESISI: TOTAL TARGET SELALU SAMA DENGAN TOTAL STOK
+                # 🎯 KUOTA PRESISI: TOTAL TARGET SELALU PERSIS SAMA DENGAN TOTAL STOK
                 # (LARGEST REMAINDER METHOD - BEBAS ANOMALI OVER-ALLOCATION)
                 # --------------------------------------------------------------
-                if tot_stk > 0:
+                if tot_stk == 1:
+                    # Aturan khusus 1 unit: Berikan utuh ke 1 area tanpa pecahan
+                    if s_off > s_onl:
+                        tgt_log, tgt_off, tgt_onl = 0, 1, 0
+                    elif s_onl > s_off:
+                        tgt_log, tgt_off, tgt_onl = 0, 0, 1
+                    else:
+                        tgt_log, tgt_off, tgt_onl = 1, 0, 0
+                elif tot_stk > 1:
                     raw_log = tot_stk * pct_log
                     raw_off = tot_stk * pct_off
                     raw_on = tot_stk * pct_on
@@ -3939,15 +3980,15 @@ class AppState:
 
                     rem = tot_stk - (flr_log + flr_off + flr_on)
 
-                    # Prioritas sisa desimal: utamakan channel yang penjualan riilnya lebih besar
+                    # Prioritas sisa desimal: utamakan channel yang penjualan riilnya lebih tinggi
                     prio_off = 10 + (1 if s_off >= s_onl else 0)
                     prio_on = 10 + (1 if s_onl > s_off else 0)
                     prio_log = 5
 
                     candidates = [
+                        (raw_log - flr_log, prio_log, 'LOG'),
                         (raw_off - flr_off, prio_off, 'OFF'),
-                        (raw_on - flr_on, prio_on, 'ONL'),
-                        (raw_log - flr_log, prio_log, 'LOG')
+                        (raw_on - flr_on, prio_on, 'ONL')
                     ]
                     candidates.sort(key=lambda x: (x[0], x[1]), reverse=True)
 
