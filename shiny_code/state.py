@@ -472,6 +472,7 @@ class AppState:
         self.pd_from_logistic = reactive.Value(0)
         self.pd_from_online = reactive.Value(0)
         self.pd_karantina_lock = reactive.Value(0)
+        self.pd_excluded_sku = reactive.Value(0)
 
         self.df_pd_display_headers = reactive.Value([])
         self.df_pd_display_rows = reactive.Value([])
@@ -4748,9 +4749,14 @@ class AppState:
             # ==================================================================
             is_toko_disp = df['BIN_CLEAN'].str.contains('TOKO|DISPLAY', na=False)
 
-            # 🛑 PENGECUALIAN SUMBER DISPLAY: EVENT, REJECT, DEFECT, KARANTINA, PERBAIKAN, RESELLER
+            # 🛑 PENGECUALIAN SUMBER DISPLAY: EVENT, REJECT, DEFECT, KARANTINA, PERBAIKAN, RESELLER, GARAGE, LIVE
             excl_display_src = "EVENT|REJECT|DEFECT|KARANTINA|PERBAIKAN|RESELLER|GARAGE|LIVE"
             is_valid_source = (~is_toko_disp) & (~df['BIN_CLEAN'].str.contains(excl_display_src, na=False))
+
+            # 🌟 [POIN 1]: HITUNG TOTAL SKU YANG ADA DI BIN DIKECUALIKAN
+            df_excluded_bins = df[df['BIN_CLEAN'].str.contains(excl_display_src, na=False) & (df['QTY_NUM'] > 0)]
+            total_sku_excluded = df_excluded_bins['SKU_CLEAN'].nunique() if not df_excluded_bins.empty else 0
+            self.pd_excluded_sku.set(total_sku_excluded)
 
             df['QTY_GUDANG_SRC'] = np.where(is_valid_source, df['QTY_NUM'], 0)
             df['QTY_TOKO_TGT']   = np.where(is_toko_disp, df['QTY_NUM'], 0)
@@ -4775,7 +4781,6 @@ class AppState:
                 (df['QTY_NUM'] > 0)
             ].copy()
 
-            # 🌟 HELPER KLASIFIKASI 3 AREA SUMBER: OFFLINE, LOGISTIC, ONLINE
             def get_bin_area_source(bin_name):
                 b = str(bin_name).upper()
                 if any(k in b for k in ['OFF', 'RSN', 'STR', 'GUDANG LT.2', 'STORE']):
@@ -4793,11 +4798,16 @@ class AppState:
                 raw_source = raw_source.sort_values(by=['AREA_PRIO', 'QTY_NUM'], ascending=[True, False])
                 detail_disp = raw_source.drop_duplicates(subset=['ARTICLE']).copy()
 
+                # 🌟 [POIN 2]: HITUNG QTY DI TOKO UNTUK DETAIL TAB 1
+                toko_sku_map = df[is_toko_disp].groupby('SKU_CLEAN')['QTY_NUM'].sum().to_dict()
+                detail_disp['QTY_TOKO_VAL'] = detail_disp['SKU_CLEAN'].map(toko_sku_map).fillna(0).astype(int)
+
                 df_detail_view = pd.DataFrame({
                     "Article": detail_disp['ARTICLE'],
                     "SKU": detail_disp['SKU_CLEAN'],
                     "Deskripsi Barang": detail_disp['DESC_CLEAN'],
                     "Size Display": detail_disp['SIZE_CLEAN'],
+                    "Qty di Toko": detail_disp['QTY_TOKO_VAL'],   # <-- TAMBAHAN KOLOM QTY DI TOKO
                     "Asal Area": detail_disp['ASAL_AREA'],
                     "Bin Lokasi": detail_disp['BIN_CLEAN'],
                     "Qty In Bin": detail_disp['QTY_NUM'].astype(int)
@@ -4807,7 +4817,10 @@ class AppState:
                 cnt_logistic = int((detail_disp['ASAL_AREA'] == "AREA LOGISTIC").sum())
                 cnt_online   = int((detail_disp['ASAL_AREA'] == "AREA ONLINE").sum())
             else:
-                df_detail_view = pd.DataFrame(columns=["Article", "SKU", "Deskripsi Barang", "Size Display", "Asal Area", "Bin Lokasi", "Qty In Bin"])
+                df_detail_view = pd.DataFrame(columns=[
+                    "Article", "SKU", "Deskripsi Barang", "Size Display", 
+                    "Qty di Toko", "Asal Area", "Bin Lokasi", "Qty In Bin"
+                ])
                 cnt_offline, cnt_logistic, cnt_online = 0, 0, 0
 
             on_disp_cnt = len(art_on_display_set)
@@ -4848,8 +4861,6 @@ class AppState:
                 gudang_agg = gudang_valid.groupby('SKU_CLEAN', as_index=False)['QTY_NUM'].sum()
                 gudang_agg.columns = ['SKU_CLEAN', 'QTY_GUDANG']
 
-                bin_map = gudang_valid.groupby('SKU_CLEAN')['BIN_CLEAN'].apply(lambda x: ", ".join(sorted(set(x)))).to_dict()
-
                 sku_master = df_lb.drop_duplicates(subset=['SKU_CLEAN'])[[
                     'SKU_CLEAN', 'BRAND_CLEAN', 'DESC_CLEAN', 'SIZE_CLEAN', 'CAT_CLEAN'
                 ]].copy()
@@ -4860,39 +4871,77 @@ class AppState:
 
                 merged_refill['QTY_TOKO'] = merged_refill['QTY_TOKO'].fillna(0).astype(int)
                 merged_refill['QTY_GUDANG'] = merged_refill['QTY_GUDANG'].fillna(0).astype(int)
-                merged_refill['LOKASI_BIN'] = merged_refill['SKU'].map(bin_map).fillna('-')
 
-                # Syarat: Stok di Toko < 10 dan Stok Gudang > 0
+                # Syarat Refill: Stok di Toko < 10 dan Stok Gudang > 0
                 merged_refill = merged_refill[(merged_refill['QTY_TOKO'] < 10) & (merged_refill['QTY_GUDANG'] > 0)].copy()
 
-                if not merged_refill.empty:
-                    merged_refill['TARGET MAKS'] = 10
-                    merged_refill['QTY REFILL'] = merged_refill.apply(
-                        lambda r: min(10 - r['QTY_TOKO'], r['QTY_GUDANG']), axis=1
-                    )
+                # Prioritaskan item yang QTY TOKO == 0
+                merged_refill['IS_ZERO'] = merged_refill['QTY_TOKO'] == 0
+                merged_refill = merged_refill.sort_values(by=['IS_ZERO', 'QTY_GUDANG'], ascending=[False, False])
 
-                    merged_refill['IS_ZERO'] = merged_refill['QTY_TOKO'] == 0
-                    merged_refill = merged_refill.sort_values(by=['IS_ZERO', 'QTY REFILL'], ascending=[False, False])
+                # 🌟 [POIN 3 & 4]: PECAH BARIS PER 1 BIN & PINDAHKAN KOLOM BIN KE PALING KIRI
+                refill_rows = []
+                for _, r in merged_refill.iterrows():
+                    sku = r['SKU']
+                    qty_toko = int(r['QTY_TOKO'])
+                    stok_gudang = int(r['QTY_GUDANG'])
+                    total_needed = min(10 - qty_toko, stok_gudang)
+                    rem_needed = total_needed
 
-                    df_rt_view = pd.DataFrame({
-                        "SKU": merged_refill['SKU'],
-                        "BRAND": merged_refill['BRAND'],
-                        "ITEM NAME": merged_refill['ITEM NAME'],
-                        "VARIANT": merged_refill['VARIANT'],
-                        "SUB KATEGORI": merged_refill['SUB KATEGORI'],
-                        "QTY TOKO": merged_refill['QTY_TOKO'],
-                        "TARGET TOKO": merged_refill['TARGET MAKS'],
-                        "QTY REFILL": merged_refill['QTY REFILL'],
-                        "STOK GUDANG": merged_refill['QTY_GUDANG'],
-                        "LOKASI BIN": merged_refill['LOKASI_BIN']
-                    })
+                    # Cari BIN gudang yang memiliki stok untuk SKU ini
+                    bins_for_sku = gudang_valid[gudang_valid['SKU_CLEAN'] == sku].groupby('BIN_CLEAN', as_index=False)['QTY_NUM'].sum()
+                    if not bins_for_sku.empty:
+                        # Prioritaskan area Store/Offline/Rak terlebih dahulu
+                        def get_bin_prio(b_name):
+                            b = str(b_name).upper()
+                            if any(k in b for k in ['STR', 'OFF', 'RSN', 'GUDANG LT.2', 'STORE']):
+                                return 1
+                            elif any(k in b for k in ['DC', 'RAK', 'LOG']):
+                                return 2
+                            return 3
+
+                        bins_for_sku['PRIO'] = bins_for_sku['BIN_CLEAN'].apply(get_bin_prio)
+                        bins_for_sku = bins_for_sku.sort_values(by=['PRIO', 'QTY_NUM'], ascending=[True, False])
+
+                        # Alokasikan progresif: ambil sampai target kekurangan (maks 10) terpenuhi
+                        for _, b_row in bins_for_sku.iterrows():
+                            if rem_needed <= 0:
+                                break
+                            b_name = b_row['BIN_CLEAN']
+                            b_qty = int(b_row['QTY_NUM'])
+                            if b_qty <= 0:
+                                continue
+
+                            take = min(rem_needed, b_qty)
+                            refill_rows.append({
+                                "BIN": b_name,            # 🌟 [POIN 4]: Kolom BIN di paling kiri (sebelah kiri SKU)
+                                "SKU": sku,
+                                "BRAND": r['BRAND'],
+                                "ITEM NAME": r['ITEM NAME'],
+                                "VARIANT": r['VARIANT'],
+                                "SUB KATEGORI": r['SUB KATEGORI'],
+                                "QTY TOKO": qty_toko,
+                                "TARGET TOKO": 10,
+                                "QTY REFILL": take,        # 🌟 [POIN 3]: Qty yang diambil dari BIN ini (atau sisa kurangnya)
+                                "STOK GUDANG": stok_gudang
+                            })
+                            rem_needed -= take
+
+                if refill_rows:
+                    df_rt_view = pd.DataFrame(refill_rows)
                 else:
-                    df_rt_view = pd.DataFrame(columns=["SKU", "BRAND", "ITEM NAME", "VARIANT", "SUB KATEGORI", "QTY TOKO", "TARGET TOKO", "QTY REFILL", "STOK GUDANG", "LOKASI BIN"])
+                    df_rt_view = pd.DataFrame(columns=[
+                        "BIN", "SKU", "BRAND", "ITEM NAME", "VARIANT", 
+                        "SUB KATEGORI", "QTY TOKO", "TARGET TOKO", "QTY REFILL", "STOK GUDANG"
+                    ])
             else:
-                df_rt_view = pd.DataFrame(columns=["SKU", "BRAND", "ITEM NAME", "VARIANT", "SUB KATEGORI", "QTY TOKO", "TARGET TOKO", "QTY REFILL", "STOK GUDANG", "LOKASI BIN"])
+                df_rt_view = pd.DataFrame(columns=[
+                    "BIN", "SKU", "BRAND", "ITEM NAME", "VARIANT", 
+                    "SUB KATEGORI", "QTY TOKO", "TARGET TOKO", "QTY REFILL", "STOK GUDANG"
+                ])
 
-            self.rt_total_sku.set(len(df_rt_view))
-            self.rt_priority_sku.set(int((df_rt_view['QTY TOKO'] == 0).sum()) if not df_rt_view.empty else 0)
+            self.rt_total_sku.set(df_rt_view['SKU'].nunique() if not df_rt_view.empty else 0)
+            self.rt_priority_sku.set(df_rt_view[df_rt_view['QTY TOKO'] == 0]['SKU'].nunique() if not df_rt_view.empty else 0)
             self.rt_total_qty_refill.set(int(df_rt_view['QTY REFILL'].sum()) if not df_rt_view.empty else 0)
 
             self._raw_df_rt_filtered = df_rt_view.copy()
