@@ -2987,27 +2987,25 @@ def server(input: Inputs, output: Outputs, session: Session):
             elif pct >= 70.0: return "#DD6B20"
             return "#E53E3E"
 
-        c_all = get_balance_color(state.bs_perc_overall())
         c_log = get_balance_color(state.bs_perc_logistik())
         c_off = get_balance_color(state.bs_perc_offline())
         c_on = get_balance_color(state.bs_perc_online())
 
-        # BARIS 1: PERSENTASE KESEIMBANGAN (% BALANCE RATE)
+        # 🌟 BARIS 1: PERSENTASE KESEIMBANGAN (HANYA LOGISTIK, OFFLINE, ONLINE)
         balance_metrics_ui = ui.div(
-            dark_metric_box("⚖️ OVERALL BALANCED (ALL AREA)", f"{state.bs_perc_overall():.1f}%", c_all),
             dark_metric_box("📦 BALANCE AREA LOGISTIK", f"{state.bs_perc_logistik():.1f}%", c_log),
             dark_metric_box("🏪 BALANCE AREA OFFLINE", f"{state.bs_perc_offline():.1f}%", c_off),
             dark_metric_box("🌐 BALANCE AREA ONLINE", f"{state.bs_perc_online():.1f}%", c_on),
             style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
         )
 
-        # BARIS 2: VOLUME TOTAL & DEFISIT SKU YANG PERLU REFILL
+        # 🌟 BARIS 2: VOLUME TOTAL & DEFISIT SKU YANG PERLU REFILL
         volume_metrics_ui = ui.div(
             dark_metric_box("📦 TOTAL UNIQUE SKU", f"{state.bs_total_sku():,} SKU", "#3182CE"),
             dark_metric_box("🔢 TOTAL QTY STOCK", f"{state.bs_total_stock():,} PCS", "#C5A059"),
-            dark_metric_box("🏪 REFILL OFFLINE", f"{state.bs_sku_need_off():,} SKU", "#DD6B20"),
-            dark_metric_box("💻 REFILL ONLINE", f"{state.bs_sku_need_on():,} SKU", "#3182CE"),
-            dark_metric_box("🚚 REFILL LOGISTIK", f"{state.bs_sku_need_log():,} SKU", "#805AD5"),
+            dark_metric_box("🏪 DEFISIT OFFLINE", f"{state.bs_sku_need_off():,} SKU", "#DD6B20"),
+            dark_metric_box("💻 DEFISIT ONLINE", f"{state.bs_sku_need_on():,} SKU", "#3182CE"),
+            dark_metric_box("🚚 DEFISIT LOGISTIK", f"{state.bs_sku_need_log():,} SKU", "#805AD5"),
             style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
         )
 
@@ -3016,7 +3014,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             ui.div(
                 ui.div(
                     ui.h4("📊 Summary Comparation Total Stock to Stock Area", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 2px 0;"),
-                    ui.p("Pengecualian otomatis terhadap BIN Defect, Reject, Karantina, Perbaikan, dan Toko.", style="color: #718096; font-size: 12px; margin: 0;"),
+                    ui.p("Pengecualian otomatis terhadap BIN Defect, Reject, Karantina, Perbaikan, Toko, Live, Putaway.", style="color: #718096; font-size: 12px; margin: 0;"),
                 ),
                 ui.download_button(
                     "btn_dl_bs_tab1",
@@ -3051,8 +3049,8 @@ def server(input: Inputs, output: Outputs, session: Session):
             balance_metrics_ui,
             volume_metrics_ui,
             ui.navset_card_tab(
-                ui.nav_panel("1. COMPARE STOK & SALES (UNIQUE SKU)", tab1_content),
-                ui.nav_panel("2. LIST REFILL PROGRESIF", tab2_content)
+                ui.nav_panel("1. COMPARE STOK & SALES", tab1_content),
+                ui.nav_panel("2. LIST REFILL", tab2_content)
             ),
             style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
         )
