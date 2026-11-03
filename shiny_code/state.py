@@ -3787,7 +3787,7 @@ class AppState:
             qty_series = pd.to_numeric(qty_raw, errors='coerce').fillna(0)
 
             # 🛑 PENGECUALIAN BIN: DEFECT, REJECT, KARANTINA, PERBAIKAN, DAN TOKO
-            excl_pattern = "DEFECT|REJECT|KARANTINA|PERBAIKAN|TOKO"
+            excl_pattern = "DEFECT|REJECT|KARANTINA|PERBAIKAN|TOKO|LIVE|PUTAWAY"
             mask_valid = ~bin_series.str.contains(excl_pattern, na=False) & (sku_series != "") & (sku_series != "NAN")
 
             df_stk = pd.DataFrame({
