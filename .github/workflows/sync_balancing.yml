@@ -2,7 +2,12 @@ name: Sync Balancing Stock Surabaya
 
 on:
   schedule:
-    - cron: '0 * * * *'
+    # Tiap 2 jam sekali (10:00, 12:00, 14:00, 16:00, 18:00, 20:00 WIB)
+    - cron: '0 3,5,7,9,11,13 * * *'
+    
+    # Jadwal tambahan pukul 21:30 WIB (14:30 UTC)
+    - cron: '30 14 * * *'
+    
   workflow_dispatch:
 
 jobs:
