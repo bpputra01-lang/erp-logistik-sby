@@ -3401,21 +3401,20 @@ def server(input: Inputs, output: Outputs, session: Session):
         if not state.pd_processed():
             return ui.div()
 
-        # TAB 1: DISPLAY AVAILABILITY (3 KATEGORI AREA ASAL + METRIK EKSKLUSI)
+        # TAB 1: DISPLAY AVAILABILITY (ARTICLE BASE)
         tab1_display_content = ui.div(
+            # BARIS 1: METRIK UTAMA DISPLAY
             ui.div(
                 dark_metric_box("🧥 TOTAL ARTICLE", f"{state.pd_total_art():,} ART", "#7B61FF"),
                 dark_metric_box("✅ ON DISPLAY", f"{state.pd_on_display():,} ({state.pd_perc_display():.1f}%)", "#10B981"),
                 dark_metric_box("⚠️ NEED DISPLAY", f"{state.pd_need_display():,} ({state.pd_perc_need():.1f}%)", "#E53E3E"),
                 style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
             ),
-            # 🌟 BARIS 2: DITAMBAHKAN KARTU METRIK TOTAL SKU DI BIN DIKECUALIKAN
+            # BARIS 2: METRIK GUDANG (DISATUKAN) & SKU DIKECUALIKAN
             ui.div(
-                dark_metric_box("🏪 FROM BIN AREA OFFLINE", f"{state.pd_from_offline():,} ART", "#DD6B20"),
-                dark_metric_box("📦 FROM BIN AREA LOGISTIC", f"{state.pd_from_logistic():,} ART", "#3182CE"),
-                dark_metric_box("🌐 FROM AREA ONLINE", f"{state.pd_from_online():,} ART", "#10B981"),
-                dark_metric_box("🚫 SKU DI BIN DIKECUALIKAN", f"{state.pd_excluded_sku():,} SKU", "#E53E3E"), # <-- POIN 1
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+                dark_metric_box("📦 ARTIKEL TERSEDIA DI GUDANG (OFF / LOG / ONL / LAINNYA)", f"{state.pd_need_display():,} ART", "#3182CE"),
+                dark_metric_box("🚫 SKU DI BIN DIKECUALIKAN", f"{state.pd_excluded_sku():,} SKU", "#E53E3E"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
             ),
             ui.div(
                 ui.div(
@@ -3444,7 +3443,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                 ui.div(
                     ui.div(
                         ui.h4("📋 Detail List Refill Toko (Khusus Lower Body - Maks 10 Pcs)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 2px 0;"),
-                        ui.p("Item masuk antrean jika stok di Toko < 10 pcs dan stok gudang > 0. Baris dipecah per BIN lokasi penarikan.", style="color: #718096; font-size: 12px; margin: 0;")
+                        ui.p("Item masuk antrean jika stok di Toko < 10 pcs dan stok gudang > 0. Baris dipecah per 1 BIN (Prioritas: OFF ➔ LOG ➔ ONL ➔ Lainnya).", style="color: #718096; font-size: 12px; margin: 0;")
                     ),
                     ui.download_button(
                         "btn_dl_rt_refill",

@@ -4749,23 +4749,21 @@ class AppState:
             # ==================================================================
             is_toko_disp = df['BIN_CLEAN'].str.contains('TOKO|DISPLAY', na=False)
 
-            # 🛑 PENGECUALIAN SUMBER DISPLAY: EVENT, REJECT, DEFECT, KARANTINA, PERBAIKAN, RESELLER, GARAGE, LIVE
+            # 🛑 PENGECUALIAN BIN: EVENT, REJECT, DEFECT, KARANTINA, PERBAIKAN, RESELLER, GARAGE, LIVE
             excl_display_src = "EVENT|REJECT|DEFECT|KARANTINA|PERBAIKAN|RESELLER|GARAGE|LIVE"
             is_valid_source = (~is_toko_disp) & (~df['BIN_CLEAN'].str.contains(excl_display_src, na=False))
 
-            # 🌟 [POIN 1]: HITUNG TOTAL SKU YANG ADA DI BIN DIKECUALIKAN
+            # HITUNG TOTAL SKU YANG ADA DI BIN DIKECUALIKAN
             df_excluded_bins = df[df['BIN_CLEAN'].str.contains(excl_display_src, na=False) & (df['QTY_NUM'] > 0)]
             total_sku_excluded = df_excluded_bins['SKU_CLEAN'].nunique() if not df_excluded_bins.empty else 0
             self.pd_excluded_sku.set(total_sku_excluded)
 
             df['QTY_GUDANG_SRC'] = np.where(is_valid_source, df['QTY_NUM'], 0)
             df['QTY_TOKO_TGT']   = np.where(is_toko_disp, df['QTY_NUM'], 0)
-            df['QTY_KARANTINA']  = np.where(df['BIN_CLEAN'].str.contains('KARANTINA', na=False), df['QTY_NUM'], 0)
 
             art_agg = df.groupby('ARTICLE', as_index=False).agg(
                 GUDANG_QTY=('QTY_GUDANG_SRC', 'sum'),
-                TOKO_QTY=('QTY_TOKO_TGT', 'sum'),
-                KARANTINA_QTY=('QTY_KARANTINA', 'sum')
+                TOKO_QTY=('QTY_TOKO_TGT', 'sum')
             )
 
             art_on_display_set = set(art_agg[art_agg['TOKO_QTY'] > 0]['ARTICLE'])
@@ -4773,32 +4771,44 @@ class AppState:
                 (art_agg['GUDANG_QTY'] > 0) & (art_agg['TOKO_QTY'] <= 0)
             ]['ARTICLE'])
 
-            karantina_count = len(art_agg[(art_agg['TOKO_QTY'] <= 0) & (art_agg['KARANTINA_QTY'] > 0)])
-
             raw_source = df[
                 (df['ARTICLE'].isin(need_display_articles)) & 
                 is_valid_source & 
                 (df['QTY_NUM'] > 0)
             ].copy()
 
-            def get_bin_area_source(bin_name):
+            # 🌟 FUNGSI TIER PRIORITAS PENCARIAN BIN:
+            # 1. Mengandung kata 'OFF' (atau 'RSN')
+            # 2. Jika tidak ada -> mengandung kata 'LOG'
+            # 3. Jika tidak ada -> mengandung kata 'ONL'
+            # 4. Jika tidak ada -> BIN lainnya (selain di atas & selain yang dikecualikan)
+            def get_bin_priority_tier(bin_name):
                 b = str(bin_name).upper()
-                if any(k in b for k in ['OFF', 'RSN', 'STR', 'GUDANG LT.2', 'STORE']):
-                    return "AREA OFFLINE", 1
-                elif any(k in b for k in ['ONL', 'HUB', 'ONLINE']):
-                    return "AREA ONLINE", 3
+                if 'OFF' in b or 'RSN' in b:
+                    return 1
+                elif 'LOG' in b:
+                    return 2
+                elif 'ONL' in b:
+                    return 3
                 else:
-                    return "AREA LOGISTIC", 2
+                    return 4
+
+            def get_area_label(bin_name):
+                prio = get_bin_priority_tier(bin_name)
+                if prio == 1: return "AREA OFFLINE"
+                elif prio == 2: return "AREA LOGISTIK"
+                elif prio == 3: return "AREA ONLINE"
+                else: return "AREA LAINNYA"
 
             if not raw_source.empty:
-                area_res = [get_bin_area_source(bn) for bn in raw_source['BIN_CLEAN']]
-                raw_source['ASAL_AREA'] = [x[0] for x in area_res]
-                raw_source['AREA_PRIO'] = [x[1] for x in area_res]
-
-                raw_source = raw_source.sort_values(by=['AREA_PRIO', 'QTY_NUM'], ascending=[True, False])
+                # Urutkan berdasarkan prioritas 1 -> 2 -> 3 -> 4, lalu QTY terbesar
+                raw_source['PRIO'] = raw_source['BIN_CLEAN'].apply(get_bin_priority_tier)
+                raw_source = raw_source.sort_values(by=['PRIO', 'QTY_NUM'], ascending=[True, False])
+                
                 detail_disp = raw_source.drop_duplicates(subset=['ARTICLE']).copy()
+                detail_disp['ASAL_AREA'] = detail_disp['BIN_CLEAN'].apply(get_area_label)
 
-                # 🌟 [POIN 2]: HITUNG QTY DI TOKO UNTUK DETAIL TAB 1
+                # Ambil QTY di Toko untuk artikel/SKU
                 toko_sku_map = df[is_toko_disp].groupby('SKU_CLEAN')['QTY_NUM'].sum().to_dict()
                 detail_disp['QTY_TOKO_VAL'] = detail_disp['SKU_CLEAN'].map(toko_sku_map).fillna(0).astype(int)
 
@@ -4807,21 +4817,16 @@ class AppState:
                     "SKU": detail_disp['SKU_CLEAN'],
                     "Deskripsi Barang": detail_disp['DESC_CLEAN'],
                     "Size Display": detail_disp['SIZE_CLEAN'],
-                    "Qty di Toko": detail_disp['QTY_TOKO_VAL'],   # <-- TAMBAHAN KOLOM QTY DI TOKO
+                    "Qty di Toko": detail_disp['QTY_TOKO_VAL'],
                     "Asal Area": detail_disp['ASAL_AREA'],
                     "Bin Lokasi": detail_disp['BIN_CLEAN'],
                     "Qty In Bin": detail_disp['QTY_NUM'].astype(int)
                 })
-
-                cnt_offline  = int((detail_disp['ASAL_AREA'] == "AREA OFFLINE").sum())
-                cnt_logistic = int((detail_disp['ASAL_AREA'] == "AREA LOGISTIC").sum())
-                cnt_online   = int((detail_disp['ASAL_AREA'] == "AREA ONLINE").sum())
             else:
                 df_detail_view = pd.DataFrame(columns=[
                     "Article", "SKU", "Deskripsi Barang", "Size Display", 
                     "Qty di Toko", "Asal Area", "Bin Lokasi", "Qty In Bin"
                 ])
-                cnt_offline, cnt_logistic, cnt_online = 0, 0, 0
 
             on_disp_cnt = len(art_on_display_set)
             need_disp_cnt = len(df_detail_view)
@@ -4834,11 +4839,6 @@ class AppState:
             self.pd_on_display.set(on_disp_cnt)
             self.pd_perc_display.set(perc_disp)
             self.pd_need_display.set(need_disp_cnt)
-            self.pd_perc_need.set(perc_need)
-            self.pd_from_offline.set(cnt_offline)
-            self.pd_from_logistic.set(cnt_logistic)
-            self.pd_from_online.set(cnt_online)
-            self.pd_karantina_lock.set(karantina_count)
 
             self._raw_df_pd_display = df_detail_view.copy()
             self.df_pd_display_headers.set(df_detail_view.columns.tolist() if not df_detail_view.empty else [])
@@ -4872,14 +4872,12 @@ class AppState:
                 merged_refill['QTY_TOKO'] = merged_refill['QTY_TOKO'].fillna(0).astype(int)
                 merged_refill['QTY_GUDANG'] = merged_refill['QTY_GUDANG'].fillna(0).astype(int)
 
-                # Syarat Refill: Stok di Toko < 10 dan Stok Gudang > 0
+                # Filter hanya item dengan stok Toko < 10 dan Gudang > 0
                 merged_refill = merged_refill[(merged_refill['QTY_TOKO'] < 10) & (merged_refill['QTY_GUDANG'] > 0)].copy()
 
-                # Prioritaskan item yang QTY TOKO == 0
                 merged_refill['IS_ZERO'] = merged_refill['QTY_TOKO'] == 0
                 merged_refill = merged_refill.sort_values(by=['IS_ZERO', 'QTY_GUDANG'], ascending=[False, False])
 
-                # 🌟 [POIN 3 & 4]: PECAH BARIS PER 1 BIN & PINDAHKAN KOLOM BIN KE PALING KIRI
                 refill_rows = []
                 for _, r in merged_refill.iterrows():
                     sku = r['SKU']
@@ -4888,22 +4886,14 @@ class AppState:
                     total_needed = min(10 - qty_toko, stok_gudang)
                     rem_needed = total_needed
 
-                    # Cari BIN gudang yang memiliki stok untuk SKU ini
+                    # Dapatkan seluruh BIN gudang yang memiliki stok untuk SKU ini
                     bins_for_sku = gudang_valid[gudang_valid['SKU_CLEAN'] == sku].groupby('BIN_CLEAN', as_index=False)['QTY_NUM'].sum()
                     if not bins_for_sku.empty:
-                        # Prioritaskan area Store/Offline/Rak terlebih dahulu
-                        def get_bin_prio(b_name):
-                            b = str(b_name).upper()
-                            if any(k in b for k in ['STR', 'OFF', 'RSN', 'GUDANG LT.2', 'STORE']):
-                                return 1
-                            elif any(k in b for k in ['DC', 'RAK', 'LOG']):
-                                return 2
-                            return 3
-
-                        bins_for_sku['PRIO'] = bins_for_sku['BIN_CLEAN'].apply(get_bin_prio)
+                        # Terapkan urutan prioritas: OFF -> LOG -> ONL -> Lainnya
+                        bins_for_sku['PRIO'] = bins_for_sku['BIN_CLEAN'].apply(get_bin_priority_tier)
                         bins_for_sku = bins_for_sku.sort_values(by=['PRIO', 'QTY_NUM'], ascending=[True, False])
 
-                        # Alokasikan progresif: ambil sampai target kekurangan (maks 10) terpenuhi
+                        # Ambil progresif per BIN hingga kebutuhan terpenuhi
                         for _, b_row in bins_for_sku.iterrows():
                             if rem_needed <= 0:
                                 break
@@ -4914,7 +4904,7 @@ class AppState:
 
                             take = min(rem_needed, b_qty)
                             refill_rows.append({
-                                "BIN": b_name,            # 🌟 [POIN 4]: Kolom BIN di paling kiri (sebelah kiri SKU)
+                                "BIN": b_name,            # Kolom BIN di paling kiri
                                 "SKU": sku,
                                 "BRAND": r['BRAND'],
                                 "ITEM NAME": r['ITEM NAME'],
@@ -4922,7 +4912,7 @@ class AppState:
                                 "SUB KATEGORI": r['SUB KATEGORI'],
                                 "QTY TOKO": qty_toko,
                                 "TARGET TOKO": 10,
-                                "QTY REFILL": take,        # 🌟 [POIN 3]: Qty yang diambil dari BIN ini (atau sisa kurangnya)
+                                "QTY REFILL": take,        # Jumlah yang diambil dari BIN ini saja
                                 "STOK GUDANG": stok_gudang
                             })
                             rem_needed -= take
