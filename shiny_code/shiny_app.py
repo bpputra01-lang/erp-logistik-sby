@@ -5638,14 +5638,6 @@ def server(input: Inputs, output: Outputs, session: Session):
             # Fallback: tetap coba load data yang ada di Supabase
             state.load_instock_daily_from_supabase()
 
-    # 🌟 AUTO-REFRESH OTOMATIS TIAP 10 DETIK (TIDAK PERLU KLIK TOMBOL MANUAL)
-    @reactive.Effect
-    def _auto_refresh_instock_page():
-        reactive.invalidate_later(10)
-        with reactive.isolate():
-            if state.logged_in() and state.main_menu() == "Instock Validation":
-                state.load_instock_daily_from_supabase()
-
     @render.ui
     def instock_validation_results_container():
         if not state.iv_processed():
