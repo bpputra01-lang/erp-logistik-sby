@@ -3746,21 +3746,17 @@ class AppState:
                 s_lstrip = s.lstrip('0')
                 return s_lstrip if s_lstrip != "" else "0"
 
-            # Helper membaca kolom cerdas: utamakan nama persis, lalu indeks posisi
             def get_col_series(df, fixed_idx, exact_names, fallback_kws, default_val=""):
                 col_map = {str(c).strip().upper(): c for c in df.columns}
-                # 1. Cek nama persis
                 for name in exact_names:
                     if name.upper() in col_map:
                         return df[col_map[name.upper()]]
-                # 2. Cek keyword
                 for kw in fallback_kws:
                     for c_up, orig_col in col_map.items():
                         if kw.upper() in c_up:
                             if 'SO' in c_up and 'SYSTEM' not in c_up and 'QTY SYSTEM' in [x.upper() for x in exact_names]:
                                 continue
                             return df[orig_col]
-                # 3. Indeks Posisi
                 if df.shape[1] > fixed_idx:
                     return df.iloc[:, fixed_idx]
                 return pd.Series(default_val, index=df.index)
@@ -3805,10 +3801,10 @@ class AppState:
             })
 
             if df_stk.empty:
-                return False, "Data stok kosong setelah mengecualikan BIN Defect/Reject/Karantina/Perbaikan!"
+                return False, "Data stok kosong setelah mengecualikan BIN Defect/Reject/Karantina/Perbaikan/Toko!"
 
             # ------------------------------------------------------------------
-            # 2. BACA DATA SALES (LOCK FIXED COLUMNS SESUAI INSTRUKSI)
+            # 2. BACA DATA SALES:
             # Kolom A (Index 0)  = INVOICE
             # Kolom B (Index 1)  = SKU
             # Kolom L (Index 11) = QTY SALES
@@ -3836,7 +3832,6 @@ class AppState:
                     inv_str = r_sls['INVOICE']
                     row_full_text = " ".join([str(v) for v in df_sls_raw.iloc[idx].values if pd.notna(v)]).upper()
 
-                    # Klasifikasi Online vs Offline
                     is_onl = any(k in inv_str for k in ['INV/', 'ONL', 'ONLINE', 'SHOPEE', 'TOKOPEDIA', 'TIKTOK', 'LAZADA', 'BLIBLI', 'WEB', 'MP/']) or \
                              any(k in row_full_text for k in ['ONLINE', 'ONL', 'SHOPEE', 'TOKOPEDIA', 'TIKTOK', 'LAZADA', 'WEB', 'HUB SURABAYA', 'HUB MALANG', 'HUB JAKARTA'])
 
@@ -3849,7 +3844,6 @@ class AppState:
                         sales_agg[s_code]['SALES_OFF'] += q_val
                     sales_agg[s_code]['TOTAL_SALES'] += q_val
 
-            # Normalisasi fallback key untuk SKU tanpa leading zero (contoh 00009048 <-> 9048)
             sales_norm_map = {}
             for s_code, data in sales_agg.items():
                 s_norm = normalize_sku_key(s_code)
@@ -3861,12 +3855,12 @@ class AppState:
 
             # ------------------------------------------------------------------
             # 3. COMPARE QTY LOG, QTY OFF, QTY ONL PER UNIQUE SKU
+            # 🌟 PENTING: AREA OFFLINE MENGANDUNG KATA 'OFF' ATAU 'RSN'
             # ------------------------------------------------------------------
             df_stk['QTY_POS'] = df_stk['QTY'].clip(lower=0)
 
-            # BIN Classification: LOG, OFF, ONL
             df_stk['IS_LOG'] = df_stk['BIN'].str.contains('LOG', na=False)
-            df_stk['IS_OFF'] = df_stk['BIN'].str.contains('OFF', na=False)
+            df_stk['IS_OFF'] = df_stk['BIN'].str.contains('OFF|RSN', na=False)  # 🌟 TERMASUK BIN RSN
             df_stk['IS_ONL'] = df_stk['BIN'].str.contains('ONL', na=False)
 
             df_stk['QTY_LOG'] = np.where(df_stk['IS_LOG'], df_stk['QTY_POS'], 0)
@@ -3885,7 +3879,6 @@ class AppState:
                 TOTAL_STOK=('QTY_POS', 'sum')
             )
 
-            # Master stok per BIN per SKU untuk progresif refill Tab 2
             bin_sku_grouped = df_stk[df_stk['QTY_POS'] > 0].groupby(['SKU', 'BIN'], as_index=False)['QTY_POS'].sum()
             sku_bins_map = {}
             for _, r in bin_sku_grouped.iterrows():
@@ -3904,7 +3897,6 @@ class AppState:
                 q_onl = to_int(r_sku['QTY_ONL'])
                 tot_stk = to_int(r_sku['TOTAL_STOK'])
 
-                # Lookup Sales (prioritaskan exact match, fallback ke strip zero)
                 sls = sales_agg.get(sku)
                 if not sls:
                     sls = sales_norm_map.get(normalize_sku_key(sku))
@@ -3917,27 +3909,60 @@ class AppState:
 
                 # Klasifikasi Alokasi Berdasarkan Sales
                 if s_tot == 0:
-                    pct_on, pct_off, pct_log = 0.10, 0.10, 0.80
+                    pct_log, pct_off, pct_on = 0.80, 0.10, 0.10
                     klasifikasi = "NO SALES (10% ONL | 10% OFF | 80% LOG)"
                 else:
                     r_on = s_onl / s_tot
                     r_off = s_off / s_tot
                     if r_on > 0.70:
-                        pct_on, pct_off, pct_log = 0.70, 0.15, 0.15
+                        pct_log, pct_off, pct_on = 0.15, 0.15, 0.70
                         klasifikasi = "DOMINAN ONLINE (>70%)"
                     elif r_off > 0.70:
-                        pct_on, pct_off, pct_log = 0.15, 0.70, 0.15
+                        pct_log, pct_off, pct_on = 0.15, 0.70, 0.15
                         klasifikasi = "DOMINAN OFFLINE (>70%)"
                     else:
-                        pct_on, pct_off, pct_log = 0.40, 0.40, 0.20
+                        pct_log, pct_off, pct_on = 0.20, 0.40, 0.40
                         klasifikasi = "BALANCED (40:40:20)"
 
-                # Target Alokasi
-                tgt_onl = to_int(np.ceil(tot_stk * pct_on))
-                tgt_off = to_int(np.ceil(tot_stk * pct_off))
-                tgt_log = max(0, tot_stk - tgt_onl - tgt_off)
+                # --------------------------------------------------------------
+                # 🎯 KUOTA PRESISI: TOTAL TARGET SELALU SAMA DENGAN TOTAL STOK
+                # (LARGEST REMAINDER METHOD - BEBAS ANOMALI OVER-ALLOCATION)
+                # --------------------------------------------------------------
+                if tot_stk > 0:
+                    raw_log = tot_stk * pct_log
+                    raw_off = tot_stk * pct_off
+                    raw_on = tot_stk * pct_on
 
-                # Kebutuhan Refill
+                    flr_log = int(raw_log)
+                    flr_off = int(raw_off)
+                    flr_on = int(raw_on)
+
+                    rem = tot_stk - (flr_log + flr_off + flr_on)
+
+                    # Prioritas sisa desimal: utamakan channel yang penjualan riilnya lebih besar
+                    prio_off = 10 + (1 if s_off >= s_onl else 0)
+                    prio_on = 10 + (1 if s_onl > s_off else 0)
+                    prio_log = 5
+
+                    candidates = [
+                        (raw_off - flr_off, prio_off, 'OFF'),
+                        (raw_on - flr_on, prio_on, 'ONL'),
+                        (raw_log - flr_log, prio_log, 'LOG')
+                    ]
+                    candidates.sort(key=lambda x: (x[0], x[1]), reverse=True)
+
+                    for i in range(rem):
+                        cat = candidates[i][2]
+                        if cat == 'OFF': flr_off += 1
+                        elif cat == 'ONL': flr_on += 1
+                        elif cat == 'LOG': flr_log += 1
+
+                    tgt_log = flr_log
+                    tgt_off = flr_off
+                    tgt_onl = flr_on
+                else:
+                    tgt_log, tgt_off, tgt_onl = 0, 0, 0
+
                 need_log = max(0, tgt_log - q_log)
                 need_off = max(0, tgt_off - q_off)
                 need_onl = max(0, tgt_onl - q_onl)
@@ -3972,7 +3997,7 @@ class AppState:
                 def bin_priority(b_dict):
                     bn = b_dict['BIN']
                     if 'LOG' in bn: return 1
-                    if not ('OFF' in bn or 'ONL' in bn): return 2
+                    if not ('OFF' in bn or 'RSN' in bn or 'ONL' in bn): return 2
                     return 3
 
                 bins_available = sorted(bins_available, key=bin_priority)
@@ -4028,7 +4053,7 @@ class AppState:
                             "QTY ONL": alloc_onl
                         })
                 elif rem_log == "NO REFILL" and rem_off == "NO REFILL" and rem_onl == "NO REFILL":
-                    default_bin = bins_available[0]['BIN'] if bins_available else "BIN TOKO / RAK"
+                    default_bin = bins_available[0]['BIN'] if bins_available else "BIN RAK"
                     tab2_rows.append({
                         "BIN": default_bin,
                         "SKU": sku,
