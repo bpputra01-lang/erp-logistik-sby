@@ -3034,7 +3034,6 @@ def server(input: Inputs, output: Outputs, session: Session):
 
         # 🌟 BARIS 1: PERSENTASE KESEIMBANGAN (% BALANCE RATE)
         balance_metrics_ui = ui.div(
-            dark_metric_box("⚖️ OVERALL BALANCED (ALL AREA)", f"{state.bs_perc_overall():.1f}%", c_all),
             dark_metric_box("📦 BALANCE AREA LOGISTIK", f"{state.bs_perc_logistik():.1f}%", c_log),
             dark_metric_box("🏪 BALANCE AREA OFFLINE", f"{state.bs_perc_offline():.1f}%", c_off),
             dark_metric_box("🌐 BALANCE AREA ONLINE", f"{state.bs_perc_online():.1f}%", c_on),
