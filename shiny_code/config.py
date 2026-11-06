@@ -169,8 +169,9 @@ def format_datetime_wib(df: pd.DataFrame, kolom: str, format_tampilan: str = "%d
 
 
 # ==============================================================================
-# GENERATOR DOKUMEN MEMO (PDF RESMI - AMAN DARI CRASH & CORRUPT)
+# GENERATOR DOKUMEN MEMO (ANTI-CRASH, AUTO XML ESCAPE & NATIVE FALLBACK)
 # ==============================================================================
+
 def sanitize_memo_items(memo_dict: dict) -> list:
     """Memastikan data items selalu berupa list of dict yang valid"""
     items = memo_dict.get("items", [])
@@ -181,29 +182,90 @@ def sanitize_memo_items(memo_dict: dict) -> list:
             items = []
     return items if isinstance(items, list) else []
 
+def esc_xml(text):
+    """Mencegah crash XML Parser ReportLab akibat karakter &, <, >"""
+    if text is None:
+        return ""
+    return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', '&quot;')
 
+def esc_native_memo(text):
+    """Mencegah karakter escape crash pada Native PDF generator"""
+    if not text:
+        return ""
+    s = str(text).replace('\\', '\\\\').replace('(', '\\(').replace(')', '\\)')
+    return s.encode('latin-1', 'replace').decode('latin-1')
+
+def wrap_text_memo(text, max_chars=30):
+    if not text: return [""]
+    words = str(text).split(' ')
+    lines = []
+    current_line = ""
+    for word in words:
+        if current_line == "":
+            current_line = word
+        elif len(current_line) + 1 + len(word) <= max_chars:
+            current_line += " " + word
+        else:
+            lines.append(current_line)
+            current_line = word
+    if current_line:
+        lines.append(current_line)
+    return lines if lines else [""]
+
+def build_native_pdf_stream(ops, width=595.28, height=841.89):
+    """Mesin pembuat PDF 1.4 murni tanpa dependensi eksternal (Jaminan anti 0 bytes)"""
+    content_stream = "\n".join(ops).encode('latin-1')
+    stream_len = len(content_stream)
+    objects = {
+        1: b"<< /Type /Catalog /Pages 2 0 R >>",
+        2: b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        3: f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {width:.2f} {height:.2f}] /Contents 4 0 R /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> >>".encode('latin-1'),
+        4: f"<< /Length {stream_len} >>\nstream\n".encode('latin-1') + content_stream + b"\nendstream",
+        5: b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>",
+        6: b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>"
+    }
+    buf_native = bytearray()
+    buf_native.extend(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+    offsets = {}
+    for obj_id in sorted(objects.keys()):
+        offsets[obj_id] = len(buf_native)
+        buf_native.extend(f"{obj_id} 0 obj\n".encode('latin-1'))
+        buf_native.extend(objects[obj_id])
+        buf_native.extend(b"\nendobj\n")
+
+    xref_offset = len(buf_native)
+    buf_native.extend(f"xref\n0 {len(objects) + 1}\n".encode('latin-1'))
+    buf_native.extend(b"0000000000 65535 f \n")
+    for obj_id in sorted(objects.keys()):
+        buf_native.extend(f"{offsets[obj_id]:010d} 00000 n \n".encode('latin-1'))
+
+    buf_native.extend(f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_offset}\n%%EOF\n".encode('latin-1'))
+    return bytes(buf_native)
+
+
+# ==============================================================================
+# MODEL 1: MEMO PENGAJUAN (A4 PORTRAIT)
+# ==============================================================================
 def generate_memo_pdf_bytes(memo_dict: dict) -> bytes:
-    """Model 1: MEMO PENGAJUAN (A4 Portrait Standar dengan QTY & Subtotal Lengkap)"""
-    import io
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib import colors
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    items = sanitize_memo_items(memo_dict)
 
+    # 1. COBA MENGGUNAKAN REPORTLAB DENGAN SANITASI XML LENGKAP
     try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib import colors
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(
             buffer, pagesize=A4,
             leftMargin=30, rightMargin=30, topMargin=30, bottomMargin=30
         )
         elements = []
-
         styles = getSampleStyleSheet()
-        
-        # Helper agar tidak duplikat Style di ReportLab
+
         def get_or_create_style(name, **kwargs):
-            if name in styles:
-                return styles[name]
+            if name in styles: return styles[name]
             st = ParagraphStyle(name, **kwargs)
             styles.add(st)
             return st
@@ -216,10 +278,10 @@ def generate_memo_pdf_bytes(memo_dict: dict) -> bytes:
         st_right_b = get_or_create_style('MemoStdRightB', fontName='Helvetica-Bold', fontSize=8.5, leading=11, alignment=2)
         st_center = get_or_create_style('MemoStdCenter', fontName='Helvetica', fontSize=8.5, leading=11, alignment=1)
 
-        # 1. Header Surat
+        # Header Surat
         header_data = [
             [Paragraph("<b><i>JEZ</i></b>", st_title), Paragraph("<b>MEMO PENGAJUAN</b>", get_or_create_style('RHead', parent=st_title, alignment=2))],
-            [Paragraph("<b>PT. ZONA KARYA NUSANTARA</b>", st_sub), Paragraph(f"No: {memo_dict.get('id', '-')}", get_or_create_style('RSub', parent=st_normal, alignment=2))]
+            [Paragraph("<b>PT. ZONA KARYA NUSANTARA</b>", st_sub), Paragraph(f"No: {esc_xml(memo_dict.get('id', '-'))}", get_or_create_style('RSub', parent=st_normal, alignment=2))]
         ]
         t_head = Table(header_data, colWidths=[260, 275])
         t_head.setStyle(TableStyle([
@@ -230,12 +292,12 @@ def generate_memo_pdf_bytes(memo_dict: dict) -> bytes:
         elements.append(t_head)
         elements.append(Spacer(1, 10))
 
-        # 2. Metadata Pengajuan
+        # Metadata
         meta_data = [
-            [Paragraph("<b>Tanggal</b>", st_bold), Paragraph(f": {memo_dict.get('tanggal', '-')}", st_normal),
-             Paragraph("<b>Divisi</b>", st_bold), Paragraph(f": {memo_dict.get('divisi', 'MARKOM')}", st_normal)],
-            [Paragraph("<b>Pengaju</b>", st_bold), Paragraph(f": {memo_dict.get('diajukan_oleh', '-')}", st_normal),
-             Paragraph("<b>Keperluan</b>", st_bold), Paragraph(f": {memo_dict.get('tujuan', '-')}", st_normal)]
+            [Paragraph("<b>Tanggal</b>", st_bold), Paragraph(f": {esc_xml(memo_dict.get('tanggal', '-'))}", st_normal),
+             Paragraph("<b>Divisi</b>", st_bold), Paragraph(f": {esc_xml(memo_dict.get('divisi', 'MARKOM'))}", st_normal)],
+            [Paragraph("<b>Pengaju</b>", st_bold), Paragraph(f": {esc_xml(memo_dict.get('diajukan_oleh', '-'))}", st_normal),
+             Paragraph("<b>Keperluan</b>", st_bold), Paragraph(f": {esc_xml(memo_dict.get('tujuan', '-'))}", st_normal)]
         ]
         t_meta = Table(meta_data, colWidths=[70, 200, 65, 200])
         t_meta.setStyle(TableStyle([
@@ -246,8 +308,7 @@ def generate_memo_pdf_bytes(memo_dict: dict) -> bytes:
         elements.append(t_meta)
         elements.append(Spacer(1, 12))
 
-        # 3. Tabel Detail Barang
-        items = sanitize_memo_items(memo_dict)
+        # Tabel Barang
         table_rows = [[
             Paragraph("<b>NO</b>", st_center),
             Paragraph("<b>SKU</b>", st_bold),
@@ -268,7 +329,7 @@ def generate_memo_pdf_bytes(memo_dict: dict) -> bytes:
             table_rows.append([
                 str(idx),
                 str(it.get('sku', '-')),
-                Paragraph(str(it.get('item_name', '-')), st_normal),
+                Paragraph(esc_xml(it.get('item_name', '-')), st_normal),
                 f"{q:,}",
                 f"Rp {cogs:,}",
                 f"Rp {sub:,}"
@@ -292,11 +353,11 @@ def generate_memo_pdf_bytes(memo_dict: dict) -> bytes:
         elements.append(t_table)
         elements.append(Spacer(1, 20))
 
-        # 4. Kotak Tanda Tangan
+        # Tanda Tangan
         sign_data = [
             [Paragraph("<b>Diajukan oleh,</b>", st_center), Paragraph("<b>Diproses oleh,</b>", st_center), Paragraph("<b>Diperiksa oleh,</b>", st_center)],
             ["\n\n\n", "\n\n\n", "\n\n\n"],
-            [Paragraph(f"( {memo_dict.get('diajukan_oleh', 'Markom')} )", st_bold),
+            [Paragraph(f"( {esc_xml(memo_dict.get('diajukan_oleh', 'Markom'))} )", st_bold),
              Paragraph("( Tim Purchasing )", st_bold),
              Paragraph("( Tim Finance )", st_bold)]
         ]
@@ -313,33 +374,132 @@ def generate_memo_pdf_bytes(memo_dict: dict) -> bytes:
 
         doc.build(elements)
         buffer.seek(0)
-        return buffer.getvalue()
+        res_bytes = buffer.getvalue()
+        if len(res_bytes) > 200:
+            return res_bytes
     except Exception as e:
-        print(f"❌ Error generate_memo_pdf_bytes: {e}")
-        return b""
+        print(f"⚠️ ReportLab memo std notice: {e}, fallback ke Native Engine...")
+
+    # 2. FALLBACK: NATIVE BINARY PDF ENGINE (PORTRAIT A4)
+    ops = []
+    ops.append("BT /F2 18 Tf 0.83 0.18 0.18 rg 30 805 Td (JEZ) Tj ET")
+    ops.append("BT /F2 14 Tf 0.83 0.18 0.18 rg 380 805 Td (MEMO PENGAJUAN) Tj ET")
+    ops.append("BT /F2 8.5 Tf 0 0 0 rg 30 792 Td (PT. ZONA KARYA NUSANTARA) Tj ET")
+    ops.append(f"BT /F1 8.5 Tf 0.2 0.2 0.2 rg 380 792 Td (No: {esc_native_memo(memo_dict.get('id', '-'))}) Tj ET")
+    ops.append("0.83 0.18 0.18 RG 1.5 w 30 782 m 565 782 l S")
+
+    # Metadata
+    y = 765
+    meta_pairs = [
+        ("Tanggal", str(memo_dict.get("tanggal", "-")), "Divisi", str(memo_dict.get("divisi", "MARKOM"))),
+        ("Pengaju", str(memo_dict.get("diajukan_oleh", "-")), "Keperluan", str(memo_dict.get("tujuan", "-")))
+    ]
+    for l1, v1, l2, v2 in meta_pairs:
+        ops.append(f"BT /F2 8 Tf 0 0 0 rg 30 {y} Td ({esc_native_memo(l1)}:) Tj ET")
+        ops.append(f"BT /F1 8 Tf 0 0 0 rg 80 {y} Td ({esc_native_memo(v1)}) Tj ET")
+        ops.append(f"BT /F2 8 Tf 0 0 0 rg 320 {y} Td ({esc_native_memo(l2)}:) Tj ET")
+        ops.append(f"BT /F1 8 Tf 0 0 0 rg 380 {y} Td ({esc_native_memo(v2)}) Tj ET")
+        y -= 14
+
+    # Tabel Barang
+    y -= 10
+    ops.append(f"0.92 0.94 0.96 rg 30 {y} 535 16 re f")
+    ops.append(f"0.7 0.7 0.7 RG 0.5 w 30 {y} 535 16 re S")
+    ops.append(f"BT /F2 7.5 Tf 0 0 0 rg 35 {y+4} Td (NO) Tj ET")
+    ops.append(f"BT /F2 7.5 Tf 0 0 0 rg 60 {y+4} Td (SKU) Tj ET")
+    ops.append(f"BT /F2 7.5 Tf 0 0 0 rg 145 {y+4} Td (NAMA ARTIKEL) Tj ET")
+    ops.append(f"BT /F2 7.5 Tf 0 0 0 rg 355 {y+4} Td (QTY) Tj ET")
+    ops.append(f"BT /F2 7.5 Tf 0 0 0 rg 400 {y+4} Td (HARGA BELI) Tj ET")
+    ops.append(f"BT /F2 7.5 Tf 0 0 0 rg 490 {y+4} Td (SUBTOTAL) Tj ET")
+
+    tot_q, tot_n = 0, 0
+    for idx_item, it in enumerate(items, start=1):
+        if y < 140: break
+        q = safe_int(it.get("qty", 1), 1)
+        cogs = safe_int(it.get("cogs", 0), 0)
+        sub = q * cogs
+        tot_q += q
+        tot_n += sub
+
+        desc_lines = wrap_text_memo(str(it.get("item_name", "-")), 35)
+        r_h = max(15, len(desc_lines) * 10)
+        y -= r_h
+
+        ops.append(f"0.85 0.85 0.85 RG 0.5 w 30 {y} 535 {r_h} re S")
+        ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 35 {y + r_h - 10} Td ({idx_item}) Tj ET")
+        ops.append(f"BT /F2 7.5 Tf 0 0 0 rg 60 {y + r_h - 10} Td ({esc_native_memo(str(it.get('sku', '-'))[:14])}) Tj ET")
+
+        line_y = y + r_h - 10
+        for l_txt in desc_lines:
+            ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 145 {line_y} Td ({esc_native_memo(l_txt)}) Tj ET")
+            line_y -= 9
+
+        ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 360 {y + r_h - 10} Td ({q:,}) Tj ET")
+        ops.append(f"BT /F1 7.5 Tf 0 0 0 rg 405 {y + r_h - 10} Td (Rp {cogs:,}) Tj ET")
+        ops.append(f"BT /F2 7.5 Tf 0 0 0 rg 490 {y + r_h - 10} Td (Rp {sub:,}) Tj ET")
+
+    # Baris Total
+    y -= 16
+    ops.append(f"0.99 0.98 0.75 rg 30 {y} 535 16 re f")
+    ops.append(f"0.5 0.5 0.5 RG 0.5 w 30 {y} 535 16 re S")
+    ops.append(f"BT /F2 8 Tf 0 0 0 rg 145 {y+4} Td (TOTAL KESELURUHAN) Tj ET")
+    ops.append(f"BT /F2 8 Tf 0 0 0 rg 360 {y+4} Td ({tot_q:,}) Tj ET")
+    ops.append(f"BT /F2 8 Tf 0 0 0 rg 490 {y+4} Td (Rp {tot_n:,}) Tj ET")
+
+    # Kotak TTD
+    y_sign = 65
+    sign_w = 535 / 3
+    ops.append(f"0.6 0.6 0.6 RG 0.5 w 30 {y_sign} 535 60 re S")
+    ops.append(f"0.6 0.6 0.6 RG 0.5 w {30+sign_w} {y_sign} 0 60 re S")
+    ops.append(f"0.6 0.6 0.6 RG 0.5 w {30+sign_w*2} {y_sign} 0 60 re S")
+
+    ops.append(f"BT /F2 8 Tf 0 0 0 rg {35} {y_sign+48} Td (Diajukan oleh,) Tj ET")
+    ops.append(f"BT /F2 8 Tf 0 0 0 rg {35+sign_w} {y_sign+48} Td (Diproses oleh,) Tj ET")
+    ops.append(f"BT /F2 8 Tf 0 0 0 rg {35+sign_w*2} {y_sign+48} Td (Diperiksa oleh,) Tj ET")
+
+    ops.append(f"BT /F1 8 Tf 0 0 0 rg {35} {y_sign+8} Td (( {esc_native_memo(memo_dict.get('diajukan_oleh', 'Markom'))} )) Tj ET")
+    ops.append(f"BT /F1 8 Tf 0 0 0 rg {35+sign_w} {y_sign+8} Td (( Tim Purchasing )) Tj ET")
+    ops.append(f"BT /F1 8 Tf 0 0 0 rg {35+sign_w*2} {y_sign+8} Td (( Tim Finance )) Tj ET")
+
+    return build_native_pdf_stream(ops, width=595.28, height=841.89)
 
 
+# ==============================================================================
+# MODEL 2: MEMO KAS ADJUSTMENT (A4 LANDSCAPE - LEBAR TABEL DIPERBAIKI)
+# ==============================================================================
 def generate_memo_kas_pdf_bytes(memo_dict: dict) -> bytes:
-    """Model 2: MEMO KAS ADJUSTMENT (A4 Landscape sesuai acuan cetak keuangan)"""
-    import io
-    from reportlab.lib.pagesizes import A4, landscape
-    from reportlab.lib import colors
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    items = sanitize_memo_items(memo_dict)
 
+    raw_tgl = memo_dict.get("tanggal", "")
     try:
+        dt = pd.to_datetime(raw_tgl)
+        bln = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
+        tgl_str = f"{dt.day} {bln[dt.month]} {dt.year}"
+    except Exception:
+        tgl_str = str(raw_tgl)
+
+    nama_pengaju = str(memo_dict.get("diajukan_oleh", "Markom")).strip()
+    divisi_txt = str(memo_dict.get("divisi", "MARKOM")).strip()
+    ket_adj = str(memo_dict.get("tujuan", "-")).strip().upper()
+
+    # 1. COBA MENGGUNAKAN REPORTLAB DENGAN LEBAR FRAME AMAN (768 PT)
+    try:
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib import colors
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+
         buffer = io.BytesIO()
+        # Lebar Printable = 841.89 - 72 = 769.89 pt. Total lebar tabel wajib <= 768 pt!
         doc = SimpleDocTemplate(
             buffer, pagesize=landscape(A4),
             leftMargin=36, rightMargin=36, topMargin=25, bottomMargin=25
         )
         elements = []
-
         styles = getSampleStyleSheet()
 
         def get_or_create_style(name, **kwargs):
-            if name in styles:
-                return styles[name]
+            if name in styles: return styles[name]
             st = ParagraphStyle(name, **kwargs)
             styles.add(st)
             return st
@@ -350,14 +510,14 @@ def generate_memo_kas_pdf_bytes(memo_dict: dict) -> bytes:
         style_right = get_or_create_style('KasRgt', fontName='Helvetica', fontSize=8.5, leading=11, alignment=2)
         style_right_b = get_or_create_style('KasRgtB', fontName='Helvetica-Bold', fontSize=8.5, leading=11, alignment=2)
 
-        # 1. Header Kop
+        # Header Kop (380 + 388 = 768 pt)
         header_data = [
             [
                 Paragraph("<font size=22 color='#D32F2F'><b><i>JEZ</i></b></font><br/><font size=8 color='#000000'><b>PT. ZONA KARYA NUSANTARA</b></font>", style_normal),
                 Paragraph("<font size=15 color='#D32F2F'><b>MEMO KAS ADJUSTMENT</b></font><br/><font size=8 color='#000000'>PT ZONA KARYA NUSANTARA</font>", get_or_create_style('KasHRight', alignment=2))
             ]
         ]
-        t_header = Table(header_data, colWidths=[380, 390])
+        t_header = Table(header_data, colWidths=[380, 388])
         t_header.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
@@ -366,28 +526,16 @@ def generate_memo_kas_pdf_bytes(memo_dict: dict) -> bytes:
         elements.append(t_header)
         elements.append(Spacer(1, 8))
 
-        # Format Tanggal
-        raw_tgl = memo_dict.get("tanggal", "")
-        try:
-            dt = pd.to_datetime(raw_tgl)
-            bln = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
-            tgl_str = f"{dt.day} {bln[dt.month]} {dt.year}"
-        except Exception:
-            tgl_str = str(raw_tgl)
-
-        nama_pengaju = str(memo_dict.get("diajukan_oleh", "Markom")).strip()
-        divisi_txt = str(memo_dict.get("divisi", "MARKOM")).strip()
-        ket_adj = str(memo_dict.get("tujuan", "-")).strip().upper()
-
+        # Metadata (140 + 628 = 768 pt)
         meta_rows = [
-            [Paragraph("Tanggal", style_normal), Paragraph(f": {tgl_str}", style_normal)],
-            [Paragraph("Nama Pengaju", style_normal), Paragraph(f": {nama_pengaju}", style_normal)],
-            [Paragraph("Divisi", style_normal), Paragraph(f": {divisi_txt}", style_normal)],
-            [Paragraph("Keterangan Adjustment", style_normal), Paragraph(f": {ket_adj}", style_normal)],
+            [Paragraph("Tanggal", style_normal), Paragraph(f": {esc_xml(tgl_str)}", style_normal)],
+            [Paragraph("Nama Pengaju", style_normal), Paragraph(f": {esc_xml(nama_pengaju)}", style_normal)],
+            [Paragraph("Divisi", style_normal), Paragraph(f": {esc_xml(divisi_txt)}", style_normal)],
+            [Paragraph("Keterangan Adjustment", style_normal), Paragraph(f": {esc_xml(ket_adj)}", style_normal)],
             [Paragraph("No. Adjustment", style_normal), Paragraph(": ", style_normal)],
             [Paragraph("Detail Adjustment", style_normal), Paragraph(":", style_normal)]
         ]
-        t_meta = Table(meta_rows, colWidths=[140, 630])
+        t_meta = Table(meta_rows, colWidths=[140, 628])
         t_meta.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('TOPPADDING', (0, 0), (-1, -1), 1),
@@ -397,8 +545,7 @@ def generate_memo_kas_pdf_bytes(memo_dict: dict) -> bytes:
         elements.append(t_meta)
         elements.append(Spacer(1, 6))
 
-        # 3. Tabel Detail (BIN | SKU | ITEM NAME | QTY | HARGA BELI | TOTAL)
-        items = sanitize_memo_items(memo_dict)
+        # Tabel Detail (95 + 115 + 278 + 50 + 110 + 120 = 768 pt)
         table_content = [
             [
                 Paragraph("<b>BIN</b>", style_bold),
@@ -410,8 +557,7 @@ def generate_memo_kas_pdf_bytes(memo_dict: dict) -> bytes:
             ]
         ]
 
-        total_beli = 0
-        total_qty = 0
+        total_beli, total_qty = 0, 0
         for it in items:
             bin_val = str(it.get("bin", "-")).strip()
             sku_val = str(it.get("sku", "-")).strip()
@@ -423,22 +569,21 @@ def generate_memo_kas_pdf_bytes(memo_dict: dict) -> bytes:
             total_beli += sub
 
             table_content.append([
-                Paragraph(bin_val, style_normal),
-                Paragraph(sku_val, style_normal),
-                Paragraph(item_val, style_normal),
+                Paragraph(esc_xml(bin_val), style_normal),
+                Paragraph(esc_xml(sku_val), style_normal),
+                Paragraph(esc_xml(item_val), style_normal),
                 Paragraph(f"{q_val:,}", style_center),
                 Paragraph(f"Rp {cogs_val:,}", style_right),
                 Paragraph(f"Rp {sub:,}", style_right)
             ])
 
-        # Baris Grand Total
         table_content.append([
             Paragraph("<b>TOTAL</b>", style_bold), "", "",
             Paragraph(f"<b>{total_qty:,}</b>", style_center), "",
             Paragraph(f"<b>Rp {total_beli:,}</b>", style_right_b)
         ])
 
-        t_detail = Table(table_content, colWidths=[100, 120, 270, 50, 110, 120])
+        t_detail = Table(table_content, colWidths=[95, 115, 278, 50, 110, 120])
         t_detail.setStyle(TableStyle([
             ('GRID', (0, 0), (-1, -2), 0.5, colors.black),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
@@ -450,13 +595,13 @@ def generate_memo_kas_pdf_bytes(memo_dict: dict) -> bytes:
         elements.append(t_detail)
         elements.append(Spacer(1, 15))
 
-        # 4. Kotak TTD
+        # Kotak TTD (256 + 256 + 256 = 768 pt)
         sign_data = [
             [Paragraph("<b>Diajukan oleh,</b>", style_bold), Paragraph("<b>Diproses oleh,</b>", style_bold), Paragraph("<b>Diperiksa oleh,</b>", style_bold)],
             ["\n\n\n", "\n\n\n", "\n\n\n"],
-            [Paragraph(f"( {nama_pengaju} )", style_normal), Paragraph("( Tim Purchasing )", style_normal), Paragraph("( Tim Finance )", style_normal)]
+            [Paragraph(f"( {esc_xml(nama_pengaju)} )", style_normal), Paragraph("( Tim Purchasing )", style_normal), Paragraph("( Tim Finance )", style_normal)]
         ]
-        t_sign = Table(sign_data, colWidths=[256, 257, 257])
+        t_sign = Table(sign_data, colWidths=[256, 256, 256])
         t_sign.setStyle(TableStyle([
             ('BOX', (0, 0), (-1, -1), 1, colors.black),
             ('INNERGRID', (0, 0), (-1, -1), 1, colors.black),
@@ -469,10 +614,96 @@ def generate_memo_kas_pdf_bytes(memo_dict: dict) -> bytes:
 
         doc.build(elements)
         buffer.seek(0)
-        return buffer.getvalue()
+        res_bytes = buffer.getvalue()
+        if len(res_bytes) > 200:
+            return res_bytes
     except Exception as e:
-        print(f"❌ Error generate_memo_kas_pdf_bytes: {e}")
-        return b""
+        print(f"⚠️ ReportLab memo kas notice: {e}, fallback ke Native Engine...")
+
+    # 2. FALLBACK: NATIVE BINARY PDF ENGINE (LANDSCAPE A4: 841.89 x 595.28)
+    ops = []
+    # Header Kop
+    ops.append("BT /F2 20 Tf 0.83 0.18 0.18 rg 36 565 Td (JEZ) Tj ET")
+    ops.append("BT /F2 9 Tf 0 0 0 rg 36 552 Td (PT. ZONA KARYA NUSANTARA) Tj ET")
+    ops.append("BT /F2 15 Tf 0.83 0.18 0.18 rg 580 565 Td (MEMO KAS ADJUSTMENT) Tj ET")
+    ops.append("BT /F1 8.5 Tf 0 0 0 rg 630 552 Td (PT ZONA KARYA NUSANTARA) Tj ET")
+    ops.append("0 0 0 RG 1.5 w 36 544 m 805 544 l S")
+
+    # Metadata
+    y = 530
+    meta_kas = [
+        ("Tanggal", tgl_str),
+        ("Nama Pengaju", nama_pengaju),
+        ("Divisi", divisi_txt),
+        ("Keterangan Adjustment", ket_adj),
+        ("No. Adjustment", ""),
+        ("Detail Adjustment", "")
+    ]
+    for lbl, val in meta_kas:
+        ops.append(f"BT /F1 8.5 Tf 0 0 0 rg 36 {y} Td ({esc_native_memo(lbl)}) Tj ET")
+        ops.append(f"BT /F1 8.5 Tf 0 0 0 rg 180 {y} Td (: {esc_native_memo(val)}) Tj ET")
+        y -= 12
+
+    # Tabel Detail
+    y -= 8
+    ops.append(f"0.1 0.2 0.35 rg 36 {y} 769 16 re f")
+    ops.append(f"BT /F2 8 Tf 1 1 1 rg 42 {y+4} Td (BIN) Tj ET")
+    ops.append(f"BT /F2 8 Tf 1 1 1 rg 140 {y+4} Td (SKU) Tj ET")
+    ops.append(f"BT /F2 8 Tf 1 1 1 rg 260 {y+4} Td (ITEM NAME) Tj ET")
+    ops.append(f"BT /F2 8 Tf 1 1 1 rg 540 {y+4} Td (QTY) Tj ET")
+    ops.append(f"BT /F2 8 Tf 1 1 1 rg 600 {y+4} Td (HARGA BELI) Tj ET")
+    ops.append(f"BT /F2 8 Tf 1 1 1 rg 710 {y+4} Td (SUBTOTAL) Tj ET")
+
+    tot_q, tot_b = 0, 0
+    for it in items:
+        if y < 110: break
+        q = safe_int(it.get("qty", 1), 1)
+        cogs = safe_int(it.get("cogs", 0), 0)
+        sub = q * cogs
+        tot_q += q
+        tot_b += sub
+
+        desc_lines = wrap_text_memo(str(it.get("item_name", "-")), 45)
+        r_h = max(15, len(desc_lines) * 10)
+        y -= r_h
+
+        ops.append(f"0.8 0.8 0.8 RG 0.5 w 36 {y} 769 {r_h} re S")
+        ops.append(f"BT /F1 8 Tf 0 0 0 rg 42 {y + r_h - 10} Td ({esc_native_memo(str(it.get('bin', '-'))[:14])}) Tj ET")
+        ops.append(f"BT /F2 8 Tf 0 0 0 rg 140 {y + r_h - 10} Td ({esc_native_memo(str(it.get('sku', '-'))[:16])}) Tj ET")
+
+        line_y = y + r_h - 10
+        for l_txt in desc_lines:
+            ops.append(f"BT /F1 8 Tf 0 0 0 rg 260 {line_y} Td ({esc_native_memo(l_txt)}) Tj ET")
+            line_y -= 9
+
+        ops.append(f"BT /F1 8 Tf 0 0 0 rg 545 {y + r_h - 10} Td ({q:,}) Tj ET")
+        ops.append(f"BT /F1 8 Tf 0 0 0 rg 600 {y + r_h - 10} Td (Rp {cogs:,}) Tj ET")
+        ops.append(f"BT /F2 8 Tf 0 0 0 rg 710 {y + r_h - 10} Td (Rp {sub:,}) Tj ET")
+
+    # Baris Total
+    y -= 16
+    ops.append(f"0.99 0.98 0.75 rg 36 {y} 769 16 re f")
+    ops.append(f"0 0 0 RG 0.5 w 36 {y} 769 16 re S")
+    ops.append(f"BT /F2 8.5 Tf 0 0 0 rg 42 {y+4} Td (TOTAL) Tj ET")
+    ops.append(f"BT /F2 8.5 Tf 0 0 0 rg 545 {y+4} Td ({tot_q:,}) Tj ET")
+    ops.append(f"BT /F2 8.5 Tf 0 0 0 rg 710 {y+4} Td (Rp {tot_b:,}) Tj ET")
+
+    # Kotak TTD
+    y_sign = 35
+    w_sign = 769 / 3
+    ops.append(f"0 0 0 RG 0.75 w 36 {y_sign} 769 55 re S")
+    ops.append(f"0 0 0 RG 0.75 w {36+w_sign} {y_sign} 0 55 re S")
+    ops.append(f"0 0 0 RG 0.75 w {36+w_sign*2} {y_sign} 0 55 re S")
+
+    ops.append(f"BT /F2 8.5 Tf 0 0 0 rg {42} {y_sign+42} Td (Diajukan oleh,) Tj ET")
+    ops.append(f"BT /F2 8.5 Tf 0 0 0 rg {42+w_sign} {y_sign+42} Td (Diproses oleh,) Tj ET")
+    ops.append(f"BT /F2 8.5 Tf 0 0 0 rg {42+w_sign*2} {y_sign+42} Td (Diperiksa oleh,) Tj ET")
+
+    ops.append(f"BT /F1 8.5 Tf 0 0 0 rg {42} {y_sign+8} Td (( {esc_native_memo(nama_pengaju)} )) Tj ET")
+    ops.append(f"BT /F1 8.5 Tf 0 0 0 rg {42+w_sign} {y_sign+8} Td (( Tim Purchasing )) Tj ET")
+    ops.append(f"BT /F1 8.5 Tf 0 0 0 rg {42+w_sign*2} {y_sign+8} Td (( Tim Finance )) Tj ET")
+
+    return build_native_pdf_stream(ops, width=841.89, height=595.28)
 # ==============================================================================
 # DEKODER TANDA TANGAN CANVAS (PURE PYTHON - TANPA PERLU DEPENDENSI EKSTERNAL)
 # ==============================================================================
