@@ -16,9 +16,8 @@ JEZPRO_PASS  = os.environ.get("JEZPRO_PASSWORD")
 
 BRANCH_NAME = "JEZ SURABAYA"
 STORE_ID = 3
-POLL_INTERVAL_SECONDS = 15
 
-# Zona Waktu WIB (UTC+7) Murni Bawaan Python - ANTI ERROR 'No module named pytz'
+# Zona Waktu WIB (UTC+7) Murni Bawaan Python
 WIB = timezone(timedelta(hours=7))
 
 # ==============================================================================
@@ -50,7 +49,6 @@ def parse_wib_datetime(dt_str):
         except Exception:
             pass
     try:
-        # Fallback format ISO dari Supabase (misal ada 'Z' atau '+00:00')
         dt = datetime.fromisoformat(clean_str.replace('Z', '+00:00'))
         return dt.astimezone(WIB)
     except Exception:
@@ -87,7 +85,6 @@ def create_jezpro_session():
 # FETCH DATA HELPER & MUTASI
 # ==============================================================================
 def fetch_helper_jezpro(session):
-    """Menarik antrean WAITING OFFLINE dari Helper App Jezpro"""
     url = "https://jezpro.id/scan_product_in_datatables"
     params = {
         "draw": "1",
@@ -124,7 +121,6 @@ def fetch_helper_jezpro(session):
     return []
 
 def fetch_bin_history_today(session):
-    """Menarik riwayat mutasi hari ini dari setup_lokasi_stok_v2"""
     today_str = datetime.now(WIB).strftime("%Y-%m-%d")
     url = "https://jezpro.id/bin_history_datatables"
     params = {
@@ -167,7 +163,7 @@ def fetch_bin_history_today(session):
     return []
 
 # ==============================================================================
-# SINKRONISASI SUPABASE (DENGAN TIME VALIDATION & LEDGER LOCK)
+# SINKRONISASI SUPABASE (MENAMBAH ITEM BARU & UPDATE STATUS TANPA MENGHAPUS)
 # ==============================================================================
 def sync_cycle(session):
     if not SUPABASE_URL or not SUPABASE_KEY:
@@ -181,25 +177,32 @@ def sync_cycle(session):
     now_wib = datetime.now(WIB)
     today_date = now_wib.strftime("%Y-%m-%d")
 
-    # Ambil data hari ini dari Supabase
+    # 🌟 1. BERSIHKAN DATA KEMARIN (Hapus data yang tanggalnya di bawah hari ini)
+    try:
+        cleanup_url = f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?sync_date=lt.{today_date}"
+        requests.delete(cleanup_url, headers=headers)
+    except Exception as e:
+        print(f"⚠️ Gagal membersihkan data lama: {e}")
+
+    # 2. Ambil data hari ini dari Supabase
     sb_url = f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?select=*&sync_date=eq.{today_date}"
     res_sb = requests.get(sb_url, headers=headers)
     sb_records = res_sb.json() if res_sb.status_code == 200 else []
+
+    # Buat Peta Berdasarkan SKU + Invoice untuk melacak status yang sudah ada di database
+    existing_records_map = {f"{r['barcode_sku']}_{r.get('invoice','')}": r for r in sb_records}
 
     waiting_in_sb = [x for x in sb_records if x.get("status") == "WAITING OFFLINE"]
     need_setup_in_sb = [x for x in sb_records if x.get("status") == "NEED_SETUP"]
     done_setup_in_sb = [x for x in sb_records if x.get("status") == "DONE_SETUP"]
 
-    # Kunci mutasi_id yang sudah pernah terpakai
-    used_mutasi_ids = set()
-    for d in done_setup_in_sb:
-        m_id = d.get("matched_mutasi_id")
-        if m_id:
-            used_mutasi_ids.add(str(m_id))
-
+    # Kunci mutasi_id yang sudah pernah terpakai hari ini (agar tidak diklaim dua kali)
+    used_mutasi_ids = set(str(d.get("matched_mutasi_id")) for d in done_setup_in_sb if d.get("matched_mutasi_id"))
     sb_waiting_map = {f"{it['barcode_sku']}_{it.get('invoice','')}": it for it in waiting_in_sb}
 
-    # --- LANGKAH 1: CEK HELPER BACKUP ---
+    # ==========================================================================
+    # LANGKAH 2: TARIK DATA DARI HELPER JEZPRO (TAMBAH ITEM BARU)
+    # ==========================================================================
     jez_helper = fetch_helper_jezpro(session)
     current_helper_keys = set()
     new_inserts = []
@@ -207,8 +210,13 @@ def sync_cycle(session):
     for it in jez_helper:
         k = f"{it['barcode_sku']}_{it['invoice']}"
         current_helper_keys.add(k)
-        if k not in sb_waiting_map:
+        
+        if k not in existing_records_map:
+            # 🌟 BUAT ID UNIK BERBASIS HASH SKU + INVOICE (Mencegah error kolom id NULL)
+            unique_id = abs(hash(f"{it['barcode_sku']}_{it['invoice']}_{time.time()}")) % 2147483647
+
             new_inserts.append({
+                "id": unique_id,  # <-- ID UNIK DITAMBAHKAN DI SINI
                 "barcode_sku": it["barcode_sku"],
                 "article_name": it["article_name"],
                 "bin_code": it["bin_code"],
@@ -220,24 +228,32 @@ def sync_cycle(session):
             })
 
     if new_inserts:
-        requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily", headers=headers, json=new_inserts)
-        print(f"   📥 {len(new_inserts)} barang baru masuk antrean WAITING OFFLINE.")
-
-    # Deteksi barang yang hilang dari Helper -> Pindah ke NEED_SETUP
+        res_ins = requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily", headers=headers, json=new_inserts)
+        if res_ins.status_code in [200, 201]:
+            print(f"   📥 {len(new_inserts)} barang baru masuk antrean WAITING OFFLINE.")
+        else:
+            print(f"   ❌ Gagal insert data baru: {res_ins.text}")
+    # ==========================================================================
+    # LANGKAH 3: DETEKSI BARANG HILANG DARI HELPER (UPDATE STATUS KE NEED_SETUP - TANPA HAPUS)
+    # ==========================================================================
     for k, sb_item in sb_waiting_map.items():
         if k not in current_helper_keys:
             disappeared_timestamp = now_wib.isoformat()
             patch_url = f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?id=eq.{sb_item['id']}"
-            requests.patch(patch_url, headers=headers, json={
+            res_patch = requests.patch(patch_url, headers=headers, json={
                 "status": "NEED_SETUP",
                 "disappeared_at": disappeared_timestamp
             })
-            print(f"   ⚠️ BARANG HILANG ({now_wib.strftime('%H:%M:%S')}): {sb_item['barcode_sku']} ➔ Siap Setup di Shiny!")
+            if res_patch.status_code in [200, 204]:
+                print(f"   ⚠️ HILANG DARI HELPER ({now_wib.strftime('%H:%M:%S')}): {sb_item['barcode_sku']} ➔ Update status ke NEED_SETUP!")
+            else:
+                print(f"   ❌ Gagal update ke NEED_SETUP: {res_patch.text}")
 
-    # --- LANGKAH 2: CEK MUTASI SUDAH DIEKSEKUSI (TIME & MUTASI-ID MATCHING) ---
+    # ==========================================================================
+    # LANGKAH 4: COCOKKAN DENGAN RIWAYAT MUTASI (UPDATE STATUS KE DONE_SETUP)
+    # ==========================================================================
     if need_setup_in_sb:
         mutasi_today = fetch_bin_history_today(session)
-        # Urutkan mutasi dari yang paling awal ke paling baru
         mutasi_today = sorted(mutasi_today, key=lambda x: x["dt_wib"] or now_wib)
 
         for target in need_setup_in_sb:
@@ -258,7 +274,7 @@ def sync_cycle(session):
                 bin_tujuan_match = ("GL1-INSTOCK" in m["bin_tujuan"] or "INSTOCK" in m["bin_tujuan"])
                 qty_match = (m["qty_mts"] >= t_qty)
 
-                # Validasi: Waktu mutasi harus >= Waktu barang hilang (toleransi mundur 60 detik)
+                # Validasi Waktu: Jam mutasi harus >= Jam barang hilang (toleransi mundur 60 detik)
                 time_valid = True
                 if t_disappeared_dt and m["dt_wib"]:
                     time_diff = (m["dt_wib"] - t_disappeared_dt).total_seconds()
@@ -273,19 +289,22 @@ def sync_cycle(session):
                 used_mutasi_ids.add(matched_mutasi["mutasi_id"])
 
                 patch_url = f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?id=eq.{target['id']}"
-                requests.patch(patch_url, headers=headers, json={
+                res_done = requests.patch(patch_url, headers=headers, json={
                     "status": "DONE_SETUP",
                     "matched_mutasi_id": matched_mutasi["mutasi_id"],
                     "setup_done_at": matched_mutasi["raw_time"]
                 })
-                print(f"   🎉 MATCH VALID! SKU: {t_sku} (Hilang: {target.get('disappeared_at')[11:19]} ➔ Mutasi: {matched_mutasi['raw_time']}) ➔ DIGESER KE DONE SETUP!")
+                if res_done.status_code in [200, 204]:
+                    print(f"   🎉 MATCH VALID! SKU: {t_sku} ➔ Update status ke DONE_SETUP!")
+                else:
+                    print(f"   ❌ Gagal update ke DONE_SETUP: {res_done.text}")
 
 # ==============================================================================
 # EKSEKUSI PROGRAM (SINGLE-RUN: JALAN SEKALI LALU KELUAR)
 # ==============================================================================
 if __name__ == "__main__":
     print("=" * 65)
-    print("🚀 MENJALANKAN SYNC INSTOCK DAILY (SINGLE RUN - TIAP 5 MENIT)")
+    print("🚀 MENJALANKAN SYNC INSTOCK DAILY (SINGLE RUN)")
     print("=" * 65)
 
     try:
