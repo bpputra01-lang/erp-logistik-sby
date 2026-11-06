@@ -50,7 +50,6 @@ def clean_article_name(raw_text):
     return t if t else "-"
 
 def parse_wib_datetime(dt_str):
-    """Mengubah format tanggal Jezpro (DD/MM/YYYY HH:MM:SS atau ISO) ke datetime WIB"""
     if not dt_str: return None
     clean_str = strip_html(dt_str).strip()
     formats = [
@@ -72,7 +71,7 @@ def parse_wib_datetime(dt_str):
         return None
 
 def get_next_supabase_id(headers):
-    """Mengambil ID tertinggi agar tidak pernah null value pada kolom id"""
+    """Mengambil ID tertinggi agar tidak terjadi null value pada kolom id"""
     try:
         url = f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?select=id&order=id.desc&limit=1"
         res = requests.get(url, headers=headers, timeout=10)
@@ -115,10 +114,6 @@ def create_jezpro_session():
 # FETCH DATA: STOCK TRACKING & MUTASI
 # ==============================================================================
 def fetch_stock_tracking_today(session):
-    """
-    Menarik data dari https://jezpro.id/stock_tracking_datatables
-    Filter: st_id = 3 (Surabaya), date = hari ini, status = WAITING OFFLINE
-    """
     today_str = datetime.now(WIB).strftime("%Y-%m-%d")
     url = "https://jezpro.id/stock_tracking_datatables"
     params = {
@@ -177,7 +172,6 @@ def fetch_stock_tracking_today(session):
     return []
 
 def fetch_bin_history_today(session):
-    """Menarik riwayat mutasi untuk mencocokkan mutasi ke GL1-INSTOCK"""
     today_str = datetime.now(WIB).strftime("%Y-%m-%d")
     url = "https://jezpro.id/bin_history_datatables"
     params = {
@@ -222,7 +216,7 @@ def fetch_bin_history_today(session):
     return []
 
 # ==============================================================================
-# SINKRONISASI SUPABASE (COMPARE STOCK TRACKING DENGAN VALIDASI JAM KETAT)
+# SINKRONISASI SUPABASE (LANGSUNG ISI DISAPPEARED_AT DENGAN JAM INSTOCK)
 # ==============================================================================
 def sync_cycle(session):
     if not SUPABASE_URL or not SUPABASE_KEY:
@@ -237,7 +231,7 @@ def sync_cycle(session):
     now_wib = datetime.now(WIB)
     today_date = now_wib.strftime("%Y-%m-%d")
 
-    # 1. BERSIHKAN DATA SEBELUM HARI INI
+    # 1. BERSIHKAN DATA KEMARIN
     try:
         cleanup_url = f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?sync_date=lt.{today_date}"
         requests.delete(cleanup_url, headers=headers)
@@ -249,35 +243,29 @@ def sync_cycle(session):
     res_sb = requests.get(sb_url, headers=headers)
     sb_records = res_sb.json() if res_sb.status_code == 200 else []
 
-    # Kelompokkan data Supabase berdasarkan status
     waiting_in_sb = [x for x in sb_records if x.get("status") == "WAITING OFFLINE" and clean_sku_key(x.get("barcode_sku"))]
     need_setup_in_sb = [x for x in sb_records if x.get("status") == "NEED_SETUP" and clean_sku_key(x.get("barcode_sku"))]
     done_setup_in_sb = [x for x in sb_records if x.get("status") == "DONE_SETUP" and clean_sku_key(x.get("barcode_sku"))]
 
     used_mutasi_ids = set(str(d.get("matched_mutasi_id")) for d in done_setup_in_sb if d.get("matched_mutasi_id"))
 
-    # 3. TARIK DATA DARI STOCK TRACKING JEZPRO HARI INI
+    # 3. TARIK DATA STOCK TRACKING JEZPRO
     tracking_today = fetch_stock_tracking_today(session)
 
-    # Pisahkan antara yang masih WAITING dengan yang sudah berubah jadi INSTOCK
     instock_movements = []
     waiting_movements = []
 
     for tr in tracking_today:
-        if tr["status"] == "INSTOCK" or "INSTOCK" in tr["status"]:
+        # Jika statusnya INSTOCK dan asalnya WAITING -> ini yang sudah di-scan masuk!
+        if "INSTOCK" in tr["status"] and ("WAITING" in tr["instock_source"] or "WAITING" in tr["status"]):
             instock_movements.append(tr)
-        else:
+        elif "WAITING" in tr["status"] or "WAITING" in tr["instock_source"]:
             waiting_movements.append(tr)
 
-    # Urutkan secara kronologis (waktu paling awal duluan)
-    instock_movements = sorted(instock_movements, key=lambda x: x["dt_wib"] or now_wib)
-    waiting_movements = sorted(waiting_movements, key=lambda x: x["dt_wib"] or now_wib)
-
-    # ID generator agar tidak terjadi error NOT NULL pada kolom id
     current_auto_id = get_next_supabase_id(headers)
     new_inserts = []
 
-    # Kunci pelacak kuantitas yang sudah tercatat di Supabase
+    # Map jumlah SKU di Supabase
     sb_sku_qty_map = {}
     for r in sb_records:
         s = clean_sku_key(r.get("barcode_sku"))
@@ -285,7 +273,72 @@ def sync_cycle(session):
             sb_sku_qty_map[s] = sb_sku_qty_map.get(s, 0) + safe_int_val(r.get("qty"), 1)
 
     # ==========================================================================
-    # LANGKAH 4: PROSES BARANG YANG MASIH WAITING OFFLINE KE SUPABASE
+    # LANGKAH 4: PROSES BARANG YANG SUDAH MENJADI "INSTOCK" (MASUK KE NEED_SETUP)
+    # ==========================================================================
+    # Kelompokkan baris WAITING di Supabase per SKU
+    waiting_by_sku = {}
+    for r in waiting_in_sb:
+        s = clean_sku_key(r.get("barcode_sku"))
+        if s not in waiting_by_sku:
+            waiting_by_sku[s] = []
+        waiting_by_sku[s].append(r)
+
+    processed_instock_keys = set()
+
+    for instk in instock_movements:
+        sku = instk["sku"]
+        jam_instock_iso = (instk["dt_wib"] or now_wib).isoformat()
+        lokasi_rak = instk["location"]
+        event_key = f"{sku}_{instk['raw_time']}_{lokasi_rak}"
+
+        if event_key in processed_instock_keys:
+            continue
+        processed_instock_keys.add(event_key)
+
+        # KASUS A: Barangnya sebelumnya sudah tercatat sebagai WAITING di Supabase
+        # -> Langsung update statusnya ke NEED_SETUP dan isi disappeared_at dengan jam INSTOCK!
+        if sku in waiting_by_sku and waiting_by_sku[sku]:
+            target_row = waiting_by_sku[sku].pop(0)
+            patch_url = f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?id=eq.{target_row['id']}"
+            patch_payload = {
+                "status": "NEED_SETUP",
+                "disappeared_at": jam_instock_iso,   # ✅ TERISI DENGAN JAM TANGGAL INSTOCK!
+                "bin_code": lokasi_rak               # ✅ TERISI DENGAN LOKASI RAK AKTUAL!
+            }
+            res_patch = requests.patch(patch_url, headers=headers, json=patch_payload)
+            if res_patch.status_code in [200, 204]:
+                target_row["status"] = "NEED_SETUP"
+                target_row["disappeared_at"] = jam_instock_iso
+                target_row["bin_code"] = lokasi_rak
+                need_setup_in_sb.append(target_row)
+                print(f"   🚀 STATUS BERUBAH ➔ INSTOCK! SKU {sku} (Jam {instk['raw_time']}) di BIN [{lokasi_rak}] -> Masuk LIST SET UP (disappeared_at terisi)!")
+            else:
+                print(f"   ❌ Gagal update: {res_patch.text}")
+
+        # KASUS B: Barangnya langsung terdeteksi INSTOCK di Jezpro dan belum ada di Supabase
+        # -> Langsung insert sebagai NEED_SETUP lengkap dengan disappeared_at!
+        elif sb_sku_qty_map.get(sku, 0) <= 0:
+            new_inserts.append({
+                "id": current_auto_id,
+                "store_id": STORE_ID,
+                "store_name": BRANCH_NAME,
+                "barcode_sku": sku,
+                "article_name": instk["article"],
+                "bin_code": lokasi_rak,
+                "qty": instk["qty"],
+                "status": "NEED_SETUP",              # ✅ Langsung siap setup
+                "invoice": instk["invoice"],
+                "sync_date": today_date,
+                "created_at": jam_instock_iso,
+                "disappeared_at": jam_instock_iso,   # ✅ Terisi jam instock!
+                "matched_mutasi_id": None,
+                "setup_done_at": None
+            })
+            current_auto_id += 1
+            print(f"   📥 Barang langsung INSTOCK terdeteksi: SKU {sku} (Jam {instk['raw_time']}) -> Masuk LIST SET UP!")
+
+    # ==========================================================================
+    # LANGKAH 5: BARANG YANG MASIH BERSTATUS "WAITING" (BELUM INSTOCK)
     # ==========================================================================
     temp_allocated = dict(sb_sku_qty_map)
     for wm in waiting_movements:
@@ -303,7 +356,7 @@ def sync_cycle(session):
                 "invoice": wm["invoice"],
                 "sync_date": today_date,
                 "created_at": (wm["dt_wib"] or now_wib).isoformat(),
-                "disappeared_at": None,
+                "disappeared_at": None,              # Masih waiting, belum instock
                 "matched_mutasi_id": None,
                 "setup_done_at": None
             })
@@ -311,99 +364,10 @@ def sync_cycle(session):
         else:
             temp_allocated[s] -= wm["qty"]
 
-    # ==========================================================================
-    # LANGKAH 5: DETEKSI PERUBAHAN STATUS MENJADI "INSTOCK"
-    # DENGAN VALIDASI WAKTU KETAT (Jam Instock >= Jam Waiting)
-    # ==========================================================================
-    # Kelompokkan WAITING yang ada di Supabase per SKU secara FIFO
-    waiting_by_sku = {}
-    for r in waiting_in_sb:
-        s = clean_sku_key(r.get("barcode_sku"))
-        if s not in waiting_by_sku:
-            waiting_by_sku[s] = []
-        waiting_by_sku[s].append(r)
-
-    used_instock_keys = set()
-
-    # A. Cek barang di Supabase yang statusnya berubah dari WAITING -> INSTOCK
-    for instk in instock_movements:
-        sku = instk["sku"]
-        dt_instock = instk["dt_wib"] or now_wib
-        loc_instock = instk["location"]
-        event_key = f"{sku}_{instk['raw_time']}_{loc_instock}"
-
-        if event_key in used_instock_keys:
-            continue
-
-        if sku in waiting_by_sku and waiting_by_sku[sku]:
-            # Ambil data waiting tertua
-            target_wait = waiting_by_sku[sku][0]
-            dt_wait = parse_wib_datetime(target_wait.get("created_at")) or now_wib
-
-            # 🛑 VALIDASI JAM KETAT: Jam Instock WAJIB >= Jam Waiting (Toleransi mundur maks 30 detik)
-            time_diff_sec = (dt_instock - dt_wait).total_seconds()
-            if time_diff_sec >= -30:
-                # MATCH! Barang ini telah di-instock, ubah status ke NEED_SETUP & isi disappeared_at
-                used_instock_keys.add(event_key)
-                waiting_by_sku[sku].pop(0)
-
-                iso_instock = dt_instock.isoformat()
-                patch_url = f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?id=eq.{target_wait['id']}"
-                patch_payload = {
-                    "status": "NEED_SETUP",
-                    "disappeared_at": iso_instock,      # ✅ TERISI DENGAN JAM TRANSAKSI INSTOCK
-                    "bin_code": loc_instock             # ✅ DIUPDATE KE LOKASI RAK BARU (cth: GL2-A-LOG-F4-2)
-                }
-                res_patch = requests.patch(patch_url, headers=headers, json=patch_payload)
-
-                if res_patch.status_code in [200, 204]:
-                    target_wait["status"] = "NEED_SETUP"
-                    target_wait["disappeared_at"] = iso_instock
-                    target_wait["bin_code"] = loc_instock
-                    need_setup_in_sb.append(target_wait)
-                    print(f"   🚀 STATUS BERUBAH ➔ INSTOCK! SKU {sku} (Jam {instk['raw_time']}) di BIN [{loc_instock}] masuk ke LIST SET UP (NEED_SETUP)!")
-                else:
-                    print(f"   ❌ Gagal update ke NEED_SETUP: {res_patch.text}")
-
-    # B. Jika ada barang di Stock Tracking yang statusnya SUDAH "INSTOCK" (asal WAITING)
-    # tapi belum pernah tercatat sama sekali di Supabase hari ini -> Langsung masukkan ke NEED_SETUP
-    for instk in instock_movements:
-        sku = instk["sku"]
-        event_key = f"{sku}_{instk['raw_time']}_{instk['location']}"
-        if event_key in used_instock_keys:
-            continue
-
-        # Cek apakah SKU ini sudah tercover di Supabase
-        if sb_sku_qty_map.get(sku, 0) <= 0:
-            used_instock_keys.add(event_key)
-            dt_instk = instk["dt_wib"] or now_wib
-            iso_instk = dt_instk.isoformat()
-
-            new_inserts.append({
-                "id": current_auto_id,
-                "store_id": STORE_ID,
-                "store_name": BRANCH_NAME,
-                "barcode_sku": sku,
-                "article_name": instk["article"],
-                "bin_code": instk["location"],
-                "qty": instk["qty"],
-                "status": "NEED_SETUP",                 # ✅ Langsung siap di-setup
-                "invoice": instk["invoice"],
-                "sync_date": today_date,
-                "created_at": iso_instk,
-                "disappeared_at": iso_instk,            # ✅ Jam instock terisi
-                "matched_mutasi_id": None,
-                "setup_done_at": None
-            })
-            current_auto_id += 1
-            print(f"   📥 Barang langsung INSTOCK terdeteksi: SKU {sku} (Jam {instk['raw_time']}) ➔ Masuk LIST SET UP!")
-
-    # Kirim insert jika ada data baru
     if new_inserts:
         res_ins = requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily", headers=headers, json=new_inserts)
         if res_ins.status_code in [200, 201]:
             print(f"   📥 Berhasil simpan {len(new_inserts)} record baru ke Supabase.")
-            # Tambahkan ke need_setup_in_sb agar bisa dicocokkan ke mutasi jika ada
             for ins in new_inserts:
                 if ins["status"] == "NEED_SETUP":
                     need_setup_in_sb.append(ins)
@@ -411,7 +375,7 @@ def sync_cycle(session):
             print(f"   ❌ Gagal insert: {res_ins.text}")
 
     # ==========================================================================
-    # LANGKAH 6: VERIFIKASI SELESAI MUTASI KE GL1-INSTOCK (DONE_SETUP)
+    # LANGKAH 6: VERIFIKASI MUTASI KE GL1-INSTOCK (DONE_SETUP)
     # ==========================================================================
     if need_setup_in_sb:
         mutasi_today = fetch_bin_history_today(session)
@@ -431,26 +395,15 @@ def sync_cycle(session):
                     continue
 
                 sku_match = (m["sku"] == t_sku)
-                # Bin asal cocok dengan lokasi instock barang
-                bin_awal_match = (m["bin_awal"] == t_bin_awal or t_bin_awal in m["bin_awal"] or m["bin_awal"] in ["STAGING INBOUND", "WAITING OFFLINE"])
-                # Bin tujuan adalah GL1-INSTOCK
                 bin_tujuan_match = ("GL1-INSTOCK" in m["bin_tujuan"] or "INSTOCK" in m["bin_tujuan"])
                 qty_match = (m["qty_mts"] >= t_qty)
 
-                # Validasi jam: Mutasi ke GL1-INSTOCK harus sesudah jam INSTOCK
-                time_valid = True
-                if t_disappeared_dt and m["dt_wib"]:
-                    time_diff = (m["dt_wib"] - t_disappeared_dt).total_seconds()
-                    if time_diff < -120:  # Toleransi 2 menit
-                        time_valid = False
-
-                if sku_match and bin_awal_match and bin_tujuan_match and qty_match and time_valid:
+                if sku_match and bin_tujuan_match and qty_match:
                     matched_mutasi = m
                     break
 
             if matched_mutasi:
                 used_mutasi_ids.add(matched_mutasi["mutasi_id"])
-
                 patch_url = f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?id=eq.{target['id']}"
                 res_done = requests.patch(patch_url, headers=headers, json={
                     "status": "DONE_SETUP",
