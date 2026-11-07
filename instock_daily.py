@@ -71,7 +71,6 @@ def parse_wib_datetime(dt_str):
         return None
 
 def get_next_supabase_id(headers):
-    """Mengambil ID tertinggi agar tidak pernah null value pada kolom id"""
     try:
         url = f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?select=id&order=id.desc&limit=1"
         res = requests.get(url, headers=headers, timeout=10)
@@ -111,18 +110,19 @@ def create_jezpro_session():
     return session
 
 # ==============================================================================
-# FETCH DATA: STOCK TRACKING & MUTASI
+# FETCH DATA STOCK TRACKING (TANPA FILTER STATUS AGAR INSTOCK TERBACA)
 # ==============================================================================
 def fetch_stock_tracking_today(session):
     today_str = datetime.now(WIB).strftime("%Y-%m-%d")
     url = "https://jezpro.id/stock_tracking_datatables"
+    
+    # 🌟 JANGAN FILTER STATUS=WAITING OFFLINE AGAR STATUS INSTOCK IKUT KETARIK
     params = {
         "draw": "1",
         "start": "0",
         "length": "1000",
         "st_id": str(STORE_ID),
         "date": today_str,
-        "status": "WAITING OFFLINE",
         "_": int(time.time() * 1000)
     }
     headers = {
@@ -172,14 +172,16 @@ def fetch_stock_tracking_today(session):
                         loc_bin = clean_bin(item[7])
                         if loc_bin: break
 
-                # 4. Deteksi Apakah Baris Ini Berstatus INSTOCK
+                # 4. Ambil Teks Seluruh Baris untuk Deteksi Status
                 full_row_text = ""
                 if isinstance(item, dict):
                     full_row_text = " ".join([str(v) for v in item.values() if v]).upper()
                 elif isinstance(item, list):
                     full_row_text = " ".join([str(v) for v in item if v]).upper()
 
-                is_instock = "INSTOCK" in full_row_text
+                # Status INSTOCK jika ada kata INSTOCK dan berasal dari WAITING
+                is_instock = ("INSTOCK" in full_row_text) and ("WAITING" in full_row_text)
+                is_waiting = ("WAITING" in full_row_text) and not is_instock
 
                 # 5. Ambil Nama Artikel & Qty
                 art_name = ""
@@ -198,8 +200,9 @@ def fetch_stock_tracking_today(session):
                     "sku": sku,
                     "article": art_name,
                     "qty": qty_val,
-                    "location": loc_bin if loc_bin else "GL1-INSTOCK",
+                    "location": loc_bin if loc_bin else "STAGING INBOUND",
                     "is_instock": is_instock,
+                    "is_waiting": is_waiting,
                     "raw_time": raw_time,
                     "dt_wib": dt_wib
                 })
@@ -253,7 +256,7 @@ def fetch_bin_history_today(session):
     return []
 
 # ==============================================================================
-# SINKRONISASI SUPABASE (LANGSUNG ISI DISAPPEARED_AT & NEED_SETUP)
+# SINKRONISASI SUPABASE (PASTI UPDATE KE NEED_SETUP & ISI DISAPPEARED_AT)
 # ==============================================================================
 def sync_cycle(session):
     if not SUPABASE_URL or not SUPABASE_KEY:
@@ -268,34 +271,32 @@ def sync_cycle(session):
     now_wib = datetime.now(WIB)
     today_date = now_wib.strftime("%Y-%m-%d")
 
-    # 1. HAPUS DATA HARI-HARI SEBELUMNYA
+    # 1. BERSIHKAN DATA SEBELUM HARI INI
     try:
         cleanup_url = f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?sync_date=lt.{today_date}"
         requests.delete(cleanup_url, headers=headers)
     except Exception as e:
         print(f"⚠️ Gagal membersihkan data lama: {e}")
 
-    # 2. AMBIL DATA SUPABASE HARI INI
+    # 2. AMBIL DATA HARI INI DARI SUPABASE
     sb_url = f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?select=*&sync_date=eq.{today_date}"
     res_sb = requests.get(sb_url, headers=headers)
     sb_records = res_sb.json() if res_sb.status_code == 200 else []
 
-    # Baris yang masih WAITING OFFLINE (yang disappeared_at-nya masih NULL di screenshot Anda)
-    waiting_in_sb = [x for x in sb_records if x.get("status") == "WAITING OFFLINE" and clean_sku_key(x.get("barcode_sku"))]
-    need_setup_in_sb = [x for x in sb_records if x.get("status") == "NEED_SETUP" and clean_sku_key(x.get("barcode_sku"))]
-    done_setup_in_sb = [x for x in sb_records if x.get("status") == "DONE_SETUP" and clean_sku_key(x.get("barcode_sku"))]
+    # Map baris WAITING OFFLINE di Supabase per SKU
+    waiting_by_sku = {}
+    for r in sb_records:
+        if r.get("status") == "WAITING OFFLINE":
+            s = clean_sku_key(r.get("barcode_sku"))
+            if s:
+                if s not in waiting_by_sku:
+                    waiting_by_sku[s] = []
+                waiting_by_sku[s].append(r)
 
+    need_setup_in_sb = [x for x in sb_records if x.get("status") == "NEED_SETUP"]
+    done_setup_in_sb = [x for x in sb_records if x.get("status") == "DONE_SETUP"]
     used_mutasi_ids = set(str(d.get("matched_mutasi_id")) for d in done_setup_in_sb if d.get("matched_mutasi_id"))
 
-    # Kelompokkan data WAITING di Supabase per SKU
-    waiting_by_sku = {}
-    for r in waiting_in_sb:
-        s = clean_sku_key(r.get("barcode_sku"))
-        if s not in waiting_by_sku:
-            waiting_by_sku[s] = []
-        waiting_by_sku[s].append(r)
-
-    # Set semua SKU yang sudah ada di Supabase
     all_sb_skus = set(clean_sku_key(x.get("barcode_sku")) for x in sb_records if clean_sku_key(x.get("barcode_sku")))
 
     # 3. TARIK PERGERAKAN HARI INI DARI STOCK TRACKING JEZPRO
@@ -304,24 +305,29 @@ def sync_cycle(session):
     current_auto_id = get_next_supabase_id(headers)
     new_inserts = []
 
-    # 4. PROSES PERGERAKAN STOCK TRACKING
+    # 4. PROSES DATA YANG SUDAH MENJADI INSTOCK
     for tr in tracking_today:
         sku = tr["sku"]
         jam_transaksi_iso = (tr["dt_wib"] or now_wib).isoformat()
         lokasi_bin = tr["location"]
-        is_instock = tr["is_instock"]
 
-        # KONDISI A: BARANG SUDAH INSTOCK (SUDAH DI-SCAN MASUK DI JEZPRO)
-        if is_instock:
-            # Jika barang ini ada di Supabase tapi statusnya masih WAITING OFFLINE (seperti di screenshot Anda):
-            # 👉 LANGSUNG UPDATE JADI NEED_SETUP DAN ISI DISAPPEARED_AT!
+        if tr["is_instock"]:
+            # KASUS A: Barangnya sudah ada di Supabase sebagai WAITING OFFLINE (seperti baris di screenshot Anda)
+            # 👉 LANGSUNG UPDATE STATUS KE NEED_SETUP & ISI DISAPPEARED_AT DENGAN JAM TRANSAKSI!
             if sku in waiting_by_sku and len(waiting_by_sku[sku]) > 0:
                 row_target = waiting_by_sku[sku].pop(0)
-                patch_url = f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?id=eq.{row_target['id']}"
+                
+                # Coba patch pakai ID, fallback pakai SKU + Date jika ID null
+                target_id = row_target.get("id")
+                if target_id:
+                    patch_url = f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?id=eq.{target_id}"
+                else:
+                    patch_url = f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?barcode_sku=eq.{sku}&sync_date=eq.{today_date}&status=eq.WAITING%20OFFLINE"
+
                 patch_payload = {
                     "status": "NEED_SETUP",
-                    "disappeared_at": jam_transaksi_iso,  # ✅ LANGSUNG TERISI JAM TANGGAL INSTOCK!
-                    "bin_code": lokasi_bin              # ✅ TERISI LOKASI RAK AKTUAL
+                    "disappeared_at": jam_transaksi_iso,  # ✅ PASTI TERISI JAM INSTOCK DARI JEZPRO!
+                    "bin_code": lokasi_bin              # ✅ TERISI LOKASI RAK AKTUAL (contoh: TOKO)
                 }
                 res_patch = requests.patch(patch_url, headers=headers, json=patch_payload)
                 if res_patch.status_code in [200, 204]:
@@ -329,12 +335,12 @@ def sync_cycle(session):
                     row_target["disappeared_at"] = jam_transaksi_iso
                     row_target["bin_code"] = lokasi_bin
                     need_setup_in_sb.append(row_target)
-                    print(f"   🚀 SUKSES! SKU {sku} (Jam {tr['raw_time']}) ➔ Update ke NEED_SETUP & disappeared_at terisi jam {tr['raw_time']}!")
+                    print(f"   🚀 SUKSES UPDATE! SKU {sku} (Jam {tr['raw_time']}) di BIN [{lokasi_bin}] ➔ Status: NEED_SETUP (disappeared_at terisi)!")
                 else:
                     print(f"   ❌ Gagal update: {res_patch.text}")
 
-            # Jika barang ini belum pernah masuk sama sekali di Supabase:
-            # 👉 LANGSUNG INSERT SEBAGAI NEED_SETUP LENGKAP DENGAN DISAPPEARED_AT!
+            # KASUS B: Barangnya belum pernah tercatat sama sekali di Supabase
+            # 👉 LANGSUNG INSERT SEBAGAI NEED_SETUP
             elif sku not in all_sb_skus:
                 new_inserts.append({
                     "id": current_auto_id,
@@ -344,41 +350,42 @@ def sync_cycle(session):
                     "article_name": tr["article"],
                     "bin_code": lokasi_bin,
                     "qty": tr["qty"],
-                    "status": "NEED_SETUP",             # ✅ Langsung siap setup
+                    "status": "NEED_SETUP",
                     "invoice": "-",
                     "sync_date": today_date,
                     "created_at": jam_transaksi_iso,
-                    "disappeared_at": jam_transaksi_iso,  # ✅ Terisi jam instock!
+                    "disappeared_at": jam_transaksi_iso,
                     "matched_mutasi_id": None,
                     "setup_done_at": None
                 })
                 current_auto_id += 1
                 all_sb_skus.add(sku)
-                print(f"   📥 Barang langsung INSTOCK terdeteksi: SKU {sku} (Jam {tr['raw_time']}) ➔ Insert ke NEED_SETUP!")
+                print(f"   📥 Baru terdeteksi INSTOCK: SKU {sku} (Jam {tr['raw_time']}) ➔ Insert ke NEED_SETUP!")
 
-        # KONDISI B: BARANG MASIH WAITING OFFLINE (BELUM DI-SCAN MASUK)
-        else:
-            if sku not in all_sb_skus:
-                new_inserts.append({
-                    "id": current_auto_id,
-                    "store_id": STORE_ID,
-                    "store_name": BRANCH_NAME,
-                    "barcode_sku": sku,
-                    "article_name": tr["article"],
-                    "bin_code": lokasi_bin,
-                    "qty": tr["qty"],
-                    "status": "WAITING OFFLINE",
-                    "invoice": "-",
-                    "sync_date": today_date,
-                    "created_at": jam_transaksi_iso,
-                    "disappeared_at": None,
-                    "matched_mutasi_id": None,
-                    "setup_done_at": None
-                })
-                current_auto_id += 1
-                all_sb_skus.add(sku)
+    # 5. PROSES BARANG YANG MASIH WAITING OFFLINE
+    for tr in tracking_today:
+        sku = tr["sku"]
+        jam_transaksi_iso = (tr["dt_wib"] or now_wib).isoformat()
+        if tr["is_waiting"] and sku not in all_sb_skus:
+            new_inserts.append({
+                "id": current_auto_id,
+                "store_id": STORE_ID,
+                "store_name": BRANCH_NAME,
+                "barcode_sku": sku,
+                "article_name": tr["article"],
+                "bin_code": tr["location"],
+                "qty": tr["qty"],
+                "status": "WAITING OFFLINE",
+                "invoice": "-",
+                "sync_date": today_date,
+                "created_at": jam_transaksi_iso,
+                "disappeared_at": None,
+                "matched_mutasi_id": None,
+                "setup_done_at": None
+            })
+            current_auto_id += 1
+            all_sb_skus.add(sku)
 
-    # Kirim insert jika ada data baru
     if new_inserts:
         res_ins = requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily", headers=headers, json=new_inserts)
         if res_ins.status_code in [200, 201]:
@@ -390,7 +397,7 @@ def sync_cycle(session):
             print(f"   ❌ Gagal insert: {res_ins.text}")
 
     # ==========================================================================
-    # 5. VERIFIKASI MUTASI KE GL1-INSTOCK (DONE_SETUP)
+    # 6. VERIFIKASI SELESAI MUTASI KE GL1-INSTOCK (DONE_SETUP)
     # ==========================================================================
     if need_setup_in_sb:
         mutasi_today = fetch_bin_history_today(session)
@@ -417,7 +424,13 @@ def sync_cycle(session):
 
             if matched_mutasi:
                 used_mutasi_ids.add(matched_mutasi["mutasi_id"])
-                patch_url = f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?id=eq.{target['id']}"
+                
+                target_id = target.get("id")
+                if target_id:
+                    patch_url = f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?id=eq.{target_id}"
+                else:
+                    patch_url = f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?barcode_sku=eq.{t_sku}&sync_date=eq.{today_date}&status=eq.NEED_SETUP"
+
                 res_done = requests.patch(patch_url, headers=headers, json={
                     "status": "DONE_SETUP",
                     "matched_mutasi_id": matched_mutasi["mutasi_id"],
@@ -431,7 +444,7 @@ def sync_cycle(session):
 # ==============================================================================
 if __name__ == "__main__":
     print("=" * 65)
-    print("🚀 MENJALANKAN SYNC INSTOCK DAILY (STOCK TRACKING BASED)")
+    print("🚀 MENJALANKAN SYNC INSTOCK DAILY (FIXED STATUS FILTER)")
     print("=" * 65)
 
     try:
