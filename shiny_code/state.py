@@ -4098,7 +4098,7 @@ class AppState:
             import traceback
             traceback.print_exc()
             return False, f"Terjadi kesalahan saat kalkulasi: {str(e)}"
-                      
+
     def apply_bs_category_filter(self, selected_cats):
         """Memfilter berdasarkan Sub Kategori dan mempertahankan filter Area aktif"""
         self.bs_selected_categories.set(selected_cats if selected_cats is not None else [])
@@ -4110,7 +4110,7 @@ class AppState:
         self._apply_combined_bs_filters()
 
     def _apply_combined_bs_filters(self):
-        """Kalkulasi gabungan filter Kategori (Tab 1 & 2) dan filter Area (khusus Tab 2)"""
+        """Kalkulasi Metrik Murni Berdasarkan Ketersediaan SKU di BIN (OFF, ONL, LOG)"""
         if self._raw_df_bs_alloc_base.empty:
             return
 
@@ -4120,54 +4120,66 @@ class AppState:
         selected_cats = self.bs_selected_categories()
         selected_area = self.bs_selected_area()
 
-        # 1. Filter Sub Kategori
+        # 1. Filter Sub Kategori (Jika ada pilihan, saring; jika tidak, SEMUANYA)
         if selected_cats and len(selected_cats) > 0:
             selected_clean = [str(x).strip().upper() for x in selected_cats]
             df_alloc = df_alloc[df_alloc["SUB KATEGORI"].isin(selected_clean)].copy()
             skus_valid = set(df_alloc["SKU"].unique())
             df_refill = df_refill[df_refill["SKU"].isin(skus_valid)].copy()
 
-        # 2. Filter Area Khusus Tab 2 (Hanya munculkan baris yang butuh refill di area tersebut)
+        # 2. Filter Area Khusus Tab 2
         if selected_area == "AREA OFFLINE":
             mask_off = (df_refill["QTY OFF"].astype(str).str.upper() != "NO REFILL") & \
                        (df_refill["QTY OFF"] != 0) & (df_refill["QTY OFF"] != "0")
             df_refill = df_refill[mask_off].copy()
-
         elif selected_area == "AREA ONLINE":
             mask_onl = (df_refill["QTY ONL"].astype(str).str.upper() != "NO REFILL") & \
                        (df_refill["QTY ONL"] != 0) & (df_refill["QTY ONL"] != "0")
             df_refill = df_refill[mask_onl].copy()
-
         elif selected_area == "AREA LOGISTIK":
             mask_log = (df_refill["QTY LOG"].astype(str).str.upper() != "NO REFILL") & \
                        (df_refill["QTY LOG"] != 0) & (df_refill["QTY LOG"] != "0")
             df_refill = df_refill[mask_log].copy()
 
-        # Kalkulasi Metrik
-        tot_sku = len(df_alloc)
+        # ----------------------------------------------------------------------
+        # 🌟 PERHITUNGAN BARU SESUAI INSTRUKSI:
+        # A = TOTAL SKU UNIK YANG ADA DI ALL BIN (SESUAI FILTER)
+        # B = TOTAL SKU YANG ADA DI MASING-MASING BIN AREA (QTY > 0)
+        # ----------------------------------------------------------------------
+        tot_sku = len(df_alloc) # Total SKU Unik (All BIN)
         tot_stk = int(df_alloc["TOTAL STOK"].sum()) if not df_alloc.empty else 0
 
-        need_off = sum(1 for _, r in df_alloc.iterrows() if r["TARGET OFF"] > r["QTY OFF"])
-        need_on = sum(1 for _, r in df_alloc.iterrows() if r["TARGET ONL"] > r["QTY ONL"])
-        need_log = sum(1 for _, r in df_alloc.iterrows() if r["TARGET LOG"] > r["QTY LOG"])
+        # Hitung berapa SKU yang BENAR-BENAR MEMILIKI STOK di area tersebut (Qty > 0)
+        sku_ada_off = sum(1 for _, r in df_alloc.iterrows() if r["QTY OFF"] > 0)
+        sku_ada_onl = sum(1 for _, r in df_alloc.iterrows() if r["QTY ONL"] > 0)
+        sku_ada_log = sum(1 for _, r in df_alloc.iterrows() if r["QTY LOG"] > 0)
 
-        ready_log = tot_sku - need_log
-        ready_off = tot_sku - need_off
-        ready_on = tot_sku - need_on
+        # DEFISIT = TOTAL SKU ALL BIN - TOTAL SKU YANG ADA DI AREA TERSEBUT
+        defisit_off = max(0, tot_sku - sku_ada_off)
+        defisit_onl = max(0, tot_sku - sku_ada_onl)
+        defisit_log = max(0, tot_sku - sku_ada_log)
 
-        perc_log = (ready_log / tot_sku * 100.0) if tot_sku > 0 else 0.0
-        perc_off = (ready_off / tot_sku * 100.0) if tot_sku > 0 else 0.0
-        perc_on = (ready_on / tot_sku * 100.0) if tot_sku > 0 else 0.0
+        # PERSENTASE KETERSEDIAAN / KESEIMBANGAN (%)
+        # Rumus: (Total SKU yang Ada di BIN / Total SKU All BIN) * 100%
+        # Atau: ((Total SKU - Defisit) / Total SKU) * 100%
+        perc_off = (sku_ada_off / tot_sku * 100.0) if tot_sku > 0 else 0.0
+        perc_on  = (sku_ada_onl / tot_sku * 100.0) if tot_sku > 0 else 0.0
+        perc_log = (sku_ada_log / tot_sku * 100.0) if tot_sku > 0 else 0.0
 
+        # Simpan ke reactive state
         self.bs_total_sku.set(tot_sku)
         self.bs_total_stock.set(tot_stk)
-        self.bs_sku_need_off.set(need_off)
-        self.bs_sku_need_on.set(need_on)
-        self.bs_sku_need_log.set(need_log)
 
-        self.bs_perc_logistik.set(perc_log)
+        # Baris Bawah: Menampilkan Total SKU yang Masih Kurang/Kosong di area tersebut
+        self.bs_sku_need_off.set(defisit_off)
+        self.bs_sku_need_on.set(defisit_onl)
+        self.bs_sku_need_log.set(defisit_log)
+
+        # Baris Atas: Menampilkan Persentase Keseimbangan Keterisian Area
         self.bs_perc_offline.set(perc_off)
         self.bs_perc_online.set(perc_on)
+        self.bs_perc_logistik.set(perc_log)
+
         self.bs_qty_refill_total.set(len(df_refill))
 
         self._raw_df_bs_alloc = df_alloc.copy()
