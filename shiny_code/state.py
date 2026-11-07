@@ -634,6 +634,8 @@ class AppState:
         self.df_iv_mutasi_headers = reactive.Value([])
         self.df_iv_mutasi_rows = reactive.Value([])
         self._raw_df_iv_mutasi = pd.DataFrame()
+        # Default: Hanya yang barusan di-instock < 5 menit
+        self.iv_filter_waktu = reactive.Value("BARUSAN_5")
 
         # Tab 1: Template Mutasi / Set Up (Yang belum dimutasi di Jezpro)
         self.df_iv_setup_headers = reactive.Value([])
@@ -7333,7 +7335,7 @@ class AppState:
     # METODE INSTOCK VALIDATION (URUT TERBARU DI ATAS, ABAIKAN TOKO & DONE, TAB 3 5-KOLOM)
     # --------------------------------------------------------------------------
     def load_instock_daily_from_supabase(self):
-        """Memuat antrean barang (Item paling baru di-instock selalu di baris paling atas)"""
+        """Memuat antrean barang dengan deteksi barang yang baru saja di-instock"""
         try:
             client = get_supabase()
             if not client:
@@ -7347,7 +7349,9 @@ class AppState:
             
             all_data = res.data if res and hasattr(res, "data") and res.data else []
 
-            # Helper konversi UTC Supabase ke Jam WIB (GMT+7)
+            now_jakarta = pd.Timestamp.now(tz="Asia/Jakarta")
+
+            # Helper konversi jam ke format string WIB
             def format_to_wib_time(ts_val):
                 if not ts_val or str(ts_val).strip() in ["", "-", "None", "nan"]:
                     return "-"
@@ -7362,7 +7366,22 @@ class AppState:
                     s = str(ts_val)
                     return s[11:19] if len(s) >= 19 else s
 
-            # Helper sorting objek waktu presisi (Parsing ke datetime WIB)
+            # Helper menghitung selisih menit instock
+            def get_instock_diff_minutes(r):
+                ts = r.get("disappeared_at") or r.get("created_at")
+                if not ts or str(ts).strip() in ["", "-", "None", "nan"]:
+                    return 999999.0
+                try:
+                    dt = pd.to_datetime(ts)
+                    if dt.tzinfo is None:
+                        dt = dt.tz_localize("UTC").tz_convert("Asia/Jakarta")
+                    else:
+                        dt = dt.tz_convert("Asia/Jakarta")
+                    return max(0.0, (now_jakarta - dt).total_seconds() / 60.0)
+                except Exception:
+                    return 999999.0
+
+            # Helper parsing objek waktu untuk sorting
             def get_sort_datetime(r):
                 ts = r.get("disappeared_at") or r.get("created_at")
                 if not ts or str(ts).strip() in ["", "-", "None", "nan"]:
@@ -7392,9 +7411,9 @@ class AppState:
                 reverse=True
             )
 
-            # 🌟 2. FILTER KETAT:
-            # - JIKA BIN AWAL MENGANDUNG "TOKO" -> ABAIKAN
-            # - JIKA SUDAH DIMUTASI (DONE_SETUP) -> JANGAN MASUKKAN LAGI
+            # Ambil mode filter aktif (Default: BARUSAN_5)
+            filter_waktu_mode = self.iv_filter_waktu() if hasattr(self, "iv_filter_waktu") else "BARUSAN_5"
+
             transit_records = []
             mutasi_5cols_records = []
             valid_need_setup = []
@@ -7402,16 +7421,38 @@ class AppState:
             for r in need_setup_sorted:
                 r_id = str(r.get("id"))
                 
-                # 🛑 FILTER 1: Jika sudah dimutasi atau sudah selesai, abaikan!
+                # 🛑 1. Abaikan jika sudah selesai dimutasi
                 if r.get("status") == "DONE_SETUP" or r.get("setup_done_at") or (r_id and r_id in done_ids):
                     continue
 
                 raw_bin = str(r.get("bin_code", "-")).replace('[', '').replace(']', '').strip().upper()
                 bin_awal = raw_bin if raw_bin not in ["WAITING OFFLINE", "-", ""] else "STAGING INBOUND"
 
-                # 🛑 FILTER 2: Jika BIN awal dari TOKO, abaikan (tidak perlu di-setup ke GL1)!
+                # 🛑 2. Abaikan jika dari rak TOKO
                 if "TOKO" in bin_awal or bin_awal == "TOKO":
                     continue
+
+                # 🌟 3. FILTER WAKTU SUPER REAL-TIME (< 5 MENIT)
+                diff_mins = get_instock_diff_minutes(r)
+                if filter_waktu_mode == "BARUSAN_5" and diff_mins > 5.0:
+                    continue
+                elif filter_waktu_mode == "BARUSAN_15" and diff_mins > 15.0:
+                    continue
+                elif filter_waktu_mode == "BARUSAN_30" and diff_mins > 30.0:
+                    continue
+
+                # Badge label durasi real-time
+                if diff_mins < 1.0:
+                    aging_badge = "🔥 Baru Saja (< 1m)"
+                elif diff_mins <= 5.0:
+                    aging_badge = f"🔥 {int(diff_mins)}m lalu"
+                elif diff_mins <= 15.0:
+                    aging_badge = f"🟢 {int(diff_mins)}m lalu"
+                elif diff_mins <= 30.0:
+                    aging_badge = f"⚡ {int(diff_mins)}m lalu"
+                else:
+                    hrs = int(diff_mins // 60)
+                    aging_badge = f"⚪ {hrs}j lalu"
 
                 q = safe_int(r.get("qty", 1), 1)
                 sku_clean = str(r.get("barcode_sku", "-")).split('.')[0].strip().upper()
@@ -7419,21 +7460,22 @@ class AppState:
 
                 valid_need_setup.append(r)
 
-                # Tab 1: Monitor Lengkap (Ada Jam Hilang & Nama Artikel)
+                # Tab 1: Monitor Lengkap
                 transit_records.append({
+                    "STATUS INSTOCK": aging_badge,
                     "JAM HILANG": disappeared_time,
                     "BIN AWAL": bin_awal,
-                    "BIN TUJUAN": "GL1-INSTOCK",
+                    "BIN TUJUAN": "STAGING INSTOCK",
                     "SKU": sku_clean,
                     "NAMA ARTIKEL": str(r.get("article_name", "-")),
                     "QUANTITY": q,
                     "NOTES": "TRANSIT INSTOCK"
                 })
 
-                # Tab 3: Khusus Item Mutasi (HANYA 5 KOLOM FORMAT RESMI JEZPRO)
+                # Tab 3: Khusus Item Mutasi (5 Kolom Murni)
                 mutasi_5cols_records.append({
                     "BIN AWAL": bin_awal,
-                    "BIN TUJUAN": "GL1-INSTOCK",
+                    "BIN TUJUAN": "STAGING INSTOCK",
                     "SKU": sku_clean,
                     "QUANTITY": q,
                     "NOTES": "TRANSIT INSTOCK"

@@ -5632,6 +5632,13 @@ def server(input: Inputs, output: Outputs, session: Session):
             ui.notification_show(f"⚠️ {msg}", type="warning", duration=4)
 
 
+    @reactive.Effect
+    @reactive.event(input.change_iv_filter_waktu)
+    def _on_iv_filter_waktu_change():
+        val = input.change_iv_filter_waktu()
+        state.iv_filter_waktu.set(val)
+        state.load_instock_daily_from_supabase()
+
     @render.ui
     def instock_validation_results_container():
         if not state.iv_processed():
@@ -5642,6 +5649,8 @@ def server(input: Inputs, output: Outputs, session: Session):
         tot_done_rows = len(state.df_iv_done_rows())
         tot_done_qty = state.iv_total_done_qty()
 
+       cur_filter_waktu = state.iv_filter_waktu() if hasattr(state, "iv_filter_waktu") else "BARUSAN_5"
+
         # 3 KARTU METRIK UTAMA
         metric_ui = ui.div(
             dark_metric_box("⏳ PERLU DI-SETUP (GL1)", f"{tot_need_rows:,} BARIS ({tot_need_qty:,} PCS)", "#E53E3E"),
@@ -5650,12 +5659,30 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
         )
 
-        # TAB 1: LIST SETUP (LENGKAP DENGAN JAM HILANG & NAMA ARTIKEL)
+        # BARIS KONTROL FILTER WAKTU INSTOCK (< 5 MENIT)
+        filter_control_bar = ui.div(
+            ui.div(
+                ui.span("⏱️ Filter Waktu Instock:", style="font-size: 12px; font-weight: 800; color: #1A202C; margin-right: 8px;"),
+                ui.tags.select(
+                    ui.tags.option("🔥 Barusan Saja (< 5 Menit)", value="BARUSAN_5", selected=(cur_filter_waktu == "BARUSAN_5")),
+                    ui.tags.option("⚡ 15 Menit Terakhir", value="BARUSAN_15", selected=(cur_filter_waktu == "BARUSAN_15")),
+                    ui.tags.option("⏳ 30 Menit Terakhir", value="BARUSAN_30", selected=(cur_filter_waktu == "BARUSAN_30")),
+                    ui.tags.option("📋 Semua Antrean Hari Ini", value="SEMUA", selected=(cur_filter_waktu == "SEMUA")),
+                    id="iv_filter_waktu_select",
+                    onchange="Shiny.setInputValue('change_iv_filter_waktu', this.value, {priority: 'event'})",
+                    style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; background: white; cursor: pointer; min-width: 220px;"
+                ),
+                style="display: flex; align-items: center;"
+            ),
+            style="display: flex; justify-content: flex-start; align-items: center; width: 100%; margin-bottom: 0.75rem;"
+        )
+        # TAB 1: LIST SETUP (LENGKAP DENGAN STATUS BARUSAN DI-INSTOCK)
         tab1_need = ui.div(
+            filter_control_bar,
             ui.div(
                 ui.div(
                     ui.h4("📋 Antrean Barang Belum Dimutasi (Monitoring)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 2px 0;"),
-                    ui.p("Barang hilang dari Helper Jezpro dan menunggu dimutasi (Terurut item terbaru di paling atas, non-TOKO).", style="color: #718096; font-size: 12px; margin: 0;")
+                    ui.p("Barang yang barusan di-instock ditandai badge '🔥 BARUSAN' dan ditaruh paling atas.", style="color: #718096; font-size: 12px; margin: 0;")
                 ),
                 ui.download_button(
                     "btn_dl_iv_setup",
@@ -5686,12 +5713,13 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="padding: 0.75rem 0;"
         )
 
-        # 🌟 TAB 3: ITEM MUTASI (HANYA 5 KOLOM: BIN AWAL, BIN TUJUAN, SKU, QUANTITY, NOTES)
+        # TAB 3: ITEM MUTASI (HANYA 5 KOLOM)
         tab3_mutasi = ui.div(
+            filter_control_bar,
             ui.div(
                 ui.div(
                     ui.h4("📄 Template Mutasi Jezpro (5 Kolom Bersih)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 2px 0;"),
-                    ui.p("Format standar bersih siap upload ke menu Mutasi Bin Jezpro (Hanya BIN AWAL, BIN TUJUAN, SKU, QUANTITY, NOTES).", style="color: #718096; font-size: 12px; margin: 0;")
+                    ui.p("Format bersih siap upload ke menu Mutasi Bin Jezpro (Hanya BIN AWAL, BIN TUJUAN, SKU, QUANTITY, NOTES).", style="color: #718096; font-size: 12px; margin: 0;")
                 ),
                 ui.download_button(
                     "btn_dl_iv_mutasi_5col",
