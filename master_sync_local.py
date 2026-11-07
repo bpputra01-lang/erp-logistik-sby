@@ -45,7 +45,7 @@ HEADERS_SB = {
 }
 
 # ==============================================================================
-# HELPER PEMBERSIH & PARSER UNIVERSAL (DIPERBAIKI)
+# HELPER PEMBERSIH & PARSER UNIVERSAL
 # ==============================================================================
 def strip_html(val):
     if not val: return ""
@@ -155,7 +155,9 @@ def create_jezpro_session():
     }, timeout=20)
     print("✅ Berhasil login Jezpro!")
 
+    # Inisialisasi route halaman-halaman penting
     session.get("https://jezpro.id/helper_backup", timeout=15)
+    session.get("https://jezpro.id/setup_lokasi_stok_v2", timeout=15) # 🌟 WAJIB: Aktifkan sesi mutasi
     session.get("https://jezpro.id/transfer_stok", timeout=15)
     session.get("https://jezpro.id/mass_adjustment", timeout=15)
     session.get("https://jezpro.id/adjustment", timeout=15)
@@ -163,13 +165,13 @@ def create_jezpro_session():
     return session
 
 # ==============================================================================
-# MODUL 1: INSTOCK DAILY SURABAYA (TIAP 45 DETIK + CLEANUP + SORTING)
+# MODUL 1: INSTOCK DAILY SURABAYA (TIAP 45 DETIK + VERIFIKASI MUTASI VALID)
 # ==============================================================================
 def run_module_instock_daily(session):
     now_wib = datetime.now(WIB)
     today_str = now_wib.strftime("%Y-%m-%d")
 
-    # 1. Bersihkan data sebelum hari ini di Supabase
+    # 1. Bersihkan data hari kemarin di Supabase
     try:
         cleanup_url = f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?sync_date=lt.{today_str}"
         requests.delete(cleanup_url, headers=HEADERS_SB, timeout=10)
@@ -268,7 +270,9 @@ def run_module_instock_daily(session):
 
     for tr in tracking_today:
         sku = tr["sku"]
-        jam_transaksi_iso = (tr["dt_wib"] or now_wib).isoformat()
+        # Waktu Instock = Waktu real-time sekarang agar jam hilang di web cocok dengan WIB
+        jam_instock_now = now_wib.isoformat()
+        jam_transaksi_asal = (tr["dt_wib"] or now_wib).isoformat()
         lokasi_bin = tr["location"]
 
         if tr["is_instock"]:
@@ -278,37 +282,37 @@ def run_module_instock_daily(session):
                 patch_url = f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?id=eq.{t_id}" if t_id else f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?barcode_sku=eq.{sku}&sync_date=eq.{today_str}&status=eq.WAITING%20OFFLINE"
                 patch_payload = {
                     "status": "NEED_SETUP",
-                    "disappeared_at": jam_transaksi_iso,
+                    "disappeared_at": jam_instock_now,
                     "bin_code": lokasi_bin
                 }
                 res_patch = requests.patch(patch_url, headers=HEADERS_SB, json=patch_payload)
                 if res_patch.status_code in [200, 204]:
                     row_target["status"] = "NEED_SETUP"
-                    row_target["disappeared_at"] = jam_transaksi_iso
+                    row_target["disappeared_at"] = jam_instock_now
                     row_target["bin_code"] = lokasi_bin
                     need_setup_in_sb.append(row_target)
-                    print(f"   🚀 [INSTOCK] SKU {sku} (Jam {tr['raw_time']}) di BIN [{lokasi_bin}] ➔ Masuk LIST SET UP!")
+                    print(f"   🚀 [INSTOCK] SKU {sku} di BIN [{lokasi_bin}] ➔ Masuk LIST SET UP!")
             elif sku not in all_sb_skus:
                 new_inserts.append({
                     "id": current_auto_id, "store_id": STORE_ID_SURABAYA, "store_name": BRANCH_SURABAYA,
                     "barcode_sku": sku, "article_name": tr["article"], "bin_code": lokasi_bin,
                     "qty": tr["qty"], "status": "NEED_SETUP", "invoice": "-", "sync_date": today_str,
-                    "created_at": jam_transaksi_iso, "disappeared_at": jam_transaksi_iso,
+                    "created_at": jam_transaksi_asal, "disappeared_at": jam_instock_now,
                     "matched_mutasi_id": None, "setup_done_at": None
                 })
                 current_auto_id += 1
                 all_sb_skus.add(sku)
-                print(f"   📥 [INSTOCK BARU] SKU {sku} (Jam {tr['raw_time']}) ➔ Masuk LIST SET UP!")
+                print(f"   📥 [INSTOCK BARU] SKU {sku} ➔ Masuk LIST SET UP!")
 
     for tr in tracking_today:
         sku = tr["sku"]
-        jam_transaksi_iso = (tr["dt_wib"] or now_wib).isoformat()
+        jam_transaksi_asal = (tr["dt_wib"] or now_wib).isoformat()
         if tr["is_waiting"] and sku not in all_sb_skus:
             new_inserts.append({
                 "id": current_auto_id, "store_id": STORE_ID_SURABAYA, "store_name": BRANCH_SURABAYA,
                 "barcode_sku": sku, "article_name": tr["article"], "bin_code": tr["location"],
                 "qty": tr["qty"], "status": "WAITING OFFLINE", "invoice": "-", "sync_date": today_str,
-                "created_at": jam_transaksi_iso, "disappeared_at": None, "matched_mutasi_id": None, "setup_done_at": None
+                "created_at": jam_transaksi_asal, "disappeared_at": None, "matched_mutasi_id": None, "setup_done_at": None
             })
             current_auto_id += 1
             all_sb_skus.add(sku)
@@ -319,27 +323,44 @@ def run_module_instock_daily(session):
             for ins in new_inserts:
                 if ins["status"] == "NEED_SETUP": need_setup_in_sb.append(ins)
 
-    # 4. Verifikasi Selesai Mutasi ke GL1-INSTOCK (Dengan sorting waktu persis standalone)
+    # 4. 🌟 VERIFIKASI SELESAI MUTASI KE GL1-INSTOCK (DONE_SETUP)
     if need_setup_in_sb:
         url_bin = "https://jezpro.id/bin_history_datatables"
-        params_bin = {"draw": "1", "start": "0", "length": "1000", "st_id": str(STORE_ID_SURABAYA), "date": today_str, "_": int(time.time() * 1000)}
+        params_bin = {
+            "draw": "1", "start": "0", "length": "1000",
+            "st_id": str(STORE_ID_SURABAYA), "date": today_str,
+            "_": int(time.time() * 1000)
+        }
+        # 🌟 WAJIB: Header AJAX XMLHttpRequest agar Jezpro mengirimkan data JSON
+        headers_bin = {
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "X-Requested-With": "XMLHttpRequest",
+            "Referer": "https://jezpro.id/setup_lokasi_stok_v2"
+        }
         try:
-            r_bin = session.get(url_bin, params=params_bin, headers={"Accept": "application/json", "Referer": "https://jezpro.id/setup_lokasi_stok_v2"}, timeout=20)
+            r_bin = session.get(url_bin, params=params_bin, headers=headers_bin, timeout=20)
             mutasi_raw = r_bin.json().get("data", []) if r_bin.status_code == 200 else []
-        except Exception:
+        except Exception as e_bin:
+            print(f"   ⚠️ Gagal menarik riwayat mutasi bin Jezpro: {e_bin}")
             mutasi_raw = []
 
         mutasi_today = []
         for m in mutasi_raw:
-            m_time = strip_html(m.get("pm_created_at") or "")
-            mutasi_today.append({
-                "pmt_id": str(strip_html(m.get("pmt_id") or m.get("DT_RowIndex") or "")),
-                "sku": clean_sku_key(m.get("ps_barcode") or m.get("barcode")),
-                "bin_tujuan": clean_bin(m.get("end_bin")),
-                "pmt_qty": safe_int_val(m.get("pmt_qty"), 0),
-                "pm_created_at": m_time,
-                "dt_wib": parse_wib_datetime(m_time) or now_wib
-            })
+            m_time = strip_html(m.get("pm_created_at") or m.get("created_at") or "")
+            # Tangkap fleksibel semua kemungkinan nama key kolom dari Jezpro
+            sku_val = clean_sku_key(m.get("ps_barcode") or m.get("barcode") or m.get("sku") or "")
+            bin_tujuan = clean_bin(m.get("end_bin") or m.get("bin_end") or m.get("pl_code_end") or m.get("pl_code") or "")
+            qty_mts = safe_int_val(m.get("pmt_qty") or m.get("qty") or m.get("qty_mts"), 1)
+
+            if sku_val:
+                mutasi_today.append({
+                    "pmt_id": str(strip_html(m.get("pmt_id") or m.get("DT_RowIndex") or m.get("id") or "")),
+                    "sku": sku_val,
+                    "bin_tujuan": bin_tujuan,
+                    "pmt_qty": qty_mts,
+                    "pm_created_at": m_time,
+                    "dt_wib": parse_wib_datetime(m_time) or now_wib
+                })
 
         # Urutkan berdasarkan waktu mutasi
         mutasi_today = sorted(mutasi_today, key=lambda x: x["dt_wib"])
@@ -351,30 +372,42 @@ def run_module_instock_daily(session):
 
             for m in mutasi_today:
                 m_id = m["pmt_id"]
-                if m_id in used_mutasi_ids: continue
-                if m["sku"] == t_sku and ("GL1-INSTOCK" in m["bin_tujuan"] or "INSTOCK" in m["bin_tujuan"]) and m["pmt_qty"] >= t_qty:
-                    matched_m = m; break
+                if m_id and m_id in used_mutasi_ids:
+                    continue
+
+                sku_match = (m["sku"] == t_sku)
+                bin_tujuan_match = ("GL1-INSTOCK" in m["bin_tujuan"] or "INSTOCK" in m["bin_tujuan"])
+                qty_match = (m["pmt_qty"] >= t_qty)
+
+                if sku_match and bin_tujuan_match and qty_match:
+                    matched_m = m
+                    break
 
             if matched_m:
-                used_mutasi_ids.add(matched_m["pmt_id"])
+                if matched_m["pmt_id"]:
+                    used_mutasi_ids.add(matched_m["pmt_id"])
                 t_id = target.get("id")
                 patch_url = f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?id=eq.{t_id}" if t_id else f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?barcode_sku=eq.{t_sku}&sync_date=eq.{today_str}&status=eq.NEED_SETUP"
-                requests.patch(patch_url, headers=HEADERS_SB, json={
+                
+                res_patch_done = requests.patch(patch_url, headers=HEADERS_SB, json={
                     "status": "DONE_SETUP",
                     "matched_mutasi_id": matched_m["pmt_id"],
                     "setup_done_at": matched_m["pm_created_at"]
                 })
-                print(f"   🎉 [DONE SETUP] SKU {t_sku} ➔ Selesai Mutasi ke GL1-INSTOCK!")
+                if res_patch_done.status_code in [200, 204]:
+                    print(f"   🎉 [DONE SETUP] SKU {t_sku} ➔ Selesai Mutasi ke GL1-INSTOCK ({matched_m['pm_created_at']})!")
+                else:
+                    print(f"   ⚠️ Gagal update DONE_SETUP ke Supabase: {res_patch_done.text}")
 
 # ==============================================================================
-# MODUL 2: WAREHOUSE ACTIVITY MONITOR (LENGKAP: PAGINATION & FILTER >= 2026)
+# MODUL 2: WAREHOUSE ACTIVITY MONITOR (ALL AREA)
 # ==============================================================================
 def run_module_warehouse_monitor(session):
     print(f"\n📊 [{datetime.now(WIB).strftime('%H:%M:%S')}] Memulai Sinkronisasi Warehouse Activity Monitor (All Area)...")
     headers_req = {"Accept": "application/json, text/javascript, */*; q=0.01", "X-Requested-With": "XMLHttpRequest"}
     now_wib = datetime.now(WIB).replace(tzinfo=None)
 
-    # 1. Staging / Waiting / Refund dari Stock Tracking (All Cabang)
+    # 1. Staging / Waiting / Refund dari Stock Tracking
     url_stg = "https://jezpro.id/stock_tracking_datatables"
     date_range = "2026-01-01|2030-12-31"
     query_targets = [
@@ -431,7 +464,6 @@ def run_module_warehouse_monitor(session):
 
                 dt_raw = strip_html(item.get("datetime") or item.get("plst_created") or "")
 
-                # Filter Dokumen >= 2026
                 doc_year = None
                 for fmt in ("%d/%m/%Y %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%d-%m-%Y %H:%M:%S", "%d/%m/%Y", "%Y-%m-%d"):
                     try:
@@ -471,7 +503,7 @@ def run_module_warehouse_monitor(session):
                 })
             time.sleep(0.04)
 
-    # 2. Transfer Stok (All Store History DENGAN PAGINATION LENGKAP)
+    # 2. Transfer Stok
     url_tf = "https://jezpro.id/transfer_history_datatables"
     open_tf_headers, open_tf_items = [], []
     try:
@@ -526,7 +558,6 @@ def run_module_warehouse_monitor(session):
                 "aging_hours": float(aging_jam), "synced_at": now_wib.isoformat()
             })
 
-            # Tarik detail item transfer LENGKAP dengan Pagination Loop
             start_it, chunk_it = 0, 250
             while True:
                 p_det = {"draw": "1", "start": str(start_it), "length": str(chunk_it), "stf_code": tf_code}
@@ -558,7 +589,7 @@ def run_module_warehouse_monitor(session):
     except Exception as e:
         print(f"   ⚠️ Transfer error: {e}")
 
-    # 3. Multiple Adjustment (All Store Menggantung DENGAN PAGINATION & FILTER 2026)
+    # 3. Multiple Adjustment
     url_ma = "https://jezpro.id/mass_adjustment_datatables"
     open_ma_headers, open_ma_items = [], []
     try:
@@ -618,7 +649,6 @@ def run_module_warehouse_monitor(session):
                 "status_category": "MENGGANTUNG", "aging_hours": float(aging_jam), "synced_at": now_wib.isoformat()
             })
 
-            # Rincian item MADJ dengan Pagination Loop
             start_m_it, chunk_m_it = 0, 250
             while True:
                 p_mdet = {"draw": "1", "start": str(start_m_it), "length": str(chunk_m_it), "ma_id": str(ma_id_val)}
@@ -647,7 +677,7 @@ def run_module_warehouse_monitor(session):
     except Exception as e:
         print(f"   ⚠️ MADJ error: {e}")
 
-    # 4. Single Adjustment (All Store Need Approval DENGAN PAGINATION & PROOF_FILE)
+    # 4. Single Adjustment
     url_single = "https://jezpro.id/adjustment_history_datatables"
     clean_single_records = []
     for branch_name, b_info in BRANCH_MAP.items():
@@ -731,7 +761,7 @@ def run_module_warehouse_monitor(session):
         print(f"   ❌ Gagal update Supabase monitor: {e}")
 
 # ==============================================================================
-# MODUL 3: MEMO MARKOM SPREADSHEET (LENGKAP: DIFF CHECK & FALLBACK RETRY)
+# MODUL 3: MEMO MARKOM SPREADSHEET
 # ==============================================================================
 def run_module_memo_markom():
     if not SPREADSHEET_URL or "http" not in SPREADSHEET_URL:
@@ -809,7 +839,6 @@ def run_module_memo_markom():
                 exist = existing_memos[key_m]
                 if str(exist.get("status_adj", "PENDING")).upper() == "DONE": continue
 
-                # Diff check: Hanya patch jika ada item/qty/nominal yang berubah!
                 existing_items = exist.get("items", [])
                 if isinstance(existing_items, str):
                     try: existing_items = json.loads(existing_items)
@@ -844,120 +873,7 @@ def run_module_memo_markom():
         print(f"   ⚠️ Memo Markom error: {e}")
 
 # ==============================================================================
-# MODUL 4 & 5: EXPORT STOK 9 CABANG & BALANCING SURABAYA
-# ==============================================================================
-def run_module_exports_and_balancing(session):
-    print(f"\n📦 [{datetime.now(WIB).strftime('%H:%M:%S')}] Memulai Ekspor Stok 9 Cabang & Balancing Surabaya...")
-
-    # 1. Ekspor Stok Seluruh 9 Cabang Jezpro -> stock_live_cache
-    for branch_name, info in BRANCH_MAP.items():
-        st_id = info["st_id"]
-        db_id = info["db_id"]
-        try:
-            print(f"   -> Ekspor Stok {branch_name} (st_id: {st_id})...")
-            url_exp = f"https://jezpro.id/export_mass_adjustment_template?st_id={st_id}&psc_id=&br_id=&pl_id=&qty_filter=1"
-            r_exp = session.get(url_exp, headers={"Referer": "https://jezpro.id/mass_adjustment"}, timeout=300)
-            excel_bytes = None
-
-            if "application/json" in r_exp.headers.get("Content-Type", ""):
-                notif_id = r_exp.json().get("notification_id")
-                check_url = f"https://jezpro.id/notifications/{notif_id}/open-export"
-                final_url = ""
-                for _ in range(15):
-                    time.sleep(3)
-                    r_chk = session.get(check_url, allow_redirects=False, timeout=60)
-                    loc = r_chk.headers.get("Location", "")
-                    if r_chk.status_code == 302 and ("neo.id" in loc or "http" in loc):
-                        final_url = loc; break
-
-                if final_url:
-                    excel_bytes = requests.get(final_url, timeout=300).content
-            else:
-                excel_bytes = r_exp.content
-
-            if excel_bytes:
-                df_stk = pd.read_excel(io.BytesIO(excel_bytes))
-                df_stk["STORE_NAME"] = branch_name
-                payload = df_stk.fillna("").to_dict(orient="records")
-                requests.post(f"{SUPABASE_URL}/rest/v1/stock_live_cache", headers=HEADERS_SB, json={
-                    "id": db_id, "branch": branch_name, "updated_at": datetime.now(WIB).isoformat(),
-                    "total_rows": len(payload), "stock_data": payload
-                }, timeout=120)
-                print(f"      ✅ Berhasil simpan {len(payload):,} baris ({branch_name})")
-
-                # Jika Surabaya, simpan juga untuk balancing_stock_cache
-                if st_id == STORE_ID_SURABAYA:
-                    requests.post(f"{SUPABASE_URL}/rest/v1/balancing_stock_cache", headers=HEADERS_SB, json={
-                        "id": "SURABAYA_BALANCING_STOCK", "branch": BRANCH_SURABAYA,
-                        "updated_at": datetime.now(WIB).isoformat(), "total_rows": len(payload),
-                        "stock_data": payload
-                    }, timeout=120)
-        except Exception as e:
-            print(f"      ⚠️ Gagal ekspor {branch_name}: {e}")
-
-    # 2. Tarik Riwayat Penjualan Surabaya 60 Hari (INV vs Non-INV) -> balancing_sales_cache
-    try:
-        now_dt = datetime.now()
-        p_start = (now_dt - timedelta(days=60)).strftime('%Y-%m-%d')
-        p_end = now_dt.strftime('%Y-%m-%d')
-        date_param = f"{p_start}|{p_end}"
-
-        print(f"   -> Menarik Sales 60 Hari Surabaya ({date_param})...")
-        url_dt = "https://jezpro.id/stock_tracking_datatables"
-        headers_dt = {"Accept": "application/json, text/javascript, */*; q=0.01", "X-Requested-With": "XMLHttpRequest"}
-
-        sales_by_sku = {}
-        start_row, total_expected = 0, 999999
-        draw_count, total_sales_rows = 1, 0
-
-        while start_row < total_expected:
-            params = {
-                "draw": str(draw_count), "start": str(start_row), "length": "2000",
-                "status": "DONE", "st_id": str(STORE_ID_SURABAYA), "date": date_param,
-                "order[0][column]": "0", "order[0][dir]": "desc"
-            }
-            res_s = session.get(url_dt, params=params, headers=headers_dt, timeout=60)
-            if res_s.status_code != 200: break
-            j_data = res_s.json()
-            chunk = j_data.get("data", [])
-            total_expected = j_data.get("recordsFiltered", j_data.get("recordsTotal", 0))
-            if not chunk: break
-
-            for item in chunk:
-                if "DONE" not in strip_html(item.get("status") or "").upper(): continue
-                sku = clean_sku_key(item.get("ps_barcode"))
-                if not sku: continue
-                q_val = safe_int(item.get("qty"), 1)
-                inv_val = strip_html(item.get("invoice") or "").upper()
-                is_onl = ("INV" not in inv_val)
-
-                if sku not in sales_by_sku:
-                    sales_by_sku[sku] = {
-                        "SKU": sku, "ARTICLE": clean_article_name(item.get("article") or item.get("p_name")),
-                        "SALES_OFFLINE": 0, "SALES_ONLINE": 0, "TOTAL_SALES": 0
-                    }
-                if is_onl: sales_by_sku[sku]["SALES_ONLINE"] += q_val
-                else: sales_by_sku[sku]["SALES_OFFLINE"] += q_val
-                sales_by_sku[sku]["TOTAL_SALES"] += q_val
-                total_sales_rows += 1
-
-            start_row += len(chunk)
-            draw_count += 1
-            time.sleep(0.02)
-
-        summary_sales = list(sales_by_sku.values())
-        requests.post(f"{SUPABASE_URL}/rest/v1/balancing_sales_cache", headers=HEADERS_SB, json={
-            "id": "SURABAYA_SALES_90D", "branch": BRANCH_SURABAYA, "period_start": p_start, "period_end": p_end,
-            "updated_at": datetime.now(WIB).isoformat(), "total_rows": total_sales_rows, "sales_data": summary_sales
-        }, timeout=120)
-        print(f"      ✅ Sales Balancing Disimpan ({len(summary_sales):,} SKU aktif terjual)")
-    except Exception as e:
-        print(f"      ⚠️ Gagal balancing sales: {e}")
-
-# ==============================================================================
-# FUNGSI SCRAPING STOCK TRACKING SALES SURABAYA (HANYA ST_ID = 3)
-# ATURAN: Mengandung 'INV' = OFFLINE, Tanpa 'INV' = ONLINE
-# FILTER: Status mengandung kata 'DONE'
+# FUNGSI SCRAPING STOCK TRACKING SALES SURABAYA (MURNI ST_ID = 3)
 # ==============================================================================
 def fetch_surabaya_sales_2months(session):
     now_dt = datetime.now(WIB)
@@ -988,8 +904,7 @@ def fetch_surabaya_sales_2months(session):
     draw_count = 1
 
     while start_row < total_expected:
-        # 🌟 WAJIB: columns[0] s/d columns[9] lengkap agar tidak error 500
-        # 🌟 KUNCI: status dikosongkan ("") agar Jezpro mengirim 'DONE' sekaligus 'DONE ONLINE'
+        # 🌟 WAJIB: columns[0] s/d columns[9] lengkap & status="" agar DONE ONLINE ikut masuk
         params = {
             "draw": str(draw_count),
             "columns[0][data]": "DT_RowIndex", "columns[0][name]": "plst_id", "columns[0][searchable]": "false", "columns[0][orderable]": "true", "columns[0][search][value]": "", "columns[0][search][regex]": "false",
@@ -1007,12 +922,12 @@ def fetch_surabaya_sales_2months(session):
             "start": str(start_row),
             "length": str(batch_size),
             "search": "",
-            "status": "",  # 🌟 KOSONGKAN agar server mengirim DONE dan DONE ONLINE
+            "status": "",  # 🌟 KOSONGKAN: Ambil DONE kasir toko dan DONE ONLINE marketplace
             "instock_source": "",
             "psc_id": "",
             "std_id": "",
             "br_id": "",
-            "st_id": str(STORE_ID_SURABAYA),  # 🌟 MURNI HANYA st_id = 3
+            "st_id": str(STORE_ID_SURABAYA),
             "date": date_param
         }
 
@@ -1032,7 +947,7 @@ def fetch_surabaya_sales_2months(session):
             for item in chunk:
                 status_raw = strip_html(item.get("status") or item.get("plst_status") or "").upper()
                 
-                # 🌟 Filter Python: Ambil semua yang mengandung kata DONE (DONE dan DONE ONLINE)
+                # Saring hanya yang sudah berstatus DONE (DONE & DONE ONLINE)
                 if "DONE" not in status_raw:
                     continue
 
@@ -1044,9 +959,7 @@ def fetch_surabaya_sales_2months(session):
                 qty_val = safe_int(item.get("qty"), 1)
                 inv_val = strip_html(item.get("invoice") or "").upper()
 
-                # 🌟 ATURAN RESMI ANDA:
-                # Mengandung 'INV' -> Offline Kasir
-                # Tanpa 'INV'      -> Online Marketplace
+                # Aturan: Mengandung 'INV' = Offline, Tanpa 'INV' = Online
                 is_online = ("INV" not in inv_val)
 
                 if is_online:
@@ -1073,7 +986,7 @@ def fetch_surabaya_sales_2months(session):
 
             start_row += len(chunk)
             draw_count += 1
-            print(f"      -> Berhasil memproses {start_row:,} / {total_expected:,} baris pergerakan...")
+            print(f"      -> Berhasil memproses {start_row:,} / {total_expected:,} baris transaksi...")
             time.sleep(0.02)
 
         except Exception as e:
@@ -1082,7 +995,7 @@ def fetch_surabaya_sales_2months(session):
 
     summary_sales = list(sales_by_sku.values())
 
-    # Kirim ke Supabase
+    # Simpan ke Supabase
     if summary_sales:
         res_push = requests.post(f"{SUPABASE_URL}/rest/v1/balancing_sales_cache", headers=HEADERS_SB, json={
             "id": "SURABAYA_SALES_90D",
@@ -1102,13 +1015,12 @@ def fetch_surabaya_sales_2months(session):
         else:
             print(f"   ❌ Gagal simpan ke Supabase: {res_push.text}")
     else:
-        print("   ⚠️ Peringatan: Tidak ada data transaksi yang ditemukan.")
+        print("   ⚠️ Peringatan: Tidak ada data transaksi sales yang ditarik.")
 
     return summary_sales
 
-
 # ==============================================================================
-# MODUL 4 & 5: EXPORT STOK 9 CABANG & BALANCING SURABAYA
+# MODUL 4 & 5: EXPORT STOK 9 CABANG & BALANCING SURABAYA (SATU FUNGSI BERSIH)
 # ==============================================================================
 def run_module_exports_and_balancing(session):
     print(f"\n📦 [{datetime.now(WIB).strftime('%H:%M:%S')}] Memulai Ekspor Stok 9 Cabang & Balancing Surabaya...")
@@ -1159,7 +1071,7 @@ def run_module_exports_and_balancing(session):
         except Exception as e:
             print(f"      ⚠️ Gagal ekspor {branch_name}: {e}")
 
-    # 2. 🌟 PANGGIL FUNGSI SCRAPING STOCK TRACKING PENJUALAN YANG SUDAH VALID
+    # 2. Tarik Riwayat Penjualan Surabaya 60 Hari (Memanggil fungsi mandiri yang benar)
     try:
         fetch_surabaya_sales_2months(session)
     except Exception as e:
@@ -1181,7 +1093,7 @@ def thread_instock_worker(session):
 # ==============================================================================
 if __name__ == "__main__":
     print("=" * 75)
-    print("🚀 MASTER LOCAL ORCHESTRATOR: JEZPRO -> SUPABASE (VERSI LENGKAP & FIX)")
+    print("🚀 MASTER LOCAL ORCHESTRATOR: JEZPRO -> SUPABASE (VERSI FIX VS CODE)")
     print("=" * 75)
 
     jez = create_jezpro_session()
