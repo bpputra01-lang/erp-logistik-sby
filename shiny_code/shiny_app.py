@@ -5642,6 +5642,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         tot_done_rows = len(state.df_iv_done_rows())
         tot_done_qty = state.iv_total_done_qty()
 
+        # 3 KARTU METRIK UTAMA
         metric_ui = ui.div(
             dark_metric_box("⏳ PERLU DI-SETUP (GL1)", f"{tot_need_rows:,} BARIS ({tot_need_qty:,} PCS)", "#E53E3E"),
             dark_metric_box("✅ DONE SETUP (VALID HARI INI)", f"{tot_done_rows:,} BARIS ({tot_done_qty:,} PCS)", "#10B981"),
@@ -5649,12 +5650,12 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
         )
 
-        # TAB 1: LIST SETUP (LENGKAP UNTUK MONITORING)
+        # TAB 1: LIST SETUP (LENGKAP DENGAN JAM HILANG & NAMA ARTIKEL)
         tab1_need = ui.div(
             ui.div(
                 ui.div(
-                    ui.h4("📋 Antrean Barang Belum Dimutasi", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 2px 0;"),
-                    ui.p("Barang ini sudah hilang dari Helper Jezpro dan menunggu dimutasi ke GL1-INSTOCK (Terurut jam terbaru).", style="color: #718096; font-size: 12px; margin: 0;")
+                    ui.h4("📋 Antrean Barang Belum Dimutasi (Monitoring)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 2px 0;"),
+                    ui.p("Barang hilang dari Helper Jezpro dan menunggu dimutasi (Terurut item terbaru di paling atas, non-TOKO).", style="color: #718096; font-size: 12px; margin: 0;")
                 ),
                 ui.download_button(
                     "btn_dl_iv_setup",
@@ -5672,7 +5673,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             ui.div(
                 ui.div(
                     ui.h4("✅ Riwayat Mutasi Sukses Tervalidasi", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 2px 0;"),
-                    ui.p("Barang yang mutasinya sudah diverifikasi cocok dengan riwayat Jezpro pada jam yang sesuai.", style="color: #718096; font-size: 12px; margin: 0;")
+                    ui.p("Barang yang mutasinya sudah diverifikasi cocok dengan riwayat Jezpro.", style="color: #718096; font-size: 12px; margin: 0;")
                 ),
                 ui.download_button(
                     "btn_dl_iv_done",
@@ -5689,8 +5690,8 @@ def server(input: Inputs, output: Outputs, session: Session):
         tab3_mutasi = ui.div(
             ui.div(
                 ui.div(
-                    ui.h4("📄 Template Mutasi Jezpro (5 Kolom Murni)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 2px 0;"),
-                    ui.p("Format standar bersih siap upload ke Jezpro (Hanya BIN AWAL, BIN TUJUAN, SKU, QUANTITY, NOTES).", style="color: #718096; font-size: 12px; margin: 0;")
+                    ui.h4("📄 Template Mutasi Jezpro (5 Kolom Bersih)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 2px 0;"),
+                    ui.p("Format standar bersih siap upload ke menu Mutasi Bin Jezpro (Hanya BIN AWAL, BIN TUJUAN, SKU, QUANTITY, NOTES).", style="color: #718096; font-size: 12px; margin: 0;")
                 ),
                 ui.download_button(
                     "btn_dl_iv_mutasi_5col",
@@ -5714,7 +5715,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
         )
 
-    # 🌟 Handler Download File Excel 5 Kolom Tab 3
+    # Handler Download File Excel 5 Kolom Tab 3
     @render.download(
         filename=lambda: f"TEMPLATE_MUTASI_JEZPRO_5KOLOM_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
     )
@@ -5724,7 +5725,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             state._raw_df_iv_mutasi.to_excel(writer, sheet_name='TEMPLATE_MUTASI', index=False)
         buf.seek(0)
         yield buf.getvalue()
-        
+
     @render.download(
         filename=lambda: f"DONE_SETUP_INSTOCK_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
     )

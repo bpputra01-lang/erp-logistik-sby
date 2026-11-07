@@ -7329,8 +7329,11 @@ class AppState:
             return False, f"Gagal mengembalikan memo: {e}"
 
 
+    # --------------------------------------------------------------------------
+    # METODE INSTOCK VALIDATION (URUT TERBARU DI ATAS, ABAIKAN TOKO & DONE, TAB 3 5-KOLOM)
+    # --------------------------------------------------------------------------
     def load_instock_daily_from_supabase(self):
-        """Memuat antrean barang (Urutan Teratas = Jam Instock Terbaru + Tab 3 Khusus 5 Kolom)"""
+        """Memuat antrean barang (Item paling baru di-instock selalu di baris paling atas)"""
         try:
             client = get_supabase()
             if not client:
@@ -7340,11 +7343,11 @@ class AppState:
             res = client.table("jezpro_instock_daily")\
                         .select("*")\
                         .eq("sync_date", today_str)\
-                        .order("id", desc=True)\
                         .execute()
             
             all_data = res.data if res and hasattr(res, "data") and res.data else []
 
+            # Helper konversi UTC Supabase ke Jam WIB (GMT+7)
             def format_to_wib_time(ts_val):
                 if not ts_val or str(ts_val).strip() in ["", "-", "None", "nan"]:
                     return "-"
@@ -7359,36 +7362,64 @@ class AppState:
                     s = str(ts_val)
                     return s[11:19] if len(s) >= 19 else s
 
-            need_setup = [x for x in all_data if x.get("status") == "NEED_SETUP"]
-            done_setup = [x for x in all_data if x.get("status") == "DONE_SETUP"]
+            # Helper sorting objek waktu presisi (Parsing ke datetime WIB)
+            def get_sort_datetime(r):
+                ts = r.get("disappeared_at") or r.get("created_at")
+                if not ts or str(ts).strip() in ["", "-", "None", "nan"]:
+                    return pd.Timestamp.min
+                try:
+                    dt = pd.to_datetime(ts)
+                    if dt.tzinfo is not None:
+                        dt = dt.tz_convert("Asia/Jakarta").tz_localize(None)
+                    return dt
+                except Exception:
+                    return pd.Timestamp.min
 
-            # 🌟 1. URUTKAN: JAM INSTOCK TERBARU PASTI DI PALING ATAS
-            need_setup = sorted(
-                need_setup,
-                key=lambda x: str(x.get("disappeared_at") or ""),
+            need_setup_raw = [x for x in all_data if x.get("status") == "NEED_SETUP"]
+            done_setup_raw = [x for x in all_data if x.get("status") == "DONE_SETUP"]
+
+            done_ids = set(str(d.get("id")) for d in done_setup_raw if d.get("id"))
+
+            # 🌟 1. URUTKAN: ITEM TERBARU MUNCUL DI LIST SETUP SELALU DITARUH PALING ATAS
+            need_setup_sorted = sorted(
+                need_setup_raw,
+                key=lambda x: (get_sort_datetime(x), safe_int(x.get("id", 0))),
                 reverse=True
             )
-            done_setup = sorted(
-                done_setup,
-                key=lambda x: str(x.get("setup_done_at") or x.get("disappeared_at") or ""),
+            done_setup_sorted = sorted(
+                done_setup_raw,
+                key=lambda x: (get_sort_datetime(x), safe_int(x.get("id", 0))),
                 reverse=True
             )
 
-            self.iv_instock_data.set(need_setup)
-            self.iv_done_data.set(done_setup)
-
-            # 🌟 2. SUSUN TAB 1 (MONITORING LENGKAP) & TAB 3 (HANYA 5 KOLOM)
+            # 🌟 2. FILTER KETAT:
+            # - JIKA BIN AWAL MENGANDUNG "TOKO" -> ABAIKAN
+            # - JIKA SUDAH DIMUTASI (DONE_SETUP) -> JANGAN MASUKKAN LAGI
             transit_records = []
             mutasi_5cols_records = []
+            valid_need_setup = []
 
-            for r in need_setup:
-                q = safe_int(r.get("qty", 1), 1)
+            for r in need_setup_sorted:
+                r_id = str(r.get("id"))
+                
+                # 🛑 FILTER 1: Jika sudah dimutasi atau sudah selesai, abaikan!
+                if r.get("status") == "DONE_SETUP" or r.get("setup_done_at") or (r_id and r_id in done_ids):
+                    continue
+
                 raw_bin = str(r.get("bin_code", "-")).replace('[', '').replace(']', '').strip().upper()
                 bin_awal = raw_bin if raw_bin not in ["WAITING OFFLINE", "-", ""] else "STAGING INBOUND"
+
+                # 🛑 FILTER 2: Jika BIN awal dari TOKO, abaikan (tidak perlu di-setup ke GL1)!
+                if "TOKO" in bin_awal or bin_awal == "TOKO":
+                    continue
+
+                q = safe_int(r.get("qty", 1), 1)
                 sku_clean = str(r.get("barcode_sku", "-")).split('.')[0].strip().upper()
                 disappeared_time = format_to_wib_time(r.get("disappeared_at"))
 
-                # Data Tab 1 (Ada Jam Hilang & Nama Artikel)
+                valid_need_setup.append(r)
+
+                # Tab 1: Monitor Lengkap (Ada Jam Hilang & Nama Artikel)
                 transit_records.append({
                     "JAM HILANG": disappeared_time,
                     "BIN AWAL": bin_awal,
@@ -7399,7 +7430,7 @@ class AppState:
                     "NOTES": "TRANSIT INSTOCK"
                 })
 
-                # Data Tab 3 (MURNI HANYA 5 KOLOM FORMAT TEMPLATE JEZPRO)
+                # Tab 3: Khusus Item Mutasi (HANYA 5 KOLOM FORMAT RESMI JEZPRO)
                 mutasi_5cols_records.append({
                     "BIN AWAL": bin_awal,
                     "BIN TUJUAN": "GL1-INSTOCK",
@@ -7408,22 +7439,26 @@ class AppState:
                     "NOTES": "TRANSIT INSTOCK"
                 })
 
+            self.iv_instock_data.set(valid_need_setup)
+            self.iv_done_data.set(done_setup_sorted)
+
+            # Data Tab 1
             df_setup = pd.DataFrame(transit_records)
-            tot_transit = sum(safe_int(x.get("qty", 1), 1) for x in need_setup)
+            tot_transit = sum(safe_int(x.get("qty", 1), 1) for x in valid_need_setup)
             self.iv_total_allocated_qty.set(tot_transit)
             self._raw_df_iv_setup = df_setup
             self.df_iv_setup_headers.set(df_setup.columns.tolist() if not df_setup.empty else [])
             self.df_iv_setup_rows.set(df_setup.fillna("").astype(str).values.tolist() if not df_setup.empty else [])
 
-            # Tab 3 Data
+            # Data Tab 3 (Murni 5 Kolom)
             df_mutasi = pd.DataFrame(mutasi_5cols_records)
             self._raw_df_iv_mutasi = df_mutasi
             self.df_iv_mutasi_headers.set(df_mutasi.columns.tolist() if not df_mutasi.empty else [])
             self.df_iv_mutasi_rows.set(df_mutasi.fillna("").astype(str).values.tolist() if not df_mutasi.empty else [])
 
-            # Tab 2: Done Setup
+            # Data Tab 2 (Done Setup)
             done_records = []
-            for r in done_setup:
+            for r in done_setup_sorted:
                 q_done = safe_int(r.get("qty", 1), 1)
                 done_time = format_to_wib_time(r.get("setup_done_at"))
                 dis_time = format_to_wib_time(r.get("disappeared_at"))
@@ -7440,14 +7475,14 @@ class AppState:
                 })
 
             df_done = pd.DataFrame(done_records)
-            tot_done = sum(safe_int(x.get("qty", 1), 1) for x in done_setup)
+            tot_done = sum(safe_int(x.get("qty", 1), 1) for x in done_setup_sorted)
             self.iv_total_done_qty.set(tot_done)
             self._raw_df_iv_done = df_done
             self.df_iv_done_headers.set(df_done.columns.tolist() if not df_done.empty else [])
             self.df_iv_done_rows.set(df_done.fillna("").astype(str).values.tolist() if not df_done.empty else [])
 
             self.iv_processed.set(True)
-            return True, f"Sinkronisasi berhasil! ({len(need_setup)} Butuh Setup, {len(done_setup)} Selesai)"
+            return True, f"Sinkronisasi berhasil! ({len(valid_need_setup)} Butuh Setup, {len(done_setup_sorted)} Selesai)"
         except Exception as e:
             return False, f"Gagal memuat data: {e}"
 
