@@ -954,8 +954,10 @@ def run_module_exports_and_balancing(session):
     except Exception as e:
         print(f"      ⚠️ Gagal balancing sales: {e}")
 
-     # ==============================================================================
-# FUNGSI SCRAPING STOCK TRACKING SALES BALANCING (LENGKAP DENGAN PARAMETER VALID)
+# ==============================================================================
+# FUNGSI SCRAPING STOCK TRACKING SALES SURABAYA (HANYA ST_ID = 3)
+# ATURAN: Mengandung 'INV' = OFFLINE, Tanpa 'INV' = ONLINE
+# FILTER: Status mengandung kata 'DONE'
 # ==============================================================================
 def fetch_surabaya_sales_2months(session):
     now_dt = datetime.now(WIB)
@@ -964,7 +966,10 @@ def fetch_surabaya_sales_2months(session):
     p_end = now_dt.strftime('%Y-%m-%d')
     date_param = f"{p_start}|{p_end}"
 
-    print(f"\n📊 Menarik Stock Tracking Penjualan 60 Hari Surabaya ({date_param})...")
+    print(f"\n📊 Menarik Stock Tracking Penjualan 60 Hari Surabaya (st_id = 3)...")
+    print(f"   📅 Rentang Tanggal : {date_param}")
+    print(f"   🎯 Logika Pemisah  : Ada 'INV' = Offline | Tanpa 'INV' = Online")
+
     url_dt = "https://jezpro.id/stock_tracking_datatables"
     headers_dt = {
         "Accept": "application/json, text/javascript, */*; q=0.01",
@@ -983,7 +988,8 @@ def fetch_surabaya_sales_2months(session):
     draw_count = 1
 
     while start_row < total_expected:
-        # 🌟 WAJIB: columns[0] s/d columns[9] harus lengkap agar tidak error 500 di Jezpro
+        # 🌟 WAJIB: columns[0] s/d columns[9] lengkap agar tidak error 500
+        # 🌟 KUNCI: status dikosongkan ("") agar Jezpro mengirim 'DONE' sekaligus 'DONE ONLINE'
         params = {
             "draw": str(draw_count),
             "columns[0][data]": "DT_RowIndex", "columns[0][name]": "plst_id", "columns[0][searchable]": "false", "columns[0][orderable]": "true", "columns[0][search][value]": "", "columns[0][search][regex]": "false",
@@ -1001,12 +1007,12 @@ def fetch_surabaya_sales_2months(session):
             "start": str(start_row),
             "length": str(batch_size),
             "search": "",
-            "status": "DONE",
+            "status": "",  # 🌟 KOSONGKAN agar server mengirim DONE dan DONE ONLINE
             "instock_source": "",
             "psc_id": "",
             "std_id": "",
             "br_id": "",
-            "st_id": str(STORE_ID_SURABAYA),
+            "st_id": str(STORE_ID_SURABAYA),  # 🌟 MURNI HANYA st_id = 3
             "date": date_param
         }
 
@@ -1025,6 +1031,8 @@ def fetch_surabaya_sales_2months(session):
 
             for item in chunk:
                 status_raw = strip_html(item.get("status") or item.get("plst_status") or "").upper()
+                
+                # 🌟 Filter Python: Ambil semua yang mengandung kata DONE (DONE dan DONE ONLINE)
                 if "DONE" not in status_raw:
                     continue
 
@@ -1035,6 +1043,10 @@ def fetch_surabaya_sales_2months(session):
 
                 qty_val = safe_int(item.get("qty"), 1)
                 inv_val = strip_html(item.get("invoice") or "").upper()
+
+                # 🌟 ATURAN RESMI ANDA:
+                # Mengandung 'INV' -> Offline Kasir
+                # Tanpa 'INV'      -> Online Marketplace
                 is_online = ("INV" not in inv_val)
 
                 if is_online:
@@ -1061,7 +1073,7 @@ def fetch_surabaya_sales_2months(session):
 
             start_row += len(chunk)
             draw_count += 1
-            print(f"      -> Berhasil menarik {start_row:,} / {total_expected:,} baris transaksi...")
+            print(f"      -> Berhasil memproses {start_row:,} / {total_expected:,} baris pergerakan...")
             time.sleep(0.02)
 
         except Exception as e:
@@ -1070,6 +1082,7 @@ def fetch_surabaya_sales_2months(session):
 
     summary_sales = list(sales_by_sku.values())
 
+    # Kirim ke Supabase
     if summary_sales:
         res_push = requests.post(f"{SUPABASE_URL}/rest/v1/balancing_sales_cache", headers=HEADERS_SB, json={
             "id": "SURABAYA_SALES_90D",
@@ -1082,12 +1095,14 @@ def fetch_surabaya_sales_2months(session):
         }, timeout=120)
 
         if res_push.status_code in [200, 201]:
-            print(f"   ✅ Sukses! {len(summary_sales):,} SKU aktif tersimpan ke balancing_sales_cache.")
-            print(f"      🛒 Offline (INV): {total_offline_qty:,} Pcs | 🌐 Online (Non-INV): {total_online_qty:,} Pcs")
+            print(f"\n   🎉 BERHASIL MENYIMPAN PENJUALAN SURABAYA!")
+            print(f"      🏷️ Total SKU Terjual : {len(summary_sales):,} SKU")
+            print(f"      🛒 Total Qty Offline  : {total_offline_qty:,} Pcs (Invoice INV)")
+            print(f"      🌐 Total Qty Online   : {total_online_qty:,} Pcs (Non-INV)")
         else:
             print(f"   ❌ Gagal simpan ke Supabase: {res_push.text}")
     else:
-        print("   ⚠️ Peringatan: Tidak ada data sales yang ditarik, Supabase tidak ditimpa.")
+        print("   ⚠️ Peringatan: Tidak ada data transaksi yang ditemukan.")
 
     return summary_sales
 
