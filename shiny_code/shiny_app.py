@@ -5649,7 +5649,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         tot_done_rows = len(state.df_iv_done_rows())
         tot_done_qty = state.iv_total_done_qty()
 
-       cur_filter_waktu = state.iv_filter_waktu() if hasattr(state, "iv_filter_waktu") else "BARUSAN_5"
+        cur_filter_waktu = state.iv_filter_waktu() if hasattr(state, "iv_filter_waktu") else "BARUSAN_5"
 
         # 3 KARTU METRIK UTAMA
         metric_ui = ui.div(
