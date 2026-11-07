@@ -3694,46 +3694,54 @@ class AppState:
             return False, f"Gagal Match Real & System: {e}"
 
 # ==========================================================================
-    # BALANCING STOCK: 2-TAB HYBRID ENGINE (SUPABASE CACHE + PROGRESSIVE REFILL)
+    # BALANCING STOCK: EFEKTIF & BEBAS MEMORYERROR (QUERY SPESIFIK SURABAYA)
     # ==========================================================================
     def load_balancing_data_from_supabase(self):
-        """Menarik data dari balancing_stock_cache dan balancing_sales_cache di Supabase"""
+        """Menarik data cache Surabaya secara hemat memori (Anti MemoryError)"""
         try:
             import json
             client = get_supabase()
             if not client:
                 return False, "Koneksi ke Supabase gagal!"
 
-            # 1. Tarik Data Stock Cache
-            res_stk = client.table("balancing_stock_cache").select("*").execute()
+            # 🌟 1. TARIK HANYA DATA STOK SURABAYA (Hemat RAM 90%)
+            res_stk = client.table("balancing_stock_cache")\
+                            .select("*")\
+                            .eq("id", "SURABAYA_BALANCING_STOCK")\
+                            .execute()
+            
             stk_records = []
             if res_stk and res_stk.data:
                 for row in res_stk.data:
-                    if "stock_data" in row and isinstance(row["stock_data"], (list, str)):
-                        raw_items = json.loads(row["stock_data"]) if isinstance(row["stock_data"], str) else row["stock_data"]
-                        stk_records.extend(raw_items)
-                    elif "data" in row and isinstance(row["data"], (list, str)):
-                        raw_items = json.loads(row["data"]) if isinstance(row["data"], str) else row["data"]
-                        stk_records.extend(raw_items)
+                    raw_data = row.get("stock_data") or row.get("data") or []
+                    if isinstance(raw_data, str):
+                        try: raw_data = json.loads(raw_data)
+                        except Exception: raw_data = []
+                    if isinstance(raw_data, list):
+                        stk_records.extend(raw_data)
                     else:
                         stk_records.append(row)
 
-            # 2. Tarik Data Sales Cache
-            res_sls = client.table("balancing_sales_cache").select("*").execute()
+            # 🌟 2. TARIK HANYA DATA SALES SURABAYA (Hemat RAM)
+            res_sls = client.table("balancing_sales_cache")\
+                            .select("*")\
+                            .eq("id", "SURABAYA_SALES_90D")\
+                            .execute()
+
             sls_records = []
             if res_sls and res_sls.data:
                 for row in res_sls.data:
-                    if "sales_data" in row and isinstance(row["sales_data"], (list, str)):
-                        raw_items = json.loads(row["sales_data"]) if isinstance(row["sales_data"], str) else row["sales_data"]
-                        sls_records.extend(raw_items)
-                    elif "data" in row and isinstance(row["data"], (list, str)):
-                        raw_items = json.loads(row["data"]) if isinstance(row["data"], str) else row["data"]
-                        sls_records.extend(raw_items)
+                    raw_data = row.get("sales_data") or row.get("data") or []
+                    if isinstance(raw_data, str):
+                        try: raw_data = json.loads(raw_data)
+                        except Exception: raw_data = []
+                    if isinstance(raw_data, list):
+                        sls_records.extend(raw_data)
                     else:
                         sls_records.append(row)
 
             if not stk_records:
-                return False, "Data pada balancing_stock_cache Supabase masih kosong!"
+                return False, "Data 'SURABAYA_BALANCING_STOCK' di Supabase masih kosong!"
 
             df_stk = pd.DataFrame(stk_records)
             df_sls = pd.DataFrame(sls_records) if sls_records else pd.DataFrame()
@@ -3817,13 +3825,13 @@ class AppState:
             })
 
             # ------------------------------------------------------------------
-            # 2. 🌟 BACA DATA SALES (DUAL MODE: DARI CACHE SUPABASE & EXCEL MENTAH)
+            # 2. 🌟 BACA DATA SALES (MENDUKUNG CACHE SUPABASE DENGAN SALES_ONLINE & SALES_OFFLINE)
             # ------------------------------------------------------------------
             sales_agg = {}
             if not df_sls_raw.empty:
                 sls_cols = [str(c).strip().upper() for c in df_sls_raw.columns]
 
-                # MODE A: DARI SUPABASE balancing_sales_cache (SUDAH ADA SALES_ONLINE & SALES_OFFLINE)
+                # MODE A: LANGSUNG BACA HASIL DARI SUPABASE balancing_sales_cache
                 if any('ONLINE' in c for c in sls_cols) or any('OFFLINE' in c for c in sls_cols):
                     col_sku_s = next((c for c in df_sls_raw.columns if str(c).strip().upper() in ['SKU', 'BARCODE']), df_sls_raw.columns[0])
                     col_off_s = next((c for c in df_sls_raw.columns if 'OFFLINE' in str(c).strip().upper()), None)
@@ -3838,7 +3846,7 @@ class AppState:
                         s_tot = to_int(r_sls[col_tot_s]) if col_tot_s and col_tot_s in r_sls else (s_off + s_onl)
                         sales_agg[s_code] = {'SALES_OFF': s_off, 'SALES_ONL': s_onl, 'TOTAL_SALES': s_tot}
 
-                # MODE B: DARI FILE TRANSAKSI MENTAH (JIKA UPLOAD ULANG MANUAL)
+                # MODE B: DARI FILE TRANSAKSI MENTAH (JIKA ADA YANG UPLOAD DOKUMEN EXCEL)
                 else:
                     col_inv = next((c for c in df_sls_raw.columns if any(k in str(c).strip().upper() for k in ['INV', 'INVOICE'])), df_sls_raw.columns[0])
                     col_sku = next((c for c in df_sls_raw.columns if any(k in str(c).strip().upper() for k in ['SKU', 'BARCODE'])), df_sls_raw.columns[1])
@@ -3873,11 +3881,13 @@ class AppState:
                 sales_norm_map[s_norm]['TOTAL_SALES'] += data['TOTAL_SALES']
 
             # ------------------------------------------------------------------
-            # 3. 🌟 PEMBAGIAN QTY BIN: LOGISTIK ('LOG'), OFFLINE ('OFF'), ONLINE ('ONL')
+            # 3. 🌟 PEMBAGIAN QTY BIN SESUAI INSTRUKSI:
+            # - LOGISTIK : BIN mengandung kata 'LOG'
+            # - OFFLINE  : BIN mengandung kata 'OFF' (atau 'RSN')
+            # - ONLINE   : BIN mengandung kata 'ONL'
             # ------------------------------------------------------------------
             df_stk['QTY_POS'] = df_stk['QTY'].clip(lower=0)
 
-            # Aturan BIN sesuai instruksi Anda:
             df_stk['IS_LOG'] = df_stk['BIN'].str.contains('LOG', na=False, case=False)
             df_stk['IS_OFF'] = df_stk['BIN'].str.contains('OFF|RSN', na=False, case=False)
             df_stk['IS_ONL'] = df_stk['BIN'].str.contains('ONL', na=False, case=False)
@@ -4087,7 +4097,8 @@ class AppState:
         except Exception as e:
             import traceback
             traceback.print_exc()
-            return False, f"Terjadi kesalahan saat kalkulasi: {str(e)}"            
+            return False, f"Terjadi kesalahan saat kalkulasi: {str(e)}"
+                      
     def apply_bs_category_filter(self, selected_cats):
         """Memfilter berdasarkan Sub Kategori dan mempertahankan filter Area aktif"""
         self.bs_selected_categories.set(selected_cats if selected_cats is not None else [])
