@@ -5642,7 +5642,6 @@ def server(input: Inputs, output: Outputs, session: Session):
         tot_done_rows = len(state.df_iv_done_rows())
         tot_done_qty = state.iv_total_done_qty()
 
-        # 3 KARTU METRIK UTAMA
         metric_ui = ui.div(
             dark_metric_box("⏳ PERLU DI-SETUP (GL1)", f"{tot_need_rows:,} BARIS ({tot_need_qty:,} PCS)", "#E53E3E"),
             dark_metric_box("✅ DONE SETUP (VALID HARI INI)", f"{tot_done_rows:,} BARIS ({tot_done_qty:,} PCS)", "#10B981"),
@@ -5650,17 +5649,17 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
         )
 
-        # TAB 1: TEMPLATE MUTASI UNTUK JEZPRO
+        # TAB 1: LIST SETUP (LENGKAP UNTUK MONITORING)
         tab1_need = ui.div(
             ui.div(
                 ui.div(
                     ui.h4("📋 Antrean Barang Belum Dimutasi", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 2px 0;"),
-                    ui.p("Barang ini sudah hilang dari Helper Jezpro dan menunggu dimutasi ke GL1-INSTOCK.", style="color: #718096; font-size: 12px; margin: 0;")
+                    ui.p("Barang ini sudah hilang dari Helper Jezpro dan menunggu dimutasi ke GL1-INSTOCK (Terurut jam terbaru).", style="color: #718096; font-size: 12px; margin: 0;")
                 ),
                 ui.download_button(
                     "btn_dl_iv_setup",
-                    ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px;"), "DOWNLOAD TEMPLATE MUTASI (.XLSX)"),
-                    style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer; font-size: 12px;"
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px;"), "DOWNLOAD MONITORING (.XLSX)"),
+                    style="background-color: #3182CE; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer; font-size: 12px;"
                 ),
                 style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 8px;"
             ),
@@ -5668,7 +5667,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="padding: 0.75rem 0;"
         )
 
-        # TAB 2: RIWAYAT SUDAH SELESAI MUTASI
+        # TAB 2: DONE SETUP
         tab2_done = ui.div(
             ui.div(
                 ui.div(
@@ -5686,27 +5685,46 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="padding: 0.75rem 0;"
         )
 
+        # 🌟 TAB 3: ITEM MUTASI (HANYA 5 KOLOM: BIN AWAL, BIN TUJUAN, SKU, QUANTITY, NOTES)
+        tab3_mutasi = ui.div(
+            ui.div(
+                ui.div(
+                    ui.h4("📄 Template Mutasi Jezpro (5 Kolom Murni)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 2px 0;"),
+                    ui.p("Format standar bersih siap upload ke Jezpro (Hanya BIN AWAL, BIN TUJUAN, SKU, QUANTITY, NOTES).", style="color: #718096; font-size: 12px; margin: 0;")
+                ),
+                ui.download_button(
+                    "btn_dl_iv_mutasi_5col",
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-cloud-arrow-down", style="margin-right: 6px;"), "DOWNLOAD TEMPLATE MUTASI 5 KOLOM (.XLSX)"),
+                    style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; font-weight: 800; border-radius: 6px; border: none; padding: 8px 18px; cursor: pointer; font-size: 12px; box-shadow: 0 2px 6px rgba(16,185,129,0.3);"
+                ),
+                style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 8px;"
+            ),
+            render_clean_table(state.df_iv_mutasi_headers(), state.df_iv_mutasi_rows(), "tbl_iv_mutasi_clean"),
+            style="padding: 0.75rem 0;"
+        )
+
         return ui.div(
             ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
             metric_ui,
             ui.navset_card_tab(
                 ui.nav_panel(f"⏳ 1. LIST SETUP ({tot_need_rows})", tab1_need),
-                ui.nav_panel(f"✅ 2. DONE SETUP ({tot_done_rows})", tab2_done)
+                ui.nav_panel(f"✅ 2. DONE SETUP ({tot_done_rows})", tab2_done),
+                ui.nav_panel(f"📄 3. ITEM MUTASI ({tot_need_rows})", tab3_mutasi)
             ),
             style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
         )
 
-    # DOWNLOAD HANDLERS
+    # 🌟 Handler Download File Excel 5 Kolom Tab 3
     @render.download(
-        filename=lambda: f"TEMPLATE_MUTASI_GL1_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+        filename=lambda: f"TEMPLATE_MUTASI_JEZPRO_5KOLOM_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
     )
-    def btn_dl_iv_setup():
+    def btn_dl_iv_mutasi_5col():
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-            state._raw_df_iv_setup.to_excel(writer, sheet_name='TEMPLATE_MUTASI', index=False)
+            state._raw_df_iv_mutasi.to_excel(writer, sheet_name='TEMPLATE_MUTASI', index=False)
         buf.seek(0)
         yield buf.getvalue()
-
+        
     @render.download(
         filename=lambda: f"DONE_SETUP_INSTOCK_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
     )

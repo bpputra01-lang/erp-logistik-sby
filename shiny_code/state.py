@@ -630,6 +630,10 @@ class AppState:
         self.iv_total_instock_qty = reactive.Value(0)
         self.iv_total_allocated_qty = reactive.Value(0)
         self.iv_total_done_qty = reactive.Value(0)
+        # Tambahkan ini di __init__ state.py:
+        self.df_iv_mutasi_headers = reactive.Value([])
+        self.df_iv_mutasi_rows = reactive.Value([])
+        self._raw_df_iv_mutasi = pd.DataFrame()
 
         # Tab 1: Template Mutasi / Set Up (Yang belum dimutasi di Jezpro)
         self.df_iv_setup_headers = reactive.Value([])
@@ -7325,18 +7329,14 @@ class AppState:
             return False, f"Gagal mengembalikan memo: {e}"
 
 
-    # --------------------------------------------------------------------------
-    # METODE INSTOCK VALIDATION (DENGAN PEMISAHAN WAKTU & STATUS MUTASI)
-    # --------------------------------------------------------------------------
     def load_instock_daily_from_supabase(self):
-        """Memuat antrean barang berdasarkan status 'NEED_SETUP' vs 'DONE_SETUP'"""
+        """Memuat antrean barang (Urutan Teratas = Jam Instock Terbaru + Tab 3 Khusus 5 Kolom)"""
         try:
             client = get_supabase()
             if not client:
                 return False, "Koneksi ke Supabase gagal!"
             
             today_str = datetime.now().strftime("%Y-%m-%d")
-            # Tarik data hari ini
             res = client.table("jezpro_instock_daily")\
                         .select("*")\
                         .eq("sync_date", today_str)\
@@ -7345,26 +7345,65 @@ class AppState:
             
             all_data = res.data if res and hasattr(res, "data") and res.data else []
 
-            # 1. PISAHKAN BERDASARKAN STATUS
+            def format_to_wib_time(ts_val):
+                if not ts_val or str(ts_val).strip() in ["", "-", "None", "nan"]:
+                    return "-"
+                try:
+                    dt = pd.to_datetime(ts_val)
+                    if dt.tzinfo is None:
+                        dt = dt.tz_localize("UTC").tz_convert("Asia/Jakarta")
+                    else:
+                        dt = dt.tz_convert("Asia/Jakarta")
+                    return dt.strftime("%H:%M:%S")
+                except Exception:
+                    s = str(ts_val)
+                    return s[11:19] if len(s) >= 19 else s
+
             need_setup = [x for x in all_data if x.get("status") == "NEED_SETUP"]
             done_setup = [x for x in all_data if x.get("status") == "DONE_SETUP"]
+
+            # 🌟 1. URUTKAN: JAM INSTOCK TERBARU PASTI DI PALING ATAS
+            need_setup = sorted(
+                need_setup,
+                key=lambda x: str(x.get("disappeared_at") or ""),
+                reverse=True
+            )
+            done_setup = sorted(
+                done_setup,
+                key=lambda x: str(x.get("setup_done_at") or x.get("disappeared_at") or ""),
+                reverse=True
+            )
 
             self.iv_instock_data.set(need_setup)
             self.iv_done_data.set(done_setup)
 
-            # 2. SUSUN TAB 1: LIST SETUP (BARANG YANG HILANG DARI HELPER & PERLU DIMUTASI)
+            # 🌟 2. SUSUN TAB 1 (MONITORING LENGKAP) & TAB 3 (HANYA 5 KOLOM)
             transit_records = []
+            mutasi_5cols_records = []
+
             for r in need_setup:
                 q = safe_int(r.get("qty", 1), 1)
                 raw_bin = str(r.get("bin_code", "-")).replace('[', '').replace(']', '').strip().upper()
-                disappeared_time = str(r.get("disappeared_at", "-"))[11:19]  # Format jam HH:MM:SS
+                bin_awal = raw_bin if raw_bin not in ["WAITING OFFLINE", "-", ""] else "STAGING INBOUND"
+                sku_clean = str(r.get("barcode_sku", "-")).split('.')[0].strip().upper()
+                disappeared_time = format_to_wib_time(r.get("disappeared_at"))
 
+                # Data Tab 1 (Ada Jam Hilang & Nama Artikel)
                 transit_records.append({
-                    "JAM HILANG": disappeared_time if disappeared_time else "-",
-                    "BIN AWAL": raw_bin if raw_bin != "WAITING OFFLINE" else "STAGING INBOUND",
+                    "JAM HILANG": disappeared_time,
+                    "BIN AWAL": bin_awal,
                     "BIN TUJUAN": "GL1-INSTOCK",
-                    "SKU": str(r.get("barcode_sku", "-")).split('.')[0].strip().upper(),
+                    "SKU": sku_clean,
                     "NAMA ARTIKEL": str(r.get("article_name", "-")),
+                    "QUANTITY": q,
+                    "NOTES": "TRANSIT INSTOCK"
+                })
+
+                # Data Tab 3 (MURNI HANYA 5 KOLOM FORMAT TEMPLATE JEZPRO)
+                mutasi_5cols_records.append({
+                    "BIN AWAL": bin_awal,
+                    "BIN TUJUAN": "GL1-INSTOCK",
+                    "SKU": sku_clean,
                     "QUANTITY": q,
                     "NOTES": "TRANSIT INSTOCK"
                 })
@@ -7376,16 +7415,22 @@ class AppState:
             self.df_iv_setup_headers.set(df_setup.columns.tolist() if not df_setup.empty else [])
             self.df_iv_setup_rows.set(df_setup.fillna("").astype(str).values.tolist() if not df_setup.empty else [])
 
-            # 3. SUSUN TAB 2: DONE SETUP (MUTASI SUDAH COCOK DENGAN JEZPRO SECARA JAM & MENIT)
+            # Tab 3 Data
+            df_mutasi = pd.DataFrame(mutasi_5cols_records)
+            self._raw_df_iv_mutasi = df_mutasi
+            self.df_iv_mutasi_headers.set(df_mutasi.columns.tolist() if not df_mutasi.empty else [])
+            self.df_iv_mutasi_rows.set(df_mutasi.fillna("").astype(str).values.tolist() if not df_mutasi.empty else [])
+
+            # Tab 2: Done Setup
             done_records = []
             for r in done_setup:
                 q_done = safe_int(r.get("qty", 1), 1)
-                done_time = str(r.get("setup_done_at", "-"))
-                dis_time = str(r.get("disappeared_at", "-"))[11:19]
+                done_time = format_to_wib_time(r.get("setup_done_at"))
+                dis_time = format_to_wib_time(r.get("disappeared_at"))
 
                 done_records.append({
-                    "JAM REQUEST": dis_time if dis_time else "-",
-                    "JAM MUTASI SELESAI": done_time if done_time else "-",
+                    "JAM REQUEST": dis_time,
+                    "JAM MUTASI SELESAI": done_time,
                     "SKU": str(r.get("barcode_sku", "-")).split('.')[0].strip().upper(),
                     "NAMA ARTIKEL": str(r.get("article_name", "-")),
                     "BIN AWAL": str(r.get("bin_code", "-")).replace('[', '').replace(']', '').strip().upper(),
