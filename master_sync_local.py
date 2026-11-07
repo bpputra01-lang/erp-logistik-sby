@@ -3,6 +3,7 @@ import io
 import re
 import json
 import time
+import random
 import threading
 import requests
 import pandas as pd
@@ -10,15 +11,14 @@ from datetime import datetime, timezone, timedelta
 from bs4 import BeautifulSoup
 
 # ==============================================================================
-# 🔑 KREDENSIAL & KONFIGURASI PUSAT (SUDAH TERPASANG LENGKAP)
+# 🔑 KREDENSIAL & KONFIGURASI PUSAT
 # ==============================================================================
-SUPABASE_URL = "https://fanzsmghhbefhhaicrok.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhbnpzbWdoaGJlZmhoYWljcm9rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxNTQzNDgsImV4cCI6MjEwMzczMDM0OH0.brCSOO9nHAUK8CxDWPperpJ--_NA_nwy5cO9OqGv3I0"
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://fanzsmghhbefhhaicrok.supabase.co")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhbnpzbWdoaGJlZmhoYWljcm9rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxNTQzNDgsImV4cCI6MjEwMzczMDM0OH0.brCSOO9nHAUK8CxDWPperpJ--_NA_nwy5cO9OqGv3I0")
 
-JEZPRO_EMAIL = "fajarbintang786@jez.co.id"
-JEZPRO_PASSWORD = "131199"
+JEZPRO_EMAIL = os.environ.get("JEZPRO_EMAIL", "fajarbintang786@jez.co.id")
+JEZPRO_PASSWORD = os.environ.get("JEZPRO_PASSWORD", "131199")
 
-# 🌟 MASUKKAN LINK GOOGLE SPREADSHEET MARKOM ANDA DI BAWAH INI:
 SPREADSHEET_URL = os.environ.get("SPREADSHEET_URL", "")
 
 STORE_ID_SURABAYA = 3
@@ -45,7 +45,7 @@ HEADERS_SB = {
 }
 
 # ==============================================================================
-# HELPER PEMBERSIH & PARSER DATA UNIVERSAL
+# HELPER PEMBERSIH & PARSER UNIVERSAL (DIPERBAIKI)
 # ==============================================================================
 def strip_html(val):
     if not val: return ""
@@ -59,10 +59,20 @@ def clean_bin(val):
     return txt.replace('[', '').replace(']', '').strip().upper()
 
 def safe_int(val, default=0):
-    if not val: return default
-    s = strip_html(str(val)).replace("Rp", "").strip()
-    digits = re.findall(r'-?\d+', s)
-    return int(digits[0]) if digits else default
+    try:
+        if pd.isna(val) or val is None:
+            return default
+        if isinstance(val, (int, float)):
+            return int(round(val))
+        s = strip_html(str(val)).replace("Rp", "").strip()
+        if "," in s and "." in s:
+            s = s.replace(".", "").replace(",", ".")
+        elif "," in s:
+            s = s.replace(",", ".")
+        return int(round(float(s)))
+    except Exception:
+        digits = re.findall(r'-?\d+', strip_html(str(val)))
+        return int(digits[0]) if digits else default
 
 def safe_int_val(val, default=0):
     return safe_int(val, default)
@@ -104,7 +114,7 @@ def parse_to_iso_timestamp(dt_raw):
     if not dt_raw:
         return datetime.now(WIB).isoformat()
     s = strip_html(str(dt_raw)).strip().replace('–', '-').replace('—', '-').replace('/', '-')
-    for fmt in ("%Y-%m-%d %H:%M:%S", "%d-%m-%Y %H:%M:%S", "%Y-%m-%d", "%d-%m-%Y"):
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%d-%m-%Y %H:%M:%S", "%d-%b-%Y %H:%M:%S", "%d-%B-%Y %H:%M:%S", "%Y-%m-%d", "%d-%m-%Y"):
         try:
             return datetime.strptime(s[:19].strip(), fmt).replace(tzinfo=WIB).isoformat()
         except Exception:
@@ -131,7 +141,7 @@ def create_jezpro_session():
     session.headers.update({
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36"
     })
-    print(f"🔐 [{datetime.now(WIB).strftime('%H:%M:%S')}] Login ke akun Jezpro ({JEZPRO_EMAIL})...")
+    print(f"🔐 [{datetime.now(WIB).strftime('%H:%M:%S')}] Login ke Jezpro ({JEZPRO_EMAIL})...")
     res = session.get("https://jezpro.id/", timeout=20)
     soup = BeautifulSoup(res.text, "html.parser")
     token_tag = soup.find("input", {"name": "_token"})
@@ -152,14 +162,21 @@ def create_jezpro_session():
     session.get("https://jezpro.id/stock_tracking", timeout=15)
     return session
 
-
 # ==============================================================================
-# MODUL 1: INSTOCK DAILY SURABAYA (JALUR KHUSUS CEPAT - TIAP 45 DETIK)
+# MODUL 1: INSTOCK DAILY SURABAYA (TIAP 45 DETIK + CLEANUP + SORTING)
 # ==============================================================================
 def run_module_instock_daily(session):
-    today_str = datetime.now(WIB).strftime("%Y-%m-%d")
     now_wib = datetime.now(WIB)
+    today_str = now_wib.strftime("%Y-%m-%d")
 
+    # 1. Bersihkan data sebelum hari ini di Supabase
+    try:
+        cleanup_url = f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?sync_date=lt.{today_str}"
+        requests.delete(cleanup_url, headers=HEADERS_SB, timeout=10)
+    except Exception:
+        pass
+
+    # 2. Ambil data stock tracking hari ini
     url_stk = "https://jezpro.id/stock_tracking_datatables"
     params = {
         "draw": "1", "start": "0", "length": "1000",
@@ -227,7 +244,7 @@ def run_module_instock_daily(session):
             "raw_time": raw_time, "dt_wib": dt_wib
         })
 
-    # Cek Database Supabase
+    # 3. Cek Database Supabase
     sb_url = f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?select=*&sync_date=eq.{today_str}"
     try:
         res_sb = requests.get(sb_url, headers=HEADERS_SB, timeout=15)
@@ -302,15 +319,30 @@ def run_module_instock_daily(session):
             for ins in new_inserts:
                 if ins["status"] == "NEED_SETUP": need_setup_in_sb.append(ins)
 
-    # Verifikasi Selesai Mutasi ke GL1-INSTOCK
+    # 4. Verifikasi Selesai Mutasi ke GL1-INSTOCK (Dengan sorting waktu persis standalone)
     if need_setup_in_sb:
         url_bin = "https://jezpro.id/bin_history_datatables"
         params_bin = {"draw": "1", "start": "0", "length": "1000", "st_id": str(STORE_ID_SURABAYA), "date": today_str, "_": int(time.time() * 1000)}
         try:
             r_bin = session.get(url_bin, params=params_bin, headers={"Accept": "application/json", "Referer": "https://jezpro.id/setup_lokasi_stok_v2"}, timeout=20)
-            mutasi_today = r_bin.json().get("data", []) if r_bin.status_code == 200 else []
+            mutasi_raw = r_bin.json().get("data", []) if r_bin.status_code == 200 else []
         except Exception:
-            mutasi_today = []
+            mutasi_raw = []
+
+        mutasi_today = []
+        for m in mutasi_raw:
+            m_time = strip_html(m.get("pm_created_at") or "")
+            mutasi_today.append({
+                "pmt_id": str(strip_html(m.get("pmt_id") or m.get("DT_RowIndex") or "")),
+                "sku": clean_sku_key(m.get("ps_barcode") or m.get("barcode")),
+                "bin_tujuan": clean_bin(m.get("end_bin")),
+                "pmt_qty": safe_int_val(m.get("pmt_qty"), 0),
+                "pm_created_at": m_time,
+                "dt_wib": parse_wib_datetime(m_time) or now_wib
+            })
+
+        # Urutkan berdasarkan waktu mutasi
+        mutasi_today = sorted(mutasi_today, key=lambda x: x["dt_wib"])
 
         for target in need_setup_in_sb:
             t_sku = clean_sku_key(target.get("barcode_sku"))
@@ -318,29 +350,24 @@ def run_module_instock_daily(session):
             matched_m = None
 
             for m in mutasi_today:
-                m_id = str(strip_html(m.get("pmt_id") or m.get("DT_RowIndex") or ""))
+                m_id = m["pmt_id"]
                 if m_id in used_mutasi_ids: continue
-                m_sku = clean_sku_key(m.get("ps_barcode") or m.get("barcode"))
-                bin_tgt = clean_bin(m.get("end_bin"))
-                q_mts = safe_int_val(m.get("pmt_qty"), 0)
-
-                if m_sku == t_sku and ("GL1-INSTOCK" in bin_tgt or "INSTOCK" in bin_tgt) and q_mts >= t_qty:
+                if m["sku"] == t_sku and ("GL1-INSTOCK" in m["bin_tujuan"] or "INSTOCK" in m["bin_tujuan"]) and m["pmt_qty"] >= t_qty:
                     matched_m = m; break
 
             if matched_m:
-                used_mutasi_ids.add(str(matched_m.get("pmt_id") or ""))
+                used_mutasi_ids.add(matched_m["pmt_id"])
                 t_id = target.get("id")
                 patch_url = f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?id=eq.{t_id}" if t_id else f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?barcode_sku=eq.{t_sku}&sync_date=eq.{today_str}&status=eq.NEED_SETUP"
                 requests.patch(patch_url, headers=HEADERS_SB, json={
                     "status": "DONE_SETUP",
-                    "matched_mutasi_id": str(matched_m.get("pmt_id") or "-"),
-                    "setup_done_at": strip_html(matched_m.get("pm_created_at") or "")
+                    "matched_mutasi_id": matched_m["pmt_id"],
+                    "setup_done_at": matched_m["pm_created_at"]
                 })
                 print(f"   🎉 [DONE SETUP] SKU {t_sku} ➔ Selesai Mutasi ke GL1-INSTOCK!")
 
-
 # ==============================================================================
-# MODUL 2: WAREHOUSE ACTIVITY MONITOR (STAGING, TRANSFER, MADJ, SINGLE ADJ)
+# MODUL 2: WAREHOUSE ACTIVITY MONITOR (LENGKAP: PAGINATION & FILTER >= 2026)
 # ==============================================================================
 def run_module_warehouse_monitor(session):
     print(f"\n📊 [{datetime.now(WIB).strftime('%H:%M:%S')}] Memulai Sinkronisasi Warehouse Activity Monitor (All Area)...")
@@ -355,11 +382,15 @@ def run_module_warehouse_monitor(session):
         {"status": "", "status_search": "REFUND"},
         {"status": "WAITING OFFLINE", "status_search": ""},
         {"status": "WAITING CHECKOUT", "status_search": ""},
+        {"status": "CHECKOUT", "status_search": ""},
         {"status": "WAITING NAMESET", "status_search": ""},
+        {"status": "NAMESET", "status_search": ""},
         {"status": "WAITING ONLINE", "status_search": ""},
         {"status": "DONE ONLINE", "status_search": ""},
         {"status": "", "status_search": "DONE ONLINE"},
-        {"status": "WAITING", "status_search": ""}
+        {"status": "WAITING", "status_search": ""},
+        {"status": "", "status_search": "WAITING"},
+        {"status": "", "status_search": ""}
     ]
 
     all_staging_records = []
@@ -369,13 +400,17 @@ def run_module_warehouse_monitor(session):
         st_id = b_info["st_id"]
         for q in query_targets:
             params = {
-                "draw": "1", "columns[0][data]": "DT_RowIndex", "columns[0][name]": "plst_id",
+                "draw": "1",
+                "columns[0][data]": "DT_RowIndex", "columns[0][name]": "plst_id", "columns[0][orderable]": "false",
                 "columns[1][data]": "datetime", "columns[1][name]": "plst_created", "columns[1][orderable]": "true",
-                "columns[2][data]": "ps_barcode", "columns[2][name]": "ps_barcode",
-                "columns[3][data]": "article", "columns[3][name]": "p_name",
-                "columns[6][data]": "qty", "columns[6][name]": "p_name",
-                "columns[7][data]": "product_location", "columns[7][name]": "pl_code",
+                "columns[2][data]": "ps_barcode", "columns[2][name]": "ps_barcode", "columns[2][orderable]": "true",
+                "columns[3][data]": "article", "columns[3][name]": "p_name", "columns[3][orderable]": "true",
+                "columns[4][data]": "invoice", "columns[4][name]": "p_name", "columns[4][orderable]": "true",
+                "columns[5][data]": "cust_name", "columns[5][name]": "cust_name", "columns[5][orderable]": "true",
+                "columns[6][data]": "qty", "columns[6][name]": "p_name", "columns[6][orderable]": "true",
+                "columns[7][data]": "product_location", "columns[7][name]": "pl_code", "columns[7][orderable]": "true",
                 "columns[8][data]": "status", "columns[8][name]": "plst_status", "columns[8][search][value]": q["status_search"],
+                "columns[9][data]": "instock_source", "columns[9][name]": "instock_source_status",
                 "order[0][column]": "1", "order[0][dir]": "desc",
                 "start": "0", "length": "500", "status": q["status"], "st_id": str(st_id), "date": date_range
             }
@@ -395,6 +430,18 @@ def run_module_warehouse_monitor(session):
                 if not (is_refund or is_waiting or is_done_online): continue
 
                 dt_raw = strip_html(item.get("datetime") or item.get("plst_created") or "")
+
+                # Filter Dokumen >= 2026
+                doc_year = None
+                for fmt in ("%d/%m/%Y %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%d-%m-%Y %H:%M:%S", "%d/%m/%Y", "%Y-%m-%d"):
+                    try:
+                        doc_year = datetime.strptime(dt_raw[:19].strip(), fmt).year; break
+                    except Exception: pass
+                if doc_year is None:
+                    y_match = re.findall(r'\b(20\d{2})\b', dt_raw)
+                    if y_match: doc_year = int(y_match[0])
+                if doc_year is not None and doc_year < 2026: continue
+
                 raw_id = item.get("plst_id") or item.get("id")
                 p_id = safe_int_val(raw_id)
                 if not p_id:
@@ -403,7 +450,14 @@ def run_module_warehouse_monitor(session):
                 if p_id in seen_stg_ids: continue
                 seen_stg_ids.add(p_id)
 
-                kategori_label = "REFUND" if is_refund else ("DONE ONLINE" if is_done_online else ("WAITING NAMESET" if "NAMESET" in status_raw else ("WAITING CHECKOUT" if "CHECKOUT" in status_raw else ("WAITING ONLINE" if "ONLINE" in status_raw else "WAITING OFFLINE"))))
+                if is_refund: kategori_label = "REFUND"
+                elif is_done_online: kategori_label = "DONE ONLINE"
+                elif "NAMESET" in status_raw: kategori_label = "WAITING NAMESET"
+                elif "CHECKOUT" in status_raw: kategori_label = "WAITING CHECKOUT"
+                elif "ONLINE" in status_raw: kategori_label = "WAITING ONLINE"
+                elif "RECEIPT" in status_raw: kategori_label = "WAITING RECEIPT"
+                else: kategori_label = "WAITING OFFLINE"
+
                 art_info = clean_stock_tracking_article(item.get("article") or item.get("p_name"))
 
                 all_staging_records.append({
@@ -417,13 +471,28 @@ def run_module_warehouse_monitor(session):
                 })
             time.sleep(0.04)
 
-    # 2. Transfer Stok (All Store History)
+    # 2. Transfer Stok (All Store History DENGAN PAGINATION LENGKAP)
     url_tf = "https://jezpro.id/transfer_history_datatables"
     open_tf_headers, open_tf_items = [], []
     try:
-        p_tf = {"draw": "1", "start": "0", "length": "500", "order[0][column]": "0", "order[0][dir]": "desc", "status": ""}
-        r_tf = session.get(url_tf, params=p_tf, headers=headers_req, timeout=30)
-        raw_tf = r_tf.json().get("data", []) if r_tf.status_code == 200 else []
+        raw_tf = []
+        start_row, total_expected = 0, 999999
+        batch_size = 500
+
+        while start_row < total_expected:
+            p_tf = {
+                "draw": "1", "start": str(start_row), "length": str(batch_size),
+                "order[0][column]": "0", "order[0][dir]": "desc", "status": ""
+            }
+            r_tf = session.get(url_tf, params=p_tf, headers=headers_req, timeout=30)
+            if r_tf.status_code != 200: break
+            d_json = r_tf.json()
+            data_chunk = d_json.get("data", [])
+            if not data_chunk: break
+            total_expected = d_json.get("recordsTotal", total_expected)
+            raw_tf.extend(data_chunk)
+            start_row += len(data_chunk)
+
         for row in raw_tf:
             st_txt = strip_html(row.get("stf_status") or "").upper()
             if st_txt not in ["DRAFT", "IN PROGRESS"]: continue
@@ -432,13 +501,21 @@ def run_module_warehouse_monitor(session):
             if not tf_code: continue
 
             tgl_str = strip_html(row.get("stf_created") or "")
+            doc_year = None
             aging_jam = 0.0
             if tgl_str:
                 for fmt in ("%Y-%m-%d %H:%M:%S", "%d-%m-%Y %H:%M:%S", "%d/%m/%Y %H:%M:%S"):
                     try:
-                        aging_jam = max(0.0, round((now_wib - datetime.strptime(tgl_str[:19].strip(), fmt)).total_seconds() / 3600.0, 1))
+                        dt_obj = datetime.strptime(tgl_str[:19].strip(), fmt)
+                        doc_year = dt_obj.year
+                        aging_jam = max(0.0, round((now_wib - dt_obj).total_seconds() / 3600.0, 1))
                         break
                     except Exception: pass
+
+            if doc_year is None:
+                m_year = re.search(r'TF(\d{4})', tf_code)
+                if m_year: doc_year = int(m_year.group(1))
+            if doc_year is not None and doc_year < 2026: continue
 
             open_tf_headers.append({
                 "stf_code": tf_code, "u_name": strip_html(row.get("u_name") or "-"),
@@ -449,33 +526,60 @@ def run_module_warehouse_monitor(session):
                 "aging_hours": float(aging_jam), "synced_at": now_wib.isoformat()
             })
 
-            # Tarik detail item untuk transfer ini
-            p_det = {"draw": "1", "start": "0", "length": "250", "stf_code": tf_code}
-            r_det = session.get("https://jezpro.id/in_transfer_bin_datatables", params=p_det, headers=headers_req, timeout=20)
-            items_chunk = r_det.json().get("data", []) if r_det.status_code == 200 else []
-            if not items_chunk:
-                r_det2 = session.get("https://jezpro.id/transfer_bin_datatables", params=p_det, headers=headers_req, timeout=20)
-                items_chunk = r_det2.json().get("data", []) if r_det2.status_code == 200 else []
+            # Tarik detail item transfer LENGKAP dengan Pagination Loop
+            start_it, chunk_it = 0, 250
+            while True:
+                p_det = {"draw": "1", "start": str(start_it), "length": str(chunk_it), "stf_code": tf_code}
+                r_det = session.get("https://jezpro.id/in_transfer_bin_datatables", params=p_det, headers=headers_req, timeout=20)
+                dj_det = r_det.json() if r_det.status_code == 200 else {}
+                items_chunk = dj_det.get("data", [])
+                if not items_chunk and start_it == 0:
+                    r_det2 = session.get("https://jezpro.id/transfer_bin_datatables", params=p_det, headers=headers_req, timeout=20)
+                    dj_det = r_det2.json() if r_det2.status_code == 200 else {}
+                    items_chunk = dj_det.get("data", [])
 
-            for it in items_chunk:
-                open_tf_items.append({
-                    "stf_code": tf_code, "article_name": strip_html(it.get("article", "-")),
-                    "bin_asal": strip_html(it.get("pl_code") or it.get("bin") or "-"),
-                    "qty_tf": safe_int_val(it.get("stfd_qty") or it.get("qty"), 1),
-                    "qty_in_bin": safe_int_val(it.get("pls_qty") or it.get("qty_bin"), 0),
-                    "start_store": strip_html(it.get("st_start") or "-"), "end_store": strip_html(it.get("st_end") or "-"),
-                    "status": st_txt, "synced_at": now_wib.isoformat()
-                })
+                if not items_chunk: break
+                for it in items_chunk:
+                    open_tf_items.append({
+                        "stf_code": tf_code, "article_name": strip_html(it.get("article", "-")),
+                        "bin_asal": strip_html(it.get("pl_code") or it.get("bin") or "-"),
+                        "qty_tf": safe_int_val(it.get("stfd_qty") or it.get("qty"), 1),
+                        "qty_in_bin": safe_int_val(it.get("pls_qty") or it.get("qty_bin"), 0),
+                        "start_store": strip_html(it.get("st_start") or "-"), "end_store": strip_html(it.get("st_end") or "-"),
+                        "status": st_txt, "synced_at": now_wib.isoformat()
+                    })
+
+                tot_rec = dj_det.get("recordsTotal", 0)
+                start_it += len(items_chunk)
+                if tot_rec > 0 and start_it >= tot_rec: break
+                if len(items_chunk) < chunk_it: break
+                time.sleep(0.04)
+
     except Exception as e:
         print(f"   ⚠️ Transfer error: {e}")
 
-    # 3. Multiple Adjustment (Khusus Menggantung)
+    # 3. Multiple Adjustment (All Store Menggantung DENGAN PAGINATION & FILTER 2026)
     url_ma = "https://jezpro.id/mass_adjustment_datatables"
     open_ma_headers, open_ma_items = [], []
     try:
-        p_ma = {"draw": "1", "start": "0", "length": "500", "order[0][column]": "0", "order[0][dir]": "desc", "st_id": ""}
-        r_ma = session.get(url_ma, params=p_ma, headers=headers_req, timeout=30)
-        raw_ma = r_ma.json().get("data", []) if r_ma.status_code == 200 else []
+        raw_ma = []
+        start_row, total_expected = 0, 999999
+        batch_size = 500
+
+        while start_row < total_expected:
+            p_ma = {
+                "draw": "1", "start": str(start_row), "length": str(batch_size),
+                "order[0][column]": "0", "order[0][dir]": "desc", "st_id": ""
+            }
+            r_ma = session.get(url_ma, params=p_ma, headers=headers_req, timeout=30)
+            if r_ma.status_code != 200: break
+            d_ma = r_ma.json()
+            data_chunk = d_ma.get("data", [])
+            if not data_chunk: break
+            total_expected = d_ma.get("recordsTotal", total_expected)
+            raw_ma.extend(data_chunk)
+            start_row += len(data_chunk)
+
         for row in raw_ma:
             st_raw = strip_html(row.get("ma_status") or "").upper()
             app_raw = strip_html(row.get("approve") or "")
@@ -484,16 +588,27 @@ def run_module_warehouse_monitor(session):
 
             m_code = re.search(r'MADJ\d+', str(row.get("ma_code_show") or row.get("ma_code") or ""))
             ma_code = m_code.group(0) if m_code else strip_html(row.get("ma_code") or "")
-            ma_id_val = safe_int_val(row.get("id")) or (abs(hash(ma_code)) % (10**10) if ma_code else 0)
+            ma_id_val = safe_int_val(row.get("id"))
+            if not ma_id_val:
+                m_id = re.search(r'detail[/?](\d+)|ma_id=(\d+)', str(row.get("action") or ""))
+                ma_id_val = int(m_id.group(1) or m_id.group(2)) if m_id else abs(hash(ma_code)) % (10**10)
 
             tgl_str = strip_html(row.get("created_at") or "")
+            doc_year = None
             aging_jam = 0.0
             if tgl_str:
                 for fmt in ("%d/%m/%Y %H:%M:%S", "%Y-%m-%d %H:%M:%S"):
                     try:
-                        aging_jam = max(0.0, round((now_wib - datetime.strptime(tgl_str[:19].strip(), fmt)).total_seconds() / 3600.0, 1))
+                        dt_obj = datetime.strptime(tgl_str[:19].strip(), fmt)
+                        doc_year = dt_obj.year
+                        aging_jam = max(0.0, round((now_wib - dt_obj).total_seconds() / 3600.0, 1))
                         break
                     except Exception: pass
+
+            if doc_year is None and ma_code:
+                m_y = re.search(r'MADJ(\d{4})', ma_code)
+                if m_y: doc_year = int(m_y.group(1))
+            if doc_year is not None and doc_year < 2026: continue
 
             open_ma_headers.append({
                 "ma_id": ma_id_val, "ma_code": ma_code, "store_name": strip_html(row.get("st_name") or "-"),
@@ -503,55 +618,83 @@ def run_module_warehouse_monitor(session):
                 "status_category": "MENGGANTUNG", "aging_hours": float(aging_jam), "synced_at": now_wib.isoformat()
             })
 
-            # Rincian item MADJ
-            p_mdet = {"draw": "1", "start": "0", "length": "250", "ma_id": str(ma_id_val)}
-            r_mdet = session.get("https://jezpro.id/mass_adjustment_detail_datatables", params=p_mdet, headers=headers_req, timeout=20)
-            items_ma = r_mdet.json().get("data", []) if r_mdet.status_code == 200 else []
-            for it in items_ma:
-                open_ma_items.append({
-                    "ma_id": ma_id_val, "bin_code": strip_html(it.get("pl_code") or "-"),
-                    "brand": strip_html(it.get("br_name") or "-"), "barcode_sku": strip_html(it.get("ps_barcode") or "-"),
-                    "article_name": strip_html(it.get("p_name") or "-"), "color": strip_html(it.get("p_color") or "-"),
-                    "size_variant": strip_html(it.get("sz_name") or "-"), "sub_category": strip_html(it.get("psc_name") or "-"),
-                    "cogs_price": safe_int_val(it.get("purchase")), "qty_system": safe_int_val(it.get("qty_export")),
-                    "qty_so": safe_int_val(it.get("qty_so")), "diff_qty": safe_int_val(it.get("mad_diff")),
-                    "adj_type": strip_html(it.get("mad_type") or "-"), "synced_at": now_wib.isoformat()
-                })
+            # Rincian item MADJ dengan Pagination Loop
+            start_m_it, chunk_m_it = 0, 250
+            while True:
+                p_mdet = {"draw": "1", "start": str(start_m_it), "length": str(chunk_m_it), "ma_id": str(ma_id_val)}
+                r_mdet = session.get("https://jezpro.id/mass_adjustment_detail_datatables", params=p_mdet, headers=headers_req, timeout=20)
+                dj_mdet = r_mdet.json() if r_mdet.status_code == 200 else {}
+                items_ma = dj_mdet.get("data", [])
+                if not items_ma: break
+
+                for it in items_ma:
+                    open_ma_items.append({
+                        "ma_id": ma_id_val, "bin_code": strip_html(it.get("pl_code") or "-"),
+                        "brand": strip_html(it.get("br_name") or "-"), "barcode_sku": strip_html(it.get("ps_barcode") or "-"),
+                        "article_name": strip_html(it.get("p_name") or "-"), "color": strip_html(it.get("p_color") or "-"),
+                        "size_variant": strip_html(it.get("sz_name") or "-"), "sub_category": strip_html(it.get("psc_name") or "-"),
+                        "cogs_price": safe_int_val(it.get("purchase")), "qty_system": safe_int_val(it.get("qty_export")),
+                        "qty_so": safe_int_val(it.get("qty_so")), "diff_qty": safe_int_val(it.get("mad_diff")),
+                        "adj_type": strip_html(it.get("mad_type") or "-"), "synced_at": now_wib.isoformat()
+                    })
+
+                tot_m = dj_mdet.get("recordsTotal", 0)
+                start_m_it += len(items_ma)
+                if tot_m > 0 and start_m_it >= tot_m: break
+                if len(items_ma) < chunk_m_it: break
+                time.sleep(0.04)
+
     except Exception as e:
         print(f"   ⚠️ MADJ error: {e}")
 
-    # 4. Single Adjustment (All Store Need Approval)
+    # 4. Single Adjustment (All Store Need Approval DENGAN PAGINATION & PROOF_FILE)
     url_single = "https://jezpro.id/adjustment_history_datatables"
     clean_single_records = []
     for branch_name, b_info in BRANCH_MAP.items():
         st_id = b_info["st_id"]
-        try:
-            p_sa = {"draw": "1", "start": "0", "length": "250", "st_id": str(st_id), "adjustment_date": f"2026-01-01|{now_wib.strftime('%Y-%m-%d')}", "status": ""}
-            r_sa = session.get(url_single, params=p_sa, headers=headers_req, timeout=20)
-            raw_sa = r_sa.json().get("data", []) if r_sa.status_code == 200 else []
-            for idx, row in enumerate(raw_sa):
-                st_raw = strip_html(row.get("ba_status") or "").upper()
-                app_raw = strip_html(row.get("ba_approve") or "").upper()
-                if any(x in st_raw for x in ["DONE", "SELESAI", "CANCEL", "BATAL"]): continue
-                if not (any(k in st_raw for k in ["MENUNGGU", "PENDING", "NEED", "WAITING", "PROGRESS", "DRAFT"]) or app_raw in ["-", "", "NONE"] or "MENUNGGU" in app_raw): continue
+        start_row, total_expected = 0, 999999
+        batch_size = 500
 
-                ba_id_val = safe_int_val(row.get("ba_id") or row.get("id")) or (abs(hash(f"{st_id}_{idx}")) % (10**10))
-                clean_single_records.append({
-                    "id": ba_id_val, "ba_code": strip_html(row.get("ba_code") or "-"),
-                    "store_name": strip_html(row.get("st_name") or branch_name),
-                    "bin_code": strip_html(row.get("pl_code") or "-"), "creator": strip_html(row.get("u_name") or "-"),
-                    "approval": strip_html(row.get("ba_approve") or "-"), "executor": strip_html(row.get("ba_executor") or "-"),
-                    "brand": strip_html(row.get("br_name") or "-"), "article_name": strip_html(row.get("p_name") or "-"),
-                    "barcode_sku": strip_html(row.get("ps_barcode") or "-"), "color": strip_html(row.get("p_color") or "-"),
-                    "size_variant": strip_html(row.get("sz_name") or "-"), "cogs": safe_int_val(row.get("cogs")),
-                    "old_qty": safe_int_val(row.get("ba_old_qty")), "new_qty": safe_int_val(row.get("ba_new_qty")),
-                    "adjust_qty": safe_int_val(row.get("adjust")), "note": strip_html(row.get("ba_note") or "-"),
-                    "status": strip_html(row.get("ba_status") or "Menunggu"), "updated_at": strip_html(row.get("ba_updated_at") or ""),
-                    "synced_at": now_wib.isoformat()
-                })
-        except Exception: pass
+        while start_row < total_expected:
+            p_sa = {
+                "draw": "1", "start": str(start_row), "length": str(batch_size),
+                "st_id": str(st_id), "adjustment_date": f"2026-01-01|{now_wib.strftime('%Y-%m-%d')}",
+                "status": ""
+            }
+            try:
+                r_sa = session.get(url_single, params=p_sa, headers=headers_req, timeout=20)
+                if r_sa.status_code != 200: break
+                d_sa = r_sa.json()
+                raw_sa = d_sa.get("data", [])
+                if not raw_sa: break
+                total_expected = d_sa.get("recordsTotal", total_expected)
+                start_row += len(raw_sa)
 
-    # Kirim Bersih ke Supabase
+                for idx, row in enumerate(raw_sa):
+                    st_raw = strip_html(row.get("ba_status") or "").upper()
+                    app_raw = strip_html(row.get("ba_approve") or "").upper()
+                    if any(x in st_raw for x in ["DONE", "SELESAI", "CANCEL", "BATAL"]): continue
+                    if not (any(k in st_raw for k in ["MENUNGGU", "PENDING", "NEED", "WAITING", "PROGRESS", "DRAFT"]) or app_raw in ["-", "", "NONE"] or "MENUNGGU" in app_raw): continue
+
+                    ba_id_val = safe_int_val(row.get("ba_id") or row.get("id")) or (abs(hash(f"{st_id}_{start_row}_{idx}")) % (10**10))
+                    clean_single_records.append({
+                        "id": ba_id_val, "ba_code": strip_html(row.get("ba_code") or "-"),
+                        "store_name": strip_html(row.get("st_name") or branch_name),
+                        "bin_code": strip_html(row.get("pl_code") or "-"), "creator": strip_html(row.get("u_name") or "-"),
+                        "approval": strip_html(row.get("ba_approve") or "-"), "executor": strip_html(row.get("ba_executor") or "-"),
+                        "brand": strip_html(row.get("br_name") or "-"), "article_name": strip_html(row.get("p_name") or "-"),
+                        "barcode_sku": strip_html(row.get("ps_barcode") or "-"), "color": strip_html(row.get("p_color") or "-"),
+                        "size_variant": strip_html(row.get("sz_name") or "-"), "cogs": safe_int_val(row.get("cogs")),
+                        "old_qty": safe_int_val(row.get("ba_old_qty")), "new_qty": safe_int_val(row.get("ba_new_qty")),
+                        "adjust_qty": safe_int_val(row.get("adjust")), "note": strip_html(row.get("ba_note") or "-"),
+                        "proof_file": strip_html(row.get("ba_proof_file") or "-"),
+                        "status": strip_html(row.get("ba_status") or "Menunggu"), "updated_at": strip_html(row.get("ba_updated_at") or ""),
+                        "synced_at": now_wib.isoformat()
+                    })
+            except Exception:
+                break
+
+    # 5. Push Bersih ke Supabase
     try:
         requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_waiting_staging?plst_id=gt.0", headers=HEADERS_SB)
         if all_staging_records:
@@ -587,16 +730,14 @@ def run_module_warehouse_monitor(session):
     except Exception as e:
         print(f"   ❌ Gagal update Supabase monitor: {e}")
 
-
 # ==============================================================================
-# MODUL 3: MEMO MARKOM SPREADSHEET (LENGKAP ANTI-DUPLIKAT - TIAP 10 MENIT)
+# MODUL 3: MEMO MARKOM SPREADSHEET (LENGKAP: DIFF CHECK & FALLBACK RETRY)
 # ==============================================================================
 def run_module_memo_markom():
     if not SPREADSHEET_URL or "http" not in SPREADSHEET_URL:
         return
     print(f"\n📑 [{datetime.now(WIB).strftime('%H:%M:%S')}] Memeriksa Spreadsheet Permintaan Markom...")
     try:
-        # 1. Ambil Cache Harga Beli dari Supabase
         lookup_cogs = {}
         res_cache = requests.get(f"{SUPABASE_URL}/rest/v1/stock_live_cache?select=*", headers=HEADERS_SB, timeout=25)
         if res_cache.status_code == 200:
@@ -613,14 +754,12 @@ def run_module_memo_markom():
                             "cogs": safe_int(it.get("HARGA BELI", it.get("cogs", 0)), 0)
                         }
 
-        # 2. Ambil Memo Eksisting di Supabase
         existing_memos = {}
         res_memo = requests.get(f"{SUPABASE_URL}/rest/v1/memo_pengajuan?select=*", headers=HEADERS_SB, timeout=25)
         if res_memo.status_code == 200:
             for m in res_memo.json():
                 existing_memos[(str(m.get("tanggal", ""))[:10], str(m.get("tujuan", "")).strip().upper())] = m
 
-        # 3. Unduh & Parse Spreadsheet
         dl_url = SPREADSHEET_URL
         m_id = re.search(r'/spreadsheets/d/([a-zA-Z0-9-_]+)', SPREADSHEET_URL)
         if m_id: dl_url = f"https://docs.google.com/spreadsheets/d/{m_id.group(1)}/export?format=xlsx"
@@ -669,10 +808,23 @@ def run_module_memo_markom():
             if key_m in existing_memos:
                 exist = existing_memos[key_m]
                 if str(exist.get("status_adj", "PENDING")).upper() == "DONE": continue
+
+                # Diff check: Hanya patch jika ada item/qty/nominal yang berubah!
+                existing_items = exist.get("items", [])
+                if isinstance(existing_items, str):
+                    try: existing_items = json.loads(existing_items)
+                    except: existing_items = []
+
+                sig_new = sorted([(x['sku'], x['qty'], x['subtotal']) for x in items_list])
+                sig_old = sorted([(x.get('sku'), x.get('qty'), x.get('subtotal')) for x in existing_items])
+
+                if sig_new == sig_old and exist.get("nominal") == tot_nom and exist.get("diajukan_oleh") == pic_doc:
+                    continue
+
                 url_upd = f"{SUPABASE_URL}/rest/v1/memo_pengajuan?id=eq.{exist['id']}"
                 requests.patch(url_upd, headers=HEADERS_SB, json={"nominal": tot_nom, "diajukan_oleh": pic_doc, "items": items_list})
             else:
-                memo_id = f"MEMO/ZKN/{tgl_doc.replace('-', '')}/{int(time.time() * 1000) % 900 + 100}"
+                memo_id = f"MEMO/ZKN/{tgl_doc.replace('-', '')}/{random.randint(100, 999)}"
                 new_inserts.append({
                     "id": memo_id, "tanggal": tgl_doc, "divisi": "MARKOM",
                     "jenis": "Pengajuan Adjustment untuk Hadiah", "tujuan": event_name,
@@ -681,16 +833,18 @@ def run_module_memo_markom():
                 })
 
         if new_inserts:
-            requests.post(f"{SUPABASE_URL}/rest/v1/memo_pengajuan", headers=HEADERS_SB, json=new_inserts)
+            res_ins = requests.post(f"{SUPABASE_URL}/rest/v1/memo_pengajuan", headers=HEADERS_SB, json=new_inserts)
+            if res_ins.status_code not in [200, 201] and "status_adj" in res_ins.text:
+                for m in new_inserts: m.pop("status_adj", None)
+                requests.post(f"{SUPABASE_URL}/rest/v1/memo_pengajuan", headers=HEADERS_SB, json=new_inserts)
             print(f"   🚀 Dibuat {len(new_inserts)} memo pengajuan baru di Supabase!")
         else:
             print("   ✅ Memo Markom sudah sinkron dan mutakhir.")
     except Exception as e:
         print(f"   ⚠️ Memo Markom error: {e}")
 
-
 # ==============================================================================
-# MODUL 4 & 5: EXPORT STOK ALL CABANG & BALANCING SURABAYA (TIAP 3 JAM)
+# MODUL 4 & 5: EXPORT STOK 9 CABANG & BALANCING SURABAYA
 # ==============================================================================
 def run_module_exports_and_balancing(session):
     print(f"\n📦 [{datetime.now(WIB).strftime('%H:%M:%S')}] Memulai Ekspor Stok 9 Cabang & Balancing Surabaya...")
@@ -756,7 +910,7 @@ def run_module_exports_and_balancing(session):
         start_row, total_expected = 0, 999999
         draw_count, total_sales_rows = 1, 0
 
-        while start_row < total_expected and start_row < 20000:
+        while start_row < total_expected:
             params = {
                 "draw": str(draw_count), "start": str(start_row), "length": "2000",
                 "status": "DONE", "st_id": str(STORE_ID_SURABAYA), "date": date_param,
@@ -800,9 +954,147 @@ def run_module_exports_and_balancing(session):
     except Exception as e:
         print(f"      ⚠️ Gagal balancing sales: {e}")
 
+        # ==============================================================================
+# FUNGSI SCRAPING STOCK TRACKING SALES BALANCING (LENGKAP DENGAN PARAMETER VALID)
+# ==============================================================================
+def fetch_surabaya_sales_2months(session):
+    now_dt = datetime.now(WIB)
+    start_date = now_dt - timedelta(days=60)
+    p_start = start_date.strftime('%Y-%m-%d')
+    p_end = now_dt.strftime('%Y-%m-%d')
+    date_param = f"{p_start}|{p_end}"
+
+    print(f"\n📊 Menarik Stock Tracking Penjualan 60 Hari ({date_param})...")
+    url_dt = "https://jezpro.id/stock_tracking_datatables"
+    headers_dt = {
+        "Accept": "application/json, text/javascript, */*; q=0.01",
+        "X-Requested-With": "XMLHttpRequest",
+        "Referer": "https://jezpro.id/stock_tracking"
+    }
+
+    sales_by_sku = {}
+    total_raw_rows = 0
+    total_offline_qty = 0
+    total_online_qty = 0
+
+    start_row = 0
+    batch_size = 2000
+    total_expected = 999999
+    draw_count = 1
+
+    while start_row < total_expected:
+        # 🌟 WAJIB: columns[0] s/d columns[9] harus didefinisikan agar tidak error 500 di Jezpro
+        params = {
+            "draw": str(draw_count),
+            "columns[0][data]": "DT_RowIndex", "columns[0][name]": "plst_id", "columns[0][searchable]": "false", "columns[0][orderable]": "true", "columns[0][search][value]": "", "columns[0][search][regex]": "false",
+            "columns[1][data]": "datetime", "columns[1][name]": "plst_created", "columns[1][searchable]": "false", "columns[1][orderable]": "true", "columns[1][search][value]": "", "columns[1][search][regex]": "false",
+            "columns[2][data]": "ps_barcode", "columns[2][name]": "ps_barcode", "columns[2][searchable]": "true", "columns[2][orderable]": "true", "columns[2][search][value]": "", "columns[2][search][regex]": "false",
+            "columns[3][data]": "article", "columns[3][name]": "p_name", "columns[3][searchable]": "false", "columns[3][orderable]": "true", "columns[3][search][value]": "", "columns[3][search][regex]": "false",
+            "columns[4][data]": "invoice", "columns[4][name]": "p_name", "columns[4][searchable]": "false", "columns[4][orderable]": "true", "columns[4][search][value]": "", "columns[4][search][regex]": "false",
+            "columns[5][data]": "cust_name", "columns[5][name]": "cust_name", "columns[5][searchable]": "false", "columns[5][orderable]": "true", "columns[5][search][value]": "", "columns[5][search][regex]": "false",
+            "columns[6][data]": "qty", "columns[6][name]": "p_name", "columns[6][searchable]": "false", "columns[6][orderable]": "true", "columns[6][search][value]": "", "columns[6][search][regex]": "false",
+            "columns[7][data]": "product_location", "columns[7][name]": "pl_code", "columns[7][searchable]": "false", "columns[7][orderable]": "true", "columns[7][search][value]": "", "columns[7][search][regex]": "false",
+            "columns[8][data]": "status", "columns[8][name]": "plst_status", "columns[8][searchable]": "false", "columns[8][orderable]": "true", "columns[8][search][value]": "", "columns[8][search][regex]": "false",
+            "columns[9][data]": "instock_source", "columns[9][name]": "instock_source_status", "columns[9][searchable]": "false", "columns[9][orderable]": "false", "columns[9][search][value]": "", "columns[9][search][regex]": "false",
+            "order[0][column]": "0",
+            "order[0][dir]": "desc",
+            "start": str(start_row),
+            "length": str(batch_size),
+            "search": "",
+            "status": "DONE",
+            "instock_source": "",
+            "psc_id": "",
+            "std_id": "",
+            "br_id": "",
+            "st_id": str(STORE_ID_SURABAYA),
+            "date": date_param
+        }
+
+        try:
+            res_s = session.get(url_dt, params=params, headers=headers_dt, timeout=60)
+            if res_s.status_code != 200:
+                print(f"      ⚠️ Gagal request HTTP {res_s.status_code}")
+                break
+
+            j_data = res_s.json()
+            chunk = j_data.get("data", [])
+            total_expected = j_data.get("recordsFiltered", j_data.get("recordsTotal", 0))
+
+            if not chunk:
+                break
+
+            for item in chunk:
+                status_raw = strip_html(item.get("status") or item.get("plst_status") or "").upper()
+                if "DONE" not in status_raw:
+                    continue
+
+                # Pembersihan SKU agar cocok dengan master stok
+                raw_sku = strip_html(item.get("ps_barcode") or "")
+                sku = raw_sku.split('.')[0].strip().upper()
+                if not sku or sku in ["-", "NAN", "NONE", "NULL"]:
+                    continue
+
+                qty_val = safe_int(item.get("qty"), 1)
+                inv_val = strip_html(item.get("invoice") or "").upper()
+                is_online = ("INV" not in inv_val)
+
+                if is_online:
+                    total_online_qty += qty_val
+                else:
+                    total_offline_qty += qty_val
+
+                if sku not in sales_by_sku:
+                    sales_by_sku[sku] = {
+                        "SKU": sku,
+                        "ARTICLE": clean_article_name(item.get("article") or item.get("p_name")),
+                        "SALES_OFFLINE": 0,
+                        "SALES_ONLINE": 0,
+                        "TOTAL_SALES": 0
+                    }
+
+                if is_online:
+                    sales_by_sku[sku]["SALES_ONLINE"] += qty_val
+                else:
+                    sales_by_sku[sku]["SALES_OFFLINE"] += qty_val
+
+                sales_by_sku[sku]["TOTAL_SALES"] += qty_val
+                total_raw_rows += 1
+
+            start_row += len(chunk)
+            draw_count += 1
+            print(f"      -> Berhasil menarik {start_row:,} / {total_expected:,} baris transaksi...")
+            time.sleep(0.02)
+
+        except Exception as e:
+            print(f"      ⚠️ Error loop sales: {e}")
+            break
+
+    summary_sales = list(sales_by_sku.values())
+
+    # Kirim ke Supabase
+    if summary_sales:
+        res_push = requests.post(f"{SUPABASE_URL}/rest/v1/balancing_sales_cache", headers=HEADERS_SB, json={
+            "id": "SURABAYA_SALES_90D",
+            "branch": BRANCH_SURABAYA,
+            "period_start": p_start,
+            "period_end": p_end,
+            "updated_at": datetime.now(WIB).isoformat(),
+            "total_rows": total_raw_rows,
+            "sales_data": summary_sales
+        }, timeout=120)
+
+        if res_push.status_code in [200, 201]:
+            print(f"   ✅ Sukses! {len(summary_sales):,} SKU aktif berhasil tersimpan ke balancing_sales_cache.")
+            print(f"      🛒 Offline (INV): {total_offline_qty:,} Pcs | 🌐 Online (Non-INV): {total_online_qty:,} Pcs")
+        else:
+            print(f"   ❌ Gagal simpan ke Supabase: {res_push.text}")
+    else:
+        print("   ⚠️ Peringatan: Tidak ada data sales yang ditarik, Supabase tidak di-overwrite.")
+
+    return summary_sales
 
 # ==============================================================================
-# THREAD KHUSUS: INSTOCK SURABAYA (TIAP 45 DETIK NONSTOP)
+# WORKER BACKGROUND THREAD (INSTOCK NONSTOP TIAP 45 DETIK)
 # ==============================================================================
 def thread_instock_worker(session):
     while True:
@@ -812,28 +1104,22 @@ def thread_instock_worker(session):
             print(f"⚠️ [Instock Loop Error]: {e}")
         time.sleep(45)
 
-
 # ==============================================================================
 # MAIN ORCHESTRATOR
 # ==============================================================================
 if __name__ == "__main__":
     print("=" * 75)
-    print("🚀 MASTER LOCAL ORCHESTRATOR: JEZPRO -> SUPABASE AKTIF")
-    print("=" * 75)
-    print("   ✅ Modul 1: Instock Surabaya (Background Thread: Tiap 45 Detik)")
-    print("   ✅ Modul 2: Warehouse Monitor Staging/TF/MADJ/SA (Tiap 5 Menit)")
-    print("   ✅ Modul 3: Memo Markom Permintaan Hadiah (Tiap 10 Menit)")
-    print("   ✅ Modul 4 & 5: Export Stok 9 Cabang & Balancing (Tiap 3 Jam)")
+    print("🚀 MASTER LOCAL ORCHESTRATOR: JEZPRO -> SUPABASE (VERSI LENGKAP & FIX)")
     print("=" * 75)
 
     jez = create_jezpro_session()
 
-    # 1. Jalankan thread khusus Instock agar bergerak cepat tanpa terganggu
+    # 1. Jalankan thread khusus Instock Surabaya mandiri tiap 45 detik
     t_instock = threading.Thread(target=thread_instock_worker, args=(jez,), daemon=True)
     t_instock.start()
-    print("🧵 Thread Instock Surabaya telah aktif dan berjalan mandiri tiap 45 detik.")
+    print("🧵 Thread Instock Surabaya telah aktif mandiri tiap 45 detik.")
 
-    # 2. Main Loop untuk jadwal tugas berkala lainnya
+    # 2. Main Loop untuk jadwal tugas berkala
     last_monitor = 0
     last_memo = 0
     last_heavy = 0
@@ -857,7 +1143,7 @@ if __name__ == "__main__":
             except Exception as e:
                 print(f"❌ Error Memo: {e}")
 
-        # Ekspor Berat & Balancing (Tiap 3 Jam / 10.800 Detik - Langsung jalan sekali di awal)
+        # Ekspor Berat & Balancing (Tiap 3 Jam / 10.800 Detik - Pertama kali langsung jalan)
         if curr - last_heavy >= 10800 or last_heavy == 0:
             try:
                 run_module_exports_and_balancing(jez)
