@@ -954,7 +954,7 @@ def run_module_exports_and_balancing(session):
     except Exception as e:
         print(f"      ⚠️ Gagal balancing sales: {e}")
 
-        # ==============================================================================
+     # ==============================================================================
 # FUNGSI SCRAPING STOCK TRACKING SALES BALANCING (LENGKAP DENGAN PARAMETER VALID)
 # ==============================================================================
 def fetch_surabaya_sales_2months(session):
@@ -964,7 +964,7 @@ def fetch_surabaya_sales_2months(session):
     p_end = now_dt.strftime('%Y-%m-%d')
     date_param = f"{p_start}|{p_end}"
 
-    print(f"\n📊 Menarik Stock Tracking Penjualan 60 Hari ({date_param})...")
+    print(f"\n📊 Menarik Stock Tracking Penjualan 60 Hari Surabaya ({date_param})...")
     url_dt = "https://jezpro.id/stock_tracking_datatables"
     headers_dt = {
         "Accept": "application/json, text/javascript, */*; q=0.01",
@@ -983,7 +983,7 @@ def fetch_surabaya_sales_2months(session):
     draw_count = 1
 
     while start_row < total_expected:
-        # 🌟 WAJIB: columns[0] s/d columns[9] harus didefinisikan agar tidak error 500 di Jezpro
+        # 🌟 WAJIB: columns[0] s/d columns[9] harus lengkap agar tidak error 500 di Jezpro
         params = {
             "draw": str(draw_count),
             "columns[0][data]": "DT_RowIndex", "columns[0][name]": "plst_id", "columns[0][searchable]": "false", "columns[0][orderable]": "true", "columns[0][search][value]": "", "columns[0][search][regex]": "false",
@@ -1028,7 +1028,6 @@ def fetch_surabaya_sales_2months(session):
                 if "DONE" not in status_raw:
                     continue
 
-                # Pembersihan SKU agar cocok dengan master stok
                 raw_sku = strip_html(item.get("ps_barcode") or "")
                 sku = raw_sku.split('.')[0].strip().upper()
                 if not sku or sku in ["-", "NAN", "NONE", "NULL"]:
@@ -1071,7 +1070,6 @@ def fetch_surabaya_sales_2months(session):
 
     summary_sales = list(sales_by_sku.values())
 
-    # Kirim ke Supabase
     if summary_sales:
         res_push = requests.post(f"{SUPABASE_URL}/rest/v1/balancing_sales_cache", headers=HEADERS_SB, json={
             "id": "SURABAYA_SALES_90D",
@@ -1084,14 +1082,73 @@ def fetch_surabaya_sales_2months(session):
         }, timeout=120)
 
         if res_push.status_code in [200, 201]:
-            print(f"   ✅ Sukses! {len(summary_sales):,} SKU aktif berhasil tersimpan ke balancing_sales_cache.")
+            print(f"   ✅ Sukses! {len(summary_sales):,} SKU aktif tersimpan ke balancing_sales_cache.")
             print(f"      🛒 Offline (INV): {total_offline_qty:,} Pcs | 🌐 Online (Non-INV): {total_online_qty:,} Pcs")
         else:
             print(f"   ❌ Gagal simpan ke Supabase: {res_push.text}")
     else:
-        print("   ⚠️ Peringatan: Tidak ada data sales yang ditarik, Supabase tidak di-overwrite.")
+        print("   ⚠️ Peringatan: Tidak ada data sales yang ditarik, Supabase tidak ditimpa.")
 
     return summary_sales
+
+
+# ==============================================================================
+# MODUL 4 & 5: EXPORT STOK 9 CABANG & BALANCING SURABAYA
+# ==============================================================================
+def run_module_exports_and_balancing(session):
+    print(f"\n📦 [{datetime.now(WIB).strftime('%H:%M:%S')}] Memulai Ekspor Stok 9 Cabang & Balancing Surabaya...")
+
+    # 1. Ekspor Stok Seluruh 9 Cabang Jezpro -> stock_live_cache
+    for branch_name, info in BRANCH_MAP.items():
+        st_id = info["st_id"]
+        db_id = info["db_id"]
+        try:
+            print(f"   -> Ekspor Stok {branch_name} (st_id: {st_id})...")
+            url_exp = f"https://jezpro.id/export_mass_adjustment_template?st_id={st_id}&psc_id=&br_id=&pl_id=&qty_filter=1"
+            r_exp = session.get(url_exp, headers={"Referer": "https://jezpro.id/mass_adjustment"}, timeout=300)
+            excel_bytes = None
+
+            if "application/json" in r_exp.headers.get("Content-Type", ""):
+                notif_id = r_exp.json().get("notification_id")
+                check_url = f"https://jezpro.id/notifications/{notif_id}/open-export"
+                final_url = ""
+                for _ in range(15):
+                    time.sleep(3)
+                    r_chk = session.get(check_url, allow_redirects=False, timeout=60)
+                    loc = r_chk.headers.get("Location", "")
+                    if r_chk.status_code == 302 and ("neo.id" in loc or "http" in loc):
+                        final_url = loc; break
+
+                if final_url:
+                    excel_bytes = requests.get(final_url, timeout=300).content
+            else:
+                excel_bytes = r_exp.content
+
+            if excel_bytes:
+                df_stk = pd.read_excel(io.BytesIO(excel_bytes))
+                df_stk["STORE_NAME"] = branch_name
+                payload = df_stk.fillna("").to_dict(orient="records")
+                requests.post(f"{SUPABASE_URL}/rest/v1/stock_live_cache", headers=HEADERS_SB, json={
+                    "id": db_id, "branch": branch_name, "updated_at": datetime.now(WIB).isoformat(),
+                    "total_rows": len(payload), "stock_data": payload
+                }, timeout=120)
+                print(f"      ✅ Berhasil simpan {len(payload):,} baris ({branch_name})")
+
+                # Jika Surabaya, simpan juga untuk balancing_stock_cache
+                if st_id == STORE_ID_SURABAYA:
+                    requests.post(f"{SUPABASE_URL}/rest/v1/balancing_stock_cache", headers=HEADERS_SB, json={
+                        "id": "SURABAYA_BALANCING_STOCK", "branch": BRANCH_SURABAYA,
+                        "updated_at": datetime.now(WIB).isoformat(), "total_rows": len(payload),
+                        "stock_data": payload
+                    }, timeout=120)
+        except Exception as e:
+            print(f"      ⚠️ Gagal ekspor {branch_name}: {e}")
+
+    # 2. 🌟 PANGGIL FUNGSI SCRAPING STOCK TRACKING PENJUALAN YANG SUDAH VALID
+    try:
+        fetch_surabaya_sales_2months(session)
+    except Exception as e:
+        print(f"      ⚠️ Gagal balancing sales: {e}")
 
 # ==============================================================================
 # WORKER BACKGROUND THREAD (INSTOCK NONSTOP TIAP 45 DETIK)
