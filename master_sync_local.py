@@ -1092,13 +1092,6 @@ if __name__ == "__main__":
             except Exception as e:
                 print(f"❌ Error Monitor: {e}")
 
-        # Memo Markom (Tiap 10 Menit / 600 Detik)
-        if curr - last_memo >= 600:
-            try:
-                run_module_memo_markom()
-                last_memo = curr
-            except Exception as e:
-                print(f"❌ Error Memo: {e}")
 
         # Ekspor Berat & Balancing (Tiap 3 Jam / 10.800 Detik - Pertama kali langsung jalan)
         if curr - last_heavy >= 10800 or last_heavy == 0:
