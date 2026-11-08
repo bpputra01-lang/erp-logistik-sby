@@ -19,7 +19,7 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXV
 JEZPRO_EMAIL = os.environ.get("JEZPRO_EMAIL", "fajarbintang786@jez.co.id")
 JEZPRO_PASSWORD = os.environ.get("JEZPRO_PASSWORD", "131199")
 
-SPREADSHEET_URL = os.environ.get("SPREADSHEET_URL", "")
+SPREADSHEET_URL = os.environ.get("SPREADSHEET_URL", "https://docs.google.com/spreadsheets/d/1yjNfDer239OR0tVUl_Xj1UCArqbcMr5dl6C-5EGtrSo/edit?gid=1695087119#gid=1695087119")
 
 STORE_ID_SURABAYA = 3
 BRANCH_SURABAYA = "JEZ SURABAYA"
