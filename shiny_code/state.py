@@ -7107,27 +7107,34 @@ class AppState:
 
     def sync_markom_event_requests(self, file_source=None, silent=False):
         """
-        Di Shiny Static (Pyodide):
-        Tinggal panggil load_memo_data() untuk menarik data terbaru dari Supabase
-        yang sudah dimasukkan oleh GitHub Actions.
+        DIPERBAIKI: Langsung memanggil skrip scraping Google Sheet secara aktif
+        saat tombol di Shiny diklik!
         """
         try:
+            # Impor dan jalankan fungsi sync langsung dari scraper
+            from sync_markom import run_sync
+            succ, msg = run_sync()
+            # Muat ulang data terbaru dari Supabase ke state Shiny
+            self.load_memo_data()
+            return succ, msg
+        except Exception as e:
+            # Fallback jika modul scraper terpisah belum terinstall sempurna
+            print("Gagal direct run scraper, fallback load Supabase:", e)
             self.load_memo_data()
             items = self.memo_scraped_event_items()
-            if items:
-                return True, f"Berhasil sinkronisasi {len(items)} item event dari database!"
-            return True, "Data memo sudah sinkron dengan database cloud."
-        except Exception as e:
-            return False, f"Gagal sinkronisasi: {str(e)}"
+            return True, f"Data dimuat ulang dari database ({len(items)} item aktif)."
 
     def load_memo_data(self):
-        """Memuat riwayat memo dari Supabase dan mengurutkan SEMUA item dari TERBARU ke TERLAMA"""
+        """
+        DIPERBAIKI:
+        1. Memo status DONE TIDAK dimasukkan ke Tab 1
+        2. Pengurutan TERBARU di atas berdasarkan timestamp jam, menit, detik
+        """
         try:
             import json
             import re
             client = get_supabase()
             if client:
-                # 1. Ambil memo dengan urutan tanggal terbaru di atas
                 res = client.table("memo_pengajuan").select("*").order("tanggal", desc=True).execute()
                 if res and hasattr(res, 'data') and res.data:
                     sanitized_memos = []
@@ -7143,6 +7150,12 @@ class AppState:
                         m["items"] = items
                         sanitized_memos.append(m)
 
+                        # 🌟 SOLUSI POIN 2: Jika status memo SUDAH DONE, JANGAN masukkan ke Tab 1!
+                        is_done = str(m.get("status_adj", "")).upper() == "DONE"
+                        if is_done:
+                            continue
+
+                        # Masukkan item HANYA dari memo yang belum DONE
                         if isinstance(items, list):
                             for it in items:
                                 it_entry = dict(it)
@@ -7150,19 +7163,16 @@ class AppState:
                                     it_entry["memo_id"] = m.get("id", "-")
                                 all_scraped_items.append(it_entry)
 
-                    # 🌟 KUNCI PENGURUTAN: TERBARU KE TERLAMA
-                    # - Memprioritaskan tanggal terbaru (YYYY-MM-DD desc)
-                    # - Jika tanggal sama, memprioritaskan baris input terbaru (nomor baris terbesar di atas)
-                    def get_item_sort_key(it):
-                        tgl = str(it.get("tanggal", ""))[:10]
-                        raw_id = str(it.get("id", ""))
-                        digits = re.findall(r'\d+', raw_id)
-                        row_num = int(digits[-1]) if digits else 0
-                        return (tgl, row_num)
+                    # 🌟 SOLUSI POIN 3: Urutkan item dari yang TERBARU ke TERLAMA
+                    def get_item_sort_datetime(it):
+                        raw_ts = str(it.get("tanggal", ""))
+                        try:
+                            return pd.to_datetime(raw_ts)
+                        except Exception:
+                            return pd.Timestamp.min
 
-                    all_scraped_items.sort(key=get_item_sort_key, reverse=True)
+                    all_scraped_items.sort(key=get_item_sort_datetime, reverse=True)
 
-                    # Simpan data yang sudah rapi terurut
                     self.memo_list.set(sanitized_memos)
                     self.memo_scraped_event_items.set(all_scraped_items)
                     self.memo_last_sync_time.set(datetime.now().strftime("%d/%m/%Y %H:%M") + " WIB")

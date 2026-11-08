@@ -4988,22 +4988,20 @@ def server(input: Inputs, output: Outputs, session: Session):
         items = state.memo_scraped_event_items()
         if not items:
             return ui.div(
-                ui.p("Belum ada data permintaan barang dengan Note 'EVENT', 'HADIAH', atau 'GIFT'. Klik tombol sync di atas untuk menarik data dari spreadsheet.", style="color: #718096; font-style: italic; text-align: center; padding: 2rem;"),
+                ui.p("Belum ada data permintaan barang aktif (Note: 'EVENT', 'HADIAH', atau 'GIFT').", style="color: #718096; font-style: italic; text-align: center; padding: 2rem;"),
                 style="background: white; border-radius: 10px; border: 1px dashed #CBD5E0;"
             )
 
-        # 🌟 PENGAMAN: Urutkan data dari permintaan terbaru ke yang paling lama
-        import re
-        def get_item_sort_key(it):
-            tgl = str(it.get("tanggal", ""))[:10]
-            raw_id = str(it.get("id", ""))
-            digits = re.findall(r'\d+', raw_id)
-            row_num = int(digits[-1]) if digits else 0
-            return (tgl, row_num)
+        # Urutkan berdasarkan waktu lengkap (terbaru di paling atas)
+        def parse_full_dt(it):
+            try:
+                return pd.to_datetime(it.get("tanggal", ""))
+            except Exception:
+                return pd.Timestamp.min
 
-        items_sorted = sorted(items, key=get_item_sort_key, reverse=True)
+        items_sorted = sorted(items, key=parse_full_dt, reverse=True)
 
-        headers = ["NO", "UNIQUE ID", "TANGGAL (M)", "PIC (A)", "KETERANGAN (B)", "BIN PICK (O)", "SKU", "ITEM NAME", "QTY (D)", "HARGA BELI", "SUBTOTAL"]
+        headers = ["NO", "UNIQUE ID", "WAKTU REQ", "PIC", "KETERANGAN", "BIN PICK", "SKU", "NAMA ARTIKEL", "QTY", "HARGA BELI", "SUBTOTAL"]
         rows = []
         tot_qty = 0
         tot_nominal = 0
@@ -5011,7 +5009,10 @@ def server(input: Inputs, output: Outputs, session: Session):
         for idx, it in enumerate(items_sorted, start=1):
             q = safe_int(it.get("qty", 1), 1)
             cogs = safe_int(it.get("cogs", 0), 0)
-            subtot = safe_int(it.get("subtotal", q * cogs), q * cogs)
+            subtot = safe_int(it.get("subtotal", 0), 0)
+            if subtot == 0 and cogs > 0:
+                subtot = q * cogs
+
             tot_qty += q
             tot_nominal += subtot
 
@@ -5156,18 +5157,27 @@ def server(input: Inputs, output: Outputs, session: Session):
             res.append(m)
         return res
 
-    # Helper render kartu item memo
     def _render_single_memo_card(m: dict, stage: str):
         m_id = m.get("id", "-")
         divisi = m.get("divisi", "MARKOM")
         tujuan = m.get("tujuan", "-")
-        nominal = safe_int(m.get("nominal", 0), 0)
+        
         items = m.get("items", [])
         if isinstance(items, str):
             import json
             try: items = json.loads(items)
             except: items = []
         items_cnt = len(items)
+
+        # 🌟 SOLUSI POIN 4: Jika nominal di memo 0, hitung langsung dari item-item di dalamnya!
+        nominal = safe_int(m.get("nominal", 0), 0)
+        if nominal == 0 and items:
+            calculated_subtotal = sum(
+                safe_int(x.get("subtotal", 0)) or (safe_int(x.get("qty", 1), 1) * safe_int(x.get("cogs", 0), 0))
+                for x in items
+            )
+            if calculated_subtotal > 0:
+                nominal = calculated_subtotal
 
         # 1. MARKOM SUB-TAB
         if stage == "MARKOM":
