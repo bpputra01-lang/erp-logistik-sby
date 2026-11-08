@@ -845,13 +845,18 @@ def run_module_warehouse_monitor(session):
         print(f"   ❌ Gagal update Supabase monitor: {e}")
 
 # ==============================================================================
-# MODUL 3: MEMO MARKOM SPREADSHEET
+# MODUL 3: MEMO MARKOM SPREADSHEET (VERSI FIX DENGAN SHEET 'Permintaan markom')
 # ==============================================================================
 def run_module_memo_markom():
     if not SPREADSHEET_URL or "http" not in SPREADSHEET_URL:
+        print("⚠️ [Memo Markom] SPREADSHEET_URL belum diatur!")
         return
-    print(f"\n📑 [{datetime.now(WIB).strftime('%H:%M:%S')}] Memeriksa Spreadsheet Permintaan Markom...")
+
+    print(f"\n📑 [{datetime.now(WIB).strftime('%H:%M:%S')}] Memeriksa Spreadsheet 'REQUEST BARANG' (Sheet: Permintaan markom)...")
     try:
+        import urllib.parse
+
+        # 1. Ambil Master Harga Beli & Nama Barang dari cache Supabase
         lookup_cogs = {}
         res_cache = requests.get(f"{SUPABASE_URL}/rest/v1/stock_live_cache?select=*", headers=HEADERS_SB, timeout=25)
         if res_cache.status_code == 200:
@@ -868,50 +873,116 @@ def run_module_memo_markom():
                             "cogs": safe_int(it.get("HARGA BELI", it.get("cogs", 0)), 0)
                         }
 
+        # 2. Ambil Riwayat Memo yang Sudah Ada di Supabase
         existing_memos = {}
         res_memo = requests.get(f"{SUPABASE_URL}/rest/v1/memo_pengajuan?select=*", headers=HEADERS_SB, timeout=25)
         if res_memo.status_code == 200:
             for m in res_memo.json():
-                existing_memos[(str(m.get("tanggal", ""))[:10], str(m.get("tujuan", "")).strip().upper())] = m
+                tgl = str(m.get("tanggal", ""))[:10]
+                tujuan = str(m.get("tujuan", "")).strip().upper()
+                existing_memos[(tgl, tujuan)] = m
 
+        # 3. Download Spreadsheet Google Sheets
         dl_url = SPREADSHEET_URL
         m_id = re.search(r'/spreadsheets/d/([a-zA-Z0-9-_]+)', SPREADSHEET_URL)
-        if m_id: dl_url = f"https://docs.google.com/spreadsheets/d/{m_id.group(1)}/export?format=xlsx"
+        if m_id:
+            dl_url = f"https://docs.google.com/spreadsheets/d/{m_id.group(1)}/export?format=xlsx"
 
         xl = pd.ExcelFile(dl_url)
-        tgt_sheet = next((s for s in xl.sheet_names if "MARKOM" in s.upper()), xl.sheet_names[0])
+        all_sheets = xl.sheet_names
+
+        # 🌟 Cari tab sheet 'Permintaan markom' secara spesifik
+        tgt_sheet = None
+        for s in all_sheets:
+            if "PERMINTAAN MARKOM" in s.strip().upper():
+                tgt_sheet = s
+                break
+        if not tgt_sheet:
+            for s in all_sheets:
+                if "MARKOM" in s.strip().upper() or "REQUEST" in s.strip().upper():
+                    tgt_sheet = s
+                    break
+        if not tgt_sheet:
+            tgt_sheet = all_sheets[0]
+
+        print(f"   🎯 Sheet yang Dibaca: '{tgt_sheet}'")
         df = pd.read_excel(xl, sheet_name=tgt_sheet)
-        if df.empty or df.shape[1] < 4: return
+        if df.empty or df.shape[1] < 5:
+            print("   ⚠️ Data di sheet kosong atau kolom tidak memadai!")
+            return
 
-        col_pic, col_note, col_sku, col_qty = df.columns[0], df.columns[1], df.columns[2], df.columns[3]
-        col_tgl = df.columns[12] if df.shape[1] > 12 else df.columns[-2]
-        col_bin = df.columns[14] if df.shape[1] > 14 else df.columns[-1]
+        # 🌟 4. PEMETAAN KOLOM DINAMIS (Sesuai Persis dengan File Anda)
+        def find_col(candidates, default_idx):
+            for cand in candidates:
+                for c in df.columns:
+                    if cand.upper() in str(c).strip().upper():
+                        return c
+            return df.columns[default_idx] if df.shape[1] > default_idx else df.columns[0]
 
-        mask = df[col_note].fillna("").astype(str).str.contains("EVENT|HADIAH|GIFT", case=False, na=False)
+        col_pic   = find_col(["PIC"], 0)
+        col_note1 = find_col(["NOTE AMP"], 2)
+        col_note2 = find_col(["NO TELP"], 1)
+        col_sku   = find_col(["SKU", "BARCODE"], 3)
+        col_qty   = find_col(["QTY", "JUMLAH"], 4)
+        col_tgl   = find_col(["TANGGAL REQ", "TIMESTAMP"], 14)
+        col_bin   = find_col(["BIN PICK", "PICK_LOCATION"], 16)
+
+        # 🌟 5. FILTER: Cari 'EVENT', 'HADIAH', atau 'GIFT' di NOTE AMP & NO TELP
+        pattern = "EVENT|HADIAH|GIFT"
+        mask = (
+            df[col_note1].fillna("").astype(str).str.contains(pattern, case=False, na=False) |
+            df[col_note2].fillna("").astype(str).str.contains(pattern, case=False, na=False)
+        )
         df_filtered = df[mask].copy()
-        if df_filtered.empty: return
 
+        if df_filtered.empty:
+            print("   ℹ️ Tidak ada baris permintaan bertanda 'EVENT', 'HADIAH', atau 'GIFT'.")
+            return
+
+        # 🌟 6. Susun Rincian Item Permintaan
         grouped_events = {}
         for row_idx, (_, r) in enumerate(df_filtered.iterrows(), start=1):
             pic_val = str(r[col_pic]).strip() if pd.notna(r[col_pic]) else "MARKOM"
-            note_val = str(r[col_note]).strip().upper() if pd.notna(r[col_note]) else "EVENT"
+
+            n1 = str(r[col_note1]).strip() if pd.notna(r[col_note1]) else ""
+            n2 = str(r[col_note2]).strip() if pd.notna(r[col_note2]) else ""
+            note_val = n1.upper() if n1 else (n2.upper() if n2 else "EVENT")
+
             raw_tgl = str(r[col_tgl]).strip() if pd.notna(r[col_tgl]) else ""
-            tgl_val = raw_tgl[:10] if len(raw_tgl) >= 10 else datetime.now().strftime("%Y-%m-%d")
+            try:
+                dt_parsed = pd.to_datetime(raw_tgl, dayfirst=True)
+                tgl_val = dt_parsed.strftime("%Y-%m-%d")
+            except Exception:
+                tgl_val = raw_tgl[:10] if len(raw_tgl) >= 10 else datetime.now().strftime("%Y-%m-%d")
+
             sku_val = str(r[col_sku]).split('.')[0].strip().upper() if pd.notna(r[col_sku]) else ""
-            if not sku_val or sku_val in ["-", "NAN", "NONE"]: continue
+            if not sku_val or sku_val in ["-", "NAN", "NONE", "SKU", ""]:
+                continue
 
             q_val = safe_int(r[col_qty], 1)
             b_val = str(r[col_bin]).strip() if pd.notna(r[col_bin]) else "GL1-DC-OUT"
             info = lookup_cogs.get(sku_val, {})
             cogs_val = info.get("cogs", 0)
 
-            grouped_events.setdefault((tgl_val, note_val), {"pic": pic_val, "items": []})["items"].append({
-                "id": f"REQ-{sku_val}-{row_idx}", "tanggal": tgl_val, "pic": pic_val,
-                "keterangan": note_val, "bin": b_val, "sku": sku_val,
-                "item_name": info.get("name") or sku_val, "cogs": cogs_val, "qty": q_val,
+            item_entry = {
+                "id": f"REQ-{sku_val}-{row_idx}",
+                "tanggal": tgl_val,
+                "pic": pic_val,
+                "keterangan": note_val,
+                "bin": b_val,
+                "sku": sku_val,
+                "item_name": info.get("name") or sku_val,
+                "cogs": cogs_val,
+                "qty": q_val,
                 "subtotal": cogs_val * q_val
-            })
+            }
 
+            group_key = (tgl_val, note_val)
+            if group_key not in grouped_events:
+                grouped_events[group_key] = {"pic": pic_val, "items": []}
+            grouped_events[group_key]["items"].append(item_entry)
+
+        # 🌟 7. Sinkronisasi (Update Jika Ada Perubahan Item/QTY, Insert Jika Memo Baru)
         new_inserts = []
         for (tgl_doc, event_name), grp_data in grouped_events.items():
             items_list = grp_data["items"]
@@ -921,40 +992,61 @@ def run_module_memo_markom():
 
             if key_m in existing_memos:
                 exist = existing_memos[key_m]
-                if str(exist.get("status_adj", "PENDING")).upper() == "DONE": continue
+                # Jika sudah diselesaikan (DONE), jangan ditimpa
+                if str(exist.get("status_adj", "PENDING")).upper() == "DONE":
+                    continue
 
                 existing_items = exist.get("items", [])
                 if isinstance(existing_items, str):
                     try: existing_items = json.loads(existing_items)
-                    except: existing_items = []
+                    except Exception: existing_items = []
 
                 sig_new = sorted([(x['sku'], x['qty'], x['subtotal']) for x in items_list])
                 sig_old = sorted([(x.get('sku'), x.get('qty'), x.get('subtotal')) for x in existing_items])
 
+                # Jika item dan nominalnya persis sama, lewati
                 if sig_new == sig_old and exist.get("nominal") == tot_nom and exist.get("diajukan_oleh") == pic_doc:
                     continue
 
-                url_upd = f"{SUPABASE_URL}/rest/v1/memo_pengajuan?id=eq.{exist['id']}"
-                requests.patch(url_upd, headers=HEADERS_SB, json={"nominal": tot_nom, "diajukan_oleh": pic_doc, "items": items_list})
+                # Encode ID memo agar tanda '/' aman saat melakukan PATCH ke Supabase
+                safe_id = urllib.parse.quote(str(exist['id']), safe='')
+                url_upd = f"{SUPABASE_URL}/rest/v1/memo_pengajuan?id=eq.{safe_id}"
+                res_patch = requests.patch(
+                    url_upd,
+                    headers=HEADERS_SB,
+                    json={"nominal": tot_nom, "diajukan_oleh": pic_doc, "items": items_list}
+                )
+                if res_patch.status_code in [200, 204]:
+                    print(f"   🔄 [UPDATE] Memo '{event_name}' ({exist['id']}) berhasil diperbarui!")
+                else:
+                    print(f"   ⚠️ Gagal update memo {exist['id']}: {res_patch.text}")
             else:
                 memo_id = f"MEMO/ZKN/{tgl_doc.replace('-', '')}/{random.randint(100, 999)}"
                 new_inserts.append({
-                    "id": memo_id, "tanggal": tgl_doc, "divisi": "MARKOM",
-                    "jenis": "Pengajuan Adjustment untuk Hadiah", "tujuan": event_name,
-                    "nominal": tot_nom, "diajukan_oleh": pic_doc, "diproses_oleh": "Tim Purchasing",
-                    "diperiksa_oleh": "Tim Finance", "status_adj": "PENDING", "items": items_list
+                    "id": memo_id,
+                    "tanggal": tgl_doc,
+                    "divisi": "MARKOM",
+                    "jenis": "Pengajuan Adjustment untuk Hadiah",
+                    "tujuan": event_name,
+                    "nominal": tot_nom,
+                    "diajukan_oleh": pic_doc,
+                    "diproses_oleh": "Tim Purchasing",
+                    "diperiksa_oleh": "Tim Finance",
+                    "status_adj": "PENDING",
+                    "items": items_list
                 })
 
         if new_inserts:
             res_ins = requests.post(f"{SUPABASE_URL}/rest/v1/memo_pengajuan", headers=HEADERS_SB, json=new_inserts)
-            if res_ins.status_code not in [200, 201] and "status_adj" in res_ins.text:
-                for m in new_inserts: m.pop("status_adj", None)
-                requests.post(f"{SUPABASE_URL}/rest/v1/memo_pengajuan", headers=HEADERS_SB, json=new_inserts)
-            print(f"   🚀 Dibuat {len(new_inserts)} memo pengajuan baru di Supabase!")
+            if res_ins.status_code in [200, 201]:
+                print(f"   🚀 Berhasil menambahkan {len(new_inserts)} memo pengajuan baru ke Supabase!")
+            else:
+                print(f"   ⚠️ Gagal insert memo baru: {res_ins.text}")
         else:
             print("   ✅ Memo Markom sudah sinkron dan mutakhir.")
+
     except Exception as e:
-        print(f"   ⚠️ Memo Markom error: {e}")
+        print(f"   ❌ Memo Markom error: {e}")
 
 # ==============================================================================
 # FUNGSI SCRAPING STOCK TRACKING SALES SURABAYA (MURNI ST_ID = 3)
