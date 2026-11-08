@@ -4992,12 +4992,23 @@ def server(input: Inputs, output: Outputs, session: Session):
                 style="background: white; border-radius: 10px; border: 1px dashed #CBD5E0;"
             )
 
+        # 🌟 PENGAMAN: Urutkan data dari permintaan terbaru ke yang paling lama
+        import re
+        def get_item_sort_key(it):
+            tgl = str(it.get("tanggal", ""))[:10]
+            raw_id = str(it.get("id", ""))
+            digits = re.findall(r'\d+', raw_id)
+            row_num = int(digits[-1]) if digits else 0
+            return (tgl, row_num)
+
+        items_sorted = sorted(items, key=get_item_sort_key, reverse=True)
+
         headers = ["NO", "UNIQUE ID", "TANGGAL (M)", "PIC (A)", "KETERANGAN (B)", "BIN PICK (O)", "SKU", "ITEM NAME", "QTY (D)", "HARGA BELI", "SUBTOTAL"]
         rows = []
         tot_qty = 0
         tot_nominal = 0
 
-        for idx, it in enumerate(items, start=1):
+        for idx, it in enumerate(items_sorted, start=1):
             q = safe_int(it.get("qty", 1), 1)
             cogs = safe_int(it.get("cogs", 0), 0)
             subtot = safe_int(it.get("subtotal", q * cogs), q * cogs)
@@ -5020,7 +5031,7 @@ def server(input: Inputs, output: Outputs, session: Session):
 
         return ui.div(
             ui.div(
-                dark_metric_box("📦 TOTAL BARIS EVENT", f"{len(items):,} ITEM", "#3182CE"),
+                dark_metric_box("📦 TOTAL BARIS EVENT", f"{len(items_sorted):,} ITEM", "#3182CE"),
                 dark_metric_box("🔢 TOTAL QTY BARANG", f"{tot_qty:,} PCS", "#C5A059"),
                 dark_metric_box("💰 TOTAL VALUASI HARGA BELI", f"Rp {tot_nominal:,}", "#10B981"),
                 style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"

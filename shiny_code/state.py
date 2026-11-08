@@ -7121,15 +7121,17 @@ class AppState:
             return False, f"Gagal sinkronisasi: {str(e)}"
 
     def load_memo_data(self):
-        """Memuat riwayat memo dari Supabase dan menggabungkan SEMUA item ke Tab 1"""
+        """Memuat riwayat memo dari Supabase dan mengurutkan SEMUA item dari TERBARU ke TERLAMA"""
         try:
             import json
+            import re
             client = get_supabase()
             if client:
+                # 1. Ambil memo dengan urutan tanggal terbaru di atas
                 res = client.table("memo_pengajuan").select("*").order("tanggal", desc=True).execute()
                 if res and hasattr(res, 'data') and res.data:
                     sanitized_memos = []
-                    all_scraped_items = []  # 🌟 Wadah untuk menampung SEMUA item dari SEMUA memo
+                    all_scraped_items = []
 
                     for m in res.data:
                         items = m.get("items", [])
@@ -7141,19 +7143,27 @@ class AppState:
                         m["items"] = items
                         sanitized_memos.append(m)
 
-                        # 🌟 GABUNGKAN SEMUA BARANG DARI SETIAP MEMO KE TAB 1
                         if isinstance(items, list):
                             for it in items:
                                 it_entry = dict(it)
-                                # Tambahkan info nomor memo jika belum ada
                                 if "memo_id" not in it_entry:
                                     it_entry["memo_id"] = m.get("id", "-")
                                 all_scraped_items.append(it_entry)
 
-                    # Simpan list memo untuk Tab 2
-                    self.memo_list.set(sanitized_memos)
+                    # 🌟 KUNCI PENGURUTAN: TERBARU KE TERLAMA
+                    # - Memprioritaskan tanggal terbaru (YYYY-MM-DD desc)
+                    # - Jika tanggal sama, memprioritaskan baris input terbaru (nomor baris terbesar di atas)
+                    def get_item_sort_key(it):
+                        tgl = str(it.get("tanggal", ""))[:10]
+                        raw_id = str(it.get("id", ""))
+                        digits = re.findall(r'\d+', raw_id)
+                        row_num = int(digits[-1]) if digits else 0
+                        return (tgl, row_num)
 
-                    # 🌟 TAB 1 SEKARANG BERISI SELURUH ITEM DARI SEMUA ACARA / SPREADSHEET
+                    all_scraped_items.sort(key=get_item_sort_key, reverse=True)
+
+                    # Simpan data yang sudah rapi terurut
+                    self.memo_list.set(sanitized_memos)
                     self.memo_scraped_event_items.set(all_scraped_items)
                     self.memo_last_sync_time.set(datetime.now().strftime("%d/%m/%Y %H:%M") + " WIB")
                 else:
