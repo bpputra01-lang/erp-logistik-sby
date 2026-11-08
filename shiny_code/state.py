@@ -1,15 +1,16 @@
-import os  
 import io
+import json
+import os
+import random
 import time
-import random               # <-- WAJIB: Cegah NameError saat generate nomor memo
-import urllib.parse 
-from datetime import datetime
-import numpy as np       
+import urllib.parse
+from datetime import datetime, timedelta, timezone  # <-- Pastikan ini lengkap
+import numpy as np
 import pandas as pd
+from config import format_datetime_wib, get_supabase, load_data_from_info, safe_int
 from shiny import reactive
-from config import get_supabase, safe_int, load_data_from_info, format_datetime_wib
 
-WIB = timezone(timedelta(hours=7)) 
+WIB = timezone(timedelta(hours=7))
 
 class AppState:
     def __init__(self):
