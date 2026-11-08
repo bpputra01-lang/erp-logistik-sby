@@ -7316,198 +7316,203 @@ class AppState:
     # METODE INSTOCK VALIDATION (URUT TERBARU DI ATAS, ABAIKAN TOKO & DONE, TAB 3 5-KOLOM)
     # --------------------------------------------------------------------------
     def load_instock_daily_from_supabase(self):
-        """Memuat antrean barang dengan deteksi barang yang baru saja di-instock"""
-        try:
-            client = get_supabase()
-            if not client:
-                return False, "Koneksi ke Supabase gagal!"
-            
-            today_str = datetime.now().strftime("%Y-%m-%d")
-            res = client.table("jezpro_instock_daily")\
-                        .select("*")\
-                        .eq("sync_date", today_str)\
-                        .execute()
-            
-            all_data = res.data if res and hasattr(res, "data") and res.data else []
+      """Memuat antrean barang terbaru dari Supabase secara aman (WIB & Fleksibel)"""
+      try:
+        client = get_supabase()
+        if not client:
+          return False, "Koneksi ke Supabase gagal!"
 
-            now_jakarta = pd.Timestamp.now(tz="Asia/Jakarta")
+        # 🌟 1. Gunakan zona waktu WIB yang konsisten dengan skrip sync background
+        today_str = datetime.now(WIB).strftime("%Y-%m-%d")
 
-            # Helper konversi jam ke format string WIB
-            def format_to_wib_time(ts_val):
-                if not ts_val or str(ts_val).strip() in ["", "-", "None", "nan"]:
-                    return "-"
-                try:
-                    dt = pd.to_datetime(ts_val)
-                    if dt.tzinfo is None:
-                        dt = dt.tz_localize("UTC").tz_convert("Asia/Jakarta")
-                    else:
-                        dt = dt.tz_convert("Asia/Jakarta")
-                    return dt.strftime("%H:%M:%S")
-                except Exception:
-                    s = str(ts_val)
-                    return s[11:19] if len(s) >= 19 else s
+        # 🌟 2. Ambil data 500 record terbaru berdasarkan 'created_at' 
+        # (Lebih aman dari pembatasan .eq('sync_date') yang sering meleset karena timezone server)
+        res = (
+            client.table("jezpro_instock_daily")
+            .select("*")
+            .order("created_at", desc=True)
+            .limit(500)
+            .execute()
+        )
 
-            # Helper menghitung selisih menit instock
-            def get_instock_diff_minutes(r):
-                ts = r.get("disappeared_at") or r.get("created_at")
-                if not ts or str(ts).strip() in ["", "-", "None", "nan"]:
-                    return 999999.0
-                try:
-                    dt = pd.to_datetime(ts)
-                    if dt.tzinfo is None:
-                        dt = dt.tz_localize("UTC").tz_convert("Asia/Jakarta")
-                    else:
-                        dt = dt.tz_convert("Asia/Jakarta")
-                    return max(0.0, (now_jakarta - dt).total_seconds() / 60.0)
-                except Exception:
-                    return 999999.0
+        all_data = res.data if res and hasattr(res, "data") and res.data else []
 
-            # Helper parsing objek waktu untuk sorting
-            def get_sort_datetime(r):
-                ts = r.get("disappeared_at") or r.get("created_at")
-                if not ts or str(ts).strip() in ["", "-", "None", "nan"]:
-                    return pd.Timestamp.min
-                try:
-                    dt = pd.to_datetime(ts)
-                    if dt.tzinfo is not None:
-                        dt = dt.tz_convert("Asia/Jakarta").tz_localize(None)
-                    return dt
-                except Exception:
-                    return pd.Timestamp.min
-
-            need_setup_raw = [x for x in all_data if x.get("status") == "NEED_SETUP"]
-            done_setup_raw = [x for x in all_data if x.get("status") == "DONE_SETUP"]
-
-            done_ids = set(str(d.get("id")) for d in done_setup_raw if d.get("id"))
-
-            # 🌟 1. URUTKAN: ITEM TERBARU MUNCUL DI LIST SETUP SELALU DITARUH PALING ATAS
-            need_setup_sorted = sorted(
-                need_setup_raw,
-                key=lambda x: (get_sort_datetime(x), safe_int(x.get("id", 0))),
-                reverse=True
-            )
-            done_setup_sorted = sorted(
-                done_setup_raw,
-                key=lambda x: (get_sort_datetime(x), safe_int(x.get("id", 0))),
-                reverse=True
-            )
-
-            # Ambil mode filter aktif (Default: BARUSAN_5)
-            filter_waktu_mode = self.iv_filter_waktu() if hasattr(self, "iv_filter_waktu") else "BARUSAN_5"
-
-            transit_records = []
-            mutasi_5cols_records = []
-            valid_need_setup = []
-
-            for r in need_setup_sorted:
-                r_id = str(r.get("id"))
-                
-                # 🛑 1. Abaikan jika sudah selesai dimutasi
-                if r.get("status") == "DONE_SETUP" or r.get("setup_done_at") or (r_id and r_id in done_ids):
-                    continue
-
-                raw_bin = str(r.get("bin_code", "-")).replace('[', '').replace(']', '').strip().upper()
-                bin_awal = raw_bin if raw_bin not in ["WAITING OFFLINE", "-", ""] else "STAGING INBOUND"
-
-                # 🛑 2. Abaikan jika dari rak TOKO
-                if "TOKO" in bin_awal or bin_awal == "TOKO":
-                    continue
-
-                # 🌟 3. FILTER WAKTU SUPER REAL-TIME (< 5 MENIT)
-                diff_mins = get_instock_diff_minutes(r)
-                if filter_waktu_mode == "BARUSAN_5" and diff_mins > 5.0:
-                    continue
-                elif filter_waktu_mode == "BARUSAN_15" and diff_mins > 15.0:
-                    continue
-                elif filter_waktu_mode == "BARUSAN_30" and diff_mins > 30.0:
-                    continue
-
-                # Badge label durasi real-time
-                if diff_mins < 1.0:
-                    aging_badge = "🔥 Baru Saja (< 1m)"
-                elif diff_mins <= 5.0:
-                    aging_badge = f"🔥 {int(diff_mins)}m lalu"
-                elif diff_mins <= 15.0:
-                    aging_badge = f"🟢 {int(diff_mins)}m lalu"
-                elif diff_mins <= 30.0:
-                    aging_badge = f"⚡ {int(diff_mins)}m lalu"
-                else:
-                    hrs = int(diff_mins // 60)
-                    aging_badge = f"⚪ {hrs}j lalu"
-
-                q = safe_int(r.get("qty", 1), 1)
-                sku_clean = str(r.get("barcode_sku", "-")).split('.')[0].strip().upper()
-                disappeared_time = format_to_wib_time(r.get("disappeared_at"))
-
-                valid_need_setup.append(r)
-
-                # Tab 1: Monitor Lengkap
-                transit_records.append({
-                    "STATUS INSTOCK": aging_badge,
-                    "JAM HILANG": disappeared_time,
-                    "BIN AWAL": bin_awal,
-                    "BIN TUJUAN": "STAGING INSTOCK",
-                    "SKU": sku_clean,
-                    "NAMA ARTIKEL": str(r.get("article_name", "-")),
-                    "QUANTITY": q,
-                    "NOTES": "TRANSIT INSTOCK"
-                })
-
-                # Tab 3: Khusus Item Mutasi (5 Kolom Murni)
-                mutasi_5cols_records.append({
-                    "BIN AWAL": bin_awal,
-                    "BIN TUJUAN": "STAGING INSTOCK",
-                    "SKU": sku_clean,
-                    "QUANTITY": q,
-                    "NOTES": "TRANSIT INSTOCK"
-                })
-
-            self.iv_instock_data.set(valid_need_setup)
-            self.iv_done_data.set(done_setup_sorted)
-
-            # Data Tab 1
-            df_setup = pd.DataFrame(transit_records)
-            tot_transit = sum(safe_int(x.get("qty", 1), 1) for x in valid_need_setup)
-            self.iv_total_allocated_qty.set(tot_transit)
-            self._raw_df_iv_setup = df_setup
-            self.df_iv_setup_headers.set(df_setup.columns.tolist() if not df_setup.empty else [])
-            self.df_iv_setup_rows.set(df_setup.fillna("").astype(str).values.tolist() if not df_setup.empty else [])
-
-            # Data Tab 3 (Murni 5 Kolom)
-            df_mutasi = pd.DataFrame(mutasi_5cols_records)
-            self._raw_df_iv_mutasi = df_mutasi
-            self.df_iv_mutasi_headers.set(df_mutasi.columns.tolist() if not df_mutasi.empty else [])
-            self.df_iv_mutasi_rows.set(df_mutasi.fillna("").astype(str).values.tolist() if not df_mutasi.empty else [])
-
-            # Data Tab 2 (Done Setup)
-            done_records = []
-            for r in done_setup_sorted:
-                q_done = safe_int(r.get("qty", 1), 1)
-                done_time = format_to_wib_time(r.get("setup_done_at"))
-                dis_time = format_to_wib_time(r.get("disappeared_at"))
-
-                done_records.append({
-                    "JAM REQUEST": dis_time,
-                    "JAM MUTASI SELESAI": done_time,
-                    "SKU": str(r.get("barcode_sku", "-")).split('.')[0].strip().upper(),
-                    "NAMA ARTIKEL": str(r.get("article_name", "-")),
-                    "BIN AWAL": str(r.get("bin_code", "-")).replace('[', '').replace(']', '').strip().upper(),
-                    "BIN TUJUAN": "GL1-INSTOCK",
-                    "QUANTITY": q_done,
-                    "STATUS": "✅ TERVERIFIKASI JEZPRO"
-                })
-
-            df_done = pd.DataFrame(done_records)
-            tot_done = sum(safe_int(x.get("qty", 1), 1) for x in done_setup_sorted)
-            self.iv_total_done_qty.set(tot_done)
-            self._raw_df_iv_done = df_done
-            self.df_iv_done_headers.set(df_done.columns.tolist() if not df_done.empty else [])
-            self.df_iv_done_rows.set(df_done.fillna("").astype(str).values.tolist() if not df_done.empty else [])
-
+        # Jika data kosong dengan limit 500, coba ambil tanpa filter
+        if not all_data:
+            self.iv_instock_data.set([])
+            self.iv_done_data.set([])
             self.iv_processed.set(True)
-            return True, f"Sinkronisasi berhasil! ({len(valid_need_setup)} Butuh Setup, {len(done_setup_sorted)} Selesai)"
-        except Exception as e:
-            return False, f"Gagal memuat data: {e}"
+            return True, "Data di Supabase masih kosong."
+
+        now_jakarta = pd.Timestamp.now(tz="Asia/Jakarta")
+
+        # Helper konversi jam ke format string WIB
+        def format_to_wib_time(ts_val):
+            if not ts_val or str(ts_val).strip() in ["", "-", "None", "nan"]:
+                return "-"
+            try:
+                dt = pd.to_datetime(ts_val)
+                if dt.tzinfo is None:
+                    dt = dt.tz_localize("UTC").tz_convert("Asia/Jakarta")
+                else:
+                    dt = dt.tz_convert("Asia/Jakarta")
+                return dt.strftime("%H:%M:%S")
+            except Exception:
+                s = str(ts_val)
+                return s[11:19] if len(s) >= 19 else s
+
+        # Helper menghitung selisih menit instock
+        def get_instock_diff_minutes(r):
+            ts = r.get("disappeared_at") or r.get("created_at")
+            if not ts or str(ts).strip() in ["", "-", "None", "nan"]:
+                return 999999.0
+            try:
+                dt = pd.to_datetime(ts)
+                if dt.tzinfo is None:
+                    dt = dt.tz_localize("UTC").tz_convert("Asia/Jakarta")
+                else:
+                    dt = dt.tz_convert("Asia/Jakarta")
+                return max(0.0, (now_jakarta - dt).total_seconds() / 60.0)
+            except Exception:
+                return 999999.0
+
+        # Helper parsing objek waktu untuk sorting
+        def get_sort_datetime(r):
+            ts = r.get("disappeared_at") or r.get("created_at")
+            if not ts or str(ts).strip() in ["", "-", "None", "nan"]:
+                return pd.Timestamp.min
+            try:
+                dt = pd.to_datetime(ts)
+                if dt.tzinfo is not None:
+                    dt = dt.tz_convert("Asia/Jakarta").tz_localize(None)
+                return dt
+            except Exception:
+                return pd.Timestamp.min
+
+        need_setup_raw = [x for x in all_data if x.get("status") == "NEED_SETUP"]
+        done_setup_raw = [x for x in all_data if x.get("status") == "DONE_SETUP"]
+
+        done_ids = set(str(d.get("id")) for d in done_setup_raw if d.get("id"))
+
+        # Urutkan: Item terbaru ditaruh paling atas
+        need_setup_sorted = sorted(
+            need_setup_raw,
+            key=lambda x: (get_sort_datetime(x), safe_int(x.get("id", 0))),
+            reverse=True
+        )
+        done_setup_sorted = sorted(
+            done_setup_raw,
+            key=lambda x: (get_sort_datetime(x), safe_int(x.get("id", 0))),
+            reverse=True
+        )
+
+        filter_waktu_mode = self.iv_filter_waktu() if hasattr(self, "iv_filter_waktu") else "BARUSAN_5"
+
+        transit_records = []
+        mutasi_5cols_records = []
+        valid_need_setup = []
+
+        for r in need_setup_sorted:
+            r_id = str(r.get("id"))
+            
+            if r.get("status") == "DONE_SETUP" or r.get("setup_done_at") or (r_id and r_id in done_ids):
+                continue
+
+            raw_bin = str(r.get("bin_code", "-")).replace('[', '').replace(']', '').strip().upper()
+            bin_awal = raw_bin if raw_bin not in ["WAITING OFFLINE", "-", ""] else "STAGING INBOUND"
+
+            if "TOKO" in bin_awal or bin_awal == "TOKO":
+                continue
+
+            diff_mins = get_instock_diff_minutes(r)
+            if filter_waktu_mode == "BARUSAN_5" and diff_mins > 5.0:
+                continue
+            elif filter_waktu_mode == "BARUSAN_15" and diff_mins > 15.0:
+                continue
+            elif filter_waktu_mode == "BARUSAN_30" and diff_mins > 30.0:
+                continue
+
+            if diff_mins < 1.0:
+                aging_badge = "🔥 Baru Saja (< 1m)"
+            elif diff_mins <= 5.0:
+                aging_badge = f"🔥 {int(diff_mins)}m lalu"
+            elif diff_mins <= 15.0:
+                aging_badge = f"🟢 {int(diff_mins)}m lalu"
+            elif diff_mins <= 30.0:
+                aging_badge = f"⚡ {int(diff_mins)}m lalu"
+            else:
+                hrs = int(diff_mins // 60)
+                aging_badge = f"⚪ {hrs}j lalu"
+
+            q = safe_int(r.get("qty", 1), 1)
+            sku_clean = str(r.get("barcode_sku", "-")).split('.')[0].strip().upper()
+            disappeared_time = format_to_wib_time(r.get("disappeared_at"))
+
+            valid_need_setup.append(r)
+
+            transit_records.append({
+                "STATUS INSTOCK": aging_badge,
+                "JAM HILANG": disappeared_time,
+                "BIN AWAL": bin_awal,
+                "BIN TUJUAN": "STAGING INSTOCK",
+                "SKU": sku_clean,
+                "NAMA ARTIKEL": str(r.get("article_name", "-")),
+                "QUANTITY": q,
+                "NOTES": "TRANSIT INSTOCK"
+            })
+
+            mutasi_5cols_records.append({
+                "BIN AWAL": bin_awal,
+                "BIN TUJUAN": "STAGING INSTOCK",
+                "SKU": sku_clean,
+                "QUANTITY": q,
+                "NOTES": "TRANSIT INSTOCK"
+            })
+
+        self.iv_instock_data.set(valid_need_setup)
+        self.iv_done_data.set(done_setup_sorted)
+
+        df_setup = pd.DataFrame(transit_records)
+        tot_transit = sum(safe_int(x.get("qty", 1), 1) for x in valid_need_setup)
+        self.iv_total_allocated_qty.set(tot_transit)
+        self._raw_df_iv_setup = df_setup
+        self.df_iv_setup_headers.set(df_setup.columns.tolist() if not df_setup.empty else [])
+        self.df_iv_setup_rows.set(df_setup.fillna("").astype(str).values.tolist() if not df_setup.empty else [])
+
+        df_mutasi = pd.DataFrame(mutasi_5cols_records)
+        self._raw_df_iv_mutasi = df_mutasi
+        self.df_iv_mutasi_headers.set(df_mutasi.columns.tolist() if not df_mutasi.empty else [])
+        self.df_iv_mutasi_rows.set(df_mutasi.fillna("").astype(str).values.tolist() if not df_mutasi.empty else [])
+
+        done_records = []
+        for r in done_setup_sorted:
+            q_done = safe_int(r.get("qty", 1), 1)
+            done_time = format_to_wib_time(r.get("setup_done_at"))
+            dis_time = format_to_wib_time(r.get("disappeared_at"))
+
+            done_records.append({
+                "JAM REQUEST": dis_time,
+                "JAM MUTASI SELESAI": done_time,
+                "SKU": str(r.get("barcode_sku", "-")).split('.')[0].strip().upper(),
+                "NAMA ARTIKEL": str(r.get("article_name", "-")),
+                "BIN AWAL": str(r.get("bin_code", "-")).replace('[', '').replace(']', '').strip().upper(),
+                "BIN TUJUAN": "GL1-INSTOCK",
+                "QUANTITY": q_done,
+                "STATUS": "✅ TERVERIFIKASI JEZPRO"
+            })
+
+        df_done = pd.DataFrame(done_records)
+        tot_done = sum(safe_int(x.get("qty", 1), 1) for x in done_setup_sorted)
+        self.iv_total_done_qty.set(tot_done)
+        self._raw_df_iv_done = df_done
+        self.df_iv_done_headers.set(df_done.columns.tolist() if not df_done.empty else [])
+        self.df_iv_done_rows.set(df_done.fillna("").astype(str).values.tolist() if not df_done.empty else [])
+
+        self.iv_processed.set(True)
+        return True, f"Sinkronisasi berhasil! ({len(valid_need_setup)} Butuh Setup, {len(done_setup_sorted)} Selesai)"
+      except Exception as e:
+        print("Error load_instock_daily_from_supabase:", e)
+        return False, f"Gagal memuat data: {e}"
 
     def process_transit_to_instock(self):
         """Trigger pembaruan data instock"""
