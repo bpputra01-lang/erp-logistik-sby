@@ -690,17 +690,38 @@ if __name__ == "__main__":
 
     last_monitor = 0
     last_heavy = 0
+    last_triggered_minute = ""  # Variabel untuk mencegah duplikasi eksekusi di menit yang sama
 
     while True:
         curr = time.time()
+        now_wib = datetime.now(WIB)
+        current_hour = now_wib.hour
+        current_minute = now_wib.minute
+        minute_str = now_wib.strftime("%Y-%m-%d-%H-%M")
 
-        if curr - last_monitor >= 300:
+        # 1. Cek jam khusus: 15:20, 21:20, dan 21:50
+        is_specific_time = (
+            (current_hour == 15 and current_minute == 20) or
+            (current_hour == 21 and current_minute == 20) or
+            (current_hour == 21 and current_minute == 50)
+        )
+
+        # 2. Cek interval waktu 2 jam (7200 detik)
+        is_two_hours_passed = (curr - last_monitor >= 7200)
+
+        # Monitor akan jalan jika sudah 2 jam ATAU pas di jam khusus (dan belum jalan di menit yang sama)
+        should_run_monitor = is_two_hours_passed or (is_specific_time and minute_str != last_triggered_minute)
+
+        if should_run_monitor:
             try:
                 run_module_warehouse_monitor(jez)
-                last_monitor = curr
+                last_monitor = curr  # Reset timer interval 2 jam
+                if is_specific_time:
+                    last_triggered_minute = minute_str  # Tandai menit ini sudah tereksekusi
             except Exception as e:
                 print(f"❌ Error Monitor: {e}")
 
+        # Sinkronisasi berat / heavy export (tetap 3 jam sekali / 10800 detik)
         if curr - last_heavy >= 10800 or last_heavy == 0:
             try:
                 run_module_exports_and_balancing(jez)
