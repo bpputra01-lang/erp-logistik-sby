@@ -151,66 +151,57 @@ def run_sync():
 
     stock_lookup = get_stock_cache()
 
-    # Grouping Data: (Tanggal Pengajuan, Note Markom)
-    grouped_events = {}
+    # 6. Susun Rincian Item Permintaan
+        grouped_events = {}
+        for row_idx, (_, r) in enumerate(df_filtered.iterrows(), start=1):
+            pic_val = str(r[col_pic]).strip() if pd.notna(r[col_pic]) else "MARKOM"
 
-    for row_idx, (_, r) in enumerate(df_filtered.iterrows(), start=1):
-        pic_val = str(r[col_pic]).strip() if pd.notna(r[col_pic]) else "MARKOM"
+            # Ambil note dari NOTE AMP jika ada, jika kosong ambil dari NO TELP
+            n1 = str(r[col_note1]).strip() if pd.notna(r[col_note1]) else ""
+            n2 = str(r[col_note2]).strip() if pd.notna(r[col_note2]) else ""
+            note_val = n1.upper() if n1 else (n2.upper() if n2 else "EVENT")
 
-        # Ambil note dari NOTE AMP jika ada, jika kosong ambil dari NO TELP
-        n1 = str(r[col_note1]).strip() if pd.notna(r[col_note1]) else ""
-        n2 = str(r[col_note2]).strip() if pd.notna(r[col_note2]) else ""
-        note_val = n1.upper() if n1 else (n2.upper() if n2 else "EVENT")
+            # Parsing tanggal aman tanpa UserWarning
+            raw_tgl = str(r[col_tgl]).strip() if pd.notna(r[col_tgl]) else ""
+            try:
+                dt_parsed = pd.to_datetime(raw_tgl)
+                tgl_val = dt_parsed.strftime("%Y-%m-%d")
+            except Exception:
+                tgl_val = raw_tgl[:10] if len(raw_tgl) >= 10 else datetime.now().strftime("%Y-%m-%d")
 
-        raw_tgl = str(r[col_tgl]).strip() if pd.notna(r[col_tgl]) else ""
-        try:
-            dt_parsed = pd.to_datetime(raw_tgl, dayfirst=True)
-            tgl_val = dt_parsed.strftime("%Y-%m-%d")
-        except Exception:
-            tgl_val = raw_tgl[:10] if len(raw_tgl) >= 10 else datetime.now().strftime("%Y-%m-%d")
+            sku_val = str(r[col_sku]).split('.')[0].strip().upper() if pd.notna(r[col_sku]) else ""
+            if not sku_val or sku_val in ["", "NAN", "NONE", "SKU", "-"]:
+                continue
 
-        sku_val = str(r[col_sku]).split('.')[0].strip().upper() if pd.notna(r[col_sku]) else ""
-        if not sku_val or sku_val in ["", "NAN", "NONE", "SKU", "-"]:
-            continue
+            # ✅ SAMAKAN NAMA VARIABEL QTY (qty_val)
+            qty_val = safe_int(r[col_qty], 1)
+            b_val = str(r[col_bin]).strip() if pd.notna(r[col_bin]) else "GL1-DC-OUT"
 
-        q_val = safe_int(r[col_qty], 1)
-        b_val = str(r[col_bin]).strip() if pd.notna(r[col_bin]) else "GL1-DC-OUT"
+            info = stock_lookup.get(sku_val, {})
+            item_name = info.get("name") or sku_val
+            harga_beli = info.get("cogs", 0)
+            subtotal = harga_beli * qty_val
 
-        info = stock_lookup.get(sku_val, {})
-        item_name = info.get("name") or sku_val
-        harga_beli = info.get("cogs", 0)
-        subtotal = harga_beli * qty_val
-
-        item_entry = {
-            "id": f"REQ-{sku_val}-{row_idx}",
-            "tanggal": tgl_val,
-            "pic": pic_val,
-            "keterangan": note_val,
-            "bin": b_val,
-            "sku": sku_val,
-            "item_name": item_name,
-            "cogs": harga_beli,
-            "qty": q_val,
-            "subtotal": subtotal
-        }
-
-        group_key = (tgl_val, note_val)
-        if group_key not in grouped_events:
-            grouped_events[group_key] = {
+            item_entry = {
+                "id": f"REQ-{sku_val}-{row_idx}",
+                "tanggal": tgl_val,
                 "pic": pic_val,
-                "items": []
+                "keterangan": note_val,
+                "bin": b_val,
+                "sku": sku_val,
+                "item_name": item_name,
+                "cogs": harga_beli,
+                "qty": qty_val,
+                "subtotal": subtotal
             }
-        grouped_events[group_key]["items"].append(item_entry)
 
-    # Sinkronisasi Pintar (Anti Duplikat Card & Update In-place)
-    new_memos_to_insert = []
-    skipped_count = 0
-
-    for (tgl_doc, event_name), grp_data in grouped_events.items():
-        items_list = grp_data["items"]
-        pic_doc = grp_data["pic"]
-        tot_nom = sum(x["subtotal"] for x in items_list)
-
+            group_key = (tgl_val, note_val)
+            if group_key not in grouped_events:
+                grouped_events[group_key] = {
+                    "pic": pic_val,
+                    "items": []
+                }
+            grouped_events[group_key]["items"].append(item_entry)
         db_match_key = (tgl_doc, event_name)
 
         if db_match_key in existing_db_memos:
