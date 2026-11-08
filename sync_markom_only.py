@@ -22,7 +22,6 @@ HEADERS = {
     "Prefer": "return=representation"
 }
 
-# --- FIX 1: safe_int yang kebal format ribuan titik maupun koma ---
 def safe_int(val, default=0):
     try:
         if pd.isna(val) or val is None:
@@ -32,7 +31,7 @@ def safe_int(val, default=0):
         s = str(val).replace("Rp", "").replace(" ", "").strip()
         if "," in s and "." in s:
             s = s.replace(".", "").replace(",", ".")
-        elif "." in s and len(s.split(".")[-1]) == 3: # Format 150.000
+        elif "." in s and len(s.split(".")[-1]) == 3:
             s = s.replace(".", "")
         elif "," in s:
             s = s.replace(",", ".")
@@ -47,7 +46,6 @@ def clean_sku(val):
     if s.endswith('.0'): s = s[:-2]
     return s if s not in ["", "NAN", "NONE", "NULL", "-"] else ""
 
-# --- FIX 2: Pencarian harga beli lengkap dari seluruh cache Supabase ---
 def get_stock_cache():
     lookup = {}
     try:
@@ -65,16 +63,12 @@ def get_stock_cache():
                     if not sku_k: continue
 
                     name_v = str(it.get("ITEM NAME") or it.get("item_name") or it.get("ARTIKEL") or it.get("article_name") or "-").strip()
-                    
-                    # Cek seluruh kemungkinan nama kolom harga beli
                     cogs_raw = (
                         it.get("HARGA BELI") or it.get("Harga Beli") or 
                         it.get("cogs") or it.get("purchase") or 
                         it.get("cogs_price") or it.get("harga_beli") or 0
                     )
                     cogs_v = safe_int(cogs_raw, 0)
-
-                    # Simpan normalisasi tanpa angka 0 di depan
                     norm_k = sku_k.lstrip('0')
                     entry = {"name": name_v, "cogs": cogs_v}
                     
@@ -112,7 +106,6 @@ def run_sync():
     match = re.search(r'/spreadsheets/d/([a-zA-Z0-9-_]+)', SPREADSHEET_URL)
     if match:
         sheet_id = match.group(1)
-        # Gunakan format CSV jika sheet tunggal atau xlsx
         download_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx"
 
     print("📥 Mengunduh Spreadsheet...")
@@ -147,7 +140,6 @@ def run_sync():
     col_tgl  = find_col(["TANGGAL REQ", "TIMESTAMP", "TANGGAL"], 6)
     col_bin  = find_col(["BIN PICK", "PICK_LOCATION", "BIN"], 9)
 
-    # Filter Baris EVENT, HADIAH, atau GIFT
     KEYWORDS = ["EVENT", "HADIAH", "GIFT"]
     pattern = "|".join(KEYWORDS)
     mask = df[col_note].fillna("").astype(str).str.contains(pattern, case=False, na=False)
@@ -168,7 +160,6 @@ def run_sync():
         raw_tgl = str(r[col_tgl]).strip() if pd.notna(r[col_tgl]) else ""
         try:
             dt_parsed = pd.to_datetime(raw_tgl)
-            # Simpan TIMESTAMP LENGKAP agar urutan per detiknya presisi
             tgl_full = dt_parsed.strftime("%Y-%m-%d %H:%M:%S")
             tgl_doc = dt_parsed.strftime("%Y-%m-%d")
         except Exception:
@@ -176,13 +167,11 @@ def run_sync():
             tgl_doc = tgl_full[:10]
 
         sku_val = clean_sku(r[col_sku])
-        if not sku_val:
-            continue
+        if not sku_val: continue
 
         qty_val = safe_int(r[col_qty], 1)
         b_val = str(r[col_bin]).strip() if pd.notna(r[col_bin]) else "GL1-DC-OUT"
 
-        # Lookup harga beli (coba SKU asli & normalisasi)
         info = stock_lookup.get(sku_val) or stock_lookup.get(sku_val.lstrip('0')) or {}
         item_name = info.get("name") or sku_val
         harga_beli = safe_int(info.get("cogs", 0), 0)
@@ -190,7 +179,7 @@ def run_sync():
 
         item_entry = {
             "id": f"REQ-{sku_val}-{row_idx}",
-            "tanggal": tgl_full,       # <-- Simpan timestamp penuh
+            "tanggal": tgl_full,
             "pic": pic_val,
             "keterangan": note_val,
             "bin": b_val,
@@ -224,12 +213,10 @@ def run_sync():
         if db_match_key in existing_db_memos:
             exist = existing_db_memos[db_match_key]
             st = str(exist.get("status_adj", "PENDING")).upper()
-
             if st == "DONE":
                 skipped_count += 1
                 continue
 
-            # Update kartu lama dengan data & harga beli terbaru
             safe_id = urllib.parse.quote(str(exist['id']), safe='')
             url_update = f"{SUPABASE_URL}/rest/v1/memo_pengajuan?id=eq.{safe_id}"
             update_payload = {
@@ -243,7 +230,7 @@ def run_sync():
         memo_id = f"MEMO/ZKN/{tgl_doc.replace('-', '')}/{random.randint(100, 999)}"
         new_memos_to_insert.append({
             "id": memo_id,
-            "tanggal": grp_data["latest_time"], # Pakai timestamp terbaru
+            "tanggal": grp_data["latest_time"],
             "divisi": "MARKOM",
             "jenis": "Pengajuan Adjustment untuk Hadiah",
             "tujuan": event_name,
@@ -263,65 +250,6 @@ def run_sync():
     
     return True, f"Sinkronisasi selesai ({skipped_count} memo DONE dilewati)."
 
-# ==============================================================================
-# TAMBAHAN DI orchestrator.py: THREAD AUTO-SYNC MEMO MARKOM TIAP 15 MENIT
-# ==============================================================================
-from sync_markom import run_sync as run_sync_memo  # Pastikan file scraper bernama sync_markom.py
-
-def thread_memo_worker():
-    """Worker background yang otomatis mengecek & scrape Google Sheet tiap 15 menit (900 detik)"""
-    # Tunggu 5 detik di awal agar session jezpro stabil
-    time.sleep(5)
-    while True:
-        try:
-            print(f"\n📑 [{datetime.now(WIB).strftime('%H:%M:%S')}] [AUTO-SYNC 15M] Menjalankan Scraping Memo Markom...")
-            succ, msg = run_sync_memo()
-            print(f"   {msg}")
-        except Exception as e:
-            print(f"⚠️ [Memo Sync Loop Error]: {e}")
-        
-        # Tidur selama 15 menit (900 detik)
-        time.sleep(900)
-
-# ==============================================================================
-# PADA BAGIAN if __name__ == "__main__": DI orchestrator.py
-# ==============================================================================
 if __name__ == "__main__":
-    print("=" * 75)
-    print("🚀 MASTER LOCAL ORCHESTRATOR: JEZPRO -> SUPABASE (VERSI AUTO-SYNC 15 MENIT)")
-    print("=" * 75)
-
-    jez = create_jezpro_session()
-
-    # 1. Thread Instock Surabaya (tiap 45 detik)
-    t_instock = threading.Thread(target=thread_instock_worker, args=(jez,), daemon=True)
-    t_instock.start()
-    print("🧵 Thread Instock Surabaya telah aktif mandiri tiap 45 detik.")
-
-    # 🌟 2. AKTIFKAN THREAD AUTO-SYNC MEMO TIAP 15 MENIT DI SINI:
-    t_memo = threading.Thread(target=thread_memo_worker, daemon=True)
-    t_memo.start()
-    print("🧵 Thread Memo Markom telah aktif mandiri tiap 15 menit (900 detik).")
-
-    # 3. Main Loop
-    last_monitor = 0
-    last_heavy = 0
-
-    while True:
-        curr = time.time()
-
-        if curr - last_monitor >= 300:
-            try:
-                run_module_warehouse_monitor(jez)
-                last_monitor = curr
-            except Exception as e:
-                print(f"❌ Error Monitor: {e}")
-
-        if curr - last_heavy >= 10800 or last_heavy == 0:
-            try:
-                run_module_exports_and_balancing(jez)
-                last_heavy = curr
-            except Exception as e:
-                print(f"❌ Error Heavy Export: {e}")
-
-        time.sleep(10)
+    print("Menjalankan standalone sync_markom_only...")
+    run_sync()

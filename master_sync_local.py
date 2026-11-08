@@ -442,9 +442,8 @@ def run_module_instock_daily(session):
 # MODUL 2: WAREHOUSE ACTIVITY MONITOR (ALL AREA)
 # ==============================================================================
 def run_module_warehouse_monitor(session):
-    print(f"\n📊 [{datetime.now(WIB).strftime('%H:%M:%S')}] Memulai Sinkronisasi Warehouse Activity Monitor...")
+    print(f"\n📊 [{datetime.now(WIB).strftime('%H:%M:%S')}] Memulai Sinkronisasi Warehouse Activity Monitor (All Area)...")
     headers_req = {"Accept": "application/json, text/javascript, */*; q=0.01", "X-Requested-With": "XMLHttpRequest"}
-    now_wib = datetime.now(WIB).replace(tzinfo=None)
 
     url_stg = "https://jezpro.id/stock_tracking_datatables"
     date_range = "2026-01-01|2030-12-31"
@@ -464,13 +463,19 @@ def run_module_warehouse_monitor(session):
         st_id = b_info["st_id"]
         for q in query_targets:
             params = {
-                "draw": "1", "start": "0", "length": "500",
-                "columns[0][data]": "DT_RowIndex", "columns[1][data]": "datetime",
-                "columns[2][data]": "ps_barcode", "columns[3][data]": "article",
-                "columns[4][data]": "invoice", "columns[5][data]": "cust_name",
-                "columns[6][data]": "qty", "columns[7][data]": "product_location",
-                "columns[8][data]": "status", "columns[8][search][value]": q["status_search"],
-                "status": q["status"], "st_id": str(st_id), "date": date_range
+                "draw": "1",
+                "columns[0][data]": "DT_RowIndex", "columns[0][name]": "plst_id", "columns[0][orderable]": "false",
+                "columns[1][data]": "datetime", "columns[1][name]": "plst_created", "columns[1][orderable]": "true",
+                "columns[2][data]": "ps_barcode", "columns[2][name]": "ps_barcode", "columns[2][orderable]": "true",
+                "columns[3][data]": "article", "columns[3][name]": "p_name", "columns[3][orderable]": "true",
+                "columns[4][data]": "invoice", "columns[4][name]": "p_name", "columns[4][orderable]": "true",
+                "columns[5][data]": "cust_name", "columns[5][name]": "cust_name", "columns[5][orderable]": "true",
+                "columns[6][data]": "qty", "columns[6][name]": "p_name", "columns[6][orderable]": "true",
+                "columns[7][data]": "product_location", "columns[7][name]": "pl_code", "columns[7][orderable]": "true",
+                "columns[8][data]": "status", "columns[8][name]": "plst_status", "columns[8][search][value]": q["status_search"],
+                "columns[9][data]": "instock_source", "columns[9][name]": "instock_source_status",
+                "order[0][column]": "1", "order[0][dir]": "desc",
+                "start": "0", "length": "500", "status": q["status"], "st_id": str(st_id), "date": date_range
             }
             try:
                 res = session.get(url_stg, params=params, headers=headers_req, timeout=20)
@@ -488,6 +493,17 @@ def run_module_warehouse_monitor(session):
                 if not (is_refund or is_waiting or is_done_online): continue
 
                 dt_raw = strip_html(item.get("datetime") or item.get("plst_created") or "")
+
+                doc_year = None
+                for fmt in ("%d/%m/%Y %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%d-%m-%Y %H:%M:%S", "%d/%m/%Y", "%Y-%m-%d"):
+                    try:
+                        doc_year = datetime.strptime(dt_raw[:19].strip(), fmt).year; break
+                    except Exception: pass
+                if doc_year is None:
+                    y_match = re.findall(r'\b(20\d{2})\b', dt_raw)
+                    if y_match: doc_year = int(y_match[0])
+                if doc_year is not None and doc_year < 2026: continue
+
                 raw_id = item.get("plst_id") or item.get("id")
                 p_id = safe_int_val(raw_id)
                 if not p_id:
@@ -517,7 +533,6 @@ def run_module_warehouse_monitor(session):
                 })
             time.sleep(0.04)
 
-    # Push Staging
     try:
         requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_waiting_staging?plst_id=gt.0", headers=HEADERS_SB)
         if all_staging_records:
