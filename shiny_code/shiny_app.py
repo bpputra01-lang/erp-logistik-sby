@@ -4961,12 +4961,14 @@ def server(input: Inputs, output: Outputs, session: Session):
     # ==========================================================================
 
     # 1. TIMER OTOMATIS SCRAPING SETIAP 5 MENIT (300 DETIK)
+    # 1. TIMER OTOMATIS SCRAPING SETIAP 15 MENIT (900 DETIK) DI BACKGROUND THREAD
     @reactive.Effect
     def _auto_scrape_markom_timer():
-        reactive.invalidate_later(300)
+        reactive.invalidate_later(900)  # 900 detik = 15 menit
         with reactive.isolate():
             if state.logged_in():
-                state.sync_markom_event_requests(silent=True)
+                import threading
+                threading.Thread(target=state.sync_markom_event_requests, kwargs={"silent": True}, daemon=True).start()
 
     # 2. TRIGGER MANUAL SYNC DARI TOMBOL TAB 1
     @reactive.Effect
@@ -5294,29 +5296,52 @@ def server(input: Inputs, output: Outputs, session: Session):
     # ==========================================================================
     # 3. TAB 2 CONTAINER: MEMILIKI 2 SUB-TAB (MARKOM & LOGISTIK)
     # ==========================================================================
+    # ==========================================================================
+    # TAB 2 CONTAINER: KERANGKA SUB-TAB DIBUAT STATIS (ANTI-LONCAT KE MARKOM)
+    # ==========================================================================
     @render.ui
     def memo_tab2_subtabs_container_ui():
+        # Kerangka tabset dibuat statis sekali saja (tidak akan recreate saat status memo berubah)
+        return ui.div(
+            ui.output_ui("memo_tab2_filter_bar_ui"),
+            ui.navset_card_tab(
+                ui.nav_panel("📢 MARKOM", ui.output_ui("memo_subtab_markom_content_ui"), value="SUB_MARKOM"),
+                ui.nav_panel("🚚 LOGISTIK", ui.output_ui("memo_subtab_logistik_content_ui"), value="SUB_LOGISTIK"),
+                id="memo_subtabs_navset"
+            )
+        )
+
+    # 1. Baris Filter Tanggal Tab 2
+    @render.ui
+    def memo_tab2_filter_bar_ui():
         m_markom = _get_memos_by_category("MARKOM")
         m_logistik = _get_memos_by_category("LOGISTIK")
         total_pending = len(m_markom) + len(m_logistik)
+        return _render_memo_date_filter_bar(total_pending, "Pending (Markom & Logistik)")
 
-        filter_bar = _render_memo_date_filter_bar(total_pending, "Pending (Markom & Logistik)")
-
+    # 2. Konten Kartu Khusus Sub-tab Markom
+    @render.ui
+    def memo_subtab_markom_content_ui():
+        m_markom = _get_memos_by_category("MARKOM")
         cards_markom = [_render_single_memo_card(m, "MARKOM") for m in m_markom]
-        content_markom = ui.div(
-            *cards_markom if cards_markom else [
-                ui.div(ui.p("Tidak ada memo di antrean Markom (Semua sudah di-request).", style="color: #718096; font-style: italic; text-align: center; padding: 2rem;"), style="background: white; border-radius: 8px; border: 1px dashed #CBD5E0;")
-            ],
-            style="padding: 0.75rem 0;"
-        )
+        if not cards_markom:
+            return ui.div(
+                ui.p("Tidak ada memo di antrean Markom (Semua sudah diajukan).", style="color: #718096; font-style: italic; text-align: center; padding: 2rem;"),
+                style="background: white; border-radius: 8px; border: 1px dashed #CBD5E0; margin-top: 0.5rem;"
+            )
+        return ui.div(*cards_markom, style="padding: 0.75rem 0;")
 
+    # 3. Konten Kartu Khusus Sub-tab Logistik
+    @render.ui
+    def memo_subtab_logistik_content_ui():
+        m_logistik = _get_memos_by_category("LOGISTIK")
         cards_logistik = [_render_single_memo_card(m, "LOGISTIK") for m in m_logistik]
-        content_logistik = ui.div(
-            *cards_logistik if cards_logistik else [
-                ui.div(ui.p("Tidak ada memo di antrean Logistik (Menunggu Eksekusi Adjustment).", style="color: #718096; font-style: italic; text-align: center; padding: 2rem;"), style="background: white; border-radius: 8px; border: 1px dashed #CBD5E0;")
-            ],
-            style="padding: 0.75rem 0;"
-        )
+        if not cards_logistik:
+            return ui.div(
+                ui.p("Tidak ada memo di antrean Logistik (Menunggu Eksekusi Adjustment).", style="color: #718096; font-style: italic; text-align: center; padding: 2rem;"),
+                style="background: white; border-radius: 8px; border: 1px dashed #CBD5E0; margin-top: 0.5rem;"
+            )
+        return ui.div(*cards_logistik, style="padding: 0.75rem 0;")
 
         return ui.div(
             filter_bar,
@@ -5353,6 +5378,9 @@ def server(input: Inputs, output: Outputs, session: Session):
     # ==========================================================================
     # 5. LISTENERS PINDAH STATUS (REQUEST -> LOGISTIK -> DONE -> REVERT)
     # ==========================================================================
+    # ==========================================================================
+    # 3. EVENT HANDLERS: STATUS PINDAH DENGAN GEMBOK POSISI SUB-TAB
+    # ==========================================================================
     @reactive.Effect
     @reactive.event(input.btn_request_memo_adj)
     def _on_request_memo_adj():
@@ -5367,9 +5395,13 @@ def server(input: Inputs, output: Outputs, session: Session):
                     break
             client = get_supabase()
             if client:
-                client.table("memo_pengajuan").update({"status_adj": "REQUESTED", "requested_at": now_str}).in_("id", [m_id]).execute()
+                client.table("memo_pengajuan").update({
+                    "status_adj": "REQUESTED",
+                    "requested_at": now_str
+                }).in_("id", [m_id]).execute()
+            
             state.memo_list.set(memos)
-            succ, msg = True, f"Memo {m_id} dipindahkan ke Sub-tab LOGISTIK (Menunggu Eksekusi)!"
+            succ, msg = True, f"Memo {m_id} dipindahkan ke Sub-tab LOGISTIK!"
         except Exception as e:
             succ, msg = False, str(e)
 
@@ -5393,7 +5425,11 @@ def server(input: Inputs, output: Outputs, session: Session):
                     break
             client = get_supabase()
             if client:
-                client.table("memo_pengajuan").update({"status_adj": "DONE", "done_at": now_str}).in_("id", [m_id]).execute()
+                client.table("memo_pengajuan").update({
+                    "status_adj": "DONE",
+                    "done_at": now_str
+                }).in_("id", [m_id]).execute()
+            
             state.memo_list.set(memos)
             succ, msg = True, f"Memo {m_id} selesai adjustment dan dipindahkan ke Tab 3 (Done)!"
         except Exception as e:
@@ -5401,6 +5437,8 @@ def server(input: Inputs, output: Outputs, session: Session):
 
         ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
         if succ:
+            # 🌟 GEMBOK: Tetap pertahankan user di sub-tab LOGISTIK (tidak loncat ke Markom)
+            ui.update_navs("memo_subtabs_navset", selected="SUB_LOGISTIK")
             ui.notification_show(f"✅ {msg}", type="message", duration=4)
         else:
             ui.notification_show(f"⚠️ {msg}", type="warning", duration=4)
@@ -5418,9 +5456,13 @@ def server(input: Inputs, output: Outputs, session: Session):
                     break
             client = get_supabase()
             if client:
-                client.table("memo_pengajuan").update({"status_adj": "REQUESTED", "done_at": None}).in_("id", [m_id]).execute()
+                client.table("memo_pengajuan").update({
+                    "status_adj": "REQUESTED",
+                    "done_at": None
+                }).in_("id", [m_id]).execute()
+            
             state.memo_list.set(memos)
-            succ, msg = True, f"Memo {m_id} dikembalikan ke Tab 2 (Sub-tab Logistik)!"
+            succ, msg = True, f"Memo {m_id} dikembalikan ke Sub-tab Logistik!"
         except Exception as e:
             succ, msg = False, str(e)
 

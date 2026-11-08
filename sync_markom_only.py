@@ -263,5 +263,65 @@ def run_sync():
     
     return True, f"Sinkronisasi selesai ({skipped_count} memo DONE dilewati)."
 
+# ==============================================================================
+# TAMBAHAN DI orchestrator.py: THREAD AUTO-SYNC MEMO MARKOM TIAP 15 MENIT
+# ==============================================================================
+from sync_markom import run_sync as run_sync_memo  # Pastikan file scraper bernama sync_markom.py
+
+def thread_memo_worker():
+    """Worker background yang otomatis mengecek & scrape Google Sheet tiap 15 menit (900 detik)"""
+    # Tunggu 5 detik di awal agar session jezpro stabil
+    time.sleep(5)
+    while True:
+        try:
+            print(f"\n📑 [{datetime.now(WIB).strftime('%H:%M:%S')}] [AUTO-SYNC 15M] Menjalankan Scraping Memo Markom...")
+            succ, msg = run_sync_memo()
+            print(f"   {msg}")
+        except Exception as e:
+            print(f"⚠️ [Memo Sync Loop Error]: {e}")
+        
+        # Tidur selama 15 menit (900 detik)
+        time.sleep(900)
+
+# ==============================================================================
+# PADA BAGIAN if __name__ == "__main__": DI orchestrator.py
+# ==============================================================================
 if __name__ == "__main__":
-    run_sync()
+    print("=" * 75)
+    print("🚀 MASTER LOCAL ORCHESTRATOR: JEZPRO -> SUPABASE (VERSI AUTO-SYNC 15 MENIT)")
+    print("=" * 75)
+
+    jez = create_jezpro_session()
+
+    # 1. Thread Instock Surabaya (tiap 45 detik)
+    t_instock = threading.Thread(target=thread_instock_worker, args=(jez,), daemon=True)
+    t_instock.start()
+    print("🧵 Thread Instock Surabaya telah aktif mandiri tiap 45 detik.")
+
+    # 🌟 2. AKTIFKAN THREAD AUTO-SYNC MEMO TIAP 15 MENIT DI SINI:
+    t_memo = threading.Thread(target=thread_memo_worker, daemon=True)
+    t_memo.start()
+    print("🧵 Thread Memo Markom telah aktif mandiri tiap 15 menit (900 detik).")
+
+    # 3. Main Loop
+    last_monitor = 0
+    last_heavy = 0
+
+    while True:
+        curr = time.time()
+
+        if curr - last_monitor >= 300:
+            try:
+                run_module_warehouse_monitor(jez)
+                last_monitor = curr
+            except Exception as e:
+                print(f"❌ Error Monitor: {e}")
+
+        if curr - last_heavy >= 10800 or last_heavy == 0:
+            try:
+                run_module_exports_and_balancing(jez)
+                last_heavy = curr
+            except Exception as e:
+                print(f"❌ Error Heavy Export: {e}")
+
+        time.sleep(10)
