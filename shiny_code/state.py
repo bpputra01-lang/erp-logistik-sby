@@ -656,7 +656,7 @@ class AppState:
         self._fl_seen_keys = set()
         self._fl_worker_started = False
 
-        # Master Checklist 27 Kriteria dari PDF
+        # ✅ 1. Definisikan list ini LEBIH DULU
         self.COMPLIANCE_DEFAULT_ITEMS = [
             # 1. GOOD RECEIVING
             {"area": "Good Receiving", "id": "RCV-01", "kriteria": "Barang yang diterima sesuai dengan Surat Jalan (Jumlah Koli & Brand)", "bobot": 3, "hasil": "Sesuai", "catatan": ""},
@@ -696,11 +696,12 @@ class AppState:
             {"area": "Peralatan & Fasilitas", "id": "EQP-03", "kriteria": "Scanner, printer dan PC berfungsi; perangkat cadangan tersedia.", "bobot": 1, "hasil": "Sesuai", "catatan": ""},
             {"area": "Peralatan & Fasilitas", "id": "EQP-05", "kriteria": "Pencahayaan, ventilasi dan suhu memadai untuk pekerja", "bobot": 1, "hasil": "Sesuai", "catatan": ""}
         ]
+
+        # ✅ 2. Baru setelah itu panggil di sini:
         self.comp_audit_checklist = reactive.Value([dict(x) for x in self.COMPLIANCE_DEFAULT_ITEMS])
         self.comp_audit_capa_list = reactive.Value([])
         self.comp_audit_history_list = reactive.Value([])
         self.comp_audit_selected_for_pdf = reactive.Value(None)
-
         
 
     def set_main_menu(self, menu: str): self.main_menu.set(menu)
