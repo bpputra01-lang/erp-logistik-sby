@@ -5822,29 +5822,28 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         yield buf.getvalue()
     # ==========================================================================
-    # INSTOCK VALIDATION CONTROLLER (KHUSUS TRANSIT TO GL1-INSTOCK)
+    # INSTOCK VALIDATION CONTROLLER (BERSIH, TUNGGAL, & ANTI-REDUP)
     # ==========================================================================
-    # 1. Listener Refresh Instock Supabase
+    
+    # 1. Tarik data saat pertama kali menu dibuka
     @reactive.Effect
-    @reactive.event(input.btn_refresh_iv_supabase)
+    def _auto_load_instock_on_menu():
+        if state.main_menu() in ["Instock Validation", "instock_validation", "instock-validation"]:
+            if not state.iv_processed():
+                state.load_instock_daily_from_supabase()
+
+    # 2. Listener Refresh Instock Supabase (Tombol Refresh)
+    @reactive.Effect
+    @reactive.event(input.btn_refresh_iv_supabase, input.btn_run_transit_instock)
     def _on_refresh_iv():
         succ, msg = state.load_instock_daily_from_supabase()
         ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
         if succ:
-            ui.notification_show(f"✅ {msg}", type="message", duration=4)
-        else:
-            ui.notification_show(f"⚠️ {msg}", type="error", duration=4)
-
-    @reactive.Effect
-    @reactive.event(input.btn_run_transit_instock)
-    def _on_run_transit_instock():
-        succ, msg = state.load_instock_daily_from_supabase()
-        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
-        if succ:
-            ui.notification_show("✅ Data Instock berhasil diperbarui dari Supabase!", type="message", duration=3)
+            ui.notification_show(f"✅ {msg}", type="message", duration=3)
         else:
             ui.notification_show(f"⚠️ {msg}", type="warning", duration=4)
 
+    # 3. Listener Perubahan Filter Waktu
     @reactive.Effect
     @reactive.event(input.change_iv_filter_waktu)
     def _on_iv_filter_waktu_change():
@@ -5852,12 +5851,25 @@ def server(input: Inputs, output: Outputs, session: Session):
         state.iv_filter_waktu.set(val)
         state.load_instock_daily_from_supabase()
 
-    # 🌟 1. HANYA SATU FUNGSI RENDER UTAMA (DENGAN KOTAK SCAN SKU & 3 TAB LENGKAP)
+    # 4. EVENT HANDLER SAAT SKU DI-INPUT / DI-SCAN (DENGAN POP-UP ERROR AMAN)
+    @reactive.Effect
+    @reactive.event(input.btn_process_iv_sku_scan)
+    def _on_process_iv_sku_scan():
+        scanned_sku = input.btn_process_iv_sku_scan()
+        if not scanned_sku:
+            return
+        
+        succ, msg = state.move_instock_sku_to_mutasi(scanned_sku)
+        if succ:
+            ui.notification_show(f"✅ {msg}", type="message", duration=3)
+        else:
+            # Memunculkan pop-up error jika item tidak ada di list
+            state.error_modal_message.set("Item tidak ada di list!")
+            state.show_error_modal.set(True)
+
+    # 5. RENDER CONTAINER UTAMA INSTOCK VALIDATION (HANYA ADA 1 FUNGSI INI)
     @render.ui
     def instock_validation_results_container():
-        if not state.iv_processed():
-            state.load_instock_daily_from_supabase()
-
         tot_need_rows = len(state.df_iv_setup_rows())
         tot_need_qty = state.iv_total_allocated_qty()
         tot_done_rows = len(state.df_iv_done_rows())
@@ -5982,7 +5994,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             ),
             style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
         )
-
+        
     # 🌟 2. EVENT HANDLER SAAT SKU DI-INPUT / DI-SCAN
     @reactive.Effect
     @reactive.event(input.btn_process_iv_sku_scan)
