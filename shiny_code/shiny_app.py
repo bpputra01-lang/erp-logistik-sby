@@ -32,20 +32,27 @@ def server(input: Inputs, output: Outputs, session: Session):
     _last_filter_state = {"c_brands": [], "c_subs": [], "c_bins": []}
     _last_seen_fl_id = reactive.Value(None)
 
-# 🔄 Cek data Supabase otomatis tiap 3 detik untuk semua pengguna web (ASYNCHRONOUS)
+# 🔄 Cek data Supabase otomatis tiap 3 detik HANYA JIKA SUDAH LOGIN
     @reactive.effect
     async def _poll_fl_requests_from_supabase():
-        reactive.invalidate_later(3)  # Periksa tiap 3 detik
+        reactive.invalidate_later(3)
+
+        # 🛑 JANGAN POLLING JIKA BELUM LOGIN (mencegah lag di halaman login)
+        if not state.logged_in():
+            return
 
         try:
+            import asyncio
             client = get_supabase()
             if client:
-                # 🌟 KUNCI PERBAIKAN: Jangan panggil .order() atau .limit() di sini agar tidak crash!
-                res = client.table("jezpro_fl_requests").select("*").execute()
+                # Jalankan query blocking di thread terpisah agar WebSocket tidak freeze
+                def fetch_data():
+                    return client.table("jezpro_fl_requests").select("*").execute()
+
+                res = await asyncio.to_thread(fetch_data)
                 raw_data = res.data if res and hasattr(res, "data") and res.data else []
 
                 if raw_data:
-                    # 🌟 Urutkan 20 data teratas murni di Python berdasarkan ID terbesar
                     import re
                     sorted_data = sorted(
                         raw_data, 
@@ -56,8 +63,6 @@ def server(input: Inputs, output: Outputs, session: Session):
                     cards = []
                     for row in sorted_data:
                         tgl_str = str(row.get("created_at", "-"))[:19].replace("T", " ")
-                        
-                        # Bersihkan tag HTML <span class=...> pada nama artikel
                         raw_art = str(row.get("article_name", "-"))
                         clean_art = re.sub(r'<[^>]+>', '', raw_art).strip() or "-"
 
@@ -71,18 +76,15 @@ def server(input: Inputs, output: Outputs, session: Session):
                             "qty": safe_int(row.get("qty", 1), 1)
                         })
 
-                    # Masukkan kartu ke web & update jam live check
                     state.fl_request_list.set(cards)
                     state.fl_last_check_time.set(datetime.now().strftime("%H:%M:%S"))
 
                     first_row = sorted_data[0]
                     newest_id = str(first_row.get("id") or first_row.get("req_id") or first_row.get("created_at") or "")
 
-                    # 🔊 JIKA ADA BARANG BARU MASUK -> PICU SUARA DI LAPTOP LAIN
                     if _last_seen_fl_id() is not None and newest_id != _last_seen_fl_id():
                         art_name = re.sub(r'<[^>]+>', '', str(first_row.get("article_name", "Barang Baru"))).strip()
                         pic_name = first_row.get("pic", "Tim FL")
-                        print(f"\n📢 [SERVER] MENGIRIM SINYAL SUARA KE SEMUA LAPTOP: {art_name} ({pic_name})")
 
                         await session.send_custom_message("trigger_fl_sound", {
                             "id": newest_id,
