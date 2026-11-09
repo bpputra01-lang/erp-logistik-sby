@@ -32,70 +32,80 @@ def server(input: Inputs, output: Outputs, session: Session):
     _last_filter_state = {"c_brands": [], "c_subs": [], "c_bins": []}
     _last_seen_fl_id = reactive.Value(None)
 
-# 🔄 Cek data Supabase otomatis tiap 3 detik HANYA JIKA SUDAH LOGIN
-    @reactive.effect
-    async def _poll_fl_requests_from_supabase():
-        reactive.invalidate_later(3)
+import asyncio
+import re
+from datetime import datetime
+from shiny import reactive, ui
 
-        # 🛑 JANGAN POLLING JIKA BELUM LOGIN (mencegah lag di halaman login)
-        if not state.logged_in():
-            return
+@reactive.effect
+async def _poll_fl_requests_from_supabase():
+    # 🛑 1. HENTIKAN TOTAL JIKA BELUM LOGIN (Jangan pasang timer apapun)
+    if not state.logged_in():
+        return
 
-        try:
-            import asyncio
+    # 🔄 2. Pasang timer HANYA JIKA SUDAH LOGIN
+    reactive.invalidate_later(3)
+
+    try:
+        # Jalankan koneksi dan fetch Supabase sepenuhnya di thread terpisah
+        def fetch_from_supabase():
             client = get_supabase()
-            if client:
-                # Jalankan query blocking di thread terpisah agar WebSocket tidak freeze
-                def fetch_data():
-                    return client.table("jezpro_fl_requests").select("*").execute()
+            if not client:
+                return []
+            res = client.table("jezpro_fl_requests").select("*").execute()
+            return res.data if res and hasattr(res, "data") and res.data else []
 
-                res = await asyncio.to_thread(fetch_data)
-                raw_data = res.data if res and hasattr(res, "data") and res.data else []
+        raw_data = await asyncio.to_thread(fetch_from_supabase)
 
-                if raw_data:
-                    import re
-                    sorted_data = sorted(
-                        raw_data, 
-                        key=lambda x: safe_int(x.get("id") or x.get("req_id") or 0), 
-                        reverse=True
-                    )[:20]
+        if raw_data:
+            sorted_data = sorted(
+                raw_data, 
+                key=lambda x: safe_int(x.get("id") or x.get("req_id") or 0), 
+                reverse=True
+            )[:20]
 
-                    cards = []
-                    for row in sorted_data:
-                        tgl_str = str(row.get("created_at", "-"))[:19].replace("T", " ")
-                        raw_art = str(row.get("article_name", "-"))
-                        clean_art = re.sub(r'<[^>]+>', '', raw_art).strip() or "-"
+            cards = []
+            for row in sorted_data:
+                tgl_str = str(row.get("created_at", "-"))[:19].replace("T", " ")
+                raw_art = str(row.get("article_name", "-"))
+                clean_art = re.sub(r'<[^>]+>', '', raw_art).strip() or "-"
 
-                        cards.append({
-                            "id": str(row.get("req_id") or row.get("id")),
-                            "article": clean_art,
-                            "datetime": tgl_str,
-                            "pic": row.get("pic", "Tim FL"),
-                            "bin": row.get("bin", "-"),
-                            "status": "WAITING OFFLINE",
-                            "qty": safe_int(row.get("qty", 1), 1)
-                        })
+                cards.append({
+                    "id": str(row.get("req_id") or row.get("id")),
+                    "article": clean_art,
+                    "datetime": tgl_str,
+                    "pic": row.get("pic", "Tim FL"),
+                    "bin": row.get("bin", "-"),
+                    "status": "WAITING OFFLINE",
+                    "qty": safe_int(row.get("qty", 1), 1)
+                })
 
-                    state.fl_request_list.set(cards)
-                    state.fl_last_check_time.set(datetime.now().strftime("%H:%M:%S"))
+            # Update reactive state
+            state.fl_request_list.set(cards)
+            state.fl_last_check_time.set(datetime.now().strftime("%H:%M:%S"))
 
-                    first_row = sorted_data[0]
-                    newest_id = str(first_row.get("id") or first_row.get("req_id") or first_row.get("created_at") or "")
+            first_row = sorted_data[0]
+            newest_id = str(first_row.get("id") or first_row.get("req_id") or first_row.get("created_at") or "")
 
-                    if _last_seen_fl_id() is not None and newest_id != _last_seen_fl_id():
-                        art_name = re.sub(r'<[^>]+>', '', str(first_row.get("article_name", "Barang Baru"))).strip()
-                        pic_name = first_row.get("pic", "Tim FL")
+            # 🛑 3. GUNAKAN ISOLATE AGAR TIDAK TERJADI INFINITE LOOP
+            with reactive.isolate():
+                last_id = _last_seen_fl_id()
 
-                        await session.send_custom_message("trigger_fl_sound", {
-                            "id": newest_id,
-                            "article": art_name,
-                            "pic": pic_name
-                        })
-                        ui.notification_show(f"🚨 Barang Baru: {art_name} ({pic_name})", type="warning", duration=6)
+            if last_id is not None and newest_id != last_id:
+                art_name = re.sub(r'<[^>]+>', '', str(first_row.get("article_name", "Barang Baru"))).strip()
+                pic_name = first_row.get("pic", "Tim FL")
 
-                    _last_seen_fl_id.set(newest_id)
-        except Exception as e:
-            print("⚠️ Error polling FL:", e)
+                await session.send_custom_message("trigger_fl_sound", {
+                    "id": newest_id,
+                    "article": art_name,
+                    "pic": pic_name
+                })
+                ui.notification_show(f"🚨 Barang Baru: {art_name} ({pic_name})", type="warning", duration=6)
+
+            _last_seen_fl_id.set(newest_id)
+
+    except Exception as e:
+        print("⚠️ Error polling FL:", e)
                 # Modal Dismiss Listeners
     @reactive.Effect
     @reactive.event(input.close_success_modal_event)
