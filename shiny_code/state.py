@@ -7416,6 +7416,13 @@ class AppState:
                 if r.get("status") == "DONE_SETUP" or r.get("setup_done_at") or (r_id and r_id in done_ids):
                     continue
 
+                raw_bin = str(r.get("bin_code", "-")).replace("[", "").replace("]", "").strip().upper()
+                bin_awal = raw_bin if raw_bin not in ["WAITING OFFLINE", "-", ""] else "STAGING INBOUND"
+
+                # 🌟 FILTER BARU: Buang / lewati jika BIN Awal adalah TOKO atau mengandung kata TOKO
+                if "TOKO" in bin_awal:
+                    continue
+
                 diff_mins = get_instock_diff_minutes(r)
                 if filter_waktu_mode == "BARUSAN_5" and diff_mins > 5.0: continue
                 elif filter_waktu_mode == "BARUSAN_15" and diff_mins > 15.0: continue
