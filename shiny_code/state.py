@@ -4726,7 +4726,7 @@ class AppState:
             is_toko_disp = df['BIN_CLEAN'].str.contains('TOKO|DISPLAY', na=False)
 
             # 🛑 PENGECUALIAN BIN: EVENT, REJECT, DEFECT, KARANTINA, PERBAIKAN, RESELLER, GARAGE, LIVE
-            excl_display_src = "EVENT|REJECT|DEFECT|KARANTINA|PERBAIKAN|RESELLER|GARAGE|LIVE|GIFT"
+            excl_display_src = "EVENT|REJECT|DEFECT|KARANTINA|PERBAIKAN|RESELLER|GARAGE|LIVE|GIFT|STAGGING|STAGING"
             is_valid_source = (~is_toko_disp) & (~df['BIN_CLEAN'].str.contains(excl_display_src, na=False))
 
             # HITUNG TOTAL SKU YANG ADA DI BIN DIKECUALIKAN
