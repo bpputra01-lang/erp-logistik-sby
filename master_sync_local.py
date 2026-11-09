@@ -161,6 +161,30 @@ def create_jezpro_session():
     session.get("https://jezpro.id/stock_tracking", timeout=15)
     return session
 
+def relogin_jezpro(session):
+    """Fungsi untuk memperbarui sesi login tanpa merusak objek session yang sedang dipakai thread"""
+    try:
+        print(f"🔄 [{datetime.now(WIB).strftime('%H:%M:%S')}] Sesi habis (401), mencoba login ulang ke Jezpro...")
+        res = session.get("https://jezpro.id/", timeout=20)
+        soup = BeautifulSoup(res.text, "html.parser")
+        token_tag = soup.find("input", {"name": "_token"})
+        if not token_tag:
+            return False
+
+        session.post("https://jezpro.id/user_login", data={
+            "_token": token_tag["value"],
+            "u_email": JEZPRO_EMAIL,
+            "password": JEZPRO_PASSWORD
+        }, timeout=20)
+
+        session.get("https://jezpro.id/helper_backup", timeout=15)
+        session.get("https://jezpro.id/stock_tracking", timeout=15)
+        session.get("https://jezpro.id/setup_lokasi_stok_v2", timeout=15)
+        print("✅ Berhasil login ulang ke Jezpro!")
+        return True
+    except Exception as e:
+        print(f"❌ Gagal login ulang: {e}")
+        return False
 # ==============================================================================
 # MODUL 1: INSTOCK DAILY SURABAYA
 # ==============================================================================
@@ -192,6 +216,14 @@ def run_module_instock_daily(session):
 
     try:
         res = session.get(url_stk, params=params, headers=headers_req, timeout=25)
+        
+        # 🌟 JIKA MENDAPAT 401 (UNAUTHORIZED) -> OTOMATIS LOGIN ULANG DAN COBA LAGI
+        if res.status_code in [401, 419] or "login" in res.url:
+            print(f"   ⚠️ [INSTOCK SBY] Terdeteksi Sesi Habis (Code: {res.status_code}). Melakukan re-login...")
+            if relogin_jezpro(session):
+                # Request ulang setelah berhasil login
+                res = session.get(url_stk, params=params, headers=headers_req, timeout=25)
+
         if res.status_code != 200: 
             print(f"   ⚠️ [INSTOCK SBY] Respons Jezpro bukan 200 (Code: {res.status_code})")
             return
