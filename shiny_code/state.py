@@ -776,7 +776,8 @@ class AppState:
 
     def get_menu_sales(self) -> list[str]:
         uname = self.username().lower()
-        if uname in ["dc"]:
+        # Batasi HANYA untuk admin/dc saja. Akun hub dan toko return list kosong []
+        if uname in ["admin", "dc"]:
             return ["Permintaan FL"]
         return []
 
