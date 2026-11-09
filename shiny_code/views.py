@@ -233,32 +233,59 @@ CUSTOM_HEAD = ui.head_content(
             }, 120000);
         };
 
-        // Data Audio Base64 (Anti-404 di semua laptop)
+       // Data Audio Base64
         const FL_AUDIO_URI = `""" + AUDIO_BASE64_DATA + """`;
         let audioCtx = null;
 
-        // Pemutar Suara Permintaan FL
+        // Pemutar Suara Permintaan FL (Prioritas MP3 -> Fallback Suara Manusia Bawaan Browser -> Beep)
         window.playFLSound = function() {
+            console.log("🔊 Mencoba memutar suara FL...");
+            let playedMP3 = false;
+
+            // 1. Coba Putar MP3 Base64 / File Statis
             try {
-                // Prioritas 1: Putar dari Base64
-                // Prioritas 2: Putar dari URL statis /static/mas_ambilin_dong.mp3
                 let source = (FL_AUDIO_URI && FL_AUDIO_URI.length > 50) ? FL_AUDIO_URI : '/static/mas_ambilin_dong.mp3';
                 let audio = new Audio(source);
-                
                 let playPromise = audio.play();
+                
                 if (playPromise !== undefined) {
-                    playPromise.catch(function(err) {
-                        console.warn("Gagal memutar audio MP3, beralih ke nada bel:", err);
-                        window.playBeepTone();
+                    playPromise.then(function() {
+                        playedMP3 = true;
+                        console.log("✅ MP3 'Mas ambilin dong' berhasil diputar!");
+                    }).catch(function(err) {
+                        console.warn("⚠️ MP3 gagal diputar, beralih ke suara Text-to-Speech:", err);
+                        window.playVoiceTTS();
                     });
                 }
             } catch(e) {
-                console.warn("Error Audio:", e);
+                console.warn("⚠️ Audio element error, beralih ke TTS:", e);
+                window.playVoiceTTS();
+            }
+        };
+
+        // 2. Fallback Suara Manusia Text-to-Speech (Pasti Berbicara Bahasa Indonesia di Chrome/Edge)
+        window.playVoiceTTS = function() {
+            try {
+                if ('speechSynthesis' in window) {
+                    // Batalkan antrean suara sebelumnya
+                    window.speechSynthesis.cancel();
+                    
+                    let msg = new SpeechSynthesisUtterance("Mas, ambilin dong!");
+                    msg.lang = "id-ID"; // Bahasa Indonesia
+                    msg.rate = 1.0;     // Kecepatan normal
+                    msg.pitch = 1.2;    // Nada sedikit tinggi/wanita
+                    
+                    window.speechSynthesis.speak(msg);
+                    console.log("🗣️ Berhasil berbicara via SpeechSynthesis browser!");
+                } else {
+                    window.playBeepTone();
+                }
+            } catch(err) {
                 window.playBeepTone();
             }
         };
 
-        // Fallback nada bel lantang jika file MP3 benar-benar tidak tersedia
+        // 3. Fallback Paling Akhir: Nada Bel
         window.playBeepTone = function() {
             try {
                 if (!audioCtx) {
@@ -278,6 +305,29 @@ CUSTOM_HEAD = ui.head_content(
                 osc.stop(audioCtx.currentTime + 0.4);
             } catch(e) {}
         };
+
+        // 🌟 PENANGKAP SINYAL SUPABASE DARI APP.PY (Wajib Ada)
+        function initFLSoundListener() {
+            if (window.Shiny && window.Shiny.addCustomMessageHandler) {
+                Shiny.addCustomMessageHandler('trigger_fl_sound', function(message) {
+                    console.log("📢 Sinyal pesanan baru diterima dari server:", message);
+                    window.playFLSound();
+                });
+            } else {
+                setTimeout(initFLSoundListener, 300);
+            }
+        }
+        initFLSoundListener();
+
+        // Buka izin audio otomatis saat pengguna mengklik layar
+        window.addEventListener('click', function unlockOnce() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }, { once: true });
 
         // AMAN: Tunggu DOMContentLoaded agar document.body tidak NULL saat di-observe
         document.addEventListener("DOMContentLoaded", function() {
@@ -3109,11 +3159,12 @@ def permintaan_fl_view(state: AppState):
                 ui.p(f"Live Check Jezpro: {state.fl_last_check_time()} WIB • Sistem otomatis bersuara saat ada permintaan baru.", style="color: #718096; font-size: 12px; margin: 0;"),
             ),
             # Tombol Test Suara & Status di Kanan Atas
+            # Tombol Test Suara & Status di Kanan Atas (Tanpa alert yang mengganggu audio)
             ui.div(
                 ui.tags.button(
                     "🔊 TEST SUARA LAPTOP INI",
                     type="button",
-                    onclick="window.playFLSound(); alert('Jika Anda mendengar suara, berarti laptop ini SUDAH SIAP menerima notifikasi!');",
+                    onclick="window.playFLSound();",
                     style="background: #10B981; color: white; font-weight: 800; font-size: 11px; padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer; margin-right: 8px;"
                 ),
                 ui.span("🟢 SUARA AKTIF", style="background: #C6F6D5; color: #22543D; font-weight: 800; font-size: 11px; padding: 6px 14px; border-radius: 20px; border: 1px solid #9AE6B4;"),
