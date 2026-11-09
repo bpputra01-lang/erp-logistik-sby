@@ -21,16 +21,34 @@ def get_image_base64(filename):
 
 def get_audio_base64(filename="mas_ambilin_dong.mp3"):
     try:
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        full_path = os.path.join(base_dir, filename)
-        target_path = full_path if os.path.exists(full_path) else filename
+        # Cari file di folder views.py maupun di folder kerja terminal
+        possible_paths = [
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), filename),
+            os.path.join(os.getcwd(), filename),
+            filename
+        ]
+        target_path = next((p for p in possible_paths if os.path.exists(p)), None)
         
-        if os.path.exists(target_path):
+        # Jika file belum ada di mana pun, buat otomatis pakai gTTS
+        if not target_path:
+            try:
+                from gtts import gTTS
+                print(f"🎙️ File {filename} belum ditemukan, membuat otomatis via gTTS...")
+                tts = gTTS(text="Mas, ambilin dong!", lang="id", slow=False)
+                gen_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
+                tts.save(gen_path)
+                target_path = gen_path
+                print(f"✅ Berhasil membuat {gen_path}")
+            except Exception as e_tts:
+                print("Gagal generate audio:", e_tts)
+
+        if target_path and os.path.exists(target_path):
             with open(target_path, "rb") as f:
                 encoded = base64.b64encode(f.read()).decode("utf-8")
-                return f"data:audio/mp3;base64,{encoded}"
+                # 🌟 WAJIB audio/mpeg (bukan audio/mp3) agar Chrome/Edge mau membaca
+                return f"data:audio/mpeg;base64,{encoded}"
         else:
-            print(f"⚠️ File {filename} tidak ditemukan di {target_path}")
+            print(f"⚠️ File {filename} tidak ditemukan.")
     except Exception as e:
         print("Gagal load audio base64:", e)
     return ""
@@ -222,24 +240,25 @@ CUSTOM_HEAD = ui.head_content(
         // Pemutar Suara Permintaan FL
         window.playFLSound = function() {
             try {
-                if (FL_AUDIO_URI && FL_AUDIO_URI.length > 50) {
-                    let audio = new Audio(FL_AUDIO_URI);
-                    let playPromise = audio.play();
-                    if (playPromise !== undefined) {
-                        playPromise.catch(function(err) {
-                            console.warn("Autoplay audio MP3 ditahan browser, beralih ke nada bel:", err);
-                            window.playBeepTone();
-                        });
-                    }
-                } else {
-                    window.playBeepTone();
+                // Prioritas 1: Putar dari Base64
+                // Prioritas 2: Putar dari URL statis /static/mas_ambilin_dong.mp3
+                let source = (FL_AUDIO_URI && FL_AUDIO_URI.length > 50) ? FL_AUDIO_URI : '/static/mas_ambilin_dong.mp3';
+                let audio = new Audio(source);
+                
+                let playPromise = audio.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(function(err) {
+                        console.warn("Gagal memutar audio MP3, beralih ke nada bel:", err);
+                        window.playBeepTone();
+                    });
                 }
             } catch(e) {
+                console.warn("Error Audio:", e);
                 window.playBeepTone();
             }
         };
 
-        // Fallback nada bel lantang jika file MP3 diblokir browser
+        // Fallback nada bel lantang jika file MP3 benar-benar tidak tersedia
         window.playBeepTone = function() {
             try {
                 if (!audioCtx) {
@@ -253,37 +272,12 @@ CUSTOM_HEAD = ui.head_content(
                 osc.connect(gain);
                 gain.connect(audioCtx.destination);
                 osc.type = "sine";
-                osc.frequency.setValueAtTime(880, audioCtx.currentTime); // 880 Hz
+                osc.frequency.setValueAtTime(880, audioCtx.currentTime);
                 gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
                 osc.start();
                 osc.stop(audioCtx.currentTime + 0.4);
-            } catch(e) {
-                console.error("Gagal membunyikan nada bel:", e);
-            }
+            } catch(e) {}
         };
-
-        // Registrasi aman penangkap sinyal dari server Python (Anti-Race Condition)
-        function initFLSoundListener() {
-            if (window.Shiny && window.Shiny.addCustomMessageHandler) {
-                Shiny.addCustomMessageHandler('trigger_fl_sound', function(message) {
-                    console.log("📢 Sinyal permintaan FL baru diterima:", message);
-                    window.playFLSound();
-                });
-            } else {
-                setTimeout(initFLSoundListener, 300);
-            }
-        }
-        initFLSoundListener();
-
-        // Otomatis unlock izin audio begitu pengguna mengklik layar di laptop mana pun
-        window.addEventListener('click', function unlockOnce() {
-            if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            if (audioCtx.state === 'suspended') {
-                audioCtx.resume();
-            }
-        }, { once: true });
 
         // AMAN: Tunggu DOMContentLoaded agar document.body tidak NULL saat di-observe
         document.addEventListener("DOMContentLoaded", function() {
