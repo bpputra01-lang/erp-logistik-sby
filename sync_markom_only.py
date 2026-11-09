@@ -21,7 +21,7 @@ SPREADSHEET_URL = os.environ.get(
 )
 
 # Interval pengecekan otomatis (dalam satuan detik, misal: 60 = tiap 1 menit)
-CHECK_INTERVAL_SECONDS = 60 
+CHECK_INTERVAL_SECONDS = 600 
 
 WIB = timezone(timedelta(hours=7))
 
