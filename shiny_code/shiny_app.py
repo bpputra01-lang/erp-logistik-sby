@@ -32,7 +32,7 @@ def server(input: Inputs, output: Outputs, session: Session):
     _last_filter_state = {"c_brands": [], "c_subs": [], "c_bins": []}
     _last_seen_fl_id = reactive.Value(None)
 
-    # 🔄 Cek data Supabase otomatis tiap 3 detik untuk semua pengguna web (ASYNCHRONOUS)
+# 🔄 Cek data Supabase otomatis tiap 3 detik untuk semua pengguna web (ASYNCHRONOUS)
     @reactive.effect
     async def _poll_fl_requests_from_supabase():
         reactive.invalidate_later(3)  # Periksa tiap 3 detik
@@ -40,35 +40,50 @@ def server(input: Inputs, output: Outputs, session: Session):
         try:
             client = get_supabase()
             if client:
-                # 🌟 Wajib urutkan berdasarkan created_at desc agar barang paling baru SELALU di indeks 0
-                res = client.table("jezpro_fl_requests").select("*").order("created_at", desc=True).limit(20).execute()
-                if res and res.data and len(res.data) > 0:
+                # 🌟 KUNCI PERBAIKAN: Jangan panggil .order() atau .limit() di sini agar tidak crash!
+                res = client.table("jezpro_fl_requests").select("*").execute()
+                raw_data = res.data if res and hasattr(res, "data") and res.data else []
+
+                if raw_data:
+                    # 🌟 Urutkan 20 data teratas murni di Python berdasarkan ID terbesar
+                    import re
+                    sorted_data = sorted(
+                        raw_data, 
+                        key=lambda x: safe_int(x.get("id") or x.get("req_id") or 0), 
+                        reverse=True
+                    )[:20]
+
                     cards = []
-                    for row in res.data:
+                    for row in sorted_data:
                         tgl_str = str(row.get("created_at", "-"))[:19].replace("T", " ")
+                        
+                        # Bersihkan tag HTML <span class=...> pada nama artikel
+                        raw_art = str(row.get("article_name", "-"))
+                        clean_art = re.sub(r'<[^>]+>', '', raw_art).strip() or "-"
+
                         cards.append({
                             "id": str(row.get("req_id") or row.get("id")),
-                            "article": row.get("article_name", "-"),
+                            "article": clean_art,
                             "datetime": tgl_str,
                             "pic": row.get("pic", "Tim FL"),
                             "bin": row.get("bin", "-"),
                             "status": "WAITING OFFLINE",
-                            "qty": row.get("qty", 1)
+                            "qty": safe_int(row.get("qty", 1), 1)
                         })
+
+                    # Masukkan kartu ke web & update jam live check
                     state.fl_request_list.set(cards)
                     state.fl_last_check_time.set(datetime.now().strftime("%H:%M:%S"))
 
-                    first_row = res.data[0]
-                    # Gabungkan ID dan Timestamp agar perubahannya 100% unik
-                    newest_id = str(first_row.get("req_id") or first_row.get("id")) + "_" + str(first_row.get("created_at"))
+                    first_row = sorted_data[0]
+                    newest_id = str(first_row.get("id") or first_row.get("req_id") or first_row.get("created_at") or "")
 
-                    # 🔊 JIKA ADA BARANG BARU MASUK -> PERINTAHKAN SEMUA BROWSER LAPTOP BERBUNYI
+                    # 🔊 JIKA ADA BARANG BARU MASUK -> PICU SUARA DI LAPTOP LAIN
                     if _last_seen_fl_id() is not None and newest_id != _last_seen_fl_id():
-                        art_name = first_row.get("article_name", "Barang Baru")
+                        art_name = re.sub(r'<[^>]+>', '', str(first_row.get("article_name", "Barang Baru"))).strip()
                         pic_name = first_row.get("pic", "Tim FL")
-                        print(f"\n📢 [SERVER -> LAPTOP CLIENT] BARANG BARU: {art_name} oleh {pic_name}! Mengirim sinyal bunyi...")
+                        print(f"\n📢 [SERVER] MENGIRIM SINYAL SUARA KE SEMUA LAPTOP: {art_name} ({pic_name})")
 
-                        # Kirim sinyal resmi Shiny ke browser client
                         await session.send_custom_message("trigger_fl_sound", {
                             "id": newest_id,
                             "article": art_name,
