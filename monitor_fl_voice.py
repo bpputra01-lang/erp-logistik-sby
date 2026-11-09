@@ -76,7 +76,13 @@ def create_jezpro_session():
 # ==============================================================================
 # 🚀 LOOP PEMANTAUAN REAL-TIME
 # ==============================================================================
-from config import get_supabase # Memakai fungsi supabase yang sudah ada di config Anda
+from supabase import create_client
+
+# Masukkan URL & Key Supabase proyek Anda langsung di sini:
+SUPABASE_URL = "https://fanzsmghhbefhhaicrok.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhbnpzbWdoaGJlZmhoYWljcm9rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxNTQzNDgsImV4cCI6MjEwMzczMDM0OH0.brCSOO9nHAUK8CxDWPperpJ--_NA_nwy5cO9OqGv3I0"
+
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def start_monitoring():
     init_audio()
