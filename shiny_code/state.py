@@ -728,33 +728,36 @@ class AppState:
         elif key == "extras": self.dropdown_extras.set(not self.dropdown_extras())
 
     def handle_login(self, u: str, p: str):
-        u, p = u.strip(), p.strip()
+        u, p = u.strip().lower(), p.strip()
         if u == "admin" and p == "sby123":
             self.logged_in.set(True)
             self.role.set("DC")
-            self.branch.set("SURABAYA")
+            self.username.set("admin")
             self.user_display_name.set("Admin DC Surabaya")
             self.login_timestamp_ms.set(int(time.time() * 1000))
             return True, "Berhasil Login! Selamat datang di ERP Surabaya."
+            
         elif u == "toko" and p == "toko123":
             self.logged_in.set(True)
-            self.role.set("CABANG")
+            self.role.set("DC")          # Tetap DC
+            self.username.set("toko")    # Dibedakan via username
             self.branch.set("SURABAYA")
-            self.user_display_name.set("User Cabang")
+            self.user_display_name.set("User Toko")
             self.login_timestamp_ms.set(int(time.time() * 1000))
-            self.load_memo_data()
-            return True, "Berhasil Login sebagai User Cabang!"
-
+            return True, "Berhasil Login sebagai User Toko!"
+            
         elif u == "hub" and p == "jkt123":
             self.logged_in.set(True)
-            self.role.set("HUB")
+            self.role.set("DC")          # Tetap DC
+            self.username.set("hub")     # Dibedakan via username
             self.branch.set("HUB JAKARTA")
             self.user_display_name.set("User Hub")
             self.login_timestamp_ms.set(int(time.time() * 1000))
             self.set_main_menu("Warehouse Activity Monitor")
             return True, "Berhasil Login sebagai User Hub!"
-
+            
         return False, "Username atau Password salah! Periksa kembali."
+
 
     def logout(self):
         self.logged_in.set(False)
@@ -764,34 +767,50 @@ class AppState:
         self.login_timestamp_ms.set(0)
 
     def get_menu_monitoring(self) -> list[str]:
-        if self.role() == "HUB":
+        uname = self.username().lower()
+        if uname == "hub":
+            return ["Warehouse Activity Monitor"]
+        elif uname == "toko":
             return ["Warehouse Activity Monitor"]
         return ["Warehouse Activity Monitor", "Memo Pengajuan", "Balancing Stock", "Database Ongkir In/Out", "Precentage Display"]
 
     def get_menu_sales(self) -> list[str]:
-        if self.role() == "HUB":
-            return [] # Disembunyikan untuk akun hub
-        return ["Permintaan FL"]
+        uname = self.username().lower()
+        if uname in ["admin"]:
+            return ["Permintaan FL"]
+        return []
 
     def get_menu_auditor(self) -> list[str]:
-        if self.role() == "HUB":
-            return [] # Disembunyikan untuk akun hub
-        return ["Warehouse Inventory Audit", "Warehouse Compliance Audit"]
-
+        uname = self.username().lower()
+        if uname in ["admin"]:
+            return ["Warehouse Inventory Audit", "Warehouse Compliance Audit"]
+        return []
+        
     def get_menu_operational(self) -> list[str]:
-        if self.role() == "HUB":
-            # Semua sub menu operasional KECUALI Instock Validation
+        uname = self.username().lower()
+        if uname == "hub":
+            # Akun Hub: Putaway System & semua sub menu operasional KECUALI Instock Validation
             return ["Putaway System", "Compare RTO", "Purchase Order Receiving", "Compare Penerimaan RTO"]
+        elif uname == "toko":
+            return ["Compare Penerimaan RTO", "Putaway System", "Purchase Order Receiving"]
         return ["Putaway System", "Compare RTO", "Purchase Order Receiving", "Instock Validation", "Compare Penerimaan RTO"]
 
     def get_menu_inventory(self) -> list[str]:
-        if self.role() == "HUB":
-            return ["Reloc Koli to Koli", "Cycle Count", "Justification SO", "Physical Inventory List"]
+        uname = self.username().lower()
+        if uname == "hub":
+            # Akun Hub: Reloc Koli to Koli, Cycle Count, Justification SO, Physical Inventory List
+            return ["Refill Shelving", "Reloc Koli to Koli", "Cycle Count", "Justification SO", "Physical Inventory List"]
+        elif uname == "toko":
+            return ["Physical Inventory List", "Cycle Count", "Stock Minus", "Compare System", "Justification SO"]
         return ["Stock Opname", "Cycle Count", "Justification SO", "Stock Minus", "Compare System", "Physical Inventory List", "Validation Barcode SKU", "Cross Check Real & System", "List Retur Out", "Reloc Koli to Koli"]
 
     def get_menu_extras(self) -> list[str]:
-        if self.role() == "HUB":
-            return ["Refill Shelving", "Latihan Rumus Excel"]
+        uname = self.username().lower()
+        if uname == "hub":
+            # Akun Hub: Refill Shelving & Latihan Rumus Excel
+            return ["Latihan Rumus Excel"]
+        elif uname == "toko":
+            return ["Precentage Display", "Refill Toko", "Store Leader RTO Decission"]
         return ["Data Timbang Ongkir", "Latihan Rumus Excel"]
 
     def get_active_content_type(self) -> str:
