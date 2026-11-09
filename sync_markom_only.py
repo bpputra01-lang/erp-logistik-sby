@@ -14,14 +14,14 @@ from datetime import datetime, timezone, timedelta
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://fanzsmghhbefhhaicrok.supabase.co")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhbnpzbWdoaGJlZmhoYWljcm9rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxNTQzNDgsImV4cCI6MjEwMzczMDM0OH0.brCSOO9nHAUK8CxDWPperpJ--_NA_nwy5cO9OqGv3I0")
 
-# Masukkan URL Google Spreadsheet Anda di sini jika tidak pakai environment variable
+# Link Google Spreadsheet sudah terpasang di bawah:
 SPREADSHEET_URL = os.environ.get(
-    "https://docs.google.com/spreadsheets/d/1yjNfDer239OR0tVUl_Xj1UCArqbcMr5dl6C-5EGtrSo/edit?usp=sharing", 
-    ""
+    "SPREADSHEET_URL", 
+    "https://docs.google.com/spreadsheets/d/1yjNfDer239OR0tVUl_Xj1UCArqbcMr5dl6C-5EGtrSo/edit?usp=sharing"
 )
 
-# Interval pengecekan otomatis (dalam satuan detik, misal: 60 = tiap 1 menit)
-CHECK_INTERVAL_SECONDS = 600 
+# Interval pengecekan otomatis (dalam detik, misal: 60 = 1 menit)
+CHECK_INTERVAL_SECONDS = 60 
 
 WIB = timezone(timedelta(hours=7))
 
@@ -112,14 +112,10 @@ def get_existing_database_memos():
 # ==============================================================================
 def run_sync():
     now_str = datetime.now(WIB).strftime("%H:%M:%S")
-    print(f"\n⏳ [{now_str}] [MARKOM SYNC] Memulai pengecekan Google Spreadsheet Markom...")
-
-    if not SPREADSHEET_URL:
-        print("   ❌ [MARKOM SYNC] Gagal: SPREADSHEET_URL belum diatur/masih kosong!")
-        return False
+    print(f"\n⏳ [{now_str}] [MARKOM SYNC] Memeriksa Google Spreadsheet Markom...")
 
     existing_db_memos = get_existing_database_memos()
-    print(f"   📂 Ditemukan {len(existing_db_memos)} riwayat memo terdaftar di database.")
+    print(f"   📂 Ditemukan {len(existing_db_memos)} riwayat memo di database.")
 
     download_url = SPREADSHEET_URL
     match = re.search(r'/spreadsheets/d/([a-zA-Z0-9-_]+)', SPREADSHEET_URL)
@@ -130,8 +126,9 @@ def run_sync():
     try:
         xl = pd.ExcelFile(download_url)
         all_sheets = xl.sheet_names
+        # Cari sheet yang namanya mengandung MARKOM, jika tidak ada pakai sheet pertama
         target_sheet = next((s for s in all_sheets if "MARKOM" in s.strip().upper()), all_sheets[0])
-        print(f"   🎯 Membaca Sheet: '{target_sheet}'...")
+        print(f"   🎯 Mengakses Sheet: '{target_sheet}'...")
         df = pd.read_excel(xl, sheet_name=target_sheet)
     except Exception as e:
         print(f"   ⚠️ Gagal via Excel, mencoba direct CSV: {e}")
@@ -143,7 +140,7 @@ def run_sync():
             return False
 
     if df.empty or df.shape[1] < 4:
-        print("   ⚠️ [MARKOM SYNC] Sheet kosong atau kolom tidak memadai.")
+        print("   ⚠️ [MARKOM SYNC] Sheet kosong atau jumlah kolom kurang.")
         return False
 
     def find_col(candidates, default_idx):
@@ -166,10 +163,10 @@ def run_sync():
     df_filtered = df[mask].copy()
 
     if df_filtered.empty:
-        print("   ℹ️ [MARKOM SYNC] Tidak ada baris bertanda EVENT, HADIAH, atau GIFT di sheet.")
+        print("   ℹ️ [MARKOM SYNC] Tidak ada baris dengan catatan EVENT, HADIAH, atau GIFT.")
         return True
 
-    print(f"   🔍 Ditemukan {len(df_filtered)} baris permintaan hadiah/event.")
+    print(f"   🔍 Ditemukan {len(df_filtered)} baris permintaan EVENT/HADIAH/GIFT.")
     stock_lookup = get_stock_cache()
 
     grouped_events = {}
@@ -272,7 +269,7 @@ def run_sync():
         if res_insert.status_code in [200, 201]:
             print(f"   ✨ [INSERT] Berhasil menambah {len(new_memos_to_insert)} memo baru ke database!")
         else:
-            print(f"   ⚠️ [INSERT] Gagal insert memo baru: {res_insert.text}")
+            print(f"   ⚠️ [INSERT] Gagal insert memo: {res_insert.text}")
 
     print(f"   ✅ [MARKOM SYNC] Selesai! (+{len(new_memos_to_insert)} Memo Baru, {updated_count} Diperbarui, {skipped_count} Dilewati karena Status DONE).")
     return True
@@ -288,19 +285,16 @@ if __name__ == "__main__":
 
     try:
         while True:
-            # Jalankan proses sinkronisasi
             try:
                 run_sync()
             except Exception as e:
                 print(f"   ❌ [ERROR UNHANDLED]: {e}")
 
-            # Tampilan Standby / Hitung Mundur agar tahu sistem tetap hidup
             now_wib = datetime.now(WIB).strftime("%H:%M:%S")
-            print(f"💤 [{now_wib}] [STANDBY] Pengecekan selesai. Menunggu {CHECK_INTERVAL_SECONDS} detik ke siklus berikutnya...")
+            print(f"💤 [{now_wib}] [STANDBY] Menunggu {CHECK_INTERVAL_SECONDS} detik ke siklus pengecekan berikutnya...")
             print("-" * 75)
 
-            # Istirahat sesuai interval
             time.sleep(CHECK_INTERVAL_SECONDS)
 
     except KeyboardInterrupt:
-        print("\n\n🛑 Script dihentikan manual oleh user (Ctrl + C). Selamat tinggal!")
+        print("\n\n🛑 Script dihentikan manual oleh user (Ctrl + C).")
