@@ -16,7 +16,7 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXV
 
 # Masukkan URL Google Spreadsheet Anda di sini jika tidak pakai environment variable
 SPREADSHEET_URL = os.environ.get(
-    "SPREADSHEET_URL", 
+    "https://docs.google.com/spreadsheets/d/1yjNfDer239OR0tVUl_Xj1UCArqbcMr5dl6C-5EGtrSo/edit?usp=sharing", 
     ""
 )
 
