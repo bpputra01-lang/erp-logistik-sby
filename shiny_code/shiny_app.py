@@ -28,20 +28,27 @@ app_ui = ui.page_fluid(
 
 def server(input: Inputs, output: Outputs, session: Session):
     state = AppState()
-    #state.start_fl_monitor_background()
     _last_filter_state = {"c_brands": [], "c_subs": [], "c_bins": []}
     _last_seen_fl_id = reactive.Value(None)
+    
+    # 🌟 Gunakan list 1 elemen agar aman antar-sesi (session-safe) tanpa butuh 'global'
+    _is_fl_polling = [False]
 
-# 🔄 Cek data Supabase otomatis tiap 3 detik HANYA JIKA SUDAH LOGIN
+    # 🔄 Cek data Supabase otomatis tiap 3 detik SECARA AMAN & ANTI-OVERLAP
     @reactive.effect
     async def _poll_fl_requests_from_supabase():
-        # 🛑 1. JANGAN JALANKAN TIMING / POLLING JIKA BELUM LOGIN (mencegah lag di login)
+        # 🛑 1. Jangan jalankan jika belum login
         if not state.logged_in():
             return
 
-        # ⏱️ 2. Timer hanya berjalan jika SUDAH login
+        # ⏱️ 2. Jadwalkan timer berikutnya 3 detik dari sekarang
         reactive.invalidate_later(3)
 
+        # 🛑 3. JIKA POLLING SESI INI MASIH BERJALAN, LEWATI SIKLUS INI
+        if _is_fl_polling[0]:
+            return
+
+        _is_fl_polling[0] = True
         try:
             import asyncio
             import re
@@ -49,17 +56,15 @@ def server(input: Inputs, output: Outputs, session: Session):
 
             client = get_supabase()
             if not client:
+                _is_fl_polling[0] = False
                 return
 
-            # Jalankan query blocking di thread terpisah agar WebSocket tidak freeze
             def fetch_data():
                 return client.table("jezpro_fl_requests").select("*").execute()
 
-            res = await asyncio.to_thread(fetch_data)
+            # ⏱️ 4. Beri batas timeout 2.5 detik agar jika Supabase lambat, app tidak ikut menggantung
+            res = await asyncio.wait_for(asyncio.to_thread(fetch_data), timeout=2.5)
             raw_data = res.data if res and hasattr(res, "data") and res.data else []
-
-            # 🕒 3. KUNCI WIB: Update jam setiap kali selesai cek, MESKIPUN datanya kosong!
-            state.fl_last_check_time.set(datetime.now().strftime("%H:%M:%S"))
 
             if raw_data:
                 sorted_data = sorted(
@@ -68,52 +73,66 @@ def server(input: Inputs, output: Outputs, session: Session):
                     reverse=True
                 )[:20]
 
-                cards = []
-                for row in sorted_data:
-                    tgl_str = str(row.get("created_at", "-"))[:19].replace("T", " ")
-                    raw_art = str(row.get("article_name", "-"))
-                    clean_art = re.sub(r'<[^>]+>', '', raw_art).strip() or "-"
-
-                    cards.append({
-                        "id": str(row.get("req_id") or row.get("id")),
-                        "article": clean_art,
-                        "datetime": tgl_str,
-                        "pic": row.get("pic", "Tim FL"),
-                        "bin": row.get("bin", "-"),
-                        "status": "WAITING OFFLINE",
-                        "qty": safe_int(row.get("qty", 1), 1)
-                    })
-
-                state.fl_request_list.set(cards)
-
+                # Ambil ID terbaru untuk pengecekan perubahan
                 first_row = sorted_data[0]
                 newest_id = str(first_row.get("id") or first_row.get("req_id") or first_row.get("created_at") or "")
 
-                # 🛑 4. KUNCI AGAR LOGIN TIDAK FREEZE:
-                # Baca ID lama menggunakan isolate agar tidak memicu infinite loop
                 with reactive.isolate():
                     prev_id = _last_seen_fl_id()
 
-                # Pemicu suara barang baru
-                if prev_id is not None and newest_id != prev_id:
-                    art_name = re.sub(r'<[^>]+>', '', str(first_row.get("article_name", "Barang Baru"))).strip()
-                    pic_name = first_row.get("pic", "Tim FL")
+                # 🌟 5. KUNCI UTAMA: HANYA UPDATE STATE JIKA ADA DATA BARU (Mencegah Re-render Spam)
+                if newest_id != prev_id:
+                    cards = []
+                    for row in sorted_data:
+                        tgl_str = str(row.get("created_at", "-"))[:19].replace("T", " ")
+                        raw_art = str(row.get("article_name", "-"))
+                        clean_art = re.sub(r'<[^>]+>', '', raw_art).strip() or "-"
 
-                    await session.send_custom_message("trigger_fl_sound", {
-                        "id": newest_id,
-                        "article": art_name,
-                        "pic": pic_name
-                    })
-                    ui.notification_show(f"🚨 Barang Baru: {art_name} ({pic_name})", type="warning", duration=6)
+                        cards.append({
+                            "id": str(row.get("req_id") or row.get("id")),
+                            "article": clean_art,
+                            "datetime": tgl_str,
+                            "pic": row.get("pic", "Tim FL"),
+                            "bin": row.get("bin", "-"),
+                            "status": "WAITING OFFLINE",
+                            "qty": safe_int(row.get("qty", 1), 1)
+                        })
 
-                _last_seen_fl_id.set(newest_id)
+                    # Update state hanya saat datanya benar-benar berubah/ada baru
+                    state.fl_request_list.set(cards)
+                    state.fl_last_check_time.set(datetime.now().strftime("%H:%M:%S"))
+
+                    # Pemicu suara barang baru (Hanya jika bukan data pertama kali load)
+                    if prev_id is not None:
+                        art_name = re.sub(r'<[^>]+>', '', str(first_row.get("article_name", "Barang Baru"))).strip()
+                        pic_name = first_row.get("pic", "Tim FL")
+
+                        await session.send_custom_message("trigger_fl_sound", {
+                            "id": newest_id,
+                            "article": art_name,
+                            "pic": pic_name
+                        })
+                        ui.notification_show(f"🚨 Barang Baru: {art_name} ({pic_name})", type="warning", duration=6)
+
+                    _last_seen_fl_id.set(newest_id)
+                else:
+                    # Jika data sama, kita cukup update jam indikator live-nya saja secara ringan
+                    state.fl_last_check_time.set(datetime.now().strftime("%H:%M:%S"))
             else:
-                # Jika antrean kosong di database, pastikan list di-reset
-                state.fl_request_list.set([])
+                with reactive.isolate():
+                    current_list = state.fl_request_list()
+                if current_list:
+                    state.fl_request_list.set([])
 
+        except asyncio.TimeoutError:
+            # Jika Supabase timeout karena internet lambat, abaikan pelan-pelan tanpa merusak app / bikin redup
+            print("⚠️ Warning: Polling Supabase timeout (jaringan lambat).")
         except Exception as e:
             print("⚠️ Error polling FL:", e)
-                # Modal Dismiss Listeners
+        finally:
+            # Selalu buka kembali kuncinya di akhir siklus khusus sesi ini
+            _is_fl_polling[0] = False
+                        # Modal Dismiss Listeners
     @reactive.Effect
     @reactive.event(input.close_success_modal_event)
     def _on_close_success_modal():
@@ -5773,6 +5792,135 @@ def server(input: Inputs, output: Outputs, session: Session):
         else:
             ui.notification_show(f"⚠️ {msg}", type="warning", duration=4)
 
+    @render.ui
+    def instock_validation_results_container():
+        if not state.iv_processed():
+            state.load_instock_daily_from_supabase()
+
+        tot_need_rows = len(state.df_iv_setup_rows())
+        tot_need_qty = state.iv_total_allocated_qty()
+        tot_done_rows = len(state.df_iv_done_rows())
+        tot_done_qty = state.iv_total_done_qty()
+
+        cur_filter_waktu = state.iv_filter_waktu() if hasattr(state, "iv_filter_waktu") else "BARUSAN_5"
+
+        metric_ui = ui.div(
+            dark_metric_box("⏳ PERLU DI-SETUP (TAB 1)", f"{tot_need_rows:,} BARIS ({tot_need_qty:,} PCS)", "#E53E3E"),
+            dark_metric_box("🚀 SIAP MUTASI (TAB 3)", f"{len(state.df_iv_mutasi_rows()):,} BARIS", "#3182CE"),
+            dark_metric_box("✅ DONE SETUP (TAB 2)", f"{tot_done_rows:,} BARIS ({tot_done_qty:,} PCS)", "#10B981"),
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+        )
+
+        # 🌟 KOTAK INPUT / SCAN SKU UNTUK MEMINDAHKAN KE TAB 3
+        sku_input_box = ui.div(
+            ui.div(
+                ui.h4("🔍 Scan / Input SKU untuk Dipindah ke Tab 3 (Mutasi)", style="font-size: 14px; font-weight: 800; color: #1A202C; margin-bottom: 6px;"),
+                ui.div(
+                    ui.input_text("iv_sku_scan_box", None, placeholder="Scan barcode atau ketik SKU lalu tekan Enter..."),
+                    ui.tags.button(
+                        "PINDAHKAN",
+                        onclick="""
+                            let val = document.getElementById('iv_sku_scan_box').value;
+                            if(val.trim() !== '') {
+                                Shiny.setInputValue('btn_process_iv_sku_scan', val, {priority: 'event'});
+                                document.getElementById('iv_sku_scan_box').value = '';
+                            }
+                        """,
+                        style="background: linear-gradient(135deg, #E50914 0%, #B20710 100%); color: white; font-weight: 800; border: none; padding: 8px 18px; border-radius: 6px; cursor: pointer; font-size: 12px; height: 38px; white-space: nowrap;"
+                    ),
+                    style="display: flex; gap: 10px; align-items: center;"
+                ),
+                # Skrip agar Barcode Scanner / Tombol Enter langsung memicu fungsi tanpa klik mouse
+                ui.tags.script("""
+                    if (!window._ivScannerListenerAdded) {
+                        window._ivScannerListenerAdded = true;
+                        document.addEventListener("keydown", function(event) {
+                            if (event.key === "Enter" && document.activeElement && document.activeElement.id === "iv_sku_scan_box") {
+                                event.preventDefault();
+                                let val = document.getElementById("iv_sku_scan_box").value;
+                                if (val.trim() !== "") {
+                                    Shiny.setInputValue('btn_process_iv_sku_scan', val, {priority: 'event'});
+                                    document.getElementById("iv_sku_scan_box").value = "";
+                                }
+                            }
+                        });
+                    }
+                """),
+                style="background: #F8FAFC; border: 1.5px solid #CBD5E0; padding: 1rem; border-radius: 10px; margin-bottom: 1rem;"
+            )
+        )
+
+        filter_control_bar = ui.div(
+            ui.div(
+                ui.span("⏱️ Filter Waktu Instock:", style="font-size: 12px; font-weight: 800; color: #1A202C; margin-right: 8px;"),
+                ui.tags.select(
+                    ui.tags.option("🔥 Barusan Saja (< 5 Menit)", value="BARUSAN_5", selected=(cur_filter_waktu == "BARUSAN_5")),
+                    ui.tags.option("⚡ 15 Menit Terakhir", value="BARUSAN_15", selected=(cur_filter_waktu == "BARUSAN_15")),
+                    ui.tags.option("⏳ 30 Menit Terakhir", value="BARUSAN_30", selected=(cur_filter_waktu == "BARUSAN_30")),
+                    ui.tags.option("📋 Semua Antrean Hari Ini", value="SEMUA", selected=(cur_filter_waktu == "SEMUA")),
+                    id="iv_filter_waktu_select",
+                    onchange="Shiny.setInputValue('change_iv_filter_waktu', this.value, {priority: 'event'})",
+                    style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; background: white; cursor: pointer; min-width: 220px;"
+                ),
+                style="display: flex; align-items: center;"
+            ),
+            style="display: flex; justify-content: flex-start; align-items: center; width: 100%; margin-bottom: 0.75rem;"
+        )
+
+        tab1_need = ui.div(
+            sku_input_box,  # 🌟 Kotak Input SKU diletakkan di atas Tab 1
+            filter_control_bar,
+            render_clean_table(state.df_iv_setup_headers(), state.df_iv_setup_rows(), "tbl_iv_setup"),
+            style="padding: 0.75rem 0;"
+        )
+
+        tab2_done = ui.div(
+            render_clean_table(state.df_iv_done_headers(), state.df_iv_done_rows(), "tbl_iv_done"),
+            style="padding: 0.75rem 0;"
+        )
+
+        tab3_mutasi = ui.div(
+            ui.div(
+                ui.div(
+                    ui.h4("📄 Template Mutasi Jezpro (Siap Di-upload)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0;"),
+                    ui.download_button(
+                        "btn_dl_iv_mutasi_5col",
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-cloud-arrow-down", style="margin-right: 6px;"), "DOWNLOAD TEMPLATE MUTASI (.XLSX)"),
+                        style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; font-weight: 800; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer; font-size: 12px;"
+                    ),
+                    style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem;"
+                ),
+                render_clean_table(state.df_iv_mutasi_headers(), state.df_iv_mutasi_rows(), "tbl_iv_mutasi_clean"),
+                style="padding: 0.75rem 0;"
+            )
+        )
+
+        return ui.div(
+            ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
+            metric_ui,
+            ui.navset_card_tab(
+                ui.nav_panel(f"⏳ 1. LIST SETUP ({tot_need_rows})", tab1_need),
+                ui.nav_panel(f"✅ 2. DONE SETUP ({tot_done_rows})", tab2_done),
+                ui.nav_panel(f"📄 3. ITEM MUTASI ({len(state.df_iv_mutasi_rows())})", tab3_mutasi)
+            ),
+            style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
+        )
+
+    # 🌟 Event Handler saat SKU di-input/scan
+    @reactive.Effect
+    @reactive.event(input.btn_process_iv_sku_scan)
+    def _on_process_iv_sku_scan():
+        scanned_sku = input.btn_process_iv_sku_scan()
+        if not scanned_sku:
+            return
+        
+        succ, msg = state.move_instock_sku_to_mutasi(scanned_sku)
+        if succ:
+            ui.notification_show(f"✅ {msg}", type="message", duration=3)
+        else:
+            # MEMUNCULKAN POP-UP ERROR JIKA ITEM TIDAK ADA DI LIST
+            state.error_modal_message.set("Item tidak ada di list!")
+            state.show_error_modal.set(True)
 
     @reactive.Effect
     @reactive.event(input.change_iv_filter_waktu)

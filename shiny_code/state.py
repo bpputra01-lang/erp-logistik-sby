@@ -644,6 +644,10 @@ class AppState:
         self.df_iv_setup_rows = reactive.Value([])
         self._raw_df_iv_setup = pd.DataFrame()
 
+        # --- INSTOCK VALIDATION 2-LIST STATE ---
+        self.iv_tab1_pending = reactive.Value([])  # Item yang masih di Tab 1
+        self.iv_tab3_scanned = reactive.Value([])  # Item yang sudah dipindah ke Tab 3
+
         # Tab 2: Riwayat Selesai (Yang mutasinya sudah cocok secara tanggal & jam)
         self.df_iv_done_headers = reactive.Value([])
         self.df_iv_done_rows = reactive.Value([])
@@ -7606,6 +7610,88 @@ class AppState:
     def process_transit_to_instock(self):
         """Trigger pembaruan data instock"""
         return self.load_instock_daily_from_supabase()
+
+    def move_instock_sku_to_mutasi(self, sku_input: str):
+        """Memindahkan item dari Tab 1 ke Tab 3 berdasarkan SKU yang di-input/scan"""
+        clean_input = str(sku_input).split('.')[0].strip().upper()
+        pending = list(self.iv_tab1_pending())
+        scanned = list(self.iv_tab3_scanned())
+        
+        # Cari indeks item di pending (Tab 1)
+        target_idx = -1
+        for idx, it in enumerate(pending):
+            s_item = str(it.get("barcode_sku", "-")).split('.')[0].strip().upper()
+            if s_item == clean_input:
+                target_idx = idx
+                break
+        
+        if target_idx != -1:
+            # Pindahkan item dari Tab 1 ke Tab 3
+            moved_item = pending.pop(target_idx)
+            scanned.append(moved_item)
+            
+            self.iv_tab1_pending.set(pending)
+            self.iv_tab3_scanned.set(scanned)
+            
+            # Refresh tabel Tab 1 dan Tab 3
+            self._refresh_iv_dataframes_from_lists()
+            return True, f"SKU {clean_input} berhasil dipindahkan ke Tab 3 (Mutasi)!"
+        else:
+            return False, "Item tidak ada di list!"
+
+    def _refresh_iv_dataframes_from_lists(self):
+        """Helper merefresh DataFrame Tab 1 dan Tab 3 dari list reaktif"""
+        pending = self.iv_tab1_pending()
+        scanned = self.iv_tab3_scanned()
+        
+        # Refresh Tab 1
+        transit_records = []
+        for r in pending:
+            raw_bin = str(r.get("bin_code", "-")).replace("[", "").replace("]", "").strip().upper()
+            bin_awal = raw_bin if raw_bin not in ["WAITING OFFLINE", "-", ""] else "STAGING INBOUND"
+            q = safe_int(r.get("qty", 1), 1)
+            sku_clean = str(r.get("barcode_sku", "-")).split('.')[0].strip().upper()
+            
+            transit_records.append({
+                "STATUS INSTOCK": "⏳ PENDING",
+                "JAM HILANG": str(r.get("disappeared_at", "-"))[11:19],
+                "BIN AWAL": bin_awal,
+                "BIN TUJUAN": "STAGING INSTOCK",
+                "SKU": sku_clean,
+                "NAMA ARTIKEL": str(r.get("article_name", "-")),
+                "QUANTITY": q,
+                "NOTES": "TRANSIT INSTOCK"
+            })
+        
+        df_setup = pd.DataFrame(transit_records)
+        self._raw_df_iv_setup = df_setup
+        self.df_iv_setup_headers.set(df_setup.columns.tolist() if not df_setup.empty else [])
+        self.df_iv_setup_rows.set(df_setup.fillna("").astype(str).values.tolist() if not df_setup.empty else [])
+
+        # Refresh Tab 3 (Mutasi 5 Kolom)
+        mutasi_records = []
+        for r in scanned:
+            raw_bin = str(r.get("bin_code", "-")).replace("[", "").replace("]", "").strip().upper()
+            bin_awal = raw_bin if raw_bin not in ["WAITING OFFLINE", "-", ""] else "STAGING INBOUND"
+            q = safe_int(r.get("qty", 1), 1)
+            sku_clean = str(r.get("barcode_sku", "-")).split('.')[0].strip().upper()
+            
+            mutasi_records.append({
+                "BIN AWAL": bin_awal,
+                "BIN TUJUAN": "GL1-INSTOCK", # Tujuan akhir mutasi
+                "SKU": sku_clean,
+                "QUANTITY": q,
+                "NOTES": "MUTASI INSTOCK"
+            })
+            
+        df_mutasi = pd.DataFrame(mutasi_records)
+        self._raw_df_iv_mutasi = df_mutasi
+        self.df_iv_mutasi_headers.set(df_mutasi.columns.tolist() if not df_mutasi.empty else [])
+        self.df_iv_mutasi_rows.set(df_mutasi.fillna("").astype(str).values.tolist() if not df_mutasi.empty else [])
+        
+        # Update Total Qty di Metrik
+        tot_need = sum(safe_int(x.get("qty", 1), 1) for x in pending)
+        self.iv_total_allocated_qty.set(tot_need)
 
 
     def get_menu_sales(self) -> list[str]:
