@@ -702,6 +702,8 @@ class AppState:
         self.comp_audit_capa_list = reactive.Value([])
         self.comp_audit_history_list = reactive.Value([])
         self.comp_audit_selected_for_pdf = reactive.Value(None)
+
+        self.fl_audio_trigger = reactive.Value(0)
         
 
     def set_main_menu(self, menu: str): self.main_menu.set(menu)
@@ -709,6 +711,7 @@ class AppState:
     def toggle_dropdown(self, key: str):
         # 🌟 Handle toggle dropdown monitoring
         if key == "monitoring": self.dropdown_monitoring.set(not self.dropdown_monitoring())
+        elif key == "sales": self.dropdown_sales.set(not self.dropdown_sales())
         elif key == "auditor": self.dropdown_auditor.set(not self.dropdown_auditor())
         elif key == "operational": self.dropdown_operational.set(not self.dropdown_operational())
         elif key == "inventory": self.dropdown_inventory.set(not self.dropdown_inventory())
@@ -744,6 +747,10 @@ class AppState:
         if self.role() == "DC":
             return ["Warehouse Activity Monitor", "Memo Pengajuan", "Balancing Stock", "Database Ongkir In/Out", "Precentage Display"]
         return ["Warehouse Activity Monitor"]
+
+    def get_menu_sales(self) -> list[str]:
+        return ["Permintaan FL"]
+
     def get_menu_auditor(self) -> list[str]:
         return ["Warehouse Inventory Audit", "Warehouse Compliance Audit"]
 
@@ -787,6 +794,7 @@ class AppState:
         elif cur_menu in ["Memo Pengajuan", "memo_pengajuan"]: return "memo_pengajuan"
         elif cur_menu in ["Warehouse Activity Monitor", "Warehouse Monitoring", "warehouse_activity_monitor"]: return "warehouse_activity_monitor"
         elif cur_menu in ["Instock Validation", "instock_validation", "instock-validation"]: return "instock_validation"
+        elif cur_menu in ["Permintaan FL", "permintaan_fl", "permintaan-fl"]: return "permintaan_fl"
         return "under_development"
 
     # --- Ongkir Methods ---
@@ -7618,31 +7626,8 @@ class AppState:
         import requests
         from bs4 import BeautifulSoup
         from datetime import datetime
-        from gtts import gTTS
-        import pygame
 
-        # 1. Siapkan Audio Voice Over
-        audio_file = "mas_ambilin_dong.mp3"
-        if not os.path.exists(audio_file):
-            try:
-                tts = gTTS(text="Mas, ambilin dong!", lang="id", slow=False)
-                tts.save(audio_file)
-            except Exception as e:
-                print("Gagal generate audio:", e)
-
-        try:
-            pygame.mixer.init()
-        except Exception:
-            pass
-
-        def play_sound():
-            try:
-                pygame.mixer.music.load(audio_file)
-                pygame.mixer.music.play()
-            except Exception as e:
-                print("Error play audio:", e)
-
-        # 2. Login ke Jezpro
+        # Login ke Jezpro
         session = requests.Session()
         session.headers.update({
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36"
@@ -7676,7 +7661,6 @@ class AppState:
         is_initial = True
         store_id = 3  # ID Surabaya
 
-        # 3. Loop Pengecekan Terus-menerus (Interval 2.5 Detik Aman)
         while True:
             try:
                 params = {
@@ -7731,11 +7715,11 @@ class AppState:
                     self.fl_request_list.set(cards_data)
                     self.fl_last_check_time.set(datetime.now().strftime("%H:%M:%S"))
 
-                    # Bunyikan suara hanya jika ada barang baru yang masuk
+                    # ✅ Picu sinyal audio ke browser pengguna:
                     if new_found:
-                        play_sound()
+                        self.fl_audio_trigger.set(self.fl_audio_trigger() + 1)
 
             except Exception as err:
                 pass
 
-            time.sleep(2.5)  # Interval 2.5 detik (Sangat aman & responsif)
+            time.sleep(2.5)

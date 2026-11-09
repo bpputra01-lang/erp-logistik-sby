@@ -197,6 +197,19 @@ CUSTOM_HEAD = ui.head_content(
             }, 120000);
         };
 
+        // Pemutar Suara Otomatis di Browser Pengguna
+        window.playFLSound = function() {
+            try {
+                // Memutar file audio mas_ambilin_dong.mp3 yang ada di folder web
+                let audio = new Audio('./mas_ambilin_dong.mp3');
+                audio.play().catch(function(err) {
+                    console.log("Audio play ditahan browser sebelum klik:", err);
+                });
+            } catch(e) {
+                console.error("Gagal putar audio:", e);
+            }
+        };
+        
         // AMAN: Tunggu DOMContentLoaded agar document.body tidak NULL saat di-observe
         document.addEventListener("DOMContentLoaded", function() {
             if (document.body) {

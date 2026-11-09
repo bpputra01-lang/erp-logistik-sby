@@ -3195,16 +3195,6 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="padding: 0.75rem 0;"
         )
 
-        return ui.div(
-            ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
-            balance_metrics_ui,
-            volume_metrics_ui,
-            ui.navset_card_tab(
-                ui.nav_panel("1. COMPARE STOK & SALES", tab1_content),
-                ui.nav_panel("2. LIST REFILL", tab2_content)
-            ),
-            style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
-        )
 
     @render.download(filename="BALANCING_COMPARE_UNIQUE_SKU.xlsx")
     def btn_dl_bs_tab1():
@@ -5348,13 +5338,6 @@ def server(input: Inputs, output: Outputs, session: Session):
             )
         return ui.div(*cards_logistik, style="padding: 0.75rem 0;")
 
-        return ui.div(
-            filter_bar,
-            ui.navset_card_tab(
-                ui.nav_panel(f"📢 MARKOM ({len(m_markom)})", content_markom),
-                ui.nav_panel(f"🚚 LOGISTIK ({len(m_logistik)})", content_logistik)
-            )
-        )
 
     # ==========================================================================
     # 4. TAB 3: DONE ADJUSTMENT (TANPA TOMBOL DOWNLOAD PDF)
@@ -5831,5 +5814,16 @@ def server(input: Inputs, output: Outputs, session: Session):
             state._raw_df_iv_done.to_excel(writer, sheet_name='DONE_SETUP', index=False)
         buf.seek(0)
         yield buf.getvalue()
+
+# Listener untuk membunyikan suara di browser saat ada permintaan FL baru
+    @reactive.Effect
+    @reactive.event(state.fl_audio_trigger)
+    def _trigger_fl_sound():
+        if state.fl_audio_trigger() > 0:
+            ui.insert_ui(
+                ui.tags.script("if (window.playFLSound) window.playFLSound();"),
+                selector="head",
+                where="beforeEnd"
+            )
         
 app = App(app_ui, server)
