@@ -57,7 +57,20 @@ def server(input: Inputs, output: Outputs, session: Session):
                     state.fl_request_list.set(cards)
                     state.fl_last_check_time.set(datetime.now().strftime("%H:%M:%S"))
 
-                    newest_id = res.data[0].get("id")
+                    first_row = res.data[0]
+                    # 🌟 Ambil ID unik yang benar-benar ada di tabel Supabase
+                    newest_id = str(first_row.get("id") or first_row.get("req_id") or first_row.get("created_at") or "")
+                    
+                    # 🔊 JIKA ADA BARANG BARU MASUK -> PERINTAHKAN BROWSER LAPTOP CLIENT BERBUNYI
+                    if _last_seen_fl_id() is not None and newest_id != _last_seen_fl_id():
+                        print(f"📢 [SERVER] Mengirim sinyal bunyi ke semua laptop untuk barang: {first_row.get('article_name')}")
+                        await session.send_custom_message("trigger_fl_sound", {
+                            "id": newest_id,
+                            "article": first_row.get("article_name", "Barang Baru")
+                        })
+                        ui.notification_show(f"🚨 Barang Baru: {first_row.get('article_name')}", type="warning", duration=6)
+
+                    _last_seen_fl_id.set(newest_id)
                     
                     # 🔊 JIKA ADA BARANG BARU MASUK -> PERINTAHKAN BROWSER LAPTOP CLIENT BERBUNYI
                     if _last_seen_fl_id() is not None and newest_id != _last_seen_fl_id():

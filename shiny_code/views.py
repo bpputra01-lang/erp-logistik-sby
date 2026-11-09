@@ -233,59 +233,54 @@ CUSTOM_HEAD = ui.head_content(
             }, 120000);
         };
 
-       // Data Audio Base64
+      // Data Audio Base64 (Anti-404 di semua laptop)
         const FL_AUDIO_URI = `""" + AUDIO_BASE64_DATA + """`;
         let audioCtx = null;
+        let globalFLAudio = null;
 
-        // Pemutar Suara Permintaan FL (Prioritas MP3 -> Fallback Suara Manusia Bawaan Browser -> Beep)
+        // Pemutar Suara Permintaan FL
         window.playFLSound = function() {
-            console.log("🔊 Mencoba memutar suara FL...");
-            let playedMP3 = false;
-
-            // 1. Coba Putar MP3 Base64 / File Statis
             try {
                 let source = (FL_AUDIO_URI && FL_AUDIO_URI.length > 50) ? FL_AUDIO_URI : '/static/mas_ambilin_dong.mp3';
-                let audio = new Audio(source);
-                let playPromise = audio.play();
+                if (!globalFLAudio) {
+                    globalFLAudio = new Audio(source);
+                } else {
+                    globalFLAudio.src = source;
+                }
                 
+                let playPromise = globalFLAudio.play();
                 if (playPromise !== undefined) {
                     playPromise.then(function() {
-                        playedMP3 = true;
-                        console.log("✅ MP3 'Mas ambilin dong' berhasil diputar!");
+                        console.log("✅ Berhasil memutar MP3 'Mas ambilin dong'");
                     }).catch(function(err) {
-                        console.warn("⚠️ MP3 gagal diputar, beralih ke suara Text-to-Speech:", err);
+                        console.warn("Gagal memutar audio MP3, beralih ke suara sistem:", err);
                         window.playVoiceTTS();
                     });
                 }
             } catch(e) {
-                console.warn("⚠️ Audio element error, beralih ke TTS:", e);
+                console.warn("Error Audio:", e);
                 window.playVoiceTTS();
             }
         };
 
-        // 2. Fallback Suara Manusia Text-to-Speech (Pasti Berbicara Bahasa Indonesia di Chrome/Edge)
+        // Fallback Suara Manusia (TTS Browser) jika MP3 diblokir
         window.playVoiceTTS = function() {
             try {
                 if ('speechSynthesis' in window) {
-                    // Batalkan antrean suara sebelumnya
                     window.speechSynthesis.cancel();
-                    
                     let msg = new SpeechSynthesisUtterance("Mas, ambilin dong!");
-                    msg.lang = "id-ID"; // Bahasa Indonesia
-                    msg.rate = 1.0;     // Kecepatan normal
-                    msg.pitch = 1.2;    // Nada sedikit tinggi/wanita
-                    
+                    msg.lang = "id-ID";
+                    msg.rate = 1.0;
                     window.speechSynthesis.speak(msg);
-                    console.log("🗣️ Berhasil berbicara via SpeechSynthesis browser!");
                 } else {
                     window.playBeepTone();
                 }
-            } catch(err) {
+            } catch(e) {
                 window.playBeepTone();
             }
         };
 
-        // 3. Fallback Paling Akhir: Nada Bel
+        // Fallback nada bel
         window.playBeepTone = function() {
             try {
                 if (!audioCtx) {
@@ -306,7 +301,7 @@ CUSTOM_HEAD = ui.head_content(
             } catch(e) {}
         };
 
-        // 🌟 PENANGKAP SINYAL SUPABASE DARI APP.PY (Wajib Ada)
+        // 🌟 PENANGKAP SINYAL RESMI DARI SERVER PYTHON (INI YANG SEBELUMNYA KURANG)
         function initFLSoundListener() {
             if (window.Shiny && window.Shiny.addCustomMessageHandler) {
                 Shiny.addCustomMessageHandler('trigger_fl_sound', function(message) {
@@ -319,8 +314,12 @@ CUSTOM_HEAD = ui.head_content(
         }
         initFLSoundListener();
 
-        // Buka izin audio otomatis saat pengguna mengklik layar
-        window.addEventListener('click', function unlockOnce() {
+        // Buka gembok izin audio otomatis saat layar disentuh/diklik
+        window.addEventListener('click', function unlockAudio() {
+            if (!globalFLAudio) {
+                let source = (FL_AUDIO_URI && FL_AUDIO_URI.length > 50) ? FL_AUDIO_URI : '/static/mas_ambilin_dong.mp3';
+                globalFLAudio = new Audio(source);
+            }
             if (!audioCtx) {
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             }
@@ -328,7 +327,6 @@ CUSTOM_HEAD = ui.head_content(
                 audioCtx.resume();
             }
         }, { once: true });
-
         // AMAN: Tunggu DOMContentLoaded agar document.body tidak NULL saat di-observe
         document.addEventListener("DOMContentLoaded", function() {
             if (document.body) {
