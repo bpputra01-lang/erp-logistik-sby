@@ -76,9 +76,12 @@ def create_jezpro_session():
 # ==============================================================================
 # 🚀 LOOP PEMANTAUAN REAL-TIME
 # ==============================================================================
+from config import get_supabase # Memakai fungsi supabase yang sudah ada di config Anda
+
 def start_monitoring():
     init_audio()
     session = create_jezpro_session()
+    supabase = get_supabase() # Hubungkan ke Supabase
 
     url_target = "https://jezpro.id/product_out_datatables"
     headers_req = {
@@ -87,12 +90,11 @@ def start_monitoring():
         "Referer": "https://jezpro.id/helper_backup"
     }
 
-    # Himpunan ID yang sudah pernah terlihat agar suara tidak berulang untuk barang yang sama
     seen_request_keys = set()
     is_initial_load = True
 
     print("\n" + "=" * 65)
-    print(f"🎧 MONITOR PERMINTAAN BARANG AKTIF (Interval: {CHECK_INTERVAL_SECONDS}s)")
+    print(f"🎧 MONITOR PERMINTAAN FL AKTIF (Tersambung ke Supabase & Web)")
     print("📢 Menunggu permintaan barang masuk dari Frontline...")
     print("=" * 65 + "\n")
 
@@ -115,7 +117,6 @@ def start_monitoring():
 
             resp = session.get(url_target, params=params, headers=headers_req, timeout=10)
 
-            # Jika session logout/kedaluwarsa, re-login otomatis
             if resp.status_code in [401, 419] or "login" in resp.url:
                 print("⚠️ Sesi login habis, mencoba login ulang...")
                 session = create_jezpro_session()
@@ -126,16 +127,15 @@ def start_monitoring():
                 data_list = raw_json.get("data", [])
 
                 for item in data_list:
-                    # Ambil identitas unik request (ID / nama artikel + waktu req)
                     req_id = item.get("id") or item.get("plst_id") or item.get("DT_RowIndex")
                     art_name = item.get("article") or item.get("p_name") or "-"
                     waktu = item.get("datetime") or item.get("created_at") or "-"
                     pic = item.get("user_name") or item.get("u_name") or "Tim FL"
                     bin_lokasi = item.get("product_location") or item.get("pl_code") or "-"
+                    qty_val = int(item.get("qty", 1) or 1)
 
                     unique_key = f"{req_id}_{art_name}_{waktu}"
 
-                    # Saat pertama kali script dinyalakan, cukup catat data yang sudah ada (tidak teriak)
                     if is_initial_load:
                         seen_request_keys.add(unique_key)
                         continue
@@ -145,19 +145,27 @@ def start_monitoring():
                         seen_request_keys.add(unique_key)
 
                         now_str = datetime.now().strftime("%H:%M:%S")
-                        print(f"\n🚨 [{now_str}] ADA PERMINTAAN BARANG BARU!")
-                        print(f"   👤 PIC      : {pic}")
-                        print(f"   📦 Artikel  : {art_name}")
-                        print(f"   📍 Lokasi   : {bin_lokasi}")
-                        print("   🔊 Memutar audio: 'Mas, ambilin dong!'\n")
+                        print(f"\n🚨 [{now_str}] PERMINTAAN BARU: {art_name} ({pic}) -> Kirim ke Supabase!")
+                        
+                        # 1. Kirim ke database Supabase agar web di laptop lain tahu
+                        try:
+                            supabase.table("jezpro_fl_requests").insert({
+                                "req_id": str(req_id),
+                                "article_name": str(art_name),
+                                "pic": str(pic),
+                                "bin": str(bin_lokasi),
+                                "qty": qty_val,
+                                "created_at": datetime.now().isoformat()
+                            }).execute()
+                        except Exception as err_db:
+                            print(f"⚠️ Gagal simpan ke Supabase: {err_db}")
 
-                        # Bunyikan suara
+                        # 2. Bunyikan suara di speaker laptop ini
                         play_alert_sound()
 
                 is_initial_load = False
 
         except requests.exceptions.RequestException as e:
-            # Cegah crash jika internet terputus sesaat
             print(f"⚠️ Masalah koneksi: {e}")
         except Exception as e:
             print(f"❌ Error: {e}")

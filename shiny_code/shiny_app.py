@@ -30,6 +30,48 @@ def server(input: Inputs, output: Outputs, session: Session):
     state = AppState()
     #state.start_fl_monitor_background()
     _last_filter_state = {"c_brands": [], "c_subs": [], "c_bins": []}
+    _last_seen_fl_id = reactive.Value(None)
+
+    # 🔄 Cek data Supabase otomatis tiap 3 detik untuk semua pengguna web
+    @reactive.Effect
+    def _poll_fl_requests_from_supabase():
+        reactive.invalidate_later(3)  # Periksa tiap 3 detik
+
+        try:
+            client = get_supabase()
+            if client:
+                res = client.table("jezpro_fl_requests").select("*").order("id", desc=True).limit(20).execute()
+                if res and res.data:
+                    # Susun kartu antrean untuk menu Permintaan FL
+                    cards = []
+                    for row in res.data:
+                        tgl_str = str(row.get("created_at", "-"))[:19].replace("T", " ")
+                        cards.append({
+                            "id": str(row.get("req_id") or row.get("id")),
+                            "article": row.get("article_name", "-"),
+                            "datetime": tgl_str,
+                            "pic": row.get("pic", "Tim FL"),
+                            "bin": row.get("bin", "-"),
+                            "status": "WAITING OFFLINE",
+                            "qty": row.get("qty", 1)
+                        })
+                    state.fl_request_list.set(cards)
+                    state.fl_last_check_time.set(datetime.now().strftime("%H:%M:%S"))
+
+                    newest_id = res.data[0].get("id")
+                    
+                    # 🔊 JIKA ADA BARANG BARU MASUK -> BUNYIKAN BROWSER LAPTOP INI
+                    if _last_seen_fl_id() is not None and newest_id != _last_seen_fl_id():
+                        ui.insert_ui(
+                            ui.tags.script("if (window.playFLSound) window.playFLSound();"),
+                            selector="head",
+                            where="beforeEnd"
+                        )
+                        ui.notification_show(f"🚨 Barang Baru: {res.data[0].get('article_name')}", type="warning", duration=5)
+
+                    _last_seen_fl_id.set(newest_id)
+        except Exception as e:
+            pass
     # Modal Dismiss Listeners
     @reactive.Effect
     @reactive.event(input.close_success_modal_event)
