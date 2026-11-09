@@ -30,31 +30,36 @@ def server(input: Inputs, output: Outputs, session: Session):
     state = AppState()
     #state.start_fl_monitor_background()
     _last_filter_state = {"c_brands": [], "c_subs": [], "c_bins": []}
-    # Di file utama / server:
+    _last_seen_fl_id = reactive.Value(None)
 
-# Simpan ID terakhir pakai variabel biasa (tidak perlu reactive.value)
-    last_seen_fl_id = None 
-
+# 🔄 Cek data Supabase otomatis tiap 3 detik HANYA JIKA SUDAH LOGIN
     @reactive.effect
     async def _poll_fl_requests_from_supabase():
-        nonlocal last_seen_fl_id
-
-        # 🛑 1. Jika belum login, fungsi ini DIAM TOTAL (tidak menjadwalkan timer)
+        # 🛑 1. JANGAN JALANKAN TIMING / POLLING JIKA BELUM LOGIN (mencegah lag di login)
         if not state.logged_in():
             return
 
-        # ⏱️ 2. Timer polling HANYA berjalan jika sudah login
+        # ⏱️ 2. Timer hanya berjalan jika SUDAH login
         reactive.invalidate_later(3)
 
         try:
-            def fetch_data():
-                client = get_supabase()
-                if not client:
-                    return []
-                res = client.table("jezpro_fl_requests").select("*").execute()
-                return res.data if res and hasattr(res, "data") else []
+            import asyncio
+            import re
+            from datetime import datetime
 
-            raw_data = await asyncio.to_thread(fetch_data)
+            client = get_supabase()
+            if not client:
+                return
+
+            # Jalankan query blocking di thread terpisah agar WebSocket tidak freeze
+            def fetch_data():
+                return client.table("jezpro_fl_requests").select("*").execute()
+
+            res = await asyncio.to_thread(fetch_data)
+            raw_data = res.data if res and hasattr(res, "data") and res.data else []
+
+            # 🕒 3. KUNCI WIB: Update jam setiap kali selesai cek, MESKIPUN datanya kosong!
+            state.fl_last_check_time.set(datetime.now().strftime("%H:%M:%S"))
 
             if raw_data:
                 sorted_data = sorted(
@@ -80,13 +85,17 @@ def server(input: Inputs, output: Outputs, session: Session):
                     })
 
                 state.fl_request_list.set(cards)
-                state.fl_last_check_time.set(datetime.now().strftime("%H:%M:%S"))
 
                 first_row = sorted_data[0]
                 newest_id = str(first_row.get("id") or first_row.get("req_id") or first_row.get("created_at") or "")
 
-                # Cek ID baru tanpa reactive loop
-                if last_seen_fl_id is not None and newest_id != last_seen_fl_id:
+                # 🛑 4. KUNCI AGAR LOGIN TIDAK FREEZE:
+                # Baca ID lama menggunakan isolate agar tidak memicu infinite loop
+                with reactive.isolate():
+                    prev_id = _last_seen_fl_id()
+
+                # Pemicu suara barang baru
+                if prev_id is not None and newest_id != prev_id:
                     art_name = re.sub(r'<[^>]+>', '', str(first_row.get("article_name", "Barang Baru"))).strip()
                     pic_name = first_row.get("pic", "Tim FL")
 
@@ -97,7 +106,10 @@ def server(input: Inputs, output: Outputs, session: Session):
                     })
                     ui.notification_show(f"🚨 Barang Baru: {art_name} ({pic_name})", type="warning", duration=6)
 
-                last_seen_fl_id = newest_id
+                _last_seen_fl_id.set(newest_id)
+            else:
+                # Jika antrean kosong di database, pastikan list di-reset
+                state.fl_request_list.set([])
 
         except Exception as e:
             print("⚠️ Error polling FL:", e)
