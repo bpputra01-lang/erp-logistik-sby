@@ -776,7 +776,7 @@ class AppState:
 
     def get_menu_sales(self) -> list[str]:
         uname = self.username().lower()
-        if uname in ["admin"]:
+        if uname in ["dc"]:
             return ["Permintaan FL"]
         return []
 
