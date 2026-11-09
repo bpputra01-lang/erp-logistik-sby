@@ -7599,7 +7599,7 @@ class AppState:
         return self.load_instock_daily_from_supabase()
 
 
-def get_menu_sales(self) -> list[str]:
+    def get_menu_sales(self) -> list[str]:
         return ["Permintaan FL"]
 
     def start_fl_monitor_background(self):
