@@ -169,6 +169,8 @@ def run_module_instock_daily(session):
     today_str = now_wib.strftime("%Y-%m-%d")
     date_param = f"{today_str}|{today_str}"
 
+    print(f"⚡ [{now_wib.strftime('%H:%M:%S')}] [INSTOCK SBY] Memeriksa pergerakan stok harian Surabaya...")
+
     try:
         cleanup_url = f"{SUPABASE_URL}/rest/v1/jezpro_instock_daily?sync_date=lt.{today_str}"
         requests.delete(cleanup_url, headers=HEADERS_SB, timeout=10)
@@ -191,9 +193,11 @@ def run_module_instock_daily(session):
     try:
         res = session.get(url_stk, params=params, headers=headers_req, timeout=25)
         if res.status_code != 200: 
+            print(f"   ⚠️ [INSTOCK SBY] Respons Jezpro bukan 200 (Code: {res.status_code})")
             return
         raw_data = res.json().get("data", [])
-    except Exception:
+    except Exception as e:
+        print(f"   ⚠️ [INSTOCK SBY] Gagal request datatables: {e}")
         return
 
     raw_tracking_items = []
@@ -308,6 +312,7 @@ def run_module_instock_daily(session):
 
     current_auto_id = get_next_supabase_id()
     new_inserts = []
+    updated_to_need = 0
 
     for tr in tracking_today:
         sku = tr["sku"]
@@ -341,6 +346,7 @@ def run_module_instock_daily(session):
                     matched_wait["bin_code"] = lokasi_bin
                     matched_wait["qty"] = qty_val
                     need_setup_in_sb.append(matched_wait)
+                    updated_to_need += 1
             elif sku_bin_key in need_setup_by_sku_bin and len(need_setup_by_sku_bin[sku_bin_key]) > 0:
                 exist_need = need_setup_by_sku_bin[sku_bin_key][0]
                 if safe_int_val(exist_need.get("qty")) != qty_val:
@@ -384,6 +390,7 @@ def run_module_instock_daily(session):
                 if ins["status"] == "NEED_SETUP":
                     need_setup_in_sb.append(ins)
 
+    done_matched = 0
     if need_setup_in_sb:
         url_bin = "https://jezpro.id/bin_history_datatables"
         params_bin = {
@@ -437,12 +444,15 @@ def run_module_instock_daily(session):
                     headers=HEADERS_SB,
                     json={"status": "DONE_SETUP", "matched_mutasi_id": matched_m["pmt_id"], "setup_done_at": matched_m["pm_created_at"]}
                 )
+                done_matched += 1
+
+    print(f"   ✅ [INSTOCK SBY] Selesai! (+{len(new_inserts)} data baru, {updated_to_need} masuk Need Setup, {done_matched} selesai disetup)\n")
 
 # ==============================================================================
 # MODUL 2: WAREHOUSE ACTIVITY MONITOR (ALL AREA)
 # ==============================================================================
 def run_module_warehouse_monitor(session):
-    print(f"\n📊 [{datetime.now(WIB).strftime('%H:%M:%S')}] Memulai Sinkronisasi Warehouse Activity Monitor (All Area)...")
+    print(f"\n📊 [{datetime.now(WIB).strftime('%H:%M:%S')}] [MONITOR] Memulai Sinkronisasi Warehouse Activity Monitor (All Area)...")
     headers_req = {"Accept": "application/json, text/javascript, */*; q=0.01", "X-Requested-With": "XMLHttpRequest"}
 
     url_stg = "https://jezpro.id/stock_tracking_datatables"
@@ -461,6 +471,7 @@ def run_module_warehouse_monitor(session):
 
     for branch_name, b_info in BRANCH_MAP.items():
         st_id = b_info["st_id"]
+        print(f"   ⏳ [MONITOR] Menarik data cabang: {branch_name}...")
         for q in query_targets:
             params = {
                 "draw": "1",
@@ -538,12 +549,12 @@ def run_module_warehouse_monitor(session):
         if all_staging_records:
             for i in range(0, len(all_staging_records), 100):
                 requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_waiting_staging", json=all_staging_records[i:i+100], headers=HEADERS_SB)
-        print(f"   ✅ Warehouse Monitor Staging Updated! ({len(all_staging_records)} baris)")
+        print(f"   ✅ [MONITOR] Warehouse Monitor Staging Selesai! ({len(all_staging_records)} baris terkirim ke Supabase)\n")
     except Exception as e:
-        print(f"   ❌ Gagal update Supabase monitor: {e}")
+        print(f"   ❌ [MONITOR] Gagal update Supabase monitor: {e}\n")
 
 # ==============================================================================
-# EKSPOR STOK & SALES SURABAYA
+# MODUL 3: EKSPOR STOK & SALES SURABAYA (HEAVY)
 # ==============================================================================
 def fetch_surabaya_sales_2months(session):
     now_dt = datetime.now(WIB)
@@ -551,6 +562,8 @@ def fetch_surabaya_sales_2months(session):
     p_start = start_date.strftime('%Y-%m-%d')
     p_end = now_dt.strftime('%Y-%m-%d')
     date_param = f"{p_start}|{p_end}"
+
+    print(f"   ⏳ [HEAVY] Menghitung rekap sales 60 hari Surabaya ({p_start} s/d {p_end})...")
 
     url_dt = "https://jezpro.id/stock_tracking_datatables"
     headers_dt = {"Accept": "application/json, text/javascript, */*; q=0.01", "X-Requested-With": "XMLHttpRequest"}
@@ -619,12 +632,15 @@ def fetch_surabaya_sales_2months(session):
             "updated_at": datetime.now(WIB).isoformat(), "total_rows": total_raw_rows,
             "sales_data": summary_sales
         }, timeout=120)
+        print(f"   ✅ [HEAVY] Rekap Sales Surabaya Terkirim! ({len(summary_sales)} SKU terdeteksi)")
 
 def run_module_exports_and_balancing(session):
+    print(f"\n📦 [{datetime.now(WIB).strftime('%H:%M:%S')}] [HEAVY] Memulai Ekspor Stok Excel Seluruh Cabang...")
     for branch_name, info in BRANCH_MAP.items():
         st_id = info["st_id"]
         db_id = info["db_id"]
         try:
+            print(f"   ⏳ [HEAVY] Mengunduh template stok: {branch_name}...")
             url_exp = f"https://jezpro.id/export_mass_adjustment_template?st_id={st_id}&psc_id=&br_id=&pl_id=&qty_filter=1"
             r_exp = session.get(url_exp, headers={"Referer": "https://jezpro.id/mass_adjustment"}, timeout=300)
             excel_bytes = None
@@ -658,20 +674,23 @@ def run_module_exports_and_balancing(session):
                         "updated_at": datetime.now(WIB).isoformat(), "total_rows": len(payload),
                         "stock_data": payload
                     }, timeout=120)
+                print(f"   ✅ [HEAVY] {branch_name} berhasil di-cache ({len(payload)} baris).")
         except Exception as e:
-            print(f"⚠️ Gagal ekspor {branch_name}: {e}")
+            print(f"   ⚠️ [HEAVY] Gagal ekspor {branch_name}: {e}")
 
     try:
         fetch_surabaya_sales_2months(session)
     except Exception as e:
-        print(f"⚠️ Gagal balancing sales: {e}")
+        print(f"   ⚠️ [HEAVY] Gagal balancing sales: {e}")
+
+    print(f"✅ [{datetime.now(WIB).strftime('%H:%M:%S')}] [HEAVY] Seluruh rangkaian ekspor berat selesai!\n")
 
 def thread_instock_worker(session):
     while True:
         try:
             run_module_instock_daily(session)
         except Exception as e:
-            print(f"⚠️ [Instock Loop Error]: {e}")
+            print(f"⚠️ [INSTOCK SBY Error]: {e}")
         time.sleep(45)
 
 # ==============================================================================
@@ -679,18 +698,20 @@ def thread_instock_worker(session):
 # ==============================================================================
 if __name__ == "__main__":
     print("=" * 75)
-    print("🚀 MASTER LOCAL ORCHESTRATOR: JEZPRO -> SUPABASE (CLEAN VERSION)")
+    print("🚀 MASTER LOCAL ORCHESTRATOR: JEZPRO -> SUPABASE (WITH LIVE LOGGING)")
     print("=" * 75)
 
     jez = create_jezpro_session()
 
+    # Jalankan background thread Instock
     t_instock = threading.Thread(target=thread_instock_worker, args=(jez,), daemon=True)
     t_instock.start()
-    print("🧵 Thread Instock Surabaya telah aktif mandiri tiap 45 detik.")
+    print("🧵 [BACKGROUND THREAD] Instock Surabaya AKTIF mandiri tiap 45 detik.\n")
 
     last_monitor = 0
     last_heavy = 0
-    last_triggered_minute = ""  # Variabel untuk mencegah duplikasi eksekusi di menit yang sama
+    last_triggered_minute = ""
+    last_standby_log = 0
 
     while True:
         curr = time.time()
@@ -709,24 +730,34 @@ if __name__ == "__main__":
         # 2. Cek interval waktu 2 jam (7200 detik)
         is_two_hours_passed = (curr - last_monitor >= 7200)
 
-        # Monitor akan jalan jika sudah 2 jam ATAU pas di jam khusus (dan belum jalan di menit yang sama)
         should_run_monitor = is_two_hours_passed or (is_specific_time and minute_str != last_triggered_minute)
 
+        # Eksekusi Warehouse Activity Monitor
         if should_run_monitor:
             try:
                 run_module_warehouse_monitor(jez)
-                last_monitor = curr  # Reset timer interval 2 jam
+                last_monitor = curr
                 if is_specific_time:
-                    last_triggered_minute = minute_str  # Tandai menit ini sudah tereksekusi
+                    last_triggered_minute = minute_str
             except Exception as e:
-                print(f"❌ Error Monitor: {e}")
+                print(f"❌ [MONITOR Error]: {e}")
 
-        # Sinkronisasi berat / heavy export (tetap 3 jam sekali / 10800 detik)
+        # Eksekusi Sinkronisasi Berat (Heavy Export tiap 3 jam / 10800 detik)
         if curr - last_heavy >= 10800 or last_heavy == 0:
             try:
                 run_module_exports_and_balancing(jez)
                 last_heavy = curr
             except Exception as e:
-                print(f"❌ Error Heavy Export: {e}")
+                print(f"❌ [HEAVY Error]: {e}")
+
+        # Keterangan Idle / Standby tiap 5 menit sekali agar terlihat program tidak macet
+        if curr - last_standby_log >= 300:
+            sisa_monitor = max(0, int(7200 - (curr - last_monitor))) // 60
+            sisa_heavy = max(0, int(10800 - (curr - last_heavy))) // 60
+            print(f"💤 [{now_wib.strftime('%H:%M:%S')}] [STANDBY] Main loop berjalan normal.")
+            print(f"   -> Sisa waktu menuju Monitor berikutnya: ~{sisa_monitor} menit")
+            print(f"   -> Sisa waktu menuju Heavy Export berikutnya: ~{sisa_heavy} menit")
+            print(f"   -> Instock Surabaya tetap berjalan mandiri di background.\n")
+            last_standby_log = curr
 
         time.sleep(10)
