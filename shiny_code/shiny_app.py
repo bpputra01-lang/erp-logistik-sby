@@ -32,9 +32,9 @@ def server(input: Inputs, output: Outputs, session: Session):
     _last_filter_state = {"c_brands": [], "c_subs": [], "c_bins": []}
     _last_seen_fl_id = reactive.Value(None)
 
-    # 🔄 Cek data Supabase otomatis tiap 3 detik untuk semua pengguna web
-    @reactive.Effect
-    def _poll_fl_requests_from_supabase():
+    # 🔄 Cek data Supabase otomatis tiap 3 detik untuk semua pengguna web (ASYNCHRONOUS)
+    @reactive.effect
+    async def _poll_fl_requests_from_supabase():
         reactive.invalidate_later(3)  # Periksa tiap 3 detik
 
         try:
@@ -42,7 +42,6 @@ def server(input: Inputs, output: Outputs, session: Session):
             if client:
                 res = client.table("jezpro_fl_requests").select("*").order("id", desc=True).limit(20).execute()
                 if res and res.data:
-                    # Susun kartu antrean untuk menu Permintaan FL
                     cards = []
                     for row in res.data:
                         tgl_str = str(row.get("created_at", "-"))[:19].replace("T", " ")
@@ -60,19 +59,19 @@ def server(input: Inputs, output: Outputs, session: Session):
 
                     newest_id = res.data[0].get("id")
                     
-                    # 🔊 JIKA ADA BARANG BARU MASUK -> BUNYIKAN BROWSER LAPTOP INI
+                    # 🔊 JIKA ADA BARANG BARU MASUK -> PERINTAHKAN BROWSER LAPTOP CLIENT BERBUNYI
                     if _last_seen_fl_id() is not None and newest_id != _last_seen_fl_id():
-                        ui.insert_ui(
-                            ui.tags.script("if (window.playFLSound) window.playFLSound();"),
-                            selector="head",
-                            where="beforeEnd"
-                        )
-                        ui.notification_show(f"🚨 Barang Baru: {res.data[0].get('article_name')}", type="warning", duration=5)
+                        # Kirim custom message resmi ke JavaScript laptop client
+                        await session.send_custom_message("trigger_fl_sound", {
+                            "id": str(newest_id),
+                            "article": res.data[0].get("article_name")
+                        })
+                        ui.notification_show(f"🚨 Barang Baru: {res.data[0].get('article_name')}", type="warning", duration=6)
 
                     _last_seen_fl_id.set(newest_id)
         except Exception as e:
-            pass
-    # Modal Dismiss Listeners
+            print("Error polling FL:", e)
+                # Modal Dismiss Listeners
     @reactive.Effect
     @reactive.event(input.close_success_modal_event)
     def _on_close_success_modal():

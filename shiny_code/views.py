@@ -19,6 +19,24 @@ def get_image_base64(filename):
         pass
     return f"./{filename}"
 
+def get_audio_base64(filename="mas_ambilin_dong.mp3"):
+    try:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        full_path = os.path.join(base_dir, filename)
+        target_path = full_path if os.path.exists(full_path) else filename
+        
+        if os.path.exists(target_path):
+            with open(target_path, "rb") as f:
+                encoded = base64.b64encode(f.read()).decode("utf-8")
+                return f"data:audio/mp3;base64,{encoded}"
+        else:
+            print(f"⚠️ File {filename} tidak ditemukan di {target_path}")
+    except Exception as e:
+        print("Gagal load audio base64:", e)
+    return ""
+
+AUDIO_BASE64_DATA = get_audio_base64("mas_ambilin_dong.mp3")
+
 # ==============================================================================
 # CSS & JAVASCRIPT ASSETS (ZERO-GLITCH, ANTI-JUMP UPLOAD & FREE SCROLL)
 # ==============================================================================
@@ -197,56 +215,75 @@ CUSTOM_HEAD = ui.head_content(
             }, 120000);
         };
 
-        // Inisialisasi Audio Objek dari static URL Shiny
-        let globalFLAudio = new Audio('/static/mas_ambilin_dong.mp3');
-        let audioUnlocked = false;
+        // Data Audio Base64 (Anti-404 di semua laptop)
+        const FL_AUDIO_URI = `""" + AUDIO_BASE64_DATA + """`;
+        let audioCtx = null;
 
-        // Buka gembok Autoplay Policy browser saat ada interaksi pertama user
-        function unlockAudioContext() {
-            if (!audioUnlocked) {
-                globalFLAudio.play().then(() => {
-                    globalFLAudio.pause();
-                    globalFLAudio.currentTime = 0;
-                    audioUnlocked = true;
-                    console.log("🔊 Audio notifikasi FL berhasil di-unlock untuk browser ini!");
-                }).catch(() => {});
-            }
-        }
-        window.addEventListener('click', unlockAudioContext, { once: true });
-        window.addEventListener('keydown', unlockAudioContext, { once: true });
-
-        // Fungsi Pemutar Suara Permintaan FL
+        // Pemutar Suara Permintaan FL
         window.playFLSound = function() {
             try {
-                let sound = new Audio('/static/mas_ambilin_dong.mp3');
-                let playPromise = sound.play();
-                if (playPromise !== undefined) {
-                    playPromise.catch(function(err) {
-                        console.warn("⚠️ Audio ditahan browser (Klik layar sekali untuk mengizinkan):", err);
-                        // Coba fallback bunyikan beep standar Web Audio API jika file audio diblokir
-                        window.playBeepFallback();
-                    });
+                if (FL_AUDIO_URI && FL_AUDIO_URI.length > 50) {
+                    let audio = new Audio(FL_AUDIO_URI);
+                    let playPromise = audio.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch(function(err) {
+                            console.warn("Autoplay audio MP3 ditahan browser, beralih ke nada bel:", err);
+                            window.playBeepTone();
+                        });
+                    }
+                } else {
+                    window.playBeepTone();
                 }
             } catch(e) {
-                console.error("Gagal putar audio:", e);
+                window.playBeepTone();
             }
         };
 
-        // Fallback nada bip jika file mp3 gagal dimuat
-        window.playBeepFallback = function() {
+        // Fallback nada bel lantang jika file MP3 diblokir browser
+        window.playBeepTone = function() {
             try {
-                let ctx = new (window.AudioContext || window.webkitAudioContext)();
-                let osc = ctx.createOscillator();
-                let gain = ctx.createGain();
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                let osc = audioCtx.createOscillator();
+                let gain = audioCtx.createGain();
                 osc.connect(gain);
-                gain.connect(ctx.destination);
+                gain.connect(audioCtx.destination);
                 osc.type = "sine";
-                osc.frequency.setValueAtTime(880, ctx.currentTime); // 880Hz
-                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                osc.frequency.setValueAtTime(880, audioCtx.currentTime); // 880 Hz
+                gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
                 osc.start();
-                osc.stop(ctx.currentTime + 0.35);
-            } catch(err) {}
+                osc.stop(audioCtx.currentTime + 0.4);
+            } catch(e) {
+                console.error("Gagal membunyikan nada bel:", e);
+            }
         };
+
+        // Registrasi aman penangkap sinyal dari server Python (Anti-Race Condition)
+        function initFLSoundListener() {
+            if (window.Shiny && window.Shiny.addCustomMessageHandler) {
+                Shiny.addCustomMessageHandler('trigger_fl_sound', function(message) {
+                    console.log("📢 Sinyal permintaan FL baru diterima:", message);
+                    window.playFLSound();
+                });
+            } else {
+                setTimeout(initFLSoundListener, 300);
+            }
+        }
+        initFLSoundListener();
+
+        // Otomatis unlock izin audio begitu pengguna mengklik layar di laptop mana pun
+        window.addEventListener('click', function unlockOnce() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }, { once: true });
 
         // AMAN: Tunggu DOMContentLoaded agar document.body tidak NULL saat di-observe
         document.addEventListener("DOMContentLoaded", function() {
@@ -3077,8 +3114,16 @@ def permintaan_fl_view(state: AppState):
                 ui.h4("Scan Barang Masuk (Permintaan Frontline)", style="font-size: 16px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
                 ui.p(f"Live Check Jezpro: {state.fl_last_check_time()} WIB • Sistem otomatis bersuara saat ada permintaan baru.", style="color: #718096; font-size: 12px; margin: 0;"),
             ),
+            # Tombol Test Suara & Status di Kanan Atas
             ui.div(
-                ui.span("🟢 SUARA AKTIF", style="background: #C6F6D5; color: #22543D; font-weight: 800; font-size: 11px; padding: 6px 14px; border-radius: 20px; border: 1px solid #9AE6B4;")
+                ui.tags.button(
+                    "🔊 TEST SUARA LAPTOP INI",
+                    type="button",
+                    onclick="window.playFLSound(); alert('Jika Anda mendengar suara, berarti laptop ini SUDAH SIAP menerima notifikasi!');",
+                    style="background: #10B981; color: white; font-weight: 800; font-size: 11px; padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer; margin-right: 8px;"
+                ),
+                ui.span("🟢 SUARA AKTIF", style="background: #C6F6D5; color: #22543D; font-weight: 800; font-size: 11px; padding: 6px 14px; border-radius: 20px; border: 1px solid #9AE6B4;"),
+                style="display: flex; align-items: center;"
             ),
             style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 1.25rem 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
         ),
