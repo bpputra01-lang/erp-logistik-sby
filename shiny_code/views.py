@@ -3197,6 +3197,29 @@ def permintaan_fl_view(state: AppState):
         style="width: 100%; max-width: 600px; margin: 0 auto; padding: 1rem 0;"
     )
 
+def refill_shelving_view(state: AppState):
+    upload_section = ui.div(
+        ui.h4("📥 Upload Data Stock untuk Refill Shelving", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+        custom_uploader_box("upload_refill_stock_file", "Upload File Stock (Excel / CSV)"),
+        ui.div(
+            ui.tags.button(
+                ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "PROSES REFILL SHELVING"),
+                onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_process_refill_shelving', Math.random(), {priority: 'event'});",
+                class_="btn-red-gradient"
+            ),
+            style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+        ),
+        style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+    )
+
+    results_section = ui.output_ui("refill_shelving_results_container")
+
+    return ui.div(
+        upload_section,
+        results_section,
+        style="width: 100%; padding: 1rem;"
+    )
+    
 def menu_item(label: str, target_menu: str, current_menu: str):
     import re
     is_active = (current_menu == target_menu)

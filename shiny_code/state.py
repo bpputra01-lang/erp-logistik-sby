@@ -653,6 +653,12 @@ class AppState:
         self.df_iv_done_rows = reactive.Value([])
         self._raw_df_iv_done = pd.DataFrame()
 
+        # --- REFILL SHELVING STATE ---
+        self.rs_processed = reactive.Value(False)
+        self.df_rs_headers = reactive.Value([])
+        self.df_rs_rows = reactive.Value([])
+        self._raw_df_rs = pd.DataFrame()
+
         # Dropdown Sales Baru
         self.dropdown_sales = reactive.Value(True)
         self.fl_request_list = reactive.Value([])
@@ -738,6 +744,16 @@ class AppState:
             self.login_timestamp_ms.set(int(time.time() * 1000))
             self.load_memo_data()
             return True, "Berhasil Login sebagai User Cabang!"
+
+        elif u == "hub" and p == "jkt123":
+            self.logged_in.set(True)
+            self.role.set("HUB")
+            self.branch.set("HUB JAKARTA")
+            self.user_display_name.set("User Hub")
+            self.login_timestamp_ms.set(int(time.time() * 1000))
+            self.set_main_menu("Warehouse Activity Monitor")
+            return True, "Berhasil Login sebagai User Hub!"
+
         return False, "Username atau Password salah! Periksa kembali."
 
     def logout(self):
@@ -748,30 +764,35 @@ class AppState:
         self.login_timestamp_ms.set(0)
 
     def get_menu_monitoring(self) -> list[str]:
-        if self.role() == "DC":
-            return ["Warehouse Activity Monitor", "Memo Pengajuan", "Balancing Stock", "Database Ongkir In/Out", "Precentage Display"]
-        return ["Warehouse Activity Monitor"]
+        if self.role() == "HUB":
+            return ["Warehouse Activity Monitor"]
+        return ["Warehouse Activity Monitor", "Memo Pengajuan", "Balancing Stock", "Database Ongkir In/Out", "Precentage Display"]
 
     def get_menu_sales(self) -> list[str]:
+        if self.role() == "HUB":
+            return [] # Disembunyikan untuk akun hub
         return ["Permintaan FL"]
 
     def get_menu_auditor(self) -> list[str]:
+        if self.role() == "HUB":
+            return [] # Disembunyikan untuk akun hub
         return ["Warehouse Inventory Audit", "Warehouse Compliance Audit"]
 
     def get_menu_operational(self) -> list[str]:
-        if self.role() == "DC":
-            return ["Putaway System", "Compare RTO", "Purchase Order Receiving", "Instock Validation", "Compare Penerimaan RTO"]
-        return ["Compare Penerimaan RTO", "Putaway System", "Purchase Order Receiving"]
+        if self.role() == "HUB":
+            # Semua sub menu operasional KECUALI Instock Validation
+            return ["Putaway System", "Compare RTO", "Purchase Order Receiving", "Compare Penerimaan RTO"]
+        return ["Putaway System", "Compare RTO", "Purchase Order Receiving", "Instock Validation", "Compare Penerimaan RTO"]
 
     def get_menu_inventory(self) -> list[str]:
-        if self.role() == "DC":
-            return ["Stock Opname", "Cycle Count", "Justification SO", "Stock Minus", "Compare System", "Physical Inventory List", "Validation Barcode SKU", "Cross Check Real & System", "List Retur Out", "Reloc Koli to Koli"]
-        return ["Physical Inventory List", "Cycle Count", "Stock Minus", "Compare System", "Justification SO"]
+        if self.role() == "HUB":
+            return ["Reloc Koli to Koli", "Cycle Count", "Justification SO", "Physical Inventory List"]
+        return ["Stock Opname", "Cycle Count", "Justification SO", "Stock Minus", "Compare System", "Physical Inventory List", "Validation Barcode SKU", "Cross Check Real & System", "List Retur Out", "Reloc Koli to Koli"]
 
     def get_menu_extras(self) -> list[str]:
-        if self.role() == "DC":
-            return ["Data Timbang Ongkir", "Latihan Rumus Excel"]
-        return ["Precentage Display", "Refill Toko", "Store Leader RTO Decission"]
+        if self.role() == "HUB":
+            return ["Refill Shelving", "Latihan Rumus Excel"]
+        return ["Data Timbang Ongkir", "Latihan Rumus Excel"]
 
     def get_active_content_type(self) -> str:
         cur_menu = self.main_menu()
@@ -793,12 +814,13 @@ class AppState:
         elif cur_menu in ["Precentage Display", "Percentage Display", "Refill Toko"]: return "percentage_display"
         elif cur_menu in ["Latihan Rumus Excel", "Excel Practice", "latihan_excel"]: return "excel_practice"
         elif cur_menu in ["Warehouse Inventory Audit", "Form Auditor", "Audit Form", "form_auditor"]: return "form_auditor"
-        # Handler untuk Warehouse Compliance Audit yang baru
         elif cur_menu in ["Warehouse Compliance Audit", "compliance_audit", "warehouse_compliance_audit"]: return "compliance_audit"
         elif cur_menu in ["Memo Pengajuan", "memo_pengajuan"]: return "memo_pengajuan"
         elif cur_menu in ["Warehouse Activity Monitor", "Warehouse Monitoring", "warehouse_activity_monitor"]: return "warehouse_activity_monitor"
         elif cur_menu in ["Instock Validation", "instock_validation", "instock-validation"]: return "instock_validation"
         elif cur_menu in ["Permintaan FL", "permintaan_fl", "permintaan-fl"]: return "permintaan_fl"
+        elif cur_menu in ["Refill Shelving", "refill_shelving"]: return "refill_shelving"
+        elif cur_menu in ["Reloc Koli to Koli", "reloc-koli-to-koli"]: return "reloc_koli_to_koli"
         return "under_development"
 
     # --- Ongkir Methods ---
@@ -7682,3 +7704,83 @@ class AppState:
                 pass
 
             time.sleep(2.5)
+
+def process_refill_shelving(self, file_info):
+        try:
+            if not file_info:
+                return False, "File Stock wajib diupload!"
+
+            df = load_data_from_info(file_info)
+            if df.empty or df.shape[1] < 10:
+                return False, "Format file kurang dari 10 kolom!"
+
+            # Pemetaan Kolom sesuai instruksi:
+            # BIN = B (idx 1) | SKU = C (idx 2) | Item Name = E (idx 4) | QTY = J (idx 9)
+            col_b = df.columns[1]
+            col_s = df.columns[2]
+            col_e = df.columns[4]
+            col_j = df.columns[9]
+
+            df_clean = pd.DataFrame({
+                'BIN': df[col_b].fillna('').astype(str).str.strip().str.upper(),
+                'SKU': df[col_s].fillna('').astype(str).str.split('.').str[0].str.strip().str.upper(),
+                'ITEM_NAME': df[col_e].fillna('-').astype(str).str.strip(),
+                'QTY_NUM': pd.to_numeric(df[col_j], errors='coerce').fillna(0).astype(int)
+            })
+
+            # Buang baris kosong
+            df_clean = df_clean[(df_clean['SKU'] != '') & (df_clean['SKU'] != 'NAN') & (df_clean['BIN'] != '')].copy()
+
+            # Deteksi BIN yang mengandung kata 'KL' (Case-insensitive)
+            df_clean['IS_KL'] = df_clean['BIN'].str.contains('KL', na=False, case=False)
+
+            refill_records = []
+
+            # Grouping berdasarkan SKU
+            for sku, group in df_clean.groupby('SKU'):
+                item_name = group['ITEM_NAME'].iloc[0]
+                
+                kl_group = group[group['IS_KL']].copy()
+                shelving_group = group[~group['IS_KL']].copy()
+
+                total_kl_qty = int(kl_group['QTY_NUM'].sum())
+                total_shelving_qty = int(shelving_group['QTY_NUM'].sum())
+
+                # KONDISI REFILL: Shelving qty 0 ATAU (1 s.d. 3), DAN total stock di KL > 0
+                if (total_shelving_qty == 0 or (1 <= total_shelving_qty <= 3)) and total_kl_qty > 0:
+                    # Target pick = 80% dari total stok di BIN KL
+                    target_pick = max(1, int(round(total_kl_qty * 0.8)))
+                    remaining_need = target_pick
+
+                    # Urutkan BIN KL berdasarkan QTY terbanyak
+                    kl_sorted = kl_group.sort_values(by='QTY_NUM', ascending=False)
+
+                    for _, kl_row in kl_sorted.iterrows():
+                        if remaining_need <= 0:
+                            break
+                        bin_ambil = kl_row['BIN']
+                        bin_qty = int(kl_row['QTY_NUM'])
+                        if bin_qty <= 0:
+                            continue
+
+                        take = min(remaining_need, bin_qty)
+                        refill_records.append({
+                            "BIN AMBIL": bin_ambil,
+                            "SKU": sku,
+                            "ITEM NAME": item_name,
+                            "QTY PICK": take
+                        })
+                        remaining_need -= take
+
+            df_res = pd.DataFrame(refill_records) if refill_records else pd.DataFrame(columns=["BIN AMBIL", "SKU", "ITEM NAME", "QTY PICK"])
+
+            self._raw_df_rs = df_res.copy()
+            self.df_rs_headers.set(df_res.columns.tolist() if not df_res.empty else [])
+            self.df_rs_rows.set(df_res.fillna("").astype(str).values.tolist() if not df_res.empty else [])
+            self.rs_processed.set(True)
+
+            return True, f"Refill Shelving Berhasil Dihitung! Ditemukan {len(df_res)} baris instruksi ambil."
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return False, f"Gagal memproses Refill Shelving: {e}"
