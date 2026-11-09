@@ -197,19 +197,57 @@ CUSTOM_HEAD = ui.head_content(
             }, 120000);
         };
 
-        // Pemutar Suara Otomatis di Browser Pengguna
+        // Inisialisasi Audio Objek dari static URL Shiny
+        let globalFLAudio = new Audio('/static/mas_ambilin_dong.mp3');
+        let audioUnlocked = false;
+
+        // Buka gembok Autoplay Policy browser saat ada interaksi pertama user
+        function unlockAudioContext() {
+            if (!audioUnlocked) {
+                globalFLAudio.play().then(() => {
+                    globalFLAudio.pause();
+                    globalFLAudio.currentTime = 0;
+                    audioUnlocked = true;
+                    console.log("🔊 Audio notifikasi FL berhasil di-unlock untuk browser ini!");
+                }).catch(() => {});
+            }
+        }
+        window.addEventListener('click', unlockAudioContext, { once: true });
+        window.addEventListener('keydown', unlockAudioContext, { once: true });
+
+        // Fungsi Pemutar Suara Permintaan FL
         window.playFLSound = function() {
             try {
-                // Memutar file audio mas_ambilin_dong.mp3 yang ada di folder web
-                let audio = new Audio('./mas_ambilin_dong.mp3');
-                audio.play().catch(function(err) {
-                    console.log("Audio play ditahan browser sebelum klik:", err);
-                });
+                let sound = new Audio('/static/mas_ambilin_dong.mp3');
+                let playPromise = sound.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(function(err) {
+                        console.warn("⚠️ Audio ditahan browser (Klik layar sekali untuk mengizinkan):", err);
+                        // Coba fallback bunyikan beep standar Web Audio API jika file audio diblokir
+                        window.playBeepFallback();
+                    });
+                }
             } catch(e) {
                 console.error("Gagal putar audio:", e);
             }
         };
-        
+
+        // Fallback nada bip jika file mp3 gagal dimuat
+        window.playBeepFallback = function() {
+            try {
+                let ctx = new (window.AudioContext || window.webkitAudioContext)();
+                let osc = ctx.createOscillator();
+                let gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.type = "sine";
+                osc.frequency.setValueAtTime(880, ctx.currentTime); // 880Hz
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.35);
+            } catch(err) {}
+        };
+
         // AMAN: Tunggu DOMContentLoaded agar document.body tidak NULL saat di-observe
         document.addEventListener("DOMContentLoaded", function() {
             if (document.body) {

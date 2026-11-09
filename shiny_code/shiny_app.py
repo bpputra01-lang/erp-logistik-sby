@@ -5868,4 +5868,8 @@ def server(input: Inputs, output: Outputs, session: Session):
                 where="beforeEnd"
             )
         
-app = App(app_ui, server)
+from pathlib import Path
+
+# Daftarkan folder root agar file mp3 dapat diakses browser client
+APP_DIR = Path(__file__).parent
+app = App(app_ui, server, static_assets={"/static": APP_DIR})
