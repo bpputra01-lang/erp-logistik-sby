@@ -5851,7 +5851,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         state.iv_filter_waktu.set(val)
         state.load_instock_daily_from_supabase()
 
-    # 4. EVENT HANDLER SAAT SKU DI-INPUT / DI-SCAN (DENGAN POP-UP ERROR AMAN)
+    # 4. EVENT HANDLER TUNGGAL SAAT SKU DI-INPUT / DI-SCAN (ANTI-DOUBLE)
     @reactive.Effect
     @reactive.event(input.btn_process_iv_sku_scan)
     def _on_process_iv_sku_scan():
@@ -5859,7 +5859,14 @@ def server(input: Inputs, output: Outputs, session: Session):
         if not scanned_sku:
             return
         
-        succ, msg = state.move_instock_sku_to_mutasi(scanned_sku)
+        # Bersihkan string SKU dari suffix waktu acak (jika ada dari JS)
+        clean_sku = scanned_sku.split("_")[0] if "_" in scanned_sku else scanned_sku
+        
+        succ, msg = state.move_instock_sku_to_mutasi(clean_sku)
+        
+        # KUNCI UTAMA: Kosongkan kotak input teks di server secara otomatis
+        ui.update_text("iv_sku_scan_box", value="")
+
         if succ:
             ui.notification_show(f"✅ {msg}", type="message", duration=3)
         else:
@@ -5885,7 +5892,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
         )
 
-        # 🌟 KOTAK INPUT / SCAN SKU UNTUK MEMINDAHKAN KE TAB 3
+        # 🌟 KOTAK INPUT / SCAN SKU (DIPROTEKSI ANTI-DOUBLE DENGAN TIMESTAMP & AUTO-CLEAR)
         sku_input_box = ui.div(
             ui.div(
                 ui.h4("🔍 Scan / Input SKU untuk Dipindah ke Tab 3 (Mutasi)", style="font-size: 14px; font-weight: 800; color: #1A202C; margin-bottom: 6px;"),
@@ -5893,27 +5900,26 @@ def server(input: Inputs, output: Outputs, session: Session):
                     ui.input_text("iv_sku_scan_box", None, placeholder="Scan barcode atau ketik SKU lalu tekan Enter..."),
                     ui.tags.button(
                         "PINDAHKAN",
-                        onclick="""
-                            let val = document.getElementById('iv_sku_scan_box').value;
-                            if(val.trim() !== '') {
-                                Shiny.setInputValue('btn_process_iv_sku_scan', val, {priority: 'event'});
-                                document.getElementById('iv_sku_scan_box').value = '';
-                            }
-                        """,
-                        style="background: linear-gradient(135deg, #E50914 0%, #B20710 100%); color: white; font-weight: 800; border: none; padding: 8px 18px; border-radius: 6px; cursor: pointer; font-size: 12px; height: 38px; white-space: nowrap;"
+                        id="btn_submit_iv_sku", 
+                        class_="btn-red-gradient",
+                        style="padding: 8px 18px; font-size: 12px; height: 38px; white-space: nowrap; border: none; cursor: pointer;"
                     ),
                     style="display: flex; gap: 10px; align-items: center;"
                 ),
+                # Skrip JS agar Enter mengirim data unik dan membersihkan kotak seketika
                 ui.tags.script("""
                     if (!window._ivScannerListenerAdded) {
                         window._ivScannerListenerAdded = true;
                         document.addEventListener("keydown", function(event) {
                             if (event.key === "Enter" && document.activeElement && document.activeElement.id === "iv_sku_scan_box") {
                                 event.preventDefault();
-                                let val = document.getElementById("iv_sku_scan_box").value;
-                                if (val.trim() !== "") {
-                                    Shiny.setInputValue('btn_process_iv_sku_scan', val, {priority: 'event'});
-                                    document.getElementById("iv_sku_scan_box").value = "";
+                                let inputEl = document.getElementById("iv_sku_scan_box");
+                                let val = inputEl ? inputEl.value.trim() : "";
+                                
+                                if (val !== "") {
+                                    // Tambahkan timestamp agar Shiny mendeteksi perubahan nilai unik (mencegah abaikan data kembar)
+                                    Shiny.setInputValue("btn_process_iv_sku_scan", val + "_" + Date.now(), {priority: "event"});
+                                    if (inputEl) inputEl.value = ""; // Kosongkan langsung
                                 }
                             }
                         });
@@ -5940,7 +5946,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="display: flex; justify-content: flex-start; align-items: center; width: 100%; margin-bottom: 0.75rem;"
         )
 
-        # TAB 1: LIST SETUP (Lengkap dengan Kotak Scan SKU di atasnya)
+        # TAB 1: LIST SETUP
         tab1_need = ui.div(
             sku_input_box,
             filter_control_bar,
@@ -5966,7 +5972,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="padding: 0.75rem 0;"
         )
 
-        # TAB 3: ITEM MUTASI (Dinamis hasil dari SKU yang di-scan)
+        # TAB 3: ITEM MUTASI
         tab3_mutasi = ui.div(
             ui.div(
                 ui.div(
@@ -5994,22 +6000,6 @@ def server(input: Inputs, output: Outputs, session: Session):
             ),
             style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
         )
-        
-    # 🌟 2. EVENT HANDLER SAAT SKU DI-INPUT / DI-SCAN
-    @reactive.Effect
-    @reactive.event(input.btn_process_iv_sku_scan)
-    def _on_process_iv_sku_scan():
-        scanned_sku = input.btn_process_iv_sku_scan()
-        if not scanned_sku:
-            return
-        
-        succ, msg = state.move_instock_sku_to_mutasi(scanned_sku)
-        if succ:
-            ui.notification_show(f"✅ {msg}", type="message", duration=3)
-        else:
-            # MEMUNCULKAN POP-UP ERROR JIKA ITEM TIDAK ADA DI LIST
-            state.error_modal_message.set("Item tidak ada di list!")
-            state.show_error_modal.set(True)
 
     # Handler Download File Excel 5 Kolom Tab 3
     @render.download(
@@ -6032,7 +6022,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         yield buf.getvalue()
 
-# Listener untuk membunyikan suara di browser saat ada permintaan FL baru
+    # Listener untuk membunyikan suara di browser saat ada permintaan FL baru
     @reactive.Effect
     @reactive.event(state.fl_audio_trigger)
     def _trigger_fl_sound():

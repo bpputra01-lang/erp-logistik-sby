@@ -3256,7 +3256,6 @@ def sidebar(state: AppState):
     if not state.sidebar_open():
         return ui.div(ui.tags.button(ui.tags.i(class_="fa-solid fa-bars", style="font-size: 18px; color: #FFFFFF;"), onclick="Shiny.setInputValue('btn_toggle_sidebar', Math.random(), {priority: 'event'})", style="background: transparent; border: none; cursor: pointer; padding: 0.5rem; border-radius: 6px;"), style="width: 60px; min-width: 60px; padding: 1rem 0.5rem; background: #111318; border-right: 1px solid #2D3748; height: 100vh; display: flex; flex-direction: column; align-items: center;")
 
-    # 🌟 1. Ambil list item dari masing-masing section
     monitoring_items = state.get_menu_monitoring()
     sales_items = state.get_menu_sales()
     auditor_items = state.get_menu_auditor()
@@ -3264,7 +3263,6 @@ def sidebar(state: AppState):
     inventory_items = state.get_menu_inventory()
     extras_items = state.get_menu_extras()
 
-    # 🌟 2. Masukkan ke list penampung, HANYA jika itemnya ada (jika kosong, header ikut hilang total)
     sections = []
 
     if monitoring_items:
@@ -3279,6 +3277,7 @@ def sidebar(state: AppState):
             )
         )
 
+    # 🌟 HANYA MUNCUL JIKA ADA ISINYA (Admin/DC), jika Hub/Toko (kosong []) maka di-skip total
     if sales_items:
         sections.append(
             ui.div(
@@ -3291,6 +3290,7 @@ def sidebar(state: AppState):
             )
         )
 
+    # 🌟 HANYA MUNCUL JIKA ADA ISINYA (Admin/DC)
     if auditor_items:
         sections.append(
             ui.div(
@@ -3358,7 +3358,7 @@ def sidebar(state: AppState):
             style="display: flex; justify-content: space-between; width: 100%; align-items: center; margin-bottom: 0.8rem; padding-bottom: 0.6rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08);"
         ),
         ui.div(
-            *sections, # 🌟 Render section yang aktif saja di sini
+            *sections,
             style="width: 100%; flex: 1; overflow-y: auto; padding-right: 4px;"
         ),
         ui.div(ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-right-from-bracket", style="margin-right: 8px; font-size: 14px;"), ui.span("Logout Sistem", style="font-weight: bold; font-size: 13px;")), onclick="Shiny.setInputValue('btn_execute_logout', Math.random(), {priority: 'event'})", class_="btn-red-gradient", style="width: 100%; padding: 0.5rem; border-radius: 6px; display: flex; align-items: center; justify-content: center;"), style="width: 100%; padding-top: 0.8rem; border-top: 1px solid rgba(255, 255, 255, 0.1); margin-top: auto;"),

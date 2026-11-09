@@ -7730,32 +7730,45 @@ class AppState:
                 return False, "File Stock wajib diupload!"
 
             df = load_data_from_info(file_info)
-            if df.empty or df.shape[1] < 10:
-                return False, "Format file kurang dari 10 kolom!"
+            if df.empty:
+                return False, "File yang diupload kosong!"
 
-            # Pemetaan Kolom sesuai instruksi:
-            # BIN = B (idx 1) | SKU = C (idx 2) | Item Name = E (idx 4) | QTY = J (idx 9)
-            col_b = df.columns[1]
-            col_s = df.columns[2]
-            col_e = df.columns[4]
-            col_j = df.columns[9]
+            df.columns = [str(c).strip().upper() for c in df.columns]
+
+            def get_flexible_col(exact_names, fallback_kws, default_idx):
+                for name in exact_names:
+                    if name.upper() in df.columns:
+                        return df[name.upper()]
+                for kw in fallback_kws:
+                    for col in df.columns:
+                        if kw.upper() in col:
+                            return df[col]
+                if df.shape[1] > default_idx:
+                    return df.iloc[:, default_idx]
+                return df.iloc[:, 0]
+
+            col_b = get_flexible_col(['BIN', 'LOKASI', 'RAK', 'BIN_CODE'], ['BIN', 'LOKASI'], 1 if df.shape[1] > 1 else 0)
+            col_s = get_flexible_col(['SKU', 'BARCODE', 'ITEM CODE', 'BARCODE_SKU'], ['SKU', 'BARCODE'], 2 if df.shape[1] > 2 else 0)
+            col_e = get_flexible_col(['ITEM NAME', 'ITEM_NAME', 'ARTIKEL', 'DESCRIPTION', 'NAMA BARANG'], ['ITEM', 'NAMA', 'ARTIKEL'], 4 if df.shape[1] > 4 else 0)
+            col_j = get_flexible_col(['QTY SYSTEM', 'QTY_SYSTEM', 'QTY', 'QUANTITY', 'STOK'], ['QTY', 'STOK', 'QUANTITY'], 9 if df.shape[1] > 9 else (df.shape[1]-1))
 
             df_clean = pd.DataFrame({
-                'BIN': df[col_b].fillna('').astype(str).str.strip().str.upper(),
-                'SKU': df[col_s].fillna('').astype(str).str.split('.').str[0].str.strip().str.upper(),
-                'ITEM_NAME': df[col_e].fillna('-').astype(str).str.strip(),
-                'QTY_NUM': pd.to_numeric(df[col_j], errors='coerce').fillna(0).astype(int)
+                'BIN': pd.Series(col_b).fillna('').astype(str).str.strip().str.upper(),
+                'SKU': pd.Series(col_s).fillna('').astype(str).str.split('.').str[0].str.strip().str.upper(),
+                'ITEM_NAME': pd.Series(col_e).fillna('-').astype(str).str.strip(),
+                'QTY_NUM': pd.to_numeric(pd.Series(col_j), errors='coerce').fillna(0).astype(int)
             })
 
-            # Buang baris kosong
             df_clean = df_clean[(df_clean['SKU'] != '') & (df_clean['SKU'] != 'NAN') & (df_clean['BIN'] != '')].copy()
 
-            # Deteksi BIN yang mengandung kata 'KL' (Case-insensitive)
+            if df_clean.empty:
+                return False, "Tidak ada data valid yang dapat diproses dari file tersebut."
+
+            # Deteksi BIN yang mengandung kata 'KL'
             df_clean['IS_KL'] = df_clean['BIN'].str.contains('KL', na=False, case=False)
 
             refill_records = []
 
-            # Grouping berdasarkan SKU
             for sku, group in df_clean.groupby('SKU'):
                 item_name = group['ITEM_NAME'].iloc[0]
                 
@@ -7765,13 +7778,11 @@ class AppState:
                 total_kl_qty = int(kl_group['QTY_NUM'].sum())
                 total_shelving_qty = int(shelving_group['QTY_NUM'].sum())
 
-                # KONDISI REFILL: Shelving qty 0 ATAU (1 s.d. 3), DAN total stock di KL > 0
+                # Kondisi: Shelving qty 0 atau 1-3, dan total stock di KL > 0
                 if (total_shelving_qty == 0 or (1 <= total_shelving_qty <= 3)) and total_kl_qty > 0:
-                    # Target pick = 80% dari total stok di BIN KL
                     target_pick = max(1, int(round(total_kl_qty * 0.8)))
                     remaining_need = target_pick
 
-                    # Urutkan BIN KL berdasarkan QTY terbanyak
                     kl_sorted = kl_group.sort_values(by='QTY_NUM', ascending=False)
 
                     for _, kl_row in kl_sorted.iterrows():
@@ -7787,11 +7798,12 @@ class AppState:
                             "BIN AMBIL": bin_ambil,
                             "SKU": sku,
                             "ITEM NAME": item_name,
+                            "QTY SHELVING": total_shelving_qty, # 🌟 Menampilkan total stok di shelving saat ini
                             "QTY PICK": take
                         })
                         remaining_need -= take
 
-            df_res = pd.DataFrame(refill_records) if refill_records else pd.DataFrame(columns=["BIN AMBIL", "SKU", "ITEM NAME", "QTY PICK"])
+            df_res = pd.DataFrame(refill_records) if refill_records else pd.DataFrame(columns=["BIN AMBIL", "SKU", "ITEM NAME", "QTY SHELVING", "QTY PICK"])
 
             self._raw_df_rs = df_res.copy()
             self.df_rs_headers.set(df_res.columns.tolist() if not df_res.empty else [])
