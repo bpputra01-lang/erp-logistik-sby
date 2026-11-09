@@ -28,7 +28,7 @@ app_ui = ui.page_fluid(
 
 def server(input: Inputs, output: Outputs, session: Session):
     state = AppState()
-    state.start_fl_monitor_background()
+    #state.start_fl_monitor_background()
     _last_filter_state = {"c_brands": [], "c_subs": [], "c_bins": []}
     # Modal Dismiss Listeners
     @reactive.Effect
