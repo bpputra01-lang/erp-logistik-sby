@@ -649,6 +649,13 @@ class AppState:
         self.df_iv_done_rows = reactive.Value([])
         self._raw_df_iv_done = pd.DataFrame()
 
+        # Dropdown Sales Baru
+        self.dropdown_sales = reactive.Value(True)
+        self.fl_request_list = reactive.Value([])
+        self.fl_last_check_time = reactive.Value("-")
+        self._fl_seen_keys = set()
+        self._fl_worker_started = False
+
         # Master Checklist 27 Kriteria dari PDF
         self.COMPLIANCE_DEFAULT_ITEMS = [
             # 1. GOOD RECEIVING
@@ -7590,3 +7597,144 @@ class AppState:
     def process_transit_to_instock(self):
         """Trigger pembaruan data instock"""
         return self.load_instock_daily_from_supabase()
+
+
+def get_menu_sales(self) -> list[str]:
+        return ["Permintaan FL"]
+
+    def start_fl_monitor_background(self):
+        """Menjalankan pemantau permintaan FL mandiri di background thread (Continuous)"""
+        if self._fl_worker_started:
+            return
+        self._fl_worker_started = True
+
+        import threading
+        threading.Thread(target=self._fl_monitor_loop, daemon=True).start()
+
+    def _fl_monitor_loop(self):
+        import os
+        import time
+        import requests
+        from bs4 import BeautifulSoup
+        from datetime import datetime
+        from gtts import gTTS
+        import pygame
+
+        # 1. Siapkan Audio Voice Over
+        audio_file = "mas_ambilin_dong.mp3"
+        if not os.path.exists(audio_file):
+            try:
+                tts = gTTS(text="Mas, ambilin dong!", lang="id", slow=False)
+                tts.save(audio_file)
+            except Exception as e:
+                print("Gagal generate audio:", e)
+
+        try:
+            pygame.mixer.init()
+        except Exception:
+            pass
+
+        def play_sound():
+            try:
+                pygame.mixer.music.load(audio_file)
+                pygame.mixer.music.play()
+            except Exception as e:
+                print("Error play audio:", e)
+
+        # 2. Login ke Jezpro
+        session = requests.Session()
+        session.headers.update({
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36"
+        })
+        
+        email = os.environ.get("JEZPRO_EMAIL", "fajarbintang786@jez.co.id")
+        password = os.environ.get("JEZPRO_PASSWORD", "131199")
+
+        try:
+            res = session.get("https://jezpro.id/", timeout=20)
+            soup = BeautifulSoup(res.text, "html.parser")
+            token_tag = soup.find("input", {"name": "_token"})
+            if token_tag:
+                session.post("https://jezpro.id/user_login", data={
+                    "_token": token_tag["value"],
+                    "u_email": email,
+                    "password": password
+                }, timeout=20)
+                session.get("https://jezpro.id/helper_backup", timeout=15)
+                print("✅ [FL MONITOR] Berhasil terhubung ke Jezpro!")
+        except Exception as e:
+            print("❌ [FL MONITOR] Gagal login Jezpro:", e)
+
+        url_target = "https://jezpro.id/product_out_datatables"
+        headers_req = {
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "X-Requested-With": "XMLHttpRequest",
+            "Referer": "https://jezpro.id/helper_backup"
+        }
+
+        is_initial = True
+        store_id = 3  # ID Surabaya
+
+        # 3. Loop Pengecekan Terus-menerus (Interval 2.5 Detik Aman)
+        while True:
+            try:
+                params = {
+                    "draw": str(int(time.time())),
+                    "columns[0][data]": "article",
+                    "columns[0][name]": "article",
+                    "columns[0][searchable]": "true",
+                    "columns[0][orderable]": "false",
+                    "order[0][column]": "0",
+                    "order[0][dir]": "desc",
+                    "start": "0",
+                    "length": "20",
+                    "search": "",
+                    "st_id": str(store_id),
+                    "_": int(time.time() * 1000)
+                }
+
+                resp = session.get(url_target, params=params, headers=headers_req, timeout=8)
+                if resp.status_code == 200:
+                    data = resp.json().get("data", [])
+                    new_found = False
+
+                    cards_data = []
+                    for it in data:
+                        req_id = str(it.get("id") or it.get("plst_id") or it.get("DT_RowIndex") or "")
+                        art_name = str(it.get("article") or it.get("p_name") or "-")
+                        waktu = str(it.get("datetime") or it.get("created_at") or "-")
+                        pic = str(it.get("user_name") or it.get("u_name") or "Tim FL")
+                        bin_lok = str(it.get("product_location") or it.get("pl_code") or "-")
+                        status = str(it.get("status") or "WAITING OFFLINE").upper()
+
+                        uniq = f"{req_id}_{art_name}_{waktu}"
+                        cards_data.append({
+                            "id": req_id,
+                            "article": art_name,
+                            "datetime": waktu,
+                            "pic": pic,
+                            "bin": bin_lok,
+                            "status": status,
+                            "qty": it.get("qty", 1)
+                        })
+
+                        if is_initial:
+                            self._fl_seen_keys.add(uniq)
+                        else:
+                            if uniq not in self._fl_seen_keys:
+                                self._fl_seen_keys.add(uniq)
+                                new_found = True
+                                print(f"🚨 [PERMINTAAN FL BARU] {art_name} diajukan oleh {pic}!")
+
+                    is_initial = False
+                    self.fl_request_list.set(cards_data)
+                    self.fl_last_check_time.set(datetime.now().strftime("%H:%M:%S"))
+
+                    # Bunyikan suara hanya jika ada barang baru yang masuk
+                    if new_found:
+                        play_sound()
+
+            except Exception as err:
+                pass
+
+            time.sleep(2.5)  # Interval 2.5 detik (Sangat aman & responsif)

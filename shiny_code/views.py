@@ -2978,6 +2978,63 @@ def instock_validation_view(state: AppState):
         style="width: 100%; padding: 1rem;"
     )
 
+def permintaan_fl_view(state: AppState):
+    cards = state.fl_request_list()
+    
+    card_elements = []
+    for item in cards:
+        status_txt = item.get("status", "WAITING OFFLINE")
+        art_raw = item.get("article", "-")
+        
+        # Ekstrak brand [BRAND]
+        brand_match = re.search(r'\[(.*?)\]', art_raw)
+        brand_str = f"[{brand_match.group(1)}]" if brand_match else ""
+        art_clean = re.sub(r'\[.*?\]\s*', '', art_raw).strip()
+
+        card_elements.append(
+            ui.div(
+                ui.div(
+                    ui.span(status_txt, style="background: #DD6B20; color: white; font-weight: 800; font-size: 11px; padding: 4px 10px; border-radius: 4px; display: inline-block; margin-right: 8px;"),
+                    ui.span(brand_str, style="font-weight: 800; font-size: 13px; color: #1A202C;"),
+                    style="margin-bottom: 6px;"
+                ),
+                ui.h4(art_clean, style="font-size: 14px; font-weight: 800; color: #1A202C; margin: 0 0 6px 0;"),
+                ui.p(item.get("datetime", "-"), style="font-size: 12px; color: #4A5568; margin: 0 0 4px 0;"),
+                ui.p(item.get("pic", "-"), style="font-size: 12px; font-weight: 800; color: #0D9488; margin: 0 0 10px 0;"),
+                ui.div(
+                    ui.span(f"Jml : {item.get('qty', 1)}", style="background: #E53E3E; color: white; font-weight: 800; font-size: 11px; padding: 5px 12px; border-radius: 6px; margin-right: 6px;"),
+                    ui.span(item.get("bin", "-"), style="background: #E53E3E; color: white; font-weight: 800; font-size: 11px; padding: 5px 12px; border-radius: 6px; margin-right: 6px;"),
+                    ui.span("Masuk", style="background: #9B2C2C; color: white; font-weight: 800; font-size: 11px; padding: 5px 12px; border-radius: 6px;"),
+                    style="display: flex; align-items: center;"
+                ),
+                style="background: #FFFFFF; border-radius: 10px; padding: 1.25rem; border: 1.5px solid #E2E8F0; margin-bottom: 0.85rem; box-shadow: 0 2px 6px rgba(0,0,0,0.02);"
+            )
+        )
+
+    if not card_elements:
+        card_elements = [
+            ui.div(
+                ui.tags.i(class_="fa-solid fa-bell-slash", style="font-size: 32px; color: #A0AEC0; margin-bottom: 8px;"),
+                ui.p("Belum ada antrean barang masuk dari tim Frontline saat ini.", style="color: #718096; font-style: italic; margin: 0;"),
+                style="text-align: center; padding: 3rem; background: white; border-radius: 12px; border: 1px dashed #CBD5E0;"
+            )
+        ]
+
+    return ui.div(
+        ui.div(
+            ui.div(
+                ui.h4("Scan Barang Masuk (Permintaan Frontline)", style="font-size: 16px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
+                ui.p(f"Live Check Jezpro: {state.fl_last_check_time()} WIB • Sistem otomatis bersuara saat ada permintaan baru.", style="color: #718096; font-size: 12px; margin: 0;"),
+            ),
+            ui.div(
+                ui.span("🟢 SUARA AKTIF", style="background: #C6F6D5; color: #22543D; font-weight: 800; font-size: 11px; padding: 6px 14px; border-radius: 20px; border: 1px solid #9AE6B4;")
+            ),
+            style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 1.25rem 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+        ),
+        ui.div(*card_elements),
+        style="width: 100%; max-width: 600px; margin: 0 auto; padding: 1rem 0;"
+    )
+
 def menu_item(label: str, target_menu: str, current_menu: str):
     import re
     is_active = (current_menu == target_menu)
@@ -3039,6 +3096,16 @@ def sidebar(state: AppState):
                 ui.div(
                     *[menu_item(item, item, cur_menu) for item in state.get_menu_monitoring()], 
                     style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_monitoring() else "display: none;"
+                ), 
+                style="width: 100%;"
+            ),
+
+            # 🌟 MENU SECTION: SALES (BARU)
+            ui.div(
+                section_dropdown_header("SALES", "sales", state.dropdown_sales()), 
+                ui.div(
+                    *[menu_item(item, item, cur_menu) for item in state.get_menu_sales()], 
+                    style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_sales() else "display: none;"
                 ), 
                 style="width: 100%;"
             ),

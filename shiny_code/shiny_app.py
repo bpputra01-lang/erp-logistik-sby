@@ -28,6 +28,7 @@ app_ui = ui.page_fluid(
 
 def server(input: Inputs, output: Outputs, session: Session):
     state = AppState()
+    state.start_fl_monitor_background()
     _last_filter_state = {"c_brands": [], "c_subs": [], "c_bins": []}
     # Modal Dismiss Listeners
     @reactive.Effect
@@ -133,7 +134,8 @@ def server(input: Inputs, output: Outputs, session: Session):
         "ll01-monitor": "Warehouse Activity Monitor",
         "warehouse-compliance-audit": "Warehouse Compliance Audit",
         "instock-validation": "Instock Validation",
-        "instock_validation": "Instock Validation"
+        "instock_validation": "Instock Validation",
+        "permintaan-fl": "Permintaan FL"
     }
 
     # 1. Saat menu diklik di sidebar -> URL di browser otomatis berubah
@@ -1107,6 +1109,9 @@ def server(input: Inputs, output: Outputs, session: Session):
         elif content_type == "warehouse_activity_monitor": page_content = warehouse_activity_monitor_view(state)
         elif content_type == "compliance_audit": page_content = compliance_audit_view(state)  # <-- TAMBAHKAN ROUTE INI
         elif content_type in ["instock_validation", "instock-validation"]: page_content = instock_validation_view(state)
+        elif content_type in ["permintaan_fl", "permintaan-fl"]: 
+            from views import permintaan_fl_view
+            page_content = permintaan_fl_view(state)
         elif content_type == "access_denied":
             page_content = ui.div(ui.h2("⛔ Akses Ditolak", style="font-size: 28px; color: #E53E3E; font-weight: bold;"), ui.p("Maaf, halaman ini dibatasi hak aksesnya.", style="color: #718096; font-size: 15px;"), style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;")
         else:
