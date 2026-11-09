@@ -5775,23 +5775,24 @@ def server(input: Inputs, output: Outputs, session: Session):
         else:
             ui.notification_show(f"⚠️ {msg}", type="error", duration=4)
 
-    # ==========================================================================
-    # INSTOCK VALIDATION CONTROLLER (TAB 1 NEED SETUP VS TAB 2 DONE SETUP)
-    # ==========================================================================
     @reactive.Effect
     @reactive.event(input.btn_run_transit_instock)
     def _on_run_transit_instock():
-        # Langsung tarik data terbaru dari Supabase secara instan (< 0.2 detik)
         succ, msg = state.load_instock_daily_from_supabase()
-        
-        # Hilangkan loading spinner global
         ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
-        
         if succ:
             ui.notification_show("✅ Data Instock berhasil diperbarui dari Supabase!", type="message", duration=3)
         else:
             ui.notification_show(f"⚠️ {msg}", type="warning", duration=4)
 
+    @reactive.Effect
+    @reactive.event(input.change_iv_filter_waktu)
+    def _on_iv_filter_waktu_change():
+        val = input.change_iv_filter_waktu()
+        state.iv_filter_waktu.set(val)
+        state.load_instock_daily_from_supabase()
+
+    # 🌟 1. HANYA SATU FUNGSI RENDER UTAMA (DENGAN KOTAK SCAN SKU & 3 TAB LENGKAP)
     @render.ui
     def instock_validation_results_container():
         if not state.iv_processed():
@@ -5801,12 +5802,13 @@ def server(input: Inputs, output: Outputs, session: Session):
         tot_need_qty = state.iv_total_allocated_qty()
         tot_done_rows = len(state.df_iv_done_rows())
         tot_done_qty = state.iv_total_done_qty()
+        tot_mutasi_rows = len(state.df_iv_mutasi_rows())
 
         cur_filter_waktu = state.iv_filter_waktu() if hasattr(state, "iv_filter_waktu") else "BARUSAN_5"
 
         metric_ui = ui.div(
             dark_metric_box("⏳ PERLU DI-SETUP (TAB 1)", f"{tot_need_rows:,} BARIS ({tot_need_qty:,} PCS)", "#E53E3E"),
-            dark_metric_box("🚀 SIAP MUTASI (TAB 3)", f"{len(state.df_iv_mutasi_rows()):,} BARIS", "#3182CE"),
+            dark_metric_box("🚀 SIAP MUTASI (TAB 3)", f"{tot_mutasi_rows:,} BARIS", "#3182CE"),
             dark_metric_box("✅ DONE SETUP (TAB 2)", f"{tot_done_rows:,} BARIS ({tot_done_qty:,} PCS)", "#10B981"),
             style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
         )
@@ -5830,7 +5832,6 @@ def server(input: Inputs, output: Outputs, session: Session):
                     ),
                     style="display: flex; gap: 10px; align-items: center;"
                 ),
-                # Skrip agar Barcode Scanner / Tombol Enter langsung memicu fungsi tanpa klik mouse
                 ui.tags.script("""
                     if (!window._ivScannerListenerAdded) {
                         window._ivScannerListenerAdded = true;
@@ -5867,120 +5868,10 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="display: flex; justify-content: flex-start; align-items: center; width: 100%; margin-bottom: 0.75rem;"
         )
 
+        # TAB 1: LIST SETUP (Lengkap dengan Kotak Scan SKU di atasnya)
         tab1_need = ui.div(
-            sku_input_box,  # 🌟 Kotak Input SKU diletakkan di atas Tab 1
+            sku_input_box,
             filter_control_bar,
-            render_clean_table(state.df_iv_setup_headers(), state.df_iv_setup_rows(), "tbl_iv_setup"),
-            style="padding: 0.75rem 0;"
-        )
-
-        tab2_done = ui.div(
-            render_clean_table(state.df_iv_done_headers(), state.df_iv_done_rows(), "tbl_iv_done"),
-            style="padding: 0.75rem 0;"
-        )
-
-        tab3_mutasi = ui.div(
-            ui.div(
-                ui.div(
-                    ui.h4("📄 Template Mutasi Jezpro (Siap Di-upload)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0;"),
-                    ui.download_button(
-                        "btn_dl_iv_mutasi_5col",
-                        ui.tags.span(ui.tags.i(class_="fa-solid fa-cloud-arrow-down", style="margin-right: 6px;"), "DOWNLOAD TEMPLATE MUTASI (.XLSX)"),
-                        style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; font-weight: 800; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer; font-size: 12px;"
-                    ),
-                    style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem;"
-                ),
-                render_clean_table(state.df_iv_mutasi_headers(), state.df_iv_mutasi_rows(), "tbl_iv_mutasi_clean"),
-                style="padding: 0.75rem 0;"
-            )
-        )
-
-        return ui.div(
-            ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
-            metric_ui,
-            ui.navset_card_tab(
-                ui.nav_panel(f"⏳ 1. LIST SETUP ({tot_need_rows})", tab1_need),
-                ui.nav_panel(f"✅ 2. DONE SETUP ({tot_done_rows})", tab2_done),
-                ui.nav_panel(f"📄 3. ITEM MUTASI ({len(state.df_iv_mutasi_rows())})", tab3_mutasi)
-            ),
-            style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
-        )
-
-    # 🌟 Event Handler saat SKU di-input/scan
-    @reactive.Effect
-    @reactive.event(input.btn_process_iv_sku_scan)
-    def _on_process_iv_sku_scan():
-        scanned_sku = input.btn_process_iv_sku_scan()
-        if not scanned_sku:
-            return
-        
-        succ, msg = state.move_instock_sku_to_mutasi(scanned_sku)
-        if succ:
-            ui.notification_show(f"✅ {msg}", type="message", duration=3)
-        else:
-            # MEMUNCULKAN POP-UP ERROR JIKA ITEM TIDAK ADA DI LIST
-            state.error_modal_message.set("Item tidak ada di list!")
-            state.show_error_modal.set(True)
-
-    @reactive.Effect
-    @reactive.event(input.change_iv_filter_waktu)
-    def _on_iv_filter_waktu_change():
-        val = input.change_iv_filter_waktu()
-        state.iv_filter_waktu.set(val)
-        state.load_instock_daily_from_supabase()
-
-    @render.ui
-    def instock_validation_results_container():
-        if not state.iv_processed():
-            state.load_instock_daily_from_supabase()
-
-        tot_need_rows = len(state.df_iv_setup_rows())
-        tot_need_qty = state.iv_total_allocated_qty()
-        tot_done_rows = len(state.df_iv_done_rows())
-        tot_done_qty = state.iv_total_done_qty()
-
-        cur_filter_waktu = state.iv_filter_waktu() if hasattr(state, "iv_filter_waktu") else "BARUSAN_5"
-
-        # 3 KARTU METRIK UTAMA
-        metric_ui = ui.div(
-            dark_metric_box("⏳ PERLU DI-SETUP (GL1)", f"{tot_need_rows:,} BARIS ({tot_need_qty:,} PCS)", "#E53E3E"),
-            dark_metric_box("✅ DONE SETUP (VALID HARI INI)", f"{tot_done_rows:,} BARIS ({tot_done_qty:,} PCS)", "#10B981"),
-            dark_metric_box("📍 LOKASI TUJUAN", "GL1-INSTOCK", "#3182CE"),
-            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
-        )
-
-        # BARIS KONTROL FILTER WAKTU INSTOCK (< 5 MENIT)
-        filter_control_bar = ui.div(
-            ui.div(
-                ui.span("⏱️ Filter Waktu Instock:", style="font-size: 12px; font-weight: 800; color: #1A202C; margin-right: 8px;"),
-                ui.tags.select(
-                    ui.tags.option("🔥 Barusan Saja (< 5 Menit)", value="BARUSAN_5", selected=(cur_filter_waktu == "BARUSAN_5")),
-                    ui.tags.option("⚡ 15 Menit Terakhir", value="BARUSAN_15", selected=(cur_filter_waktu == "BARUSAN_15")),
-                    ui.tags.option("⏳ 30 Menit Terakhir", value="BARUSAN_30", selected=(cur_filter_waktu == "BARUSAN_30")),
-                    ui.tags.option("📋 Semua Antrean Hari Ini", value="SEMUA", selected=(cur_filter_waktu == "SEMUA")),
-                    id="iv_filter_waktu_select",
-                    onchange="Shiny.setInputValue('change_iv_filter_waktu', this.value, {priority: 'event'})",
-                    style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; background: white; cursor: pointer; min-width: 220px;"
-                ),
-                style="display: flex; align-items: center;"
-            ),
-            style="display: flex; justify-content: flex-start; align-items: center; width: 100%; margin-bottom: 0.75rem;"
-        )
-        # TAB 1: LIST SETUP (LENGKAP DENGAN STATUS BARUSAN DI-INSTOCK)
-        tab1_need = ui.div(
-            filter_control_bar,
-            ui.div(
-                ui.div(
-                    ui.h4("📋 Antrean Barang Belum Dimutasi (Monitoring)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 2px 0;"),
-                    ui.p("Barang yang barusan di-instock ditandai badge '🔥 BARUSAN' dan ditaruh paling atas.", style="color: #718096; font-size: 12px; margin: 0;")
-                ),
-                ui.download_button(
-                    "btn_dl_iv_setup",
-                    ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px;"), "DOWNLOAD MONITORING (.XLSX)"),
-                    style="background-color: #3182CE; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer; font-size: 12px;"
-                ),
-                style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 8px;"
-            ),
             render_clean_table(state.df_iv_setup_headers(), state.df_iv_setup_rows(), "tbl_iv_setup"),
             style="padding: 0.75rem 0;"
         )
@@ -6003,17 +5894,16 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="padding: 0.75rem 0;"
         )
 
-        # TAB 3: ITEM MUTASI (HANYA 5 KOLOM)
+        # TAB 3: ITEM MUTASI (Dinamis hasil dari SKU yang di-scan)
         tab3_mutasi = ui.div(
-            filter_control_bar,
             ui.div(
                 ui.div(
-                    ui.h4("📄 Template Mutasi Jezpro (5 Kolom Bersih)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 2px 0;"),
-                    ui.p("Format bersih siap upload ke menu Mutasi Bin Jezpro (Hanya BIN AWAL, BIN TUJUAN, SKU, QUANTITY, NOTES).", style="color: #718096; font-size: 12px; margin: 0;")
+                    ui.h4("📄 Template Mutasi Jezpro (Item Hasil Scan)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 2px 0;"),
+                    ui.p("Item yang berhasil dipindah melalui scan SKU akan terkumpul di sini, siap di-upload ke Mutasi Bin Jezpro.", style="color: #718096; font-size: 12px; margin: 0;")
                 ),
                 ui.download_button(
                     "btn_dl_iv_mutasi_5col",
-                    ui.tags.span(ui.tags.i(class_="fa-solid fa-cloud-arrow-down", style="margin-right: 6px;"), "DOWNLOAD TEMPLATE MUTASI 5 KOLOM (.XLSX)"),
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-cloud-arrow-down", style="margin-right: 6px;"), "DOWNLOAD TEMPLATE MUTASI (.XLSX)"),
                     style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; font-weight: 800; border-radius: 6px; border: none; padding: 8px 18px; cursor: pointer; font-size: 12px; box-shadow: 0 2px 6px rgba(16,185,129,0.3);"
                 ),
                 style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 8px;"
@@ -6028,10 +5918,26 @@ def server(input: Inputs, output: Outputs, session: Session):
             ui.navset_card_tab(
                 ui.nav_panel(f"⏳ 1. LIST SETUP ({tot_need_rows})", tab1_need),
                 ui.nav_panel(f"✅ 2. DONE SETUP ({tot_done_rows})", tab2_done),
-                ui.nav_panel(f"📄 3. ITEM MUTASI ({tot_need_rows})", tab3_mutasi)
+                ui.nav_panel(f"📄 3. ITEM MUTASI ({tot_mutasi_rows})", tab3_mutasi)
             ),
             style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
         )
+
+    # 🌟 2. EVENT HANDLER SAAT SKU DI-INPUT / DI-SCAN
+    @reactive.Effect
+    @reactive.event(input.btn_process_iv_sku_scan)
+    def _on_process_iv_sku_scan():
+        scanned_sku = input.btn_process_iv_sku_scan()
+        if not scanned_sku:
+            return
+        
+        succ, msg = state.move_instock_sku_to_mutasi(scanned_sku)
+        if succ:
+            ui.notification_show(f"✅ {msg}", type="message", duration=3)
+        else:
+            # MEMUNCULKAN POP-UP ERROR JIKA ITEM TIDAK ADA DI LIST
+            state.error_modal_message.set("Item tidak ada di list!")
+            state.show_error_modal.set(True)
 
     # Handler Download File Excel 5 Kolom Tab 3
     @render.download(
