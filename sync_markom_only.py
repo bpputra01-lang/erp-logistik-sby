@@ -1,19 +1,29 @@
 import os
 import re
 import json
+import time
 import random
 import urllib.parse
 import requests
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
+# ==============================================================================
+# 🔑 KONFIGURASI PUSAT & KREDENSIAL
+# ==============================================================================
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://fanzsmghhbefhhaicrok.supabase.co")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhbnpzbWdoaGJlZmhoYWljcm9rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxNTQzNDgsImV4cCI6MjEwMzczMDM0OH0.brCSOO9nHAUK8CxDWPperpJ--_NA_nwy5cO9OqGv3I0")
 
+# Masukkan URL Google Spreadsheet Anda di sini jika tidak pakai environment variable
 SPREADSHEET_URL = os.environ.get(
     "SPREADSHEET_URL", 
-    "https://docs.google.com/spreadsheets/d/1yjNfDer239OR0tVUl_Xj1UCArqbcMr5dl6C-5EGtrSo/edit?gid=1695087119#gid=1695087119"
+    ""
 )
+
+# Interval pengecekan otomatis (dalam satuan detik, misal: 60 = tiap 1 menit)
+CHECK_INTERVAL_SECONDS = 60 
+
+WIB = timezone(timedelta(hours=7))
 
 HEADERS = {
     "apikey": SUPABASE_KEY,
@@ -22,6 +32,9 @@ HEADERS = {
     "Prefer": "return=representation"
 }
 
+# ==============================================================================
+# HELPER PEMBERSIH & PARSER
+# ==============================================================================
 def safe_int(val, default=0):
     try:
         if pd.isna(val) or val is None:
@@ -77,7 +90,7 @@ def get_stock_cache():
                     if norm_k and (norm_k not in lookup or lookup[norm_k]["cogs"] == 0):
                         lookup[norm_k] = entry
     except Exception as e:
-        print(f"⚠️ Gagal load stock_live_cache: {e}")
+        print(f"   ⚠️ [STOCK CACHE] Gagal load stock_live_cache: {e}")
     return lookup
 
 def get_existing_database_memos():
@@ -91,16 +104,22 @@ def get_existing_database_memos():
                 tujuan = str(m.get("tujuan", "")).strip().upper()
                 existing_map[(tgl, tujuan)] = m
     except Exception as e:
-        print(f"⚠️ Gagal membaca memo eksisting: {e}")
+        print(f"   ⚠️ [DB MEMO] Gagal membaca memo eksisting: {e}")
     return existing_map
 
+# ==============================================================================
+# FUNGSI SINKRONISASI UTAMA
+# ==============================================================================
 def run_sync():
+    now_str = datetime.now(WIB).strftime("%H:%M:%S")
+    print(f"\n⏳ [{now_str}] [MARKOM SYNC] Memulai pengecekan Google Spreadsheet Markom...")
+
     if not SPREADSHEET_URL:
-        print("❌ SPREADSHEET_URL belum diatur!")
-        return False, "Spreadsheet URL kosong"
+        print("   ❌ [MARKOM SYNC] Gagal: SPREADSHEET_URL belum diatur/masih kosong!")
+        return False
 
     existing_db_memos = get_existing_database_memos()
-    print(f"📂 Ditemukan {len(existing_db_memos)} riwayat memo di database.")
+    print(f"   📂 Ditemukan {len(existing_db_memos)} riwayat memo terdaftar di database.")
 
     download_url = SPREADSHEET_URL
     match = re.search(r'/spreadsheets/d/([a-zA-Z0-9-_]+)', SPREADSHEET_URL)
@@ -108,23 +127,24 @@ def run_sync():
         sheet_id = match.group(1)
         download_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx"
 
-    print("📥 Mengunduh Spreadsheet...")
     try:
         xl = pd.ExcelFile(download_url)
         all_sheets = xl.sheet_names
         target_sheet = next((s for s in all_sheets if "MARKOM" in s.strip().upper()), all_sheets[0])
-        print(f"🎯 Membaca Sheet: '{target_sheet}'")
+        print(f"   🎯 Membaca Sheet: '{target_sheet}'...")
         df = pd.read_excel(xl, sheet_name=target_sheet)
     except Exception as e:
-        print(f"❌ Gagal membaca sheet via Excel, mencoba direct CSV: {e}")
+        print(f"   ⚠️ Gagal via Excel, mencoba direct CSV: {e}")
         try:
             csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
             df = pd.read_csv(csv_url)
         except Exception as e2:
-            return False, f"Gagal membaca sheet: {e2}"
+            print(f"   ❌ [MARKOM SYNC] Gagal mengunduh spreadsheet: {e2}")
+            return False
 
     if df.empty or df.shape[1] < 4:
-        return False, "Sheet kosong atau kolom kurang!"
+        print("   ⚠️ [MARKOM SYNC] Sheet kosong atau kolom tidak memadai.")
+        return False
 
     def find_col(candidates, default_idx):
         for cand in candidates:
@@ -146,9 +166,10 @@ def run_sync():
     df_filtered = df[mask].copy()
 
     if df_filtered.empty:
-        print("ℹ️ Tidak ada baris EVENT, HADIAH, atau GIFT.")
-        return True, "Tidak ada data baru dengan note Event/Hadiah/Gift."
+        print("   ℹ️ [MARKOM SYNC] Tidak ada baris bertanda EVENT, HADIAH, atau GIFT di sheet.")
+        return True
 
+    print(f"   🔍 Ditemukan {len(df_filtered)} baris permintaan hadiah/event.")
     stock_lookup = get_stock_cache()
 
     grouped_events = {}
@@ -163,7 +184,7 @@ def run_sync():
             tgl_full = dt_parsed.strftime("%Y-%m-%d %H:%M:%S")
             tgl_doc = dt_parsed.strftime("%Y-%m-%d")
         except Exception:
-            tgl_full = raw_tgl if len(raw_tgl) >= 10 else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            tgl_full = raw_tgl if len(raw_tgl) >= 10 else datetime.now(WIB).strftime("%Y-%m-%d %H:%M:%S")
             tgl_doc = tgl_full[:10]
 
         sku_val = clean_sku(r[col_sku])
@@ -202,6 +223,7 @@ def run_sync():
             grouped_events[group_key]["latest_time"] = tgl_full
 
     new_memos_to_insert = []
+    updated_count = 0
     skipped_count = 0
 
     for (tgl_doc, event_name), grp_data in grouped_events.items():
@@ -224,7 +246,9 @@ def run_sync():
                 "diajukan_oleh": pic_doc,
                 "items": items_list
             }
-            requests.patch(url_update, headers=HEADERS, json=update_payload)
+            res_upd = requests.patch(url_update, headers=HEADERS, json=update_payload)
+            if res_upd.status_code in [200, 204]:
+                updated_count += 1
             continue
 
         memo_id = f"MEMO/ZKN/{tgl_doc.replace('-', '')}/{random.randint(100, 999)}"
@@ -246,10 +270,37 @@ def run_sync():
         url_insert = f"{SUPABASE_URL}/rest/v1/memo_pengajuan"
         res_insert = requests.post(url_insert, headers=HEADERS, json=new_memos_to_insert)
         if res_insert.status_code in [200, 201]:
-            return True, f"Berhasil membuat {len(new_memos_to_insert)} memo baru di database!"
-    
-    return True, f"Sinkronisasi selesai ({skipped_count} memo DONE dilewati)."
+            print(f"   ✨ [INSERT] Berhasil menambah {len(new_memos_to_insert)} memo baru ke database!")
+        else:
+            print(f"   ⚠️ [INSERT] Gagal insert memo baru: {res_insert.text}")
 
+    print(f"   ✅ [MARKOM SYNC] Selesai! (+{len(new_memos_to_insert)} Memo Baru, {updated_count} Diperbarui, {skipped_count} Dilewati karena Status DONE).")
+    return True
+
+# ==============================================================================
+# MAIN CONTINUOUS LOOP
+# ==============================================================================
 if __name__ == "__main__":
-    print("Menjalankan standalone sync_markom_only...")
-    run_sync()
+    print("=" * 75)
+    print("🚀 DAEMON SYNC MARKOM: SPREADSHEET -> SUPABASE (CONTINUOUS LOOP)")
+    print(f"⏱️ Interval Pengecekan Otomatis: Tiap {CHECK_INTERVAL_SECONDS} Detik")
+    print("=" * 75)
+
+    try:
+        while True:
+            # Jalankan proses sinkronisasi
+            try:
+                run_sync()
+            except Exception as e:
+                print(f"   ❌ [ERROR UNHANDLED]: {e}")
+
+            # Tampilan Standby / Hitung Mundur agar tahu sistem tetap hidup
+            now_wib = datetime.now(WIB).strftime("%H:%M:%S")
+            print(f"💤 [{now_wib}] [STANDBY] Pengecekan selesai. Menunggu {CHECK_INTERVAL_SECONDS} detik ke siklus berikutnya...")
+            print("-" * 75)
+
+            # Istirahat sesuai interval
+            time.sleep(CHECK_INTERVAL_SECONDS)
+
+    except KeyboardInterrupt:
+        print("\n\n🛑 Script dihentikan manual oleh user (Ctrl + C). Selamat tinggal!")
