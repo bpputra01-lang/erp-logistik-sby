@@ -5767,7 +5767,60 @@ def server(input: Inputs, output: Outputs, session: Session):
         ui.modal_remove()
         succ, msg = state.delete_memo(m_id)
         ui.notification_show(f"🗑️ {msg}", type="message", duration=3)
+    @reactive.Effect
+    @reactive.event(input.btn_process_refill_shelving)
+    def _proc_refill_shelving():
+        f = input.upload_refill_stock_file()
+        if not f:
+            state.error_modal_message.set("Upload file stock terlebih dahulu!")
+            state.show_error_modal.set(True)
+            return
+        succ, msg = state.process_refill_shelving(f)
+        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+        if succ:
+            state.show_success_modal.set(True)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
 
+    @render.ui
+    def refill_shelving_results_container():
+        if not state.rs_processed():
+            return ui.div()
+
+        total_rows = len(state.df_rs_rows())
+
+        return ui.div(
+            ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
+            ui.h4("📋 HASIL INSTRUKSI REFILL SHELVING", style="font-size: 16px; color: #010B13; font-weight: 800; margin-bottom: 1rem;"),
+            ui.div(
+                dark_metric_box("📦 TOTAL INSTRUKSI AMBIL", f"{total_rows:,} BARIS", "#3182CE"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+            ),
+            ui.div(
+                ui.div(
+                    ui.download_button(
+                        "btn_dl_refill_shelving",
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px;"), "DOWNLOAD REFILL SHELVING (.XLSX)"),
+                        style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer; font-size: 12px;"
+                    ),
+                    style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
+                ),
+                render_clean_table(state.df_rs_headers(), state.df_rs_rows(), "tbl_refill_shelving"),
+                style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0;"
+            ),
+            style="width: 100%;"
+        )
+
+    @render.download(
+        filename=lambda: f"REFILL_SHELVING_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    )
+    def btn_dl_refill_shelving():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_rs.to_excel(writer, sheet_name='REFILL_SHELVING', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
     # ==========================================================================
     # INSTOCK VALIDATION CONTROLLER (KHUSUS TRANSIT TO GL1-INSTOCK)
     # ==========================================================================
@@ -5984,57 +6037,4 @@ from pathlib import Path
 APP_DIR = Path(__file__).parent
 app = App(app_ui, server, static_assets={"/static": APP_DIR})
 
-    @reactive.Effect
-    @reactive.event(input.btn_process_refill_shelving)
-    def _proc_refill_shelving():
-        f = input.upload_refill_stock_file()
-        if not f:
-            state.error_modal_message.set("Upload file stock terlebih dahulu!")
-            state.show_error_modal.set(True)
-            return
-        succ, msg = state.process_refill_shelving(f)
-        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
-        if succ:
-            state.show_success_modal.set(True)
-        else:
-            state.error_modal_message.set(msg)
-            state.show_error_modal.set(True)
-
-    @render.ui
-    def refill_shelving_results_container():
-        if not state.rs_processed():
-            return ui.div()
-
-        total_rows = len(state.df_rs_rows())
-
-        return ui.div(
-            ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
-            ui.h4("📋 HASIL INSTRUKSI REFILL SHELVING", style="font-size: 16px; color: #010B13; font-weight: 800; margin-bottom: 1rem;"),
-            ui.div(
-                dark_metric_box("📦 TOTAL INSTRUKSI AMBIL", f"{total_rows:,} BARIS", "#3182CE"),
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
-            ),
-            ui.div(
-                ui.div(
-                    ui.download_button(
-                        "btn_dl_refill_shelving",
-                        ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px;"), "DOWNLOAD REFILL SHELVING (.XLSX)"),
-                        style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer; font-size: 12px;"
-                    ),
-                    style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
-                ),
-                render_clean_table(state.df_rs_headers(), state.df_rs_rows(), "tbl_refill_shelving"),
-                style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0;"
-            ),
-            style="width: 100%;"
-        )
-
-    @render.download(
-        filename=lambda: f"REFILL_SHELVING_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
-    )
-    def btn_dl_refill_shelving():
-        buf = io.BytesIO()
-        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-            state._raw_df_rs.to_excel(writer, sheet_name='REFILL_SHELVING', index=False)
-        buf.seek(0)
-        yield buf.getvalue()
+    
