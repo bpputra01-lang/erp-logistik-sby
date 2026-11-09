@@ -222,15 +222,16 @@ CUSTOM_HEAD = ui.head_content(
             if (spinner) spinner.style.display = 'none';
         };
 
-        window.showGlobalSpinner = function() {
+       window.showGlobalSpinner = function() {
             let spinner = document.getElementById('global_reflex_loading');
             if (spinner) spinner.style.display = 'flex';
             if (document.body) document.body.classList.add('process-running');
 
             clearTimeout(window.spinnerSafetyTimer);
+            // Ganti 120000 menjadi 8000 (8 detik)
             window.spinnerSafetyTimer = setTimeout(function() {
                 window.hideGlobalSpinner();
-            }, 120000);
+            }, 8000);
         };
 
       // Data Audio Base64
@@ -340,7 +341,7 @@ CUSTOM_HEAD = ui.head_content(
             }
         }
         initFLSoundListener();
-        
+
         // AMAN: Tunggu DOMContentLoaded agar document.body tidak NULL saat di-observe
         document.addEventListener("DOMContentLoaded", function() {
             if (document.body) {
@@ -370,7 +371,15 @@ CUSTOM_HEAD = ui.head_content(
             });
             // shiny:idle sengaja tidak mematikan spinner agar spinner tetap berputar sampai komputasi Python selesai
         }
-
+        // Otomatis bersihkan tirai hitam begitu Shiny selesai menghitung (Idle)
+        $(document).on('shiny:idle shiny:value shiny:error', function() {
+            if (window.hideGlobalSpinner) {
+                window.hideGlobalSpinner();
+            }
+            if (document.body) {
+                document.body.classList.remove('process-running');
+            }
+        });
         // --- 7. ROUTING MENU ---
         if (window.location.pathname.endsWith('index.html') && window.history.replaceState) {
             let cleanPath = window.location.pathname.replace(/index\.html$/, '');

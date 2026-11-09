@@ -1165,51 +1165,59 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         yield buf.getvalue()
 
-    # Main Dynamic Router
+    # 1. Main Root Container (Hanya dibuat sekali & tidak akan hancur-bangun saat ganti menu)
     @render.ui
     def main_root_container():
-        if not state.logged_in(): return login_page()
-        content_type = state.get_active_content_type()
-
-        if content_type == "dashboard_ongkir": page_content = main_dashboard_view(state)
-        elif content_type == "stock_minus": page_content = stock_minus_view(state)
-        elif content_type == "putaway_system": page_content = putaway_view(state)
-        elif content_type == "compare_system": page_content = compare_system_view(state)
-        elif content_type == "cycle_count": page_content = cycle_count_view(state)
-        elif content_type == "ppa_audit": page_content = ppa_audit_view(state)
-        elif content_type == "cycle_count_analyzer": page_content = cycle_count_analyzer_view(state)
-        elif content_type == "compare_rto": page_content = compare_rto_view(state)
-        elif content_type == "stock_opname": page_content = stock_opname_view(state)
-        elif content_type == "justification_so": page_content = justification_so_view(state)
-        elif content_type == "cross_check_real_sys": page_content = cross_check_real_system_view(state)
-        elif content_type == "balancing_stock": page_content = balancing_stock_view(state)
-        elif content_type == "physical_inventory_list": page_content = physical_inventory_list_view(state)
-        elif content_type == "validation_barcode_sku": page_content = validation_barcode_sku_view(state)
-        elif content_type in ["percentage_display", "percentage-display"]: page_content = percentage_display_view(state)
-        elif content_type in ["excel_practice", "latihan_excel"]: page_content = excel_practice_view(state)
-        elif content_type == "form_auditor": page_content = auditor_view(state)
-        elif content_type in ["memo_pengajuan", "memo-pengajuan"]: page_content = memo_pengajuan_view(state)
-        elif content_type == "warehouse_activity_monitor": page_content = warehouse_activity_monitor_view(state)
-        elif content_type == "compliance_audit": page_content = compliance_audit_view(state)  # <-- TAMBAHKAN ROUTE INI
-        elif content_type in ["instock_validation", "instock-validation"]: page_content = instock_validation_view(state)
-        elif content_type in ["permintaan_fl", "permintaan-fl"]: 
-            from views import permintaan_fl_view
-            page_content = permintaan_fl_view(state)
-        elif content_type == "access_denied":
-            page_content = ui.div(ui.h2("⛔ Akses Ditolak", style="font-size: 28px; color: #E53E3E; font-weight: bold;"), ui.p("Maaf, halaman ini dibatasi hak aksesnya.", style="color: #718096; font-size: 15px;"), style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;")
-        else:
-            page_content = ui.div(ui.h2(f"Halaman: {state.main_menu()}", style="font-size: 28px; color: #1A202C; font-weight: bold;"), ui.p("Halaman ini sedang dalam tahap pengembangan.", style="color: #718096; font-size: 15px;"), style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;")
+        if not state.logged_in(): 
+            return login_page()
 
         return ui.div(
             sidebar(state),
             ui.div(
                 global_header(state),
-                page_content,
-                id="main-scroll-container",   # <-- TAMBAHKAN ID INI DI SINI
+                ui.output_ui("dynamic_page_content_area"),  # 👈 Sub-renderer terisolasi di sini!
+                id="main-scroll-container",
                 style="flex: 1; height: 100vh; overflow-y: auto; padding: 1.5rem; background-color: #F7FAFC;"
             ),
             style="display: flex; width: 100vw; height: 100vh; overflow: hidden; background-color: #111318;"
         )
+
+    # 2. Sub-Renderer (Hanya bagian dalam ini saja yang berganti saat menu dipilih)
+    @render.ui
+    def dynamic_page_content_area():
+        if not state.logged_in():
+            return ui.div()
+            
+        content_type = state.get_active_content_type()
+
+        if content_type == "dashboard_ongkir": return main_dashboard_view(state)
+        elif content_type == "stock_minus": return stock_minus_view(state)
+        elif content_type == "putaway_system": return putaway_view(state)
+        elif content_type == "compare_system": return compare_system_view(state)
+        elif content_type == "cycle_count": return cycle_count_view(state)
+        elif content_type == "ppa_audit": return ppa_audit_view(state)
+        elif content_type == "cycle_count_analyzer": return cycle_count_analyzer_view(state)
+        elif content_type == "compare_rto": return compare_rto_view(state)
+        elif content_type == "stock_opname": return stock_opname_view(state)
+        elif content_type == "justification_so": return justification_so_view(state)
+        elif content_type == "cross_check_real_sys": return cross_check_real_system_view(state)
+        elif content_type == "balancing_stock": return balancing_stock_view(state)
+        elif content_type == "physical_inventory_list": return physical_inventory_list_view(state)
+        elif content_type == "validation_barcode_sku": return validation_barcode_sku_view(state)
+        elif content_type in ["percentage_display", "percentage-display"]: return percentage_display_view(state)
+        elif content_type in ["excel_practice", "latihan_excel"]: return excel_practice_view(state)
+        elif content_type == "form_auditor": return auditor_view(state)
+        elif content_type in ["memo_pengajuan", "memo-pengajuan"]: return memo_pengajuan_view(state)
+        elif content_type == "warehouse_activity_monitor": return warehouse_activity_monitor_view(state)
+        elif content_type == "compliance_audit": return compliance_audit_view(state)
+        elif content_type in ["instock_validation", "instock-validation"]: return instock_validation_view(state)
+        elif content_type in ["permintaan_fl", "permintaan-fl"]: 
+            from views import permintaan_fl_view
+            return permintaan_fl_view(state)
+        elif content_type == "access_denied":
+            return ui.div(ui.h2("⛔ Akses Ditolak", style="color: #E53E3E; font-weight: bold;"), style="padding: 3rem; text-align: center;")
+        else:
+            return ui.div(ui.h2(f"Halaman: {state.main_menu()}", style="font-weight: bold;"), style="padding: 3rem; text-align: center;")
 # ==========================================================================
     # CYCLE COUNT / NON AUDIT CONTROLLER (FIXED: ANTI-RESET FILTER)
     # ==========================================================================
