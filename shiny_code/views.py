@@ -3256,6 +3256,13 @@ def sidebar(state: AppState):
     if not state.sidebar_open():
         return ui.div(ui.tags.button(ui.tags.i(class_="fa-solid fa-bars", style="font-size: 18px; color: #FFFFFF;"), onclick="Shiny.setInputValue('btn_toggle_sidebar', Math.random(), {priority: 'event'})", style="background: transparent; border: none; cursor: pointer; padding: 0.5rem; border-radius: 6px;"), style="width: 60px; min-width: 60px; padding: 1rem 0.5rem; background: #111318; border-right: 1px solid #2D3748; height: 100vh; display: flex; flex-direction: column; align-items: center;")
 
+# 🌟 PENGAMAN MUTLAK: Jika akunnya 'hub' atau 'toko', paksa sales_items jadi kosong []
+    uname = state.username().lower()
+    if uname in ["hub", "toko"]:
+        sales_items = []
+    else:
+        sales_items = state.get_menu_sales()
+        
     monitoring_items = state.get_menu_monitoring()
     sales_items = state.get_menu_sales()
     auditor_items = state.get_menu_auditor()
