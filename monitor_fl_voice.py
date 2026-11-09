@@ -18,7 +18,7 @@ JEZPRO_PASSWORD = os.environ.get("JEZPRO_PASSWORD", "131199")
 STORE_ID_SURABAYA = 3  # Sesuaikan dengan store id tempatmu (3 = Surabaya)
 
 AUDIO_FILE = "mas_ambilin_dong.mp3"
-CHECK_INTERVAL_SECONDS = 3  # Rekomendasi 1.5 - 2 detik agar tidak diblokir Cloudflare
+CHECK_INTERVAL_SECONDS = 3  # Rekomendasi 2-3 detik agar tidak diblokir
 
 # ==============================================================================
 # 🔊 GENERATOR & PEMUTAR SUARA
@@ -45,7 +45,7 @@ def play_alert_sound():
         # Mainkan di thread terpisah agar proses scraping tidak terhenti sesaat
         threading.Thread(target=_play, daemon=True).start()
     except Exception as e:
-        print(f"⚠️ Gagal memutar suara: {e}")
+        print(f"⚠️ Gagal memutar suara di server: {e}")
 
 # ==============================================================================
 # 🔐 LOGIN KE JEZPRO
@@ -78,11 +78,10 @@ def create_jezpro_session():
 # ==============================================================================
 from supabase import create_client
 
-# Masukkan URL & Key Supabase proyek Anda langsung di sini:
+# Kredensial Supabase
 SUPABASE_URL = "https://fanzsmghhbefhhaicrok.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhbnpzbWdoaGJlZmhoYWljcm9rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxNTQzNDgsImV4cCI6MjEwMzczMDM0OH0.brCSOO9nHAUK8CxDWPperpJ--_NA_nwy5cO9OqGv3I0"
 
-# Buat fungsi get_supabase agar baris 90 tidak error lagi
 _client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def get_supabase():
@@ -91,7 +90,7 @@ def get_supabase():
 def start_monitoring():
     init_audio()
     session = create_jezpro_session()
-    supabase = get_supabase() # Hubungkan ke Supabase
+    supabase = get_supabase()
 
     url_target = "https://jezpro.id/product_out_datatables"
     headers_req = {
@@ -104,7 +103,7 @@ def start_monitoring():
     is_initial_load = True
 
     print("\n" + "=" * 65)
-    print(f"🎧 MONITOR PERMINTAAN FL AKTIF (Tersambung ke Supabase & Web)")
+    print("🎧 MONITOR PERMINTAAN FL AKTIF (Tersambung ke Supabase & Web)")
     print("📢 Menunggu permintaan barang masuk dari Frontline...")
     print("=" * 65 + "\n")
 
@@ -146,6 +145,7 @@ def start_monitoring():
 
                     unique_key = f"{req_id}_{art_name}_{waktu}"
 
+                    # Lewati data yang sudah ada saat pertama kali bot di-start
                     if is_initial_load:
                         seen_request_keys.add(unique_key)
                         continue
@@ -155,11 +155,12 @@ def start_monitoring():
                         seen_request_keys.add(unique_key)
 
                         now_str = datetime.now().strftime("%H:%M:%S")
-                        print(f"\n🚨 [{now_str}] PERMINTAAN BARU: {art_name} ({pic}) -> Kirim ke Supabase!")
+                        print("\n" + "-" * 55)
+                        print(f"🚨 [{now_str}] PERMINTAAN DARI JEZPRO: {art_name} (PIC: {pic})")
                         
                         # 1. Kirim ke database Supabase agar web di laptop lain tahu
                         try:
-                            supabase.table("jezpro_fl_requests").insert({
+                            res_db = supabase.table("jezpro_fl_requests").insert({
                                 "req_id": str(req_id),
                                 "article_name": str(art_name),
                                 "pic": str(pic),
@@ -167,18 +168,27 @@ def start_monitoring():
                                 "qty": qty_val,
                                 "created_at": datetime.now().isoformat()
                             }).execute()
+
+                            # 🌟 VALIDASI RESMI SUPABASE
+                            if res_db and res_db.data:
+                                print(f"✅ [SUPABASE BERHASIL] Data masuk ke Cloud! ID: {res_db.data[0].get('id') or req_id}")
+                            else:
+                                print("⚠️ [SUPABASE GAGAL] Supabase tidak merespons data yang tersimpan!")
+
                         except Exception as err_db:
-                            print(f"⚠️ Gagal simpan ke Supabase: {err_db}")
+                            print(f"❌ [SUPABASE ERROR]: {err_db}")
 
-                        # 2. Bunyikan suara di speaker laptop ini
+                        # 2. Bunyikan suara di speaker laptop server
                         play_alert_sound()
+                        print("-" * 55)
 
+                # 🌟 PENTING: Jangan sampai baris ini hilang/terhapus!
                 is_initial_load = False
 
         except requests.exceptions.RequestException as e:
-            print(f"⚠️ Masalah koneksi: {e}")
+            print(f"⚠️ Masalah koneksi ke Jezpro: {e}")
         except Exception as e:
-            print(f"❌ Error: {e}")
+            print(f"❌ Error umum: {e}")
 
         time.sleep(CHECK_INTERVAL_SECONDS)
 

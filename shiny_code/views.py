@@ -233,44 +233,75 @@ CUSTOM_HEAD = ui.head_content(
             }, 120000);
         };
 
-      // Data Audio Base64 (Anti-404 di semua laptop)
+      // Data Audio Base64
         const FL_AUDIO_URI = `""" + AUDIO_BASE64_DATA + """`;
         let audioCtx = null;
-        let globalFLAudio = null;
+        let flAudioBuffer = null;
 
-        // Pemutar Suara Permintaan FL
-        window.playFLSound = function() {
-            try {
+        // Fungsi Pre-Decode Audio ke Web Audio Buffer (Kunci agar tidak diblokir browser saat WebSocket masuk)
+        function initAudioBuffer() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            if (!flAudioBuffer) {
                 let source = (FL_AUDIO_URI && FL_AUDIO_URI.length > 50) ? FL_AUDIO_URI : '/static/mas_ambilin_dong.mp3';
-                if (!globalFLAudio) {
-                    globalFLAudio = new Audio(source);
-                } else {
-                    globalFLAudio.src = source;
+                fetch(source)
+                    .then(response => response.arrayBuffer())
+                    .then(buffer => audioCtx.decodeAudioData(buffer))
+                    .then(decoded => {
+                        flAudioBuffer = decoded;
+                        console.log("✅ Audio 'Mas ambilin dong' tersimpan di memori browser laptop ini!");
+                    })
+                    .catch(e => console.warn("Fallback WebAudio:", e));
+            }
+        }
+
+        // Buka izin audio permanen begitu user mengklik tombol atau layar
+        window.addEventListener('click', initAudioBuffer);
+
+        // Pemutar Suara Kebal Blokir Autoplay
+        window.playFLSound = function() {
+            console.log("🔊 Menerima perintah putar suara FL...");
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            // Jika buffer audio sudah siap -> Putar langsung tanpa kena blokir Chrome
+            if (flAudioBuffer) {
+                try {
+                    let sourceNode = audioCtx.createBufferSource();
+                    sourceNode.buffer = flAudioBuffer;
+                    sourceNode.connect(audioCtx.destination);
+                    sourceNode.start(0);
+                    console.log("✅ Berhasil memutar 'Mas ambilin dong' via AudioBuffer!");
+                    return;
+                } catch(err) {
+                    console.warn("Buffer play failed:", err);
                 }
-                
-                let playPromise = globalFLAudio.play();
-                if (playPromise !== undefined) {
-                    playPromise.then(function() {
-                        console.log("✅ Berhasil memutar MP3 'Mas ambilin dong'");
-                    }).catch(function(err) {
-                        console.warn("Gagal memutar audio MP3, beralih ke suara sistem:", err);
-                        window.playVoiceTTS();
-                    });
-                }
+            }
+
+            // Alternatif kedua: HTML5 Audio
+            try {
+                let fallbackAudio = new Audio((FL_AUDIO_URI && FL_AUDIO_URI.length > 50) ? FL_AUDIO_URI : '/static/mas_ambilin_dong.mp3');
+                fallbackAudio.play().catch(() => window.playVoiceTTS());
             } catch(e) {
-                console.warn("Error Audio:", e);
                 window.playVoiceTTS();
             }
         };
 
-        // Fallback Suara Manusia (TTS Browser) jika MP3 diblokir
+        // Fallback Suara Manusia bawaan browser
         window.playVoiceTTS = function() {
             try {
                 if ('speechSynthesis' in window) {
                     window.speechSynthesis.cancel();
                     let msg = new SpeechSynthesisUtterance("Mas, ambilin dong!");
                     msg.lang = "id-ID";
-                    msg.rate = 1.0;
                     window.speechSynthesis.speak(msg);
                 } else {
                     window.playBeepTone();
@@ -283,12 +314,8 @@ CUSTOM_HEAD = ui.head_content(
         // Fallback nada bel
         window.playBeepTone = function() {
             try {
-                if (!audioCtx) {
-                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                }
-                if (audioCtx.state === 'suspended') {
-                    audioCtx.resume();
-                }
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
                 let osc = audioCtx.createOscillator();
                 let gain = audioCtx.createGain();
                 osc.connect(gain);
@@ -301,11 +328,11 @@ CUSTOM_HEAD = ui.head_content(
             } catch(e) {}
         };
 
-        // 🌟 PENANGKAP SINYAL RESMI DARI SERVER PYTHON (INI YANG SEBELUMNYA KURANG)
+        // 🌟 PENANGKAP SINYAL SUPABASE RESMI DARI APP.PY
         function initFLSoundListener() {
             if (window.Shiny && window.Shiny.addCustomMessageHandler) {
                 Shiny.addCustomMessageHandler('trigger_fl_sound', function(message) {
-                    console.log("📢 Sinyal pesanan baru diterima dari server:", message);
+                    console.log("🚨 [WEBSOCKET] Ada barang baru dari Supabase:", message);
                     window.playFLSound();
                 });
             } else {
@@ -313,20 +340,7 @@ CUSTOM_HEAD = ui.head_content(
             }
         }
         initFLSoundListener();
-
-        // Buka gembok izin audio otomatis saat layar disentuh/diklik
-        window.addEventListener('click', function unlockAudio() {
-            if (!globalFLAudio) {
-                let source = (FL_AUDIO_URI && FL_AUDIO_URI.length > 50) ? FL_AUDIO_URI : '/static/mas_ambilin_dong.mp3';
-                globalFLAudio = new Audio(source);
-            }
-            if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            if (audioCtx.state === 'suspended') {
-                audioCtx.resume();
-            }
-        }, { once: true });
+        
         // AMAN: Tunggu DOMContentLoaded agar document.body tidak NULL saat di-observe
         document.addEventListener("DOMContentLoaded", function() {
             if (document.body) {

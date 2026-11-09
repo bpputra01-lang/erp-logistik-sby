@@ -40,8 +40,9 @@ def server(input: Inputs, output: Outputs, session: Session):
         try:
             client = get_supabase()
             if client:
-                res = client.table("jezpro_fl_requests").select("*").order("id", desc=True).limit(20).execute()
-                if res and res.data:
+                # 🌟 Wajib urutkan berdasarkan created_at desc agar barang paling baru SELALU di indeks 0
+                res = client.table("jezpro_fl_requests").select("*").order("created_at", desc=True).limit(20).execute()
+                if res and res.data and len(res.data) > 0:
                     cards = []
                     for row in res.data:
                         tgl_str = str(row.get("created_at", "-"))[:19].replace("T", " ")
@@ -58,32 +59,26 @@ def server(input: Inputs, output: Outputs, session: Session):
                     state.fl_last_check_time.set(datetime.now().strftime("%H:%M:%S"))
 
                     first_row = res.data[0]
-                    # 🌟 Ambil ID unik yang benar-benar ada di tabel Supabase
-                    newest_id = str(first_row.get("id") or first_row.get("req_id") or first_row.get("created_at") or "")
-                    
-                    # 🔊 JIKA ADA BARANG BARU MASUK -> PERINTAHKAN BROWSER LAPTOP CLIENT BERBUNYI
+                    # Gabungkan ID dan Timestamp agar perubahannya 100% unik
+                    newest_id = str(first_row.get("req_id") or first_row.get("id")) + "_" + str(first_row.get("created_at"))
+
+                    # 🔊 JIKA ADA BARANG BARU MASUK -> PERINTAHKAN SEMUA BROWSER LAPTOP BERBUNYI
                     if _last_seen_fl_id() is not None and newest_id != _last_seen_fl_id():
-                        print(f"📢 [SERVER] Mengirim sinyal bunyi ke semua laptop untuk barang: {first_row.get('article_name')}")
+                        art_name = first_row.get("article_name", "Barang Baru")
+                        pic_name = first_row.get("pic", "Tim FL")
+                        print(f"\n📢 [SERVER -> LAPTOP CLIENT] BARANG BARU: {art_name} oleh {pic_name}! Mengirim sinyal bunyi...")
+
+                        # Kirim sinyal resmi Shiny ke browser client
                         await session.send_custom_message("trigger_fl_sound", {
                             "id": newest_id,
-                            "article": first_row.get("article_name", "Barang Baru")
+                            "article": art_name,
+                            "pic": pic_name
                         })
-                        ui.notification_show(f"🚨 Barang Baru: {first_row.get('article_name')}", type="warning", duration=6)
-
-                    _last_seen_fl_id.set(newest_id)
-                    
-                    # 🔊 JIKA ADA BARANG BARU MASUK -> PERINTAHKAN BROWSER LAPTOP CLIENT BERBUNYI
-                    if _last_seen_fl_id() is not None and newest_id != _last_seen_fl_id():
-                        # Kirim custom message resmi ke JavaScript laptop client
-                        await session.send_custom_message("trigger_fl_sound", {
-                            "id": str(newest_id),
-                            "article": res.data[0].get("article_name")
-                        })
-                        ui.notification_show(f"🚨 Barang Baru: {res.data[0].get('article_name')}", type="warning", duration=6)
+                        ui.notification_show(f"🚨 Barang Baru: {art_name} ({pic_name})", type="warning", duration=6)
 
                     _last_seen_fl_id.set(newest_id)
         except Exception as e:
-            print("Error polling FL:", e)
+            print("⚠️ Error polling FL:", e)
                 # Modal Dismiss Listeners
     @reactive.Effect
     @reactive.event(input.close_success_modal_event)
