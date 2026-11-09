@@ -3256,15 +3256,15 @@ def sidebar(state: AppState):
     if not state.sidebar_open():
         return ui.div(ui.tags.button(ui.tags.i(class_="fa-solid fa-bars", style="font-size: 18px; color: #FFFFFF;"), onclick="Shiny.setInputValue('btn_toggle_sidebar', Math.random(), {priority: 'event'})", style="background: transparent; border: none; cursor: pointer; padding: 0.5rem; border-radius: 6px;"), style="width: 60px; min-width: 60px; padding: 1rem 0.5rem; background: #111318; border-right: 1px solid #2D3748; height: 100vh; display: flex; flex-direction: column; align-items: center;")
 
-# 🌟 PENGAMAN MUTLAK: Jika akunnya 'hub' atau 'toko', paksa sales_items jadi kosong []
+    monitoring_items = state.get_menu_monitoring()
+    
+    # 🌟 PENGAMAN MUTLAK: Paksa kosongkan sales_items jika user adalah hub atau toko
     uname = state.username().lower()
     if uname in ["hub", "toko"]:
         sales_items = []
     else:
         sales_items = state.get_menu_sales()
-        
-    monitoring_items = state.get_menu_monitoring()
-    sales_items = state.get_menu_sales()
+
     auditor_items = state.get_menu_auditor()
     operational_items = state.get_menu_operational()
     inventory_items = state.get_menu_inventory()
@@ -3284,7 +3284,7 @@ def sidebar(state: AppState):
             )
         )
 
-    # 🌟 HANYA MUNCUL JIKA ADA ISINYA (Admin/DC), jika Hub/Toko (kosong []) maka di-skip total
+    # 🌟 Karena sales_items dipaksa [] untuk hub/toko, blok ini otomatis di-skip total oleh Python
     if sales_items:
         sections.append(
             ui.div(
@@ -3297,7 +3297,6 @@ def sidebar(state: AppState):
             )
         )
 
-    # 🌟 HANYA MUNCUL JIKA ADA ISINYA (Admin/DC)
     if auditor_items:
         sections.append(
             ui.div(
