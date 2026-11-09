@@ -785,7 +785,7 @@ class AppState:
         if uname in ["admin"]:
             return ["Warehouse Inventory Audit", "Warehouse Compliance Audit"]
         return []
-        
+
     def get_menu_operational(self) -> list[str]:
         uname = self.username().lower()
         if uname == "hub":
@@ -7724,7 +7724,7 @@ class AppState:
 
             time.sleep(2.5)
 
-def process_refill_shelving(self, file_info):
+    def process_refill_shelving(self, file_info):
         try:
             if not file_info:
                 return False, "File Stock wajib diupload!"
