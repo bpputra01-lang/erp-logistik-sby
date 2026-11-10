@@ -7383,26 +7383,29 @@ class AppState:
     # METODE INSTOCK VALIDATION (URUT TERBARU DI ATAS, ABAIKAN TOKO & DONE, TAB 3 5-KOLOM)
     # --------------------------------------------------------------------------
     def load_instock_daily_from_supabase(self):
-        """Memuat antrean barang terbaru dari Supabase dan inisialisasi Tab 1 & Tab 3"""
+        """Memuat antrean barang terbaru dari Supabase secara cepat dan aman (Anti-Hang)"""
         try:
             client = get_supabase()
             if not client:
+                self.iv_processed.set(True)
                 return False, "Koneksi ke Supabase gagal!"
 
             today_str = datetime.now(WIB).strftime("%Y-%m-%d")
 
-            res = client.table("jezpro_instock_daily").select("*").eq("sync_date", today_str).execute()
+            # 🌟 1. Ambil data hari ini maksimal 300 baris terbaru saja
+            res = client.table("jezpro_instock_daily").select("*").eq("sync_date", today_str).order("id", desc=True).limit(300).execute()
             all_data = res.data if res and hasattr(res, "data") and res.data else []
 
+            # 🌟 2. Jika hari ini kosong, ambil 150 data terakhir saja (JANGAN SELECT * SEMUA TABEL)
             if not all_data:
-                res_all = client.table("jezpro_instock_daily").select("*").execute()
+                res_all = client.table("jezpro_instock_daily").select("*").order("id", desc=True).limit(150).execute()
                 all_data = res_all.data if res_all and hasattr(res_all, "data") and res_all.data else []
 
             if not all_data:
                 self.iv_instock_data.set([])
                 self.iv_done_data.set([])
                 self.iv_tab1_pending.set([])
-                self.iv_tab3_scanned.set([]) # Tab 3 kosong
+                self.iv_tab3_scanned.set([])
                 self.iv_processed.set(True)
                 return True, "Data di Supabase masih kosong."
 

@@ -95,6 +95,26 @@ CUSTOM_HEAD = ui.head_content(
                 else window.location.hash = '#' + slug;
             } catch(e) {}
         };
+    /* 🌟 CEGAH LAYAR MENJADI ABU-ABU/REDUP SAAT WEBSOCKET RECONNECT */
+        #shiny-disconnected-overlay {
+            display: none !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
+        
+        .shiny-disconnected {
+            opacity: 1 !important;
+            filter: none !important;
+        }
+        // Otomatis sambungkan ulang jika server sempat berkedip tanpa perlu refresh manual
+        $(document).on('shiny:disconnected', function() {
+            console.log("Koneksi sempat terputus, menyambungkan kembali otomatis...");
+            setTimeout(function() {
+                if (window.Shiny && Shiny.shinyapp && Shiny.shinyapp.reconnect) {
+                    Shiny.shinyapp.reconnect();
+                }
+            }, 1000);
+        });
 
         // --- 2. GEMBOK OTOMATIS JUDUL & FAVICON ---
         function setBrandTab() {
