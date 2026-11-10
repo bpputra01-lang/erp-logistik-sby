@@ -5730,16 +5730,16 @@ def server(input: Inputs, output: Outputs, session: Session):
             if not state.iv_processed():
                 state.load_instock_daily_from_supabase()
 
-    # 2. Listener Refresh Instock Supabase (Tombol Refresh)
+    # ✅ HANYA DENGARKAN btn_run_transit_instock
     @reactive.Effect
-    @reactive.event(input.btn_refresh_iv_supabase, input.btn_run_transit_instock)
+    @reactive.event(input.btn_run_transit_instock)
     def _on_refresh_iv():
         succ, msg = state.load_instock_daily_from_supabase()
         ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
         if succ:
             ui.notification_show(f"✅ {msg}", type="message", duration=3)
         else:
-            ui.notification_show(f"⚠️ {msg}", type="warning", duration=4)
+            ui.notification_show(f"⚠️ {msg}", type="warning", duration=5)
 
     # 3. Listener Perubahan Filter Waktu
     @reactive.Effect

@@ -7375,16 +7375,26 @@ class AppState:
                 self.iv_processed.set(True)
                 return False, "Koneksi ke Supabase gagal!"
 
-            today_str = datetime.now(WIB).strftime("%Y-%m-%d")
+            all_data = []
 
-            # 🌟 1. Ambil data hari ini maksimal 300 baris terbaru saja
-            res = client.table("jezpro_instock_daily").select("*").eq("sync_date", today_str).order("id", desc=True).limit(300).execute()
-            all_data = res.data if res and hasattr(res, "data") and res.data else []
+            # 1. Coba query dengan tanggal hari ini
+            try:
+                today_str = datetime.now(WIB).strftime("%Y-%m-%d")
+                res = client.table("jezpro_instock_daily").select("*").eq("sync_date", today_str).limit(300).execute()
+                if res and hasattr(res, "data") and res.data:
+                    all_data = res.data
+            except Exception as e_date:
+                print("Query sync_date dilewati:", e_date)
 
-            # 🌟 2. Jika hari ini kosong, ambil 150 data terakhir saja (JANGAN SELECT * SEMUA TABEL)
+            # 2. Jika hari ini kosong atau error, ambil data terbaru langsung
             if not all_data:
-                res_all = client.table("jezpro_instock_daily").select("*").order("id", desc=True).limit(150).execute()
-                all_data = res_all.data if res_all and hasattr(res_all, "data") and res_all.data else []
+                try:
+                    res_all = client.table("jezpro_instock_daily").select("*").limit(200).execute()
+                    if res_all and hasattr(res_all, "data") and res_all.data:
+                        all_data = res_all.data
+                except Exception as e_all:
+                    print("Query fallback gagal:", e_all)
+                    return False, f"Tabel Supabase error: {e_all}"
 
             if not all_data:
                 self.iv_instock_data.set([])
@@ -7395,13 +7405,13 @@ class AppState:
                 return True, "Data di Supabase masih kosong."
 
             df_all = pd.DataFrame(all_data)
-            if "created_at" in df_all.columns:
-                df_all["_sort_dt"] = pd.to_datetime(df_all["created_at"], errors='coerce')
-                df_all = df_all.sort_values(by=["_sort_dt", "id"], ascending=[False, False])
-            elif "id" in df_all.columns:
-                df_all = df_all.sort_values(by="id", ascending=False)
+            
+            # Pengurutan aman tanpa ketergantungan kolom 'id'
+            sort_cols = [c for c in ["created_at", "disappeared_at", "id"] if c in df_all.columns]
+            if sort_cols:
+                df_all = df_all.sort_values(by=sort_cols[0], ascending=False)
 
-            all_data = df_all.head(500).to_dict(orient="records")
+            all_data = df_all.to_dict(orient="records")
             now_jakarta = pd.Timestamp.now(tz='Asia/Jakarta')
 
             def format_to_wib_time(ts_val):
@@ -7425,34 +7435,28 @@ class AppState:
                     return max(0.0, (now_jakarta - dt).total_seconds() / 60.0)
                 except Exception: return 999999.0
 
-            def get_sort_datetime(r):
-                ts = r.get("disappeared_at") or r.get("created_at")
-                if not ts or str(ts).strip() in ["", "-", "None", "nan"]: return pd.Timestamp.min
-                try:
-                    dt = pd.to_datetime(ts)
-                    if dt.tzinfo is not None: dt = dt.tz_convert('Asia/Jakarta').tz_localize(None)
-                    return dt
-                except Exception: return pd.Timestamp.min
+            # 🌟 Pengecekan Status fleksibel (tidak peka huruf besar/kecil)
+            need_setup_raw = []
+            done_setup_raw = []
+            for x in all_data:
+                st = str(x.get("status", x.get("waiting_status", ""))).strip().upper()
+                if "DONE" in st:
+                    done_setup_raw.append(x)
+                else:
+                    need_setup_raw.append(x)
 
-            need_setup_raw = [x for x in all_data if x.get("status") == "NEED_SETUP"]
-            done_setup_raw = [x for x in all_data if x.get("status") == "DONE_SETUP"]
             done_ids = set(str(d.get("id")) for d in done_setup_raw if d.get("id"))
-
-            need_setup_sorted = sorted(need_setup_raw, key=lambda x: (get_sort_datetime(x), safe_int(x.get("id", 0))), reverse=True)
-            done_setup_sorted = sorted(done_setup_raw, key=lambda x: (get_sort_datetime(x), safe_int(x.get("id", 0))), reverse=True)
-
             filter_waktu_mode = self.iv_filter_waktu() if hasattr(self, "iv_filter_waktu") else "BARUSAN_5"
 
             valid_need_setup = []
-            for r in need_setup_sorted:
+            for r in need_setup_raw:
                 r_id = str(r.get("id"))
-                if r.get("status") == "DONE_SETUP" or r.get("setup_done_at") or (r_id and r_id in done_ids):
+                if r.get("setup_done_at") or (r_id and r_id in done_ids):
                     continue
 
-                raw_bin = str(r.get("bin_code", "-")).replace("[", "").replace("]", "").strip().upper()
+                raw_bin = str(r.get("bin_code", r.get("bin", "-"))).replace("[", "").replace("]", "").strip().upper()
                 bin_awal = raw_bin if raw_bin not in ["WAITING OFFLINE", "-", ""] else "STAGING INBOUND"
 
-                # 🌟 FILTER BARU: Buang / lewati jika BIN Awal adalah TOKO atau mengandung kata TOKO
                 if "TOKO" in bin_awal:
                     continue
 
@@ -7463,17 +7467,15 @@ class AppState:
 
                 valid_need_setup.append(r)
 
-            # 🌟 INISIALISASI LIST: Tab 1 berisi semua antrean, Tab 3 KOSONG saat awal load
             self.iv_tab1_pending.set(valid_need_setup)
             self.iv_tab3_scanned.set([])
-            self.iv_done_data.set(done_setup_sorted)
+            self.iv_done_data.set(done_setup_raw)
 
-            # Panggil helper untuk generate tabel Tab 1 & Tab 3
             self._refresh_iv_dataframes_from_lists()
 
             # Generate Tab 2 (Done Setup)
             done_records = []
-            for r in done_setup_sorted:
+            for r in done_setup_raw:
                 q_done = safe_int(r.get("qty", 1), 1)
                 done_time = format_to_wib_time(r.get("setup_done_at"))
                 dis_time = format_to_wib_time(r.get("disappeared_at"))
@@ -7484,23 +7486,24 @@ class AppState:
                     "JAM MUTASI SELESAI": done_time,
                     "SKU": sku_clean,
                     "NAMA ARTIKEL": str(r.get("article_name", "-")),
-                    "BIN AWAL": str(r.get("bin_code", "-")).replace("[", "").replace("]", "").strip().upper(),
+                    "BIN AWAL": str(r.get("bin_code", r.get("bin", "-"))).replace("[", "").replace("]", "").strip().upper(),
                     "BIN TUJUAN": "GL1-INSTOCK",
                     "QUANTITY": q_done,
                     "STATUS": "✅ TERVERIFIKASI JEZPRO"
                 })
 
             df_done = pd.DataFrame(done_records)
-            tot_done = sum(safe_int(x.get("qty", 1), 1) for x in done_setup_sorted)
+            tot_done = sum(safe_int(x.get("qty", 1), 1) for x in done_setup_raw)
             self.iv_total_done_qty.set(tot_done)
             self._raw_df_iv_done = df_done
             self.df_iv_done_headers.set(df_done.columns.tolist() if not df_done.empty else [])
             self.df_iv_done_rows.set(df_done.fillna("").astype(str).values.tolist() if not df_done.empty else [])
 
             self.iv_processed.set(True)
-            return True, f"Sinkronisasi berhasil! ({len(valid_need_setup)} Butuh Setup, {len(done_setup_sorted)} Selesai)"
+            return True, f"Sinkronisasi berhasil! ({len(valid_need_setup)} Butuh Setup, {len(done_setup_raw)} Selesai)"
         except Exception as e:
             print("Error load_instock_daily_from_supabase:", e)
+            self.iv_processed.set(True)
             return False, f"Gagal memuat data: {e}"
 
     def move_instock_sku_to_mutasi(self, sku_input: str):
