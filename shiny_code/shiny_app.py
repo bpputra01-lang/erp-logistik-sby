@@ -59,10 +59,9 @@ def server(input: Inputs, output: Outputs, session: Session):
                 _is_fl_polling[0] = False
                 return
 
-            # MENJADI INI (Hanya ambil 20 request terakhir agar super ringan dan tidak membuat hang):
             def fetch_data():
-                return client.table("jezpro_fl_requests").select("*").order("id", desc=True).limit(20).execute()
-                
+                return client.table("jezpro_fl_requests").select("*").execute()
+
             # ⏱️ 4. Beri batas timeout 2.5 detik agar jika Supabase lambat, app tidak ikut menggantung
             res = await asyncio.wait_for(asyncio.to_thread(fetch_data), timeout=2.5)
             raw_data = res.data if res and hasattr(res, "data") and res.data else []
