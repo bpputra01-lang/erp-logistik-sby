@@ -3224,7 +3224,24 @@ def permintaan_fl_view(state: AppState):
                 ui.tags.button(
                     "🔊 TEST SUARA LAPTOP INI",
                     type="button",
-                    onclick="window.playFLSound();",
+                    onclick="""
+                        try {
+                            if (typeof window.playFLSound === 'function') {
+                                window.playFLSound();
+                            } else {
+                                let msg = new SpeechSynthesisUtterance('Mas, ambilin dong!');
+                                msg.lang = 'id-ID';
+                                msg.pitch = 1.35;
+                                msg.rate = 1.05;
+                                window.speechSynthesis.speak(msg);
+                            }
+                        } catch(e) {
+                            console.error('Test audio error:', e);
+                            let msg = new SpeechSynthesisUtterance('Mas, ambilin dong!');
+                            msg.lang = 'id-ID';
+                            window.speechSynthesis.speak(msg);
+                        }
+                    """,
                     style="background: #10B981; color: white; font-weight: 800; font-size: 11px; padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer; margin-right: 8px;"
                 ),
                 ui.span("🟢 SUARA AKTIF", style="background: #C6F6D5; color: #22543D; font-weight: 800; font-size: 11px; padding: 6px 14px; border-radius: 20px; border: 1px solid #9AE6B4;"),
