@@ -234,9 +234,9 @@ CUSTOM_HEAD = ui.head_content(
             }, 8000);
         };
 
-      // Pemutar Suara Kebal Blokir Autoplay (SUDAH DIBOOST 2.8x LEBIH KERAS)
+      // Pemutar Suara Kebal Blokir Autoplay & Anti-Macet (Volume Boosted)
         window.playFLSound = function() {
-            console.log("🔊 Menerima perintah putar suara FL (Booster Mode)...");
+            console.log("🔊 Menerima perintah putar suara FL...");
             if (!audioCtx) {
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             }
@@ -244,62 +244,50 @@ CUSTOM_HEAD = ui.head_content(
                 audioCtx.resume();
             }
 
-            // Jika buffer audio sudah siap -> Boost volume via GainNode & Compressor
+            // 1. Putar via Web Audio Buffer + Gain Booster Langsung ke Speaker
             if (flAudioBuffer) {
                 try {
                     let sourceNode = audioCtx.createBufferSource();
-                    sourceNode.buffer = flAudioBuffer;
-
-                    // 1. BOOSTER VOLUME (2.8x / 280% lebih keras)
                     let gainNode = audioCtx.createGain();
-                    gainNode.gain.setValueAtTime(2.8, audioCtx.currentTime);
-
-                    // 2. COMPRESSOR (Menjaga suara tetap jernih dan tidak pecah saat keras)
-                    let compressor = audioCtx.createDynamicsCompressor();
-                    compressor.threshold.setValueAtTime(-12, audioCtx.currentTime);
-                    compressor.knee.setValueAtTime(30, audioCtx.currentTime);
-                    compressor.ratio.setValueAtTime(12, audioCtx.currentTime);
-                    compressor.attack.setValueAtTime(0.003, audioCtx.currentTime);
-                    compressor.release.setValueAtTime(0.25, audioCtx.currentTime);
-
-                    // Alur koneksi: Source -> Booster Gain -> Compressor -> Speaker
+                    
+                    sourceNode.buffer = flAudioBuffer;
+                    gainNode.gain.value = 3.0; // 👈 Naikkan volume 300% (3x lipat)
+                    
+                    // Langsung sambung ke speaker (tanpa compressor yang bikin macet)
                     sourceNode.connect(gainNode);
-                    gainNode.connect(compressor);
-                    compressor.connect(audioCtx.destination);
-
+                    gainNode.connect(audioCtx.destination);
+                    
                     sourceNode.start(0);
-                    console.log("✅ Berhasil memutar 'Mas ambilin dong' dengan volume keras!");
+                    console.log("✅ Berhasil memutar via AudioBuffer (Volume 3x)!");
                     return;
                 } catch(err) {
-                    console.warn("Buffer play failed:", err);
+                    console.warn("Buffer boost failed, fallback ke HTML5:", err);
                 }
             }
 
-            // Alternatif kedua: HTML5 Audio
+            // 2. Fallback HTML5 Audio jika buffer belum siap
             try {
-                let fallbackAudio = new Audio((FL_AUDIO_URI && FL_AUDIO_URI.length > 50) ? FL_AUDIO_URI : '/static/mas_ambilin_dong.mp3');
+                let audioSrc = (FL_AUDIO_URI && FL_AUDIO_URI.length > 50) ? FL_AUDIO_URI : '/static/mas_ambilin_dong.mp3';
+                let fallbackAudio = new Audio(audioSrc);
                 fallbackAudio.volume = 1.0;
-                fallbackAudio.play().catch(() => window.playVoiceTTS());
+                fallbackAudio.play().catch(function() {
+                    window.playVoiceTTS();
+                });
             } catch(e) {
                 window.playVoiceTTS();
             }
         };
 
-        // Fallback Suara Manusia bawaan browser (WANITA LEBIH LANTANG & TEGAS)
+        // Fallback Suara Wanita Melengking & Lantang
         window.playVoiceTTS = function() {
             try {
                 if ('speechSynthesis' in window) {
                     window.speechSynthesis.cancel();
                     let msg = new SpeechSynthesisUtterance("Mas, ambilin dong!");
                     msg.lang = "id-ID";
-                    msg.volume = 1.0;   // Volume maksimal
-                    msg.pitch = 1.35;   // Nada suara dinaikkan agar lebih melengking/lantang
-                    msg.rate = 1.05;    // Sedikit lebih cepat & tegas
-                    
-                    let voices = window.speechSynthesis.getVoices();
-                    let idVoice = voices.find(v => v.lang.includes("id") || v.lang.includes("ID"));
-                    if (idVoice) msg.voice = idVoice;
-
+                    msg.volume = 1.0; 
+                    msg.pitch = 1.4;  // 👈 Ditinggikan agar suara wanita lebih cempreng & terdengar jelas
+                    msg.rate = 1.1;   // 👈 Sedikit dipercepat agar tegas seperti di toko
                     window.speechSynthesis.speak(msg);
                 } else {
                     window.playBeepTone();
