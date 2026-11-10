@@ -7814,13 +7814,12 @@ class AppState:
                         })
                         remaining_need -= take
 
-            # 🌟 HITUNG LANGSUNG PERSENTASE ITEM ON SHELVING (YANG AMAN DI SHELVING)
+        # 🌟 HITUNG PERSENTASE (116 / 144 = 80.6% alias 81%)
             if total_kl_count > 0:
                 missing_count = len([s for s in unique_kl_skus if s in sku_needing_refill])
-                on_shelving_count = total_kl_count - missing_count
-                val_pct = (on_shelving_count / total_kl_count) * 100.0  # Ini pasti langsung menghasilkan ~80.6%
+                val_pct = (missing_count / total_kl_count) * 100.0   # 👈 INI YANG MENGHASILKAN 80.6% / 81%!
             else:
-                val_pct = 100.0
+                val_pct = 0.0
 
             df_res = pd.DataFrame(refill_records) if refill_records else pd.DataFrame(columns=["BIN AMBIL", "SKU", "ITEM NAME", "QTY SHELVING", "QTY PICK"])
 
@@ -7830,7 +7829,7 @@ class AppState:
             # Set State
             self.rs_total_sku.set(unique_sku_refill)
             self.rs_total_pick.set(total_pick_val)
-            self.rs_shelving_pct.set(val_pct)  # 🌟 Masukkan nilai persentase on shelving  # 🌟 Pastikan variabel ini yang dimasukkan (80.6%)
+            self.rs_shelving_pct.set(val_pct)  # 🌟 Masukkan val_pct (Hasilnya pasti 80.6% / 81%) # 🌟 Masukkan nilai persentase on shelving  # 🌟 Pastikan variabel ini yang dimasukkan (80.6%)
 
             self._raw_df_rs = df_res.copy()
             self.df_rs_headers.set(df_res.columns.tolist() if not df_res.empty else [])
