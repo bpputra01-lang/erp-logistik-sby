@@ -5920,5 +5920,6 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         yield buf.getvalue()
 
+from pathlib import Path
 
-    
+app = App(app_ui, server)
