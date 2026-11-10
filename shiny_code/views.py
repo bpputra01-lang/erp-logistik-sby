@@ -234,49 +234,39 @@ CUSTOM_HEAD = ui.head_content(
             }, 8000);
         };
 
-      // Pemutar Suara Kebal Blokir Autoplay & Anti-Macet (Volume Boosted)
-        window.playFLSound = function() {
-            console.log("🔊 Menerima perintah putar suara FL...");
-            if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            if (audioCtx.state === 'suspended') {
-                audioCtx.resume();
-            }
+      // =====================================================================
+        // AUDIO CONTROLLER (SELF-CONTAINED & BOOSTER 300%)
+        // =====================================================================
+        window.audioCtx = window.audioCtx || null;
+        window.flAudioBuffer = window.flAudioBuffer || null;
+        const FL_AUDIO_URI = `""" + AUDIO_BASE64_DATA + """`;
 
-            // 1. Putar via Web Audio Buffer + Gain Booster Langsung ke Speaker
-            if (flAudioBuffer) {
-                try {
-                    let sourceNode = audioCtx.createBufferSource();
-                    let gainNode = audioCtx.createGain();
-                    
-                    sourceNode.buffer = flAudioBuffer;
-                    gainNode.gain.value = 3.0; // 👈 Naikkan volume 300% (3x lipat)
-                    
-                    // Langsung sambung ke speaker (tanpa compressor yang bikin macet)
-                    sourceNode.connect(gainNode);
-                    gainNode.connect(audioCtx.destination);
-                    
-                    sourceNode.start(0);
-                    console.log("✅ Berhasil memutar via AudioBuffer (Volume 3x)!");
-                    return;
-                } catch(err) {
-                    console.warn("Buffer boost failed, fallback ke HTML5:", err);
-                }
-            }
-
-            // 2. Fallback HTML5 Audio jika buffer belum siap
+        // Inisialisasi Audio Buffer Mandiri
+        window.initAudioBuffer = function() {
             try {
-                let audioSrc = (FL_AUDIO_URI && FL_AUDIO_URI.length > 50) ? FL_AUDIO_URI : '/static/mas_ambilin_dong.mp3';
-                let fallbackAudio = new Audio(audioSrc);
-                fallbackAudio.volume = 1.0;
-                fallbackAudio.play().catch(function() {
-                    window.playVoiceTTS();
-                });
+                if (!window.audioCtx) {
+                    window.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (window.audioCtx.state === 'suspended') {
+                    window.audioCtx.resume();
+                }
+                if (!window.flAudioBuffer) {
+                    let source = (FL_AUDIO_URI && FL_AUDIO_URI.length > 50) ? FL_AUDIO_URI : '/static/mas_ambilin_dong.mp3';
+                    fetch(source)
+                        .then(response => response.arrayBuffer())
+                        .then(buffer => window.audioCtx.decodeAudioData(buffer))
+                        .then(decoded => {
+                            window.flAudioBuffer = decoded;
+                            console.log("✅ Buffer audio tersimpan di memori browser.");
+                        })
+                        .catch(e => console.warn("Fetch audio buffer fallback:", e));
+                }
             } catch(e) {
-                window.playVoiceTTS();
+                console.warn("Init audio error:", e);
             }
         };
+
+        window.addEventListener('click', window.initAudioBuffer, { once: true });
 
         // Fallback Suara Wanita Melengking & Lantang
         window.playVoiceTTS = function() {
@@ -286,16 +276,90 @@ CUSTOM_HEAD = ui.head_content(
                     let msg = new SpeechSynthesisUtterance("Mas, ambilin dong!");
                     msg.lang = "id-ID";
                     msg.volume = 1.0; 
-                    msg.pitch = 1.4;  // 👈 Ditinggikan agar suara wanita lebih cempreng & terdengar jelas
-                    msg.rate = 1.1;   // 👈 Sedikit dipercepat agar tegas seperti di toko
+                    msg.pitch = 1.4;  // Ditinggikan agar cempreng dan terdengar jelas
+                    msg.rate = 1.05;  // Tegas dan cepat
                     window.speechSynthesis.speak(msg);
-                } else {
+                } else if (typeof window.playBeepTone === 'function') {
                     window.playBeepTone();
                 }
             } catch(e) {
-                window.playBeepTone();
+                console.warn("TTS error:", e);
             }
         };
+
+        // Pemutar Suara FL (Dengan Booster Volume 300%)
+        window.playFLSound = function() {
+            console.log("🔊 Menerima perintah putar suara FL...");
+            try {
+                if (!window.audioCtx) {
+                    window.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (window.audioCtx.state === 'suspended') {
+                    window.audioCtx.resume();
+                }
+
+                // 1. Putar via AudioBuffer jika sudah siap (dengan pengeras suara 3.0x)
+                if (window.flAudioBuffer) {
+                    let sourceNode = window.audioCtx.createBufferSource();
+                    let gainNode = window.audioCtx.createGain();
+                    
+                    gainNode.gain.value = 3.0; // Volume diperkeras 300%
+                    sourceNode.buffer = window.flAudioBuffer;
+                    
+                    sourceNode.connect(gainNode);
+                    gainNode.connect(window.audioCtx.destination);
+                    
+                    sourceNode.start(0);
+                    console.log("✅ Berhasil memutar via AudioBuffer (Volume 300%)");
+                    return;
+                }
+            } catch(err) {
+                console.warn("WebAudio context error, beralih ke fallback:", err);
+            }
+
+            // 2. Fallback HTML5 Audio jika buffer belum selesai decode
+            try {
+                let audioSrc = (FL_AUDIO_URI && FL_AUDIO_URI.length > 50) ? FL_AUDIO_URI : '/static/mas_ambilin_dong.mp3';
+                let fallbackAudio = new Audio(audioSrc);
+                fallbackAudio.volume = 1.0;
+                let playPromise = fallbackAudio.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(() => window.playVoiceTTS());
+                }
+            } catch(e) {
+                window.playVoiceTTS();
+            }
+        };
+
+        // Fallback nada bel jika browser tidak mendukung TTS
+        window.playBeepTone = function() {
+            try {
+                if (!window.audioCtx) window.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (window.audioCtx.state === 'suspended') window.audioCtx.resume();
+                let osc = window.audioCtx.createOscillator();
+                let gain = window.audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(window.audioCtx.destination);
+                osc.type = "sine";
+                osc.frequency.setValueAtTime(880, window.audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.5, window.audioCtx.currentTime);
+                osc.start();
+                osc.stop(window.audioCtx.currentTime + 0.4);
+            } catch(e) {}
+        };
+
+        // Listener sinyal Supabase
+        function initFLSoundListener() {
+            if (window.Shiny && window.Shiny.addCustomMessageHandler) {
+                Shiny.addCustomMessageHandler('trigger_fl_sound', function(message) {
+                    console.log("🚨 [WEBSOCKET] Ada barang baru dari Supabase:", message);
+                    window.playFLSound();
+                });
+            } else {
+                setTimeout(initFLSoundListener, 300);
+            }
+        }
+        initFLSoundListener();
 
         // AMAN: Tunggu DOMContentLoaded agar document.body tidak NULL saat di-observe
         document.addEventListener("DOMContentLoaded", function() {
