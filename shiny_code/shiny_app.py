@@ -5790,35 +5790,42 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
         )
 
-        # 🌟 KOTAK INPUT / SCAN SKU (DIPROTEKSI ANTI-DOUBLE DENGAN TIMESTAMP & AUTO-CLEAR)
+        # 🌟 KOTAK INPUT / SCAN SKU (BISA DI-KLIK MAUPUN DITEKAN ENTER)
         sku_input_box = ui.div(
             ui.div(
                 ui.h4("🔍 Scan / Input SKU untuk Dipindah ke Tab 3 (Mutasi)", style="font-size: 14px; font-weight: 800; color: #1A202C; margin-bottom: 6px;"),
                 ui.div(
-                    ui.input_text("iv_sku_scan_box", None, placeholder="Scan barcode atau ketik SKU lalu tekan Enter..."),
+                    ui.input_text("iv_sku_scan_box", None, placeholder="Scan barcode atau ketik SKU lalu tekan Enter / klik Pindahkan..."),
                     ui.tags.button(
                         "PINDAHKAN",
                         id="btn_submit_iv_sku", 
+                        type="button",
+                        onclick="window.submitIvSkuScan();",  # 👈 Event klik tombol sekarang aktif
                         class_="btn-red-gradient",
                         style="padding: 8px 18px; font-size: 12px; height: 38px; white-space: nowrap; border: none; cursor: pointer;"
                     ),
                     style="display: flex; gap: 10px; align-items: center;"
                 ),
-                # Skrip JS agar Enter mengirim data unik dan membersihkan kotak seketika
+                # Skrip JS agar tombol klik & tombol Enter menjalankan fungsi yang sama
                 ui.tags.script("""
+                    window.submitIvSkuScan = function() {
+                        let inputEl = document.getElementById("iv_sku_scan_box");
+                        let val = inputEl ? inputEl.value.trim() : "";
+                        if (val !== "") {
+                            if (window.Shiny && window.Shiny.setInputValue) {
+                                Shiny.setInputValue("btn_process_iv_sku_scan", val + "_" + Date.now(), {priority: "event"});
+                            }
+                            inputEl.value = "";
+                            inputEl.focus();
+                        }
+                    };
+
                     if (!window._ivScannerListenerAdded) {
                         window._ivScannerListenerAdded = true;
                         document.addEventListener("keydown", function(event) {
                             if (event.key === "Enter" && document.activeElement && document.activeElement.id === "iv_sku_scan_box") {
                                 event.preventDefault();
-                                let inputEl = document.getElementById("iv_sku_scan_box");
-                                let val = inputEl ? inputEl.value.trim() : "";
-                                
-                                if (val !== "") {
-                                    // Tambahkan timestamp agar Shiny mendeteksi perubahan nilai unik (mencegah abaikan data kembar)
-                                    Shiny.setInputValue("btn_process_iv_sku_scan", val + "_" + Date.now(), {priority: "event"});
-                                    if (inputEl) inputEl.value = ""; // Kosongkan langsung
-                                }
+                                window.submitIvSkuScan();
                             }
                         });
                     }
