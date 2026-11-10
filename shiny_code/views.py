@@ -52,6 +52,13 @@ CUSTOM_HEAD = ui.head_content(
             }
         };
 
+        window.updateUrlMenu = function(menuName) {
+            try {
+                let slug = menuName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+                if (window.history.pushState) window.history.pushState(null, '', '#' + slug);
+                else window.location.hash = '#' + slug;
+            } catch(e) {}
+        };
         
         // --- 2. GEMBOK OTOMATIS JUDUL & FAVICON ---
         function setBrandTab() {
