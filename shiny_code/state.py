@@ -7814,15 +7814,16 @@ class AppState:
                         })
                         remaining_need -= take
 
-            # 🌟 HITUNG PERSENTASE ITEMS ON SHELVING
-            # Rumus: (Total SKU di Koli yang TIDAK perlu refill / Total SKU di Koli) * 100%
+            # 🌟 BALIK NILAINYA MENJADI BARANG YANG SUDAH ADA DI SHELVING
             if total_kl_count > 0:
                 missing_count = len([s for s in unique_kl_skus if s in sku_needing_refill])
-                not_on_shelving_pct = (missing_count / total_kl_count) * 100.0  # Persentase yang tidak ada di shelving
-                items_on_shelving_pct = max(0.0, 100.0 - not_on_shelving_pct)    # Persentase Items on Shelving
+                not_on_shelving_pct = (missing_count / total_kl_count) * 100.0  
+                items_on_shelving_pct = max(0.0, 100.0 - not_on_shelving_pct)    # Hasilnya 80.6%
             else:
                 items_on_shelving_pct = 100.0
 
+            self.rs_shelving_pct.set(items_on_shelving_pct)
+            
             df_res = pd.DataFrame(refill_records) if refill_records else pd.DataFrame(columns=["BIN AMBIL", "SKU", "ITEM NAME", "QTY SHELVING", "QTY PICK"])
 
             unique_sku_refill = len(sku_needing_refill)
