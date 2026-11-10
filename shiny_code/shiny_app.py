@@ -5793,10 +5793,15 @@ def server(input: Inputs, output: Outputs, session: Session):
         return ui.div(
             ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
             ui.h4("📋 HASIL INSTRUKSI REFILL SHELVING", style="font-size: 16px; color: #010B13; font-weight: 800; margin-bottom: 1rem;"),
+            
+            # 🌟 3 KARTU METRIK BARU
             ui.div(
-                dark_metric_box("📦 TOTAL INSTRUKSI AMBIL", f"{total_rows:,} BARIS", "#3182CE"),
+                dark_metric_box("📦 TOTAL SKU PERLU REFILL", f"{state.rs_total_sku():,} SKU", "#3182CE"),
+                dark_metric_box("🔢 TOTAL QTY PICK (PCS)", f"{state.rs_total_pick():,} PCS", "#C5A059"),
+                dark_metric_box("📊 % STOK SHELVING VS KOLI", f"{state.rs_shelving_pct():.1f}%", "#10B981"),
                 style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
             ),
+            
             ui.div(
                 ui.div(
                     ui.download_button(

@@ -655,6 +655,9 @@ class AppState:
 
         # --- REFILL SHELVING STATE ---
         self.rs_processed = reactive.Value(False)
+        self.rs_total_sku = reactive.Value(0)       # 🌟 Tambahan state SKU perlu refill
+        self.rs_total_pick = reactive.Value(0)      # 🌟 Tambahan state Qty pick total
+        self.rs_shelving_pct = reactive.Value(0.0)  # 🌟 Tambahan state persentase shelving vs koli
         self.df_rs_headers = reactive.Value([])
         self.df_rs_rows = reactive.Value([])
         self._raw_df_rs = pd.DataFrame()
@@ -7765,8 +7768,15 @@ class AppState:
             if df_clean.empty:
                 return False, "Tidak ada data valid yang dapat diproses dari file tersebut."
 
-            # Deteksi BIN yang mengandung kata 'KL'
+            # Deteksi BIN yang mengandung kata 'KL' (Koli / Reserve)
             df_clean['IS_KL'] = df_clean['BIN'].str.contains('KL', na=False, case=False)
+
+            # 🌟 HITUNG TOTAL STOK KOLI (KL) VS STOK SHELVING (NON-KL)
+            total_kl_qty = int(df_clean[df_clean['IS_KL']]['QTY_NUM'].sum())
+            total_shelving_qty = int(df_clean[~df_clean['IS_KL']]['QTY_NUM'].sum())
+            
+            # Persentase Stok Shelving terhadap Koli (KL)
+            shelving_vs_koli_pct = (total_shelving_qty / total_kl_qty * 100.0) if total_kl_qty > 0 else 0.0
 
             refill_records = []
 
@@ -7776,12 +7786,12 @@ class AppState:
                 kl_group = group[group['IS_KL']].copy()
                 shelving_group = group[~group['IS_KL']].copy()
 
-                total_kl_qty = int(kl_group['QTY_NUM'].sum())
-                total_shelving_qty = int(shelving_group['QTY_NUM'].sum())
+                total_kl_sku_qty = int(kl_group['QTY_NUM'].sum())
+                total_shelving_qty_sku = int(shelving_group['QTY_NUM'].sum())
 
                 # Kondisi: Shelving qty 0 atau 1-3, dan total stock di KL > 0
-                if (total_shelving_qty == 0 or (1 <= total_shelving_qty <= 3)) and total_kl_qty > 0:
-                    target_pick = max(1, int(round(total_kl_qty * 0.8)))
+                if (total_shelving_qty_sku == 0 or (1 <= total_shelving_qty_sku <= 3)) and total_kl_sku_qty > 0:
+                    target_pick = max(1, int(round(total_kl_sku_qty * 0.8)))
                     remaining_need = target_pick
 
                     kl_sorted = kl_group.sort_values(by='QTY_NUM', ascending=False)
@@ -7799,12 +7809,20 @@ class AppState:
                             "BIN AMBIL": bin_ambil,
                             "SKU": sku,
                             "ITEM NAME": item_name,
-                            "QTY SHELVING": total_shelving_qty, # 🌟 Menampilkan total stok di shelving saat ini
+                            "QTY SHELVING": total_shelving_qty_sku,
                             "QTY PICK": take
                         })
                         remaining_need -= take
 
             df_res = pd.DataFrame(refill_records) if refill_records else pd.DataFrame(columns=["BIN AMBIL", "SKU", "ITEM NAME", "QTY SHELVING", "QTY PICK"])
+
+            # 🌟 SET STATE METRIK BARU
+            unique_sku_refill = df_res['SKU'].nunique() if not df_res.empty else 0
+            total_pick_val = int(df_res['QTY PICK'].sum()) if not df_res.empty else 0
+
+            self.rs_total_sku.set(unique_sku_refill)
+            self.rs_total_pick.set(total_pick_val)
+            self.rs_shelving_pct.set(shelving_vs_koli_pct)
 
             self._raw_df_rs = df_res.copy()
             self.df_rs_headers.set(df_res.columns.tolist() if not df_res.empty else [])
