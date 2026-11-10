@@ -7771,14 +7771,13 @@ class AppState:
             # Deteksi BIN yang mengandung kata 'KL' (Koli / Reserve)
             df_clean['IS_KL'] = df_clean['BIN'].str.contains('KL', na=False, case=False)
 
-            # 🌟 HITUNG TOTAL STOK KOLI (KL) VS STOK SHELVING (NON-KL)
-            total_kl_qty = int(df_clean[df_clean['IS_KL']]['QTY_NUM'].sum())
-            total_shelving_qty = int(df_clean[~df_clean['IS_KL']]['QTY_NUM'].sum())
-            
-            # Persentase Stok Shelving terhadap Koli (KL)
-            shelving_vs_koli_pct = (total_shelving_qty / total_kl_qty * 100.0) if total_kl_qty > 0 else 0.0
+            # 🌟 AMBIL SEMUA SKU UNIK YANG ADA DI KOLI (KL DENGAN QTY > 0)
+            kl_skus_df = df_clean[df_clean['IS_KL'] & (df_clean['QTY_NUM'] > 0)]
+            unique_kl_skus = kl_skus_df['SKU'].unique()
+            total_kl_count = len(unique_kl_skus)
 
             refill_records = []
+            sku_needing_refill = set()
 
             for sku, group in df_clean.groupby('SKU'):
                 item_name = group['ITEM_NAME'].iloc[0]
@@ -7789,8 +7788,9 @@ class AppState:
                 total_kl_sku_qty = int(kl_group['QTY_NUM'].sum())
                 total_shelving_qty_sku = int(shelving_group['QTY_NUM'].sum())
 
-                # Kondisi: Shelving qty 0 atau 1-3, dan total stock di KL > 0
+                # Kondisi: Shelving qty 0 atau 1-3, dan total stock di KL > 0 (Perlu Refill)
                 if (total_shelving_qty_sku == 0 or (1 <= total_shelving_qty_sku <= 3)) and total_kl_sku_qty > 0:
+                    sku_needing_refill.add(sku)
                     target_pick = max(1, int(round(total_kl_sku_qty * 0.8)))
                     remaining_need = target_pick
 
@@ -7814,15 +7814,24 @@ class AppState:
                         })
                         remaining_need -= take
 
+            # 🌟 HITUNG PERSENTASE ITEMS ON SHELVING
+            # Rumus: (Total SKU di Koli yang TIDAK perlu refill / Total SKU di Koli) * 100%
+            if total_kl_count > 0:
+                missing_count = len([s for s in unique_kl_skus if s in sku_needing_refill])
+                not_on_shelving_pct = (missing_count / total_kl_count) * 100.0  # Persentase yang tidak ada di shelving
+                items_on_shelving_pct = max(0.0, 100.0 - not_on_shelving_pct)    # Persentase Items on Shelving
+            else:
+                items_on_shelving_pct = 100.0
+
             df_res = pd.DataFrame(refill_records) if refill_records else pd.DataFrame(columns=["BIN AMBIL", "SKU", "ITEM NAME", "QTY SHELVING", "QTY PICK"])
 
-            # 🌟 SET STATE METRIK BARU
-            unique_sku_refill = df_res['SKU'].nunique() if not df_res.empty else 0
+            unique_sku_refill = len(sku_needing_refill)
             total_pick_val = int(df_res['QTY PICK'].sum()) if not df_res.empty else 0
 
+            # Set State
             self.rs_total_sku.set(unique_sku_refill)
             self.rs_total_pick.set(total_pick_val)
-            self.rs_shelving_pct.set(shelving_vs_koli_pct)
+            self.rs_shelving_pct.set(items_on_shelving_pct)
 
             self._raw_df_rs = df_res.copy()
             self.df_rs_headers.set(df_res.columns.tolist() if not df_res.empty else [])
