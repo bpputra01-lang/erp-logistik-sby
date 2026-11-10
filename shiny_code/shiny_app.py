@@ -29,100 +29,7 @@ app_ui = ui.page_fluid(
 def server(input: Inputs, output: Outputs, session: Session):
     state = AppState()
     _last_filter_state = {"c_brands": [], "c_subs": [], "c_bins": []}
-    _last_seen_fl_id = reactive.Value(None)
     
-    # 🌟 Gunakan list 1 elemen agar aman antar-sesi (session-safe) tanpa butuh 'global'
-    _is_fl_polling = [False]
-
-    @reactive.effect
-    async def _poll_fl_requests_from_supabase():
-        if not state.logged_in():
-            return
-
-        # ⏱️ Polling tiap 4 detik
-        reactive.invalidate_later(4)
-
-        if _is_fl_polling[0]:
-            return
-
-        _is_fl_polling[0] = True
-        try:
-            import asyncio
-            import re
-            from datetime import datetime
-
-            client = get_supabase()
-            if not client:
-                _is_fl_polling[0] = False
-                return
-
-            def fetch_data():
-                return client.table("jezpro_fl_requests").select("*").execute()
-
-            res = await asyncio.wait_for(asyncio.to_thread(fetch_data), timeout=2.5)
-            raw_data = res.data if res and hasattr(res, "data") and res.data else []
-
-            if raw_data:
-                sorted_data = sorted(
-                    raw_data, 
-                    key=lambda x: safe_int(x.get("id") or x.get("req_id") or 0), 
-                    reverse=True
-                )[:20]
-
-                first_row = sorted_data[0]
-                newest_id = str(first_row.get("id") or first_row.get("req_id") or first_row.get("created_at") or "")
-
-                with reactive.isolate():
-                    prev_id = _last_seen_fl_id()
-
-                # 🌟 KUNCI: HANYA UPDATE STATE SAAT BENAR-BENAR ADA BARANG BARU
-                if newest_id != prev_id:
-                    cards = []
-                    for row in sorted_data:
-                        tgl_str = str(row.get("created_at", "-"))[:19].replace("T", " ")
-                        raw_art = str(row.get("article_name", "-"))
-                        clean_art = re.sub(r'<[^>]+>', '', raw_art).strip() or "-"
-
-                        cards.append({
-                            "id": str(row.get("req_id") or row.get("id")),
-                            "article": clean_art,
-                            "datetime": tgl_str,
-                            "pic": row.get("pic", "Tim FL"),
-                            "bin": row.get("bin", "-"),
-                            "status": "WAITING OFFLINE",
-                            "qty": safe_int(row.get("qty", 1), 1)
-                        })
-
-                    state.fl_request_list.set(cards)
-                    state.fl_last_check_time.set(datetime.now().strftime("%H:%M:%S"))
-
-                    if prev_id is not None:
-                        art_name = re.sub(r'<[^>]+>', '', str(first_row.get("article_name", "Barang Baru"))).strip()
-                        pic_name = first_row.get("pic", "Tim FL")
-
-                        # Picu suara ke browser
-                        await session.send_custom_message("trigger_fl_sound", {
-                            "id": newest_id,
-                            "article": art_name,
-                            "pic": pic_name
-                        })
-                        ui.notification_show(f"🚨 Barang Baru: {art_name} ({pic_name})", type="warning", duration=6)
-
-                    _last_seen_fl_id.set(newest_id)
-                # 🛑 KUNCI ANTI-REDUP: JANGAN UPDATE fl_last_check_time JIKA TIDAK ADA DATA BARU!
-            else:
-                with reactive.isolate():
-                    current_list = state.fl_request_list()
-                if current_list:
-                    state.fl_request_list.set([])
-
-        except asyncio.TimeoutError:
-            pass
-        except Exception as e:
-            print("⚠️ Error polling FL:", e)
-        finally:
-            _is_fl_polling[0] = False
-                        # Modal Dismiss Listeners
     @reactive.Effect
     @reactive.event(input.close_success_modal_event)
     def _on_close_success_modal():
@@ -227,7 +134,6 @@ def server(input: Inputs, output: Outputs, session: Session):
         "warehouse-compliance-audit": "Warehouse Compliance Audit",
         "instock-validation": "Instock Validation",
         "instock_validation": "Instock Validation",
-        "permintaan-fl": "Permintaan FL",
         "refill-shelving": "Refill Shelving",
         "refill_shelving": "Refill Shelving",
         "reloc-koli-to-koli": "Reloc Koli to Koli",
@@ -1224,9 +1130,6 @@ def server(input: Inputs, output: Outputs, session: Session):
         elif content_type == "warehouse_activity_monitor": return warehouse_activity_monitor_view(state)
         elif content_type == "compliance_audit": return compliance_audit_view(state)
         elif content_type in ["instock_validation", "instock-validation"]: return instock_validation_view(state)
-        elif content_type in ["permintaan_fl", "permintaan-fl"]: 
-            from views import permintaan_fl_view
-            return permintaan_fl_view(state)
         elif content_type == "refill_shelving": 
             from views import refill_shelving_view
             return refill_shelving_view(state)
@@ -6017,21 +5920,5 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         yield buf.getvalue()
 
-    # Listener untuk membunyikan suara di browser saat ada permintaan FL baru
-    @reactive.Effect
-    @reactive.event(state.fl_audio_trigger)
-    def _trigger_fl_sound():
-        if state.fl_audio_trigger() > 0:
-            ui.insert_ui(
-                ui.tags.script("if (window.playFLSound) window.playFLSound();"),
-                selector="head",
-                where="beforeEnd"
-            )
-        
-from pathlib import Path
-
-# Daftarkan folder root agar file mp3 dapat diakses browser client
-APP_DIR = Path(__file__).parent
-app = App(app_ui, server, static_assets={"/static": APP_DIR})
 
     

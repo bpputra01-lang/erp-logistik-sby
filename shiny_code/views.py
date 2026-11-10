@@ -19,42 +19,6 @@ def get_image_base64(filename):
         pass
     return f"./{filename}"
 
-def get_audio_base64(filename="mas_ambilin_dong.mp3"):
-    try:
-        # Cari file di folder views.py maupun di folder kerja terminal
-        possible_paths = [
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), filename),
-            os.path.join(os.getcwd(), filename),
-            filename
-        ]
-        target_path = next((p for p in possible_paths if os.path.exists(p)), None)
-        
-        # Jika file belum ada di mana pun, buat otomatis pakai gTTS
-        if not target_path:
-            try:
-                from gtts import gTTS
-                print(f"🎙️ File {filename} belum ditemukan, membuat otomatis via gTTS...")
-                tts = gTTS(text="Mas, ambilin dong!", lang="id", slow=False)
-                gen_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
-                tts.save(gen_path)
-                target_path = gen_path
-                print(f"✅ Berhasil membuat {gen_path}")
-            except Exception as e_tts:
-                print("Gagal generate audio:", e_tts)
-
-        if target_path and os.path.exists(target_path):
-            with open(target_path, "rb") as f:
-                encoded = base64.b64encode(f.read()).decode("utf-8")
-                # 🌟 WAJIB audio/mpeg (bukan audio/mp3) agar Chrome/Edge mau membaca
-                return f"data:audio/mpeg;base64,{encoded}"
-        else:
-            print(f"⚠️ File {filename} tidak ditemukan.")
-    except Exception as e:
-        print("Gagal load audio base64:", e)
-    return ""
-
-AUDIO_BASE64_DATA = get_audio_base64("mas_ambilin_dong.mp3")
-
 # ==============================================================================
 # CSS & JAVASCRIPT ASSETS (ZERO-GLITCH, ANTI-JUMP UPLOAD & FREE SCROLL)
 # ==============================================================================
@@ -88,26 +52,7 @@ CUSTOM_HEAD = ui.head_content(
             }
         };
 
-        window.updateUrlMenu = function(menuName) {
-            try {
-                let slug = menuName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-                if (window.history.pushState) window.history.pushState(null, '', '#' + slug);
-                else window.location.hash = '#' + slug;
-            } catch(e) {}
-        };
-
-        // Otomatis sambungkan ulang jika server sempat berkedip tanpa perlu refresh manual
-        if (window.jQuery) {
-            $(document).on('shiny:disconnected', function() {
-                console.log("Koneksi sempat terputus, menyambungkan kembali otomatis...");
-                setTimeout(function() {
-                    if (window.Shiny && Shiny.shinyapp && Shiny.shinyapp.reconnect) {
-                        Shiny.shinyapp.reconnect();
-                    }
-                }, 1000);
-            });
-        }
-
+        
         // --- 2. GEMBOK OTOMATIS JUDUL & FAVICON ---
         function setBrandTab() {
             if (document.title !== "ZKN WAREHOUSE ERP") document.title = "ZKN WAREHOUSE ERP";
@@ -245,132 +190,6 @@ CUSTOM_HEAD = ui.head_content(
             }, 8000);
         };
 
-        // =====================================================================
-        // AUDIO CONTROLLER (SELF-CONTAINED & BOOSTER 300%)
-        // =====================================================================
-        window.audioCtx = window.audioCtx || null;
-        window.flAudioBuffer = window.flAudioBuffer || null;
-        const FL_AUDIO_URI = `""" + AUDIO_BASE64_DATA + """`;
-
-        // Inisialisasi Audio Buffer Mandiri
-        window.initAudioBuffer = function() {
-            try {
-                if (!window.audioCtx) {
-                    window.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                }
-                if (window.audioCtx.state === 'suspended') {
-                    window.audioCtx.resume();
-                }
-                if (!window.flAudioBuffer) {
-                    let source = (FL_AUDIO_URI && FL_AUDIO_URI.length > 50) ? FL_AUDIO_URI : '/static/mas_ambilin_dong.mp3';
-                    fetch(source)
-                        .then(response => response.arrayBuffer())
-                        .then(buffer => window.audioCtx.decodeAudioData(buffer))
-                        .then(decoded => {
-                            window.flAudioBuffer = decoded;
-                            console.log("✅ Buffer audio tersimpan di memori browser.");
-                        })
-                        .catch(e => console.warn("Fetch audio buffer fallback:", e));
-                }
-            } catch(e) {
-                console.warn("Init audio error:", e);
-            }
-        };
-
-        window.addEventListener('click', window.initAudioBuffer, { once: true });
-
-        // Fallback Suara Wanita Melengking & Lantang
-        window.playVoiceTTS = function() {
-            try {
-                if ('speechSynthesis' in window) {
-                    window.speechSynthesis.cancel();
-                    let msg = new SpeechSynthesisUtterance("Mas, ambilin dong!");
-                    msg.lang = "id-ID";
-                    msg.volume = 1.0; 
-                    msg.pitch = 1.4;
-                    msg.rate = 1.05;
-                    window.speechSynthesis.speak(msg);
-                } else if (typeof window.playBeepTone === 'function') {
-                    window.playBeepTone();
-                }
-            } catch(e) {
-                console.warn("TTS error:", e);
-            }
-        };
-
-        // Pemutar Suara FL (Dengan Booster Volume 300%)
-        window.playFLSound = function() {
-            console.log("🔊 Menerima perintah putar suara FL...");
-            try {
-                if (!window.audioCtx) {
-                    window.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                }
-                if (window.audioCtx.state === 'suspended') {
-                    window.audioCtx.resume();
-                }
-
-                // 1. Putar via AudioBuffer jika sudah siap (dengan pengeras suara 3.0x)
-                if (window.flAudioBuffer) {
-                    let sourceNode = window.audioCtx.createBufferSource();
-                    let gainNode = window.audioCtx.createGain();
-                    
-                    gainNode.gain.value = 3.0;
-                    sourceNode.buffer = window.flAudioBuffer;
-                    
-                    sourceNode.connect(gainNode);
-                    gainNode.connect(window.audioCtx.destination);
-                    
-                    sourceNode.start(0);
-                    console.log("✅ Berhasil memutar via AudioBuffer (Volume 300%)");
-                    return;
-                }
-            } catch(err) {
-                console.warn("WebAudio context error, beralih ke fallback:", err);
-            }
-
-            // 2. Fallback HTML5 Audio jika buffer belum selesai decode
-            try {
-                let audioSrc = (FL_AUDIO_URI && FL_AUDIO_URI.length > 50) ? FL_AUDIO_URI : '/static/mas_ambilin_dong.mp3';
-                let fallbackAudio = new Audio(audioSrc);
-                fallbackAudio.volume = 1.0;
-                let playPromise = fallbackAudio.play();
-                if (playPromise !== undefined) {
-                    playPromise.catch(() => window.playVoiceTTS());
-                }
-            } catch(e) {
-                window.playVoiceTTS();
-            }
-        };
-
-        // Fallback nada bel jika browser tidak mendukung TTS
-        window.playBeepTone = function() {
-            try {
-                if (!window.audioCtx) window.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                if (window.audioCtx.state === 'suspended') window.audioCtx.resume();
-                let osc = window.audioCtx.createOscillator();
-                let gain = window.audioCtx.createGain();
-                osc.connect(gain);
-                gain.connect(window.audioCtx.destination);
-                osc.type = "sine";
-                osc.frequency.setValueAtTime(880, window.audioCtx.currentTime);
-                gain.gain.setValueAtTime(0.5, window.audioCtx.currentTime);
-                osc.start();
-                osc.stop(window.audioCtx.currentTime + 0.4);
-            } catch(e) {}
-        };
-
-        // Listener sinyal Supabase
-        function initFLSoundListener() {
-            if (window.Shiny && window.Shiny.addCustomMessageHandler) {
-                Shiny.addCustomMessageHandler('trigger_fl_sound', function(message) {
-                    console.log("🚨 [WEBSOCKET] Ada barang baru dari Supabase:", message);
-                    window.playFLSound();
-                });
-            } else {
-                setTimeout(initFLSoundListener, 300);
-            }
-        }
-        initFLSoundListener();
 
         // AMAN: Tunggu DOMContentLoaded agar document.body tidak NULL saat di-observe
         document.addEventListener("DOMContentLoaded", function() {
@@ -3141,71 +2960,7 @@ def instock_validation_view(state: AppState):
         style="width: 100%; padding: 1rem;"
     )
 
-def permintaan_fl_view(state: AppState):
-    cards = state.fl_request_list()
-    
-    card_elements = []
-    for item in cards:
-        status_txt = item.get("status", "WAITING OFFLINE")
-        art_raw = item.get("article", "-")
-        
-        # Ekstrak brand [BRAND]
-        brand_match = re.search(r'\[(.*?)\]', art_raw)
-        brand_str = f"[{brand_match.group(1)}]" if brand_match else ""
-        art_clean = re.sub(r'\[.*?\]\s*', '', art_raw).strip()
 
-        card_elements.append(
-            ui.div(
-                ui.div(
-                    ui.span(status_txt, style="background: #DD6B20; color: white; font-weight: 800; font-size: 11px; padding: 4px 10px; border-radius: 4px; display: inline-block; margin-right: 8px;"),
-                    ui.span(brand_str, style="font-weight: 800; font-size: 13px; color: #1A202C;"),
-                    style="margin-bottom: 6px;"
-                ),
-                ui.h4(art_clean, style="font-size: 14px; font-weight: 800; color: #1A202C; margin: 0 0 6px 0;"),
-                ui.p(item.get("datetime", "-"), style="font-size: 12px; color: #4A5568; margin: 0 0 4px 0;"),
-                ui.p(item.get("pic", "-"), style="font-size: 12px; font-weight: 800; color: #0D9488; margin: 0 0 10px 0;"),
-                ui.div(
-                    ui.span(f"Jml : {item.get('qty', 1)}", style="background: #E53E3E; color: white; font-weight: 800; font-size: 11px; padding: 5px 12px; border-radius: 6px; margin-right: 6px;"),
-                    ui.span(item.get("bin", "-"), style="background: #E53E3E; color: white; font-weight: 800; font-size: 11px; padding: 5px 12px; border-radius: 6px; margin-right: 6px;"),
-                    ui.span("Masuk", style="background: #9B2C2C; color: white; font-weight: 800; font-size: 11px; padding: 5px 12px; border-radius: 6px;"),
-                    style="display: flex; align-items: center;"
-                ),
-                style="background: #FFFFFF; border-radius: 10px; padding: 1.25rem; border: 1.5px solid #E2E8F0; margin-bottom: 0.85rem; box-shadow: 0 2px 6px rgba(0,0,0,0.02);"
-            )
-        )
-
-    if not card_elements:
-        card_elements = [
-            ui.div(
-                ui.tags.i(class_="fa-solid fa-bell-slash", style="font-size: 32px; color: #A0AEC0; margin-bottom: 8px;"),
-                ui.p("Belum ada antrean barang masuk dari tim Frontline saat ini.", style="color: #718096; font-style: italic; margin: 0;"),
-                style="text-align: center; padding: 3rem; background: white; border-radius: 12px; border: 1px dashed #CBD5E0;"
-            )
-        ]
-
-    return ui.div(
-        ui.div(
-            ui.div(
-                ui.h4("Scan Barang Masuk (Permintaan Frontline)", style="font-size: 16px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
-                ui.p(f"Live Check Jezpro: {state.fl_last_check_time()} WIB • Sistem otomatis bersuara saat ada permintaan baru.", style="color: #718096; font-size: 12px; margin: 0;"),
-            ),
-            # Tombol Test Suara & Status di Kanan Atas
-            # Tombol Test Suara & Status di Kanan Atas (Tanpa alert yang mengganggu audio)
-            ui.div(
-                ui.tags.button(
-                    "🔊 TEST SUARA LAPTOP INI",
-                    type="button",
-                    onclick="window.playFLSound();",
-                    style="background: #10B981; color: white; font-weight: 800; font-size: 11px; padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer; margin-right: 8px;"
-                ),
-                ui.span("🟢 SUARA AKTIF", style="background: #C6F6D5; color: #22543D; font-weight: 800; font-size: 11px; padding: 6px 14px; border-radius: 20px; border: 1px solid #9AE6B4;"),
-                style="display: flex; align-items: center;"
-            ),
-            style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 1.25rem 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
-        ),
-        ui.div(*card_elements),
-        style="width: 100%; max-width: 600px; margin: 0 auto; padding: 1rem 0;"
-    )
 
 def refill_shelving_view(state: AppState):
     upload_section = ui.div(
@@ -3268,12 +3023,7 @@ def sidebar(state: AppState):
 
     monitoring_items = state.get_menu_monitoring()
     
-    # 🌟 PENGAMAN MUTLAK: Paksa kosongkan sales_items jika user adalah hub atau toko
-    uname = state.username().lower()
-    if uname in ["hub", "toko"]:
-        sales_items = []
-    else:
-        sales_items = state.get_menu_sales()
+ 
 
     auditor_items = state.get_menu_auditor()
     operational_items = state.get_menu_operational()
@@ -3294,18 +3044,7 @@ def sidebar(state: AppState):
             )
         )
 
-    # 🌟 Karena sales_items dipaksa [] untuk hub/toko, blok ini otomatis di-skip total oleh Python
-    if sales_items:
-        sections.append(
-            ui.div(
-                section_dropdown_header("SALES", "sales", state.dropdown_sales()), 
-                ui.div(
-                    *[menu_item(item, item, cur_menu) for item in sales_items], 
-                    style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_sales() else "display: none;"
-                ), 
-                style="width: 100%;"
-            )
-        )
+    
 
     if auditor_items:
         sections.append(
