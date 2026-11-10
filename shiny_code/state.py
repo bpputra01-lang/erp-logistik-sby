@@ -7509,6 +7509,70 @@ class AppState:
         scanned = self.iv_tab3_scanned()
         
         now_jakarta = pd.Timestamp.now(tz='Asia/Jakarta')
+        
+        def get_instock_diff_minutes(r):
+            ts = r.get("disappeared_at") or r.get("created_at")
+            if not ts or str(ts).strip() in ["", "-", "None", "nan"]: return 999999.0
+            try:
+                dt = pd.to_datetime(ts)
+                if dt.tzinfo is None: dt = dt.tz_localize('UTC').tz_convert('Asia/Jakarta')
+                else: dt = dt.tz_convert('Asia/Jakarta')
+                return max(0.0, (now_jakarta - dt).total_seconds() / 60.0)
+            except Exception: return 999999.0
+
+        # 1. Refresh Tab 1 (Pending)
+        transit_records = []
+        for r in pending:
+            raw_bin = str(r.get("bin_code", r.get("bin", "-"))).replace("[", "").replace("]", "").strip().upper()
+            bin_awal = raw_bin if raw_bin not in ["WAITING OFFLINE", "-", ""] else "STAGING INBOUND"
+            q = safe_int(r.get("qty", 1), 1)
+            sku_clean = str(r.get("barcode_sku") or r.get("sku") or r.get("SKU") or "-").split('.')[0].strip().upper()
+            
+            diff_mins = get_instock_diff_minutes(r)
+            if diff_mins < 1.0: aging_badge = "🔥 Baru Saja (< 1m)"
+            elif diff_mins <= 5.0: aging_badge = f"🔥 {int(diff_mins)}m lalu"
+            elif diff_mins <= 15.0: aging_badge = f"🟢 {int(diff_mins)}m lalu"
+            else: aging_badge = f"⚡ {int(diff_mins)}m lalu"
+
+            transit_records.append({
+                "STATUS INSTOCK": aging_badge,
+                "JAM HILANG": str(r.get("disappeared_at", "-"))[11:19],
+                "BIN AWAL": bin_awal,
+                "BIN TUJUAN": "STAGING INSTOCK",
+                "SKU": sku_clean,
+                "NAMA ARTIKEL": str(r.get("article_name", "-")),
+                "QUANTITY": q,
+                "NOTES": "TRANSIT INSTOCK"
+            })
+        
+        df_setup = pd.DataFrame(transit_records)
+        self._raw_df_iv_setup = df_setup
+        self.df_iv_setup_headers.set(df_setup.columns.tolist() if not df_setup.empty else [])
+        self.df_iv_setup_rows.set(df_setup.fillna("").astype(str).values.tolist() if not df_setup.empty else [])
+
+        # 2. Refresh Tab 3 (Mutasi - Hanya item yang sudah di-scan/dipindah)
+        mutasi_records = []
+        for r in scanned:
+            raw_bin = str(r.get("bin_code", r.get("bin", "-"))).replace("[", "").replace("]", "").strip().upper()
+            bin_awal = raw_bin if raw_bin not in ["WAITING OFFLINE", "-", ""] else "STAGING INBOUND"
+            q = safe_int(r.get("qty", 1), 1)
+            sku_clean = str(r.get("barcode_sku") or r.get("sku") or r.get("SKU") or "-").split('.')[0].strip().upper()
+            
+            mutasi_records.append({
+                "BIN AWAL": bin_awal,
+                "BIN TUJUAN": "STAGING INSTOCK",
+                "SKU": sku_clean,
+                "QUANTITY": q,
+                "NOTES": "MUTASI INSTOCK"
+            })
+            
+        df_mutasi = pd.DataFrame(mutasi_records)
+        self._raw_df_iv_mutasi = df_mutasi
+        self.df_iv_mutasi_headers.set(df_mutasi.columns.tolist() if not df_mutasi.empty else [])
+        self.df_iv_mutasi_rows.set(df_mutasi.fillna("").astype(str).values.tolist() if not df_mutasi.empty else [])
+        
+        tot_need = sum(safe_int(x.get("qty", 1), 1) for x in pending)
+        self.iv_total_allocated_qty.set(tot_need)
 
     def move_instock_sku_to_mutasi(self, sku_input: str):
         """Memindahkan item dari Tab 1 ke Tab 3 berdasarkan SKU/Barcode yang di-input atau di-scan"""
@@ -7518,26 +7582,20 @@ class AppState:
         
         target_idx = -1
         for idx, it in enumerate(pending):
-            # Cek seluruh kemungkinan nama kolom barcode/sku dari Supabase
             raw_s = it.get("barcode_sku") or it.get("sku") or it.get("SKU") or it.get("barcode") or it.get("BARCODE") or it.get("item_code") or ""
             s_item = str(raw_s).split('.')[0].strip().upper()
             
-            # Cocokkan baik string persis maupun tanpa angka 0 di depan (misal: 009048 vs 9048)
             if s_item == clean_input or (s_item.lstrip('0') and s_item.lstrip('0') == clean_input.lstrip('0')):
                 target_idx = idx
                 break
         
         if target_idx != -1:
-            # 1. Keluarkan dari Tab 1 (Pending)
             moved_item = pending.pop(target_idx)
-            # 2. Masukkan ke Tab 3 (Scanned / Mutasi)
             scanned.append(moved_item)
             
-            # 3. Update state reactive
             self.iv_tab1_pending.set(pending)
             self.iv_tab3_scanned.set(scanned)
             
-            # 4. Refresh tampilan tabel secara otomatis
             self._refresh_iv_dataframes_from_lists()
             return True, f"SKU {clean_input} berhasil dipindahkan ke Tab 3!"
         else:
