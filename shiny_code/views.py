@@ -56,16 +56,14 @@ def get_audio_base64(filename="mas_ambilin_dong.mp3"):
 AUDIO_BASE64_DATA = get_audio_base64("mas_ambilin_dong.mp3")
 
 # ==============================================================================
-# CSS & JAVASCRIPT ASSETS (ZERO-GLITCH, ANTI-JUMP UPLOAD & FREE SCROLL)
+# CSS & JAVASCRIPT ASSETS (BERSIH, ANTI-CRASH & ANTI-REDUP)
 # ==============================================================================
 CUSTOM_HEAD = ui.head_content(
-    # --- 1. HTML NATIVE TITLE & FAVICON ---
     ui.tags.title("ZKN WAREHOUSE ERP"),
     ui.tags.link(rel="icon", type="image/png", href="./image_981625.png?v=99"),
 
-    # --- 2. SCRIPT UTAMA ---
+    # --- 1. SCRIPT UTAMA (MURNI JAVASCRIPT, TIDAK ADA CSS NYASAR) ---
     ui.tags.script("""
-        // --- 1. DEFINISI ROUTING MENU DI PALING AWAL (ANTI-UNDEFINED) ---
         function getContainer() {
             return document.getElementById("main-scroll-container");
         }
@@ -76,7 +74,7 @@ CUSTOM_HEAD = ui.head_content(
                 let c = getContainer();
                 if (c) c.scrollTop = 0;
 
-                let basePath = window.location.pathname.replace(/index\.html$/, '');
+                let basePath = window.location.pathname.replace(/index\\.html$/, '');
                 if (!basePath.endsWith('/')) basePath += '/';
                 if (window.history.pushState) window.history.pushState(null, '', basePath + '#' + slug);
                 else window.location.hash = '#' + slug;
@@ -95,28 +93,24 @@ CUSTOM_HEAD = ui.head_content(
                 else window.location.hash = '#' + slug;
             } catch(e) {}
         };
-    /* 🌟 CEGAH LAYAR MENJADI ABU-ABU/REDUP SAAT WEBSOCKET RECONNECT */
-        #shiny-disconnected-overlay {
-            display: none !important;
-            opacity: 0 !important;
-            pointer-events: none !important;
-        }
-        
-        .shiny-disconnected {
-            opacity: 1 !important;
-            filter: none !important;
-        }
-        // Otomatis sambungkan ulang jika server sempat berkedip tanpa perlu refresh manual
-        $(document).on('shiny:disconnected', function() {
-            console.log("Koneksi sempat terputus, menyambungkan kembali otomatis...");
-            setTimeout(function() {
-                if (window.Shiny && Shiny.shinyapp && Shiny.shinyapp.reconnect) {
-                    Shiny.shinyapp.reconnect();
-                }
-            }, 1000);
-        });
 
-        // --- 2. GEMBOK OTOMATIS JUDUL & FAVICON ---
+        // Otomatis sambungkan ulang jika koneksi sempat terputus
+        if (window.jQuery) {
+            $(document).on('shiny:disconnected', function() {
+                setTimeout(function() {
+                    if (window.Shiny && Shiny.shinyapp && Shiny.shinyapp.reconnect) {
+                        Shiny.shinyapp.reconnect();
+                    }
+                }, 1000);
+            });
+
+            // 🌟 Pastikan tirai hitam langsung hilang begitu kalkulasi selesai
+            $(document).on('shiny:idle shiny:value shiny:error', function() {
+                if (window.hideGlobalSpinner) window.hideGlobalSpinner();
+                if (document.body) document.body.classList.remove('process-running');
+            });
+        }
+
         function setBrandTab() {
             if (document.title !== "ZKN WAREHOUSE ERP") document.title = "ZKN WAREHOUSE ERP";
             let favicon = document.querySelector("link[rel~='icon']");
@@ -131,110 +125,7 @@ CUSTOM_HEAD = ui.head_content(
         setBrandTab();
         setInterval(setBrandTab, 1000);
 
-        // --- 3. ENGINE PAGINASI CEPAT (0ms) ---
-        window.fastTables = window.fastTables || {};
-        window.renderFastTablePage = function(tableId) {
-            let tState = window.fastTables[tableId];
-            if (!tState) return;
-            let tbody = document.getElementById(tableId + "_tbody");
-            if (!tbody) return;
-
-            let total = tState.data.length;
-            let size = tState.pageSize === -1 ? total : tState.pageSize;
-            let maxPages = Math.max(1, Math.ceil(total / size));
-            if (tState.currentPage > maxPages) tState.currentPage = maxPages;
-            if (tState.currentPage < 1) tState.currentPage = 1;
-
-            let start = (tState.currentPage - 1) * size;
-            let end = Math.min(start + size, total);
-
-            let htmlStr = "";
-            for (let i = start; i < end; i++) {
-                let row = tState.data[i];
-                htmlStr += "<tr>";
-                for (let j = 0; j < row.length; j++) {
-                    let cell = row[j] !== null && row[j] !== undefined ? String(row[j]).trim() : "";
-                    if (/^-?\\d+\\.0+$/.test(cell)) cell = cell.replace(/\\.0+$/, "");
-                    htmlStr += "<td>" + cell + "</td>";
-                }
-                htmlStr += "</tr>";
-            }
-            tbody.innerHTML = htmlStr;
-
-            let info = document.getElementById(tableId + "_info");
-            let pageNum = document.getElementById(tableId + "_page_num");
-            let prevBtn = document.getElementById(tableId + "_prev_btn");
-            let nextBtn = document.getElementById(tableId + "_next_btn");
-
-            if (info) {
-                let dispStart = total > 0 ? (start + 1) : 0;
-                info.innerText = "Menampilkan " + dispStart + " - " + end + " dari " + total.toLocaleString() + " baris";
-            }
-            if (pageNum) pageNum.innerText = "Hal " + tState.currentPage + " / " + maxPages;
-            if (prevBtn) prevBtn.disabled = (tState.currentPage <= 1);
-            if (nextBtn) nextBtn.disabled = (tState.currentPage >= maxPages);
-        };
-
-        window.changeFastPageSize = function(tableId, sizeVal) {
-            if (window.fastTables[tableId]) {
-                window.fastTables[tableId].pageSize = parseInt(sizeVal);
-                window.fastTables[tableId].currentPage = 1;
-                window.renderFastTablePage(tableId);
-            }
-        };
-
-        window.navFastTablePage = function(tableId, delta) {
-            if (window.fastTables[tableId]) {
-                window.fastTables[tableId].currentPage += delta;
-                window.renderFastTablePage(tableId);
-            }
-        };
-
-        // --- 4. HUMAN-AWARE ZERO-GLITCH SCROLL ENGINE ---
-        let userScrollTop = 0;
-        let isHumanScrolling = false;
-        let humanScrollTimer = null;
-        let isFileInteracting = false;
-
-        function markHumanScroll() {
-            isHumanScrolling = true;
-            clearTimeout(humanScrollTimer);
-            humanScrollTimer = setTimeout(function() {
-                isHumanScrolling = false;
-            }, 250);
-        }
-
-        window.addEventListener('wheel', markHumanScroll, { passive: true, capture: true });
-        window.addEventListener('touchmove', markHumanScroll, { passive: true, capture: true });
-        window.addEventListener('keydown', function(e) {
-            if ([32, 33, 34, 35, 36, 38, 40].includes(e.keyCode)) markHumanScroll();
-        }, { passive: true, capture: true });
-        
-        document.addEventListener('mousedown', function(e) {
-            let c = getContainer();
-            if (c) {
-                let rect = c.getBoundingClientRect();
-                if (e.clientX >= rect.right - 25) markHumanScroll();
-            }
-        }, true);
-        document.addEventListener('mousemove', function(e) {
-            if (e.buttons === 1) markHumanScroll();
-        }, true);
-
-        document.addEventListener('scroll', function(e) {
-            let c = getContainer();
-            if (!c) return;
-
-            if (e.target === c || e.target === document) {
-                if (isHumanScrolling) {
-                    userScrollTop = c.scrollTop;
-                } else if (userScrollTop > 0 && c.scrollTop === 0) {
-                    c.scrollTop = userScrollTop;
-                }
-            }
-        }, true);
-
-        // --- 5. SPINNER CONTROLLER ---
+        // SPINNER CONTROLLER (AMAN DARI MACET)
         window.hideGlobalSpinner = function() {
             clearTimeout(window.spinnerSafetyTimer);
             if (document.body) document.body.classList.remove('process-running');
@@ -242,26 +133,25 @@ CUSTOM_HEAD = ui.head_content(
             if (spinner) spinner.style.display = 'none';
         };
 
-       window.showGlobalSpinner = function() {
+        window.showGlobalSpinner = function() {
             let spinner = document.getElementById('global_reflex_loading');
             if (spinner) spinner.style.display = 'flex';
             if (document.body) document.body.classList.add('process-running');
 
             clearTimeout(window.spinnerSafetyTimer);
-            // Ganti 120000 menjadi 8000 (8 detik)
+            // Safety timeout 6 detik: tirai WAJIB hilang otomatis jika server hang
             window.spinnerSafetyTimer = setTimeout(function() {
                 window.hideGlobalSpinner();
-            }, 8000);
+            }, 6000);
         };
 
-      // =====================================================================
-        // AUDIO CONTROLLER (SELF-CONTAINED & BOOSTER 300%)
+        // =====================================================================
+        // AUDIO CONTROLLER (DIPERBAIKI AGAR PASTI BUNYI)
         // =====================================================================
         window.audioCtx = window.audioCtx || null;
         window.flAudioBuffer = window.flAudioBuffer || null;
         const FL_AUDIO_URI = `""" + AUDIO_BASE64_DATA + """`;
 
-        // Inisialisasi Audio Buffer Mandiri
         window.initAudioBuffer = function() {
             try {
                 if (!window.audioCtx) {
@@ -275,20 +165,14 @@ CUSTOM_HEAD = ui.head_content(
                     fetch(source)
                         .then(response => response.arrayBuffer())
                         .then(buffer => window.audioCtx.decodeAudioData(buffer))
-                        .then(decoded => {
-                            window.flAudioBuffer = decoded;
-                            console.log("✅ Buffer audio tersimpan di memori browser.");
-                        })
-                        .catch(e => console.warn("Fetch audio buffer fallback:", e));
+                        .then(decoded => { window.flAudioBuffer = decoded; })
+                        .catch(e => console.warn("Fetch audio fallback:", e));
                 }
-            } catch(e) {
-                console.warn("Init audio error:", e);
-            }
+            } catch(e) {}
         };
-
         window.addEventListener('click', window.initAudioBuffer, { once: true });
 
-        // Fallback Suara Wanita Melengking & Lantang
+        // Fallback suara wanita
         window.playVoiceTTS = function() {
             try {
                 if ('speechSynthesis' in window) {
@@ -296,62 +180,16 @@ CUSTOM_HEAD = ui.head_content(
                     let msg = new SpeechSynthesisUtterance("Mas, ambilin dong!");
                     msg.lang = "id-ID";
                     msg.volume = 1.0; 
-                    msg.pitch = 1.4;  // Ditinggikan agar cempreng dan terdengar jelas
-                    msg.rate = 1.05;  // Tegas dan cepat
+                    msg.pitch = 1.3;
+                    msg.rate = 1.05;
                     window.speechSynthesis.speak(msg);
                 } else if (typeof window.playBeepTone === 'function') {
                     window.playBeepTone();
                 }
-            } catch(e) {
-                console.warn("TTS error:", e);
-            }
+            } catch(e) {}
         };
 
-        // Pemutar Suara FL (Dengan Booster Volume 300%)
-        window.playFLSound = function() {
-            console.log("🔊 Menerima perintah putar suara FL...");
-            try {
-                if (!window.audioCtx) {
-                    window.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                }
-                if (window.audioCtx.state === 'suspended') {
-                    window.audioCtx.resume();
-                }
-
-                // 1. Putar via AudioBuffer jika sudah siap (dengan pengeras suara 3.0x)
-                if (window.flAudioBuffer) {
-                    let sourceNode = window.audioCtx.createBufferSource();
-                    let gainNode = window.audioCtx.createGain();
-                    
-                    gainNode.gain.value = 3.0; // Volume diperkeras 300%
-                    sourceNode.buffer = window.flAudioBuffer;
-                    
-                    sourceNode.connect(gainNode);
-                    gainNode.connect(window.audioCtx.destination);
-                    
-                    sourceNode.start(0);
-                    console.log("✅ Berhasil memutar via AudioBuffer (Volume 300%)");
-                    return;
-                }
-            } catch(err) {
-                console.warn("WebAudio context error, beralih ke fallback:", err);
-            }
-
-            // 2. Fallback HTML5 Audio jika buffer belum selesai decode
-            try {
-                let audioSrc = (FL_AUDIO_URI && FL_AUDIO_URI.length > 50) ? FL_AUDIO_URI : '/static/mas_ambilin_dong.mp3';
-                let fallbackAudio = new Audio(audioSrc);
-                fallbackAudio.volume = 1.0;
-                let playPromise = fallbackAudio.play();
-                if (playPromise !== undefined) {
-                    playPromise.catch(() => window.playVoiceTTS());
-                }
-            } catch(e) {
-                window.playVoiceTTS();
-            }
-        };
-
-        // Fallback nada bel jika browser tidak mendukung TTS
+        // Fallback nada bel
         window.playBeepTone = function() {
             try {
                 if (!window.audioCtx) window.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -368,11 +206,42 @@ CUSTOM_HEAD = ui.head_content(
             } catch(e) {}
         };
 
-        // Listener sinyal Supabase
+        // FUNGSI UTAMA PEMUTAR SUARA FL
+        window.playFLSound = function() {
+            console.log("🔊 Menjalankan pemutar suara...");
+            try {
+                if (!window.audioCtx) window.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (window.audioCtx.state === 'suspended') window.audioCtx.resume();
+
+                if (window.flAudioBuffer) {
+                    let sourceNode = window.audioCtx.createBufferSource();
+                    let gainNode = window.audioCtx.createGain();
+                    gainNode.gain.value = 3.0; // Booster volume 300%
+                    sourceNode.buffer = window.flAudioBuffer;
+                    sourceNode.connect(gainNode);
+                    gainNode.connect(window.audioCtx.destination);
+                    sourceNode.start(0);
+                    return;
+                }
+            } catch(err) {}
+
+            try {
+                let audioSrc = (FL_AUDIO_URI && FL_AUDIO_URI.length > 50) ? FL_AUDIO_URI : '/static/mas_ambilin_dong.mp3';
+                let fallbackAudio = new Audio(audioSrc);
+                fallbackAudio.volume = 1.0;
+                let playPromise = fallbackAudio.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(() => window.playVoiceTTS());
+                }
+            } catch(e) {
+                window.playVoiceTTS();
+            }
+        };
+
+        // Listener sinyal barang baru dari Supabase
         function initFLSoundListener() {
             if (window.Shiny && window.Shiny.addCustomMessageHandler) {
                 Shiny.addCustomMessageHandler('trigger_fl_sound', function(message) {
-                    console.log("🚨 [WEBSOCKET] Ada barang baru dari Supabase:", message);
                     window.playFLSound();
                 });
             } else {
@@ -381,83 +250,17 @@ CUSTOM_HEAD = ui.head_content(
         }
         initFLSoundListener();
 
-        // AMAN: Tunggu DOMContentLoaded agar document.body tidak NULL saat di-observe
         document.addEventListener("DOMContentLoaded", function() {
-            if (document.body) {
-                let modalObserver = new MutationObserver(function() {
-                    let hasModal = document.getElementById('success-modal-overlay') || 
-                                   document.getElementById('error-modal-overlay') ||
-                                   document.querySelector('.shiny-notification');
-                    if (hasModal) {
-                        window.hideGlobalSpinner();
-                    }
-                });
-                modalObserver.observe(document.body, { childList: true, subtree: true });
-            }
-
             let h = window.location.hash.replace('#', '').trim();
             if (h && window.Shiny) {
                 setTimeout(function() { Shiny.setInputValue('initial_url_hash', h, {priority: 'event'}); }, 500);
             }
         });
-        // --- 6. SHINY EVENT LISTENERS (HAPUS SHINY:IDLE AGAR TIDAK MATI PREMATUR) ---
-        if (window.jQuery) {
-            $(document).on('shiny:fileuploaded shiny:inputchanged', function() {
-                let c = getContainer();
-                if (c && userScrollTop > 0) {
-                    c.scrollTop = userScrollTop;
-                }
-            });
-            // shiny:idle sengaja tidak mematikan spinner agar spinner tetap berputar sampai komputasi Python selesai
-        }
-        // Otomatis bersihkan tirai hitam begitu Shiny selesai menghitung (Idle)
-        $(document).on('shiny:idle shiny:value shiny:error', function() {
-            if (window.hideGlobalSpinner) {
-                window.hideGlobalSpinner();
-            }
-            if (document.body) {
-                document.body.classList.remove('process-running');
-            }
-        });
-        // --- 7. ROUTING MENU ---
-        if (window.location.pathname.endsWith('index.html') && window.history.replaceState) {
-            let cleanPath = window.location.pathname.replace(/index\.html$/, '');
-            window.history.replaceState(null, '', cleanPath + window.location.hash);
-        }
-
-        window.setMenuRoute = function(menuName, slug) {
-            // Saat user klik menu di sidebar, reset scroll ke paling atas
-            userScrollTop = 0;
-            let c = getContainer();
-            if (c) c.scrollTop = 0;
-
-            try {
-                let basePath = window.location.pathname.replace(/index\.html$/, '');
-                if (!basePath.endsWith('/')) basePath += '/';
-                if (window.history.pushState) window.history.pushState(null, '', basePath + '#' + slug);
-                else window.location.hash = '#' + slug;
-            } catch(e) { window.location.hash = '#' + slug; }
-            Shiny.setInputValue('select_menu_item', menuName, {priority: 'event'});
-        };
-
-        window.updateUrlMenu = function(menuName) {
-            let slug = menuName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-            if (window.history.pushState) window.history.pushState(null, null, '#' + slug);
-            else window.location.hash = '#' + slug;
-        };
-
-        document.addEventListener("DOMContentLoaded", function() {
-            let h = window.location.hash.replace('#', '').trim();
-            if (h) {
-                setTimeout(function() { Shiny.setInputValue('initial_url_hash', h, {priority: 'event'}); }, 500);
-            }
-        });
     """),
 
-    # --- 3. FONT AWESOME ICONS ---
     ui.tags.link(rel="stylesheet", href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"),
 
-    # --- 4. CSS STYLING LENGKAP ---
+    # --- 2. CSS STYLING (SEMUA CSS DILETAKKAN DI SINI) ---
     ui.tags.style("""
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         body, html { height: 100%; width: 100%; overflow-x: hidden; background-color: #111318; margin: 0; padding: 0; }
@@ -467,76 +270,20 @@ CUSTOM_HEAD = ui.head_content(
             overflow-x: hidden !important;
             scroll-behavior: auto !important;
             overscroll-behavior: contain !important;
-            -webkit-overflow-scrolling: touch;
         }
 
-        /* POSISI INPUT FILE PERSIS DI DALAM TOMBOL (CEGAH LOMPATAN SAAT DIKLIK) */
-        .btn-file {
-            position: relative !important;
-            overflow: hidden !important;
-            cursor: pointer !important;
-        }
-        .btn-file input[type="file"],
-        .reflex-upload-container input[type="file"] {
-            position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100% !important;
-            height: 100% !important;
+        /* 🌟 CEGAH LAYAR MENJADI ABU-ABU / REDUP KETIKA WEBSOCKET ATAU REKALKULASI */
+        #shiny-disconnected-overlay {
+            display: none !important;
             opacity: 0 !important;
-            cursor: pointer !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            display: block !important;
-            z-index: 5 !important;
+            pointer-events: none !important;
+        }
+        
+        .shiny-disconnected {
+            opacity: 1 !important;
+            filter: none !important;
         }
 
-        .reflex-upload-container {
-            border: 2px dashed #000000 !important;
-            border-radius: 8px;
-            background: #F8FAFC;
-            padding: 1.25rem 1.5rem;
-            min-height: 85px;
-            width: 100%;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: flex-start !important;
-            position: relative !important;
-            transition: border-color 0.15s ease, background-color 0.15s ease !important;
-        }
-        .reflex-upload-container:hover {
-            border-color: #C5A059 !important;
-            background-color: #FFFFFF !important;
-        }
-        .reflex-upload-container .shiny-input-container { margin-bottom: 0 !important; width: 100%; display: flex !important; align-items: center !important; }
-        .reflex-upload-container .input-group { display: flex !important; align-items: center !important; width: 100% !important; margin-bottom: 0 !important; }
-        .reflex-upload-container .input-group-prepend, .reflex-upload-container .input-group-btn { display: flex !important; align-items: center !important; margin: 0 !important; }
-        .reflex-upload-container .btn-file {
-            background-color: #C5A059 !important; color: white !important; font-weight: bold !important;
-            border-radius: 6px !important; border: none !important; padding: 8px 18px !important;
-            margin-right: 14px !important; display: inline-flex !important; align-items: center !important; height: 38px !important;
-        }
-        .reflex-upload-container input[type="text"].form-control {
-            background-color: transparent !important; border: none !important; color: #38A169 !important;
-            font-weight: 700 !important; font-size: 14px !important; box-shadow: none !important;
-            padding: 0 !important; height: 38px !important; line-height: 38px !important; display: flex !important;
-            align-items: center !important; width: 100% !important; flex: 1 1 auto !important;
-            overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important;
-        }
-        .reflex-upload-container input[type="text"].form-control::placeholder { color: #718096 !important; font-weight: normal !important; font-size: 13px !important; }
-
-        .reflex-upload-container .shiny-file-input-progress,
-        .reflex-upload-container .progress,
-        .csv-batch-box .shiny-file-input-progress,
-        .csv-batch-box .progress { display: none !important; visibility: hidden !important; height: 0 !important; margin: 0 !important; padding: 0 !important; opacity: 0 !important; }
-
-        .csv-batch-box {
-            border: 2px dashed #000000 !important; border-radius: 12px; background: #FFF5F5;
-            padding: 2rem 1.5rem; width: 100%; text-align: center; margin-bottom: 1.25rem;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-        }
-
-        /* HILANGKAN LAYAR REDUP / BLUR BAWAAN SHINY SAAT REKALKULASI */
         .recalculating, 
         .shiny-output-binding-busy,
         .shiny-bound-output.recalculating {
@@ -545,47 +292,14 @@ CUSTOM_HEAD = ui.head_content(
             transition: none !important;
         }
 
-        /* Jaga input search tetap fokus dan tidak berkedip */
-        #ll01_global_note:focus, 
-        #ll01_global_tgl_start:focus, 
-        #ll01_global_tgl_end:focus {
-            outline: none;
-            border-color: #3182CE !important;
+        /* SPINNER OVERLAY: KLIK PADA LAYAR LANGSUNG MENUTUP TIRAI */
+        #global_reflex_loading { display: none; cursor: pointer; }
+        body.process-running #global_reflex_loading {
+            display: flex !important; position: fixed !important;
+            top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important;
+            background: rgba(0, 0, 0, 0.4) !important; z-index: 99990 !important;
+            align-items: center !important; justify-content: center !important;
         }
-        .csv-batch-box .shiny-input-container { margin-bottom: 0 !important; width: 100%; }
-        .csv-batch-box .input-group { display: flex !important; align-items: center !important; width: 100% !important; margin-bottom: 0 !important; }
-        .csv-batch-box .btn-file { background: #1A202C !important; color: #FFFFFF !important; font-weight: 700 !important; border-radius: 6px !important; border: none !important; padding: 8px 16px !important; margin-right: 10px !important; }
-        .csv-batch-box input[type="text"].form-control { background-color: transparent !important; border: none !important; color: #2D3748 !important; font-weight: 700 !important; font-size: 13px !important; box-shadow: none !important; }
-
-        .selectize-control .selectize-input {
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234A5568' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
-            background-repeat: no-repeat !important;
-            background-position: right 0.75rem center !important;
-            background-size: 14px 14px !important;
-            padding-right: 2.25rem !important;
-        }
-
-        .selectize-control .selectize-input.dropdown-active {
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23E50914' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='18 15 12 9 6 15'%3E%3C/polyline%3E%3C/svg%3E") !important;
-        }
-
-        select.form-control, select {
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234A5568' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
-            background-repeat: no-repeat !important;
-            background-position: right 0.75rem center !important;
-            background-size: 14px 14px !important;
-            padding-right: 2.25rem !important;
-            -webkit-appearance: none !important;
-            -moz-appearance: none !important;
-            appearance: none !important;
-        }
-
-        @keyframes blinkAnimation {
-            0% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.25; transform: scale(0.75); }
-            100% { opacity: 1; transform: scale(1); }
-        }
-        .blink-online { animation: blinkAnimation 1.5s infinite ease-in-out; }
 
         .reflex-spinner-red {
             width: 38px; height: 38px;
@@ -595,33 +309,13 @@ CUSTOM_HEAD = ui.head_content(
         }
         @keyframes reflexSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        #global_reflex_loading { display: none; cursor: pointer; }
-        body.process-running #global_reflex_loading {
-            display: flex !important; position: fixed !important;
-            top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important;
-            background: rgba(0, 0, 0, 0.5) !important; z-index: 99990 !important;
-            align-items: center !important; justify-content: center !important;
+        @keyframes blinkAnimation {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.25; transform: scale(0.75); }
+            100% { opacity: 1; transform: scale(1); }
         }
+        .blink-online { animation: blinkAnimation 1.5s infinite ease-in-out; }
 
-        body:has(#success-modal-overlay) #global_reflex_loading,
-        body:has(#error-modal-overlay) #global_reflex_loading { display: none !important; }
-
-        #success-modal-overlay, #error-modal-overlay { z-index: 999999 !important; }
-
-        @keyframes popIn { 0% { transform: scale(0.5); opacity: 0; } 70% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
-        .animate-pop { animation: popIn 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
-        
-        #shiny-notification-panel { top: 25px !important; right: 25px !important; bottom: auto !important; left: auto !important; position: fixed !important; z-index: 999999 !important; width: 360px !important; }
-        .shiny-notification { border-radius: 10px !important; box-shadow: 0 10px 25px rgba(0,0,0,0.18) !important; font-weight: 700 !important; font-size: 13px !important; padding: 14px 18px !important; margin-bottom: 10px !important; }
-        .shiny-notification-message { background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important; color: #FFFFFF !important; border: none !important; }
-        .shiny-notification-error { background: linear-gradient(135deg, #E50914 0%, #B20710 100%) !important; color: #FFFFFF !important; border: none !important; }
-        .shiny-notification-warning { background: linear-gradient(135deg, #DD6B20 0%, #C05621 100%) !important; color: #FFFFFF !important; border: none !important; }
-
-        .custom-clean-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
-        .custom-clean-table th { background: #EDF2F7; color: #1A202C; font-weight: bold; font-size: 12px; padding: 10px; white-space: nowrap; border-bottom: 1px solid #CBD5E0; }
-        .custom-clean-table td { color: #2D3748; padding: 8px 10px; white-space: nowrap; border-bottom: 1px solid #EDF2F7; }
-        .custom-clean-table tr:hover { background-color: #F8FAFC; }
-        
         .btn-red-gradient {
             background: linear-gradient(135deg, #E50914 0%, #B20710 100%) !important;
             color: #FFFFFF !important; font-weight: 800 !important; border-radius: 6px !important;
@@ -630,22 +324,8 @@ CUSTOM_HEAD = ui.head_content(
         }
         .btn-red-gradient:hover { filter: brightness(1.1); }
         .btn-locked { background-color: #E50914 !important; opacity: 0.5 !important; color: white !important; font-weight: bold !important; border-radius: 6px !important; cursor: not-allowed !important; border: none !important; padding: 0.75rem 1.5rem; }
-
-        .btn-page-nav {
-            background: #FFFFFF; border: 1.5px solid #CBD5E0; border-radius: 6px;
-            padding: 4px 12px; font-weight: 700; font-size: 12px; color: #1A202C;
-            cursor: pointer; transition: all 0.2s ease;
-        }
-        .btn-page-nav:hover:not(:disabled) { background: #EDF2F7; border-color: #A0AEC0; }
-        .btn-page-nav:disabled { opacity: 0.35; cursor: not-allowed; }
-
-        details { border: 1px solid #E2E8F0; border-radius: 6px; margin-bottom: 8px; background: #FFFFFF; }
-        summary { font-weight: bold; padding: 10px 14px; cursor: pointer; color: #1A202C; background: #F8FAFC; border-radius: 6px; }
-        details[open] summary { border-bottom: 1px solid #E2E8F0; border-radius: 6px 6px 0 0; }
-        .accordion-content { padding: 14px; font-size: 13px; color: #4A5568; background: #F7FAFC; }
     """),
 
-    # --- 5. SCRIPT LIVE TIMER ---
     ui.tags.script("""
         setInterval(function() {
             let elStore = document.getElementById('login-time-store');
@@ -841,9 +521,9 @@ def static_loading_spinner():
             ui.span("Sedang memproses data, mohon tunggu...", style="font-weight: bold; color: #1A202C; font-size: 14px; text-align: center;"),
             style="background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25); display: flex; flex-direction: column; align-items: center; gap: 1rem; min-width: 280px;"
         ),
-        id="global_reflex_loading"
+        id="global_reflex_loading",
+        onclick="window.hideGlobalSpinner();"  # 👈 KLIK PADA LAYAR LANGSUNG MENUTUP TIRAI SPINNER
     )
-
 # ==============================================================================
 # HELPER KOMPONEN UPLOADER BOX
 # ==============================================================================

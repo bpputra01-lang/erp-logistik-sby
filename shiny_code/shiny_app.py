@@ -34,17 +34,14 @@ def server(input: Inputs, output: Outputs, session: Session):
     # 🌟 Gunakan list 1 elemen agar aman antar-sesi (session-safe) tanpa butuh 'global'
     _is_fl_polling = [False]
 
-    # 🔄 Cek data Supabase otomatis tiap 3 detik SECARA AMAN & ANTI-OVERLAP
     @reactive.effect
     async def _poll_fl_requests_from_supabase():
-        # 🛑 1. Jangan jalankan jika belum login
         if not state.logged_in():
             return
 
-        # ⏱️ 2. Jadwalkan timer berikutnya 3 detik dari sekarang
-        reactive.invalidate_later(3)
+        # ⏱️ Polling tiap 4 detik
+        reactive.invalidate_later(4)
 
-        # 🛑 3. JIKA POLLING SESI INI MASIH BERJALAN, LEWATI SIKLUS INI
         if _is_fl_polling[0]:
             return
 
@@ -62,7 +59,6 @@ def server(input: Inputs, output: Outputs, session: Session):
             def fetch_data():
                 return client.table("jezpro_fl_requests").select("*").execute()
 
-            # ⏱️ 4. Beri batas timeout 2.5 detik agar jika Supabase lambat, app tidak ikut menggantung
             res = await asyncio.wait_for(asyncio.to_thread(fetch_data), timeout=2.5)
             raw_data = res.data if res and hasattr(res, "data") and res.data else []
 
@@ -73,14 +69,13 @@ def server(input: Inputs, output: Outputs, session: Session):
                     reverse=True
                 )[:20]
 
-                # Ambil ID terbaru untuk pengecekan perubahan
                 first_row = sorted_data[0]
                 newest_id = str(first_row.get("id") or first_row.get("req_id") or first_row.get("created_at") or "")
 
                 with reactive.isolate():
                     prev_id = _last_seen_fl_id()
 
-                # 🌟 5. KUNCI UTAMA: HANYA UPDATE STATE JIKA ADA DATA BARU (Mencegah Re-render Spam)
+                # 🌟 KUNCI: HANYA UPDATE STATE SAAT BENAR-BENAR ADA BARANG BARU
                 if newest_id != prev_id:
                     cards = []
                     for row in sorted_data:
@@ -98,15 +93,14 @@ def server(input: Inputs, output: Outputs, session: Session):
                             "qty": safe_int(row.get("qty", 1), 1)
                         })
 
-                    # Update state hanya saat datanya benar-benar berubah/ada baru
                     state.fl_request_list.set(cards)
                     state.fl_last_check_time.set(datetime.now().strftime("%H:%M:%S"))
 
-                    # Pemicu suara barang baru (Hanya jika bukan data pertama kali load)
                     if prev_id is not None:
                         art_name = re.sub(r'<[^>]+>', '', str(first_row.get("article_name", "Barang Baru"))).strip()
                         pic_name = first_row.get("pic", "Tim FL")
 
+                        # Picu suara ke browser
                         await session.send_custom_message("trigger_fl_sound", {
                             "id": newest_id,
                             "article": art_name,
@@ -115,9 +109,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                         ui.notification_show(f"🚨 Barang Baru: {art_name} ({pic_name})", type="warning", duration=6)
 
                     _last_seen_fl_id.set(newest_id)
-                else:
-                    # Jika data sama, kita cukup update jam indikator live-nya saja secara ringan
-                    state.fl_last_check_time.set(datetime.now().strftime("%H:%M:%S"))
+                # 🛑 KUNCI ANTI-REDUP: JANGAN UPDATE fl_last_check_time JIKA TIDAK ADA DATA BARU!
             else:
                 with reactive.isolate():
                     current_list = state.fl_request_list()
@@ -125,12 +117,10 @@ def server(input: Inputs, output: Outputs, session: Session):
                     state.fl_request_list.set([])
 
         except asyncio.TimeoutError:
-            # Jika Supabase timeout karena internet lambat, abaikan pelan-pelan tanpa merusak app / bikin redup
-            print("⚠️ Warning: Polling Supabase timeout (jaringan lambat).")
+            pass
         except Exception as e:
             print("⚠️ Error polling FL:", e)
         finally:
-            # Selalu buka kembali kuncinya di akhir siklus khusus sesi ini
             _is_fl_polling[0] = False
                         # Modal Dismiss Listeners
     @reactive.Effect
