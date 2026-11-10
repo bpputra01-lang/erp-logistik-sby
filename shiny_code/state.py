@@ -7502,13 +7502,46 @@ class AppState:
             print("Error load_instock_daily_from_supabase:", e)
             self.iv_processed.set(True)
             return False, f"Gagal memuat data: {e}"
-            
+
     def _refresh_iv_dataframes_from_lists(self):
         """Helper merefresh tabel Tab 1 dan Tab 3 secara akurat"""
         pending = self.iv_tab1_pending()
         scanned = self.iv_tab3_scanned()
         
         now_jakarta = pd.Timestamp.now(tz='Asia/Jakarta')
+
+    def move_instock_sku_to_mutasi(self, sku_input: str):
+        """Memindahkan item dari Tab 1 ke Tab 3 berdasarkan SKU/Barcode yang di-input atau di-scan"""
+        clean_input = str(sku_input).split('.')[0].strip().upper()
+        pending = list(self.iv_tab1_pending())
+        scanned = list(self.iv_tab3_scanned())
+        
+        target_idx = -1
+        for idx, it in enumerate(pending):
+            # Cek seluruh kemungkinan nama kolom barcode/sku dari Supabase
+            raw_s = it.get("barcode_sku") or it.get("sku") or it.get("SKU") or it.get("barcode") or it.get("BARCODE") or it.get("item_code") or ""
+            s_item = str(raw_s).split('.')[0].strip().upper()
+            
+            # Cocokkan baik string persis maupun tanpa angka 0 di depan (misal: 009048 vs 9048)
+            if s_item == clean_input or (s_item.lstrip('0') and s_item.lstrip('0') == clean_input.lstrip('0')):
+                target_idx = idx
+                break
+        
+        if target_idx != -1:
+            # 1. Keluarkan dari Tab 1 (Pending)
+            moved_item = pending.pop(target_idx)
+            # 2. Masukkan ke Tab 3 (Scanned / Mutasi)
+            scanned.append(moved_item)
+            
+            # 3. Update state reactive
+            self.iv_tab1_pending.set(pending)
+            self.iv_tab3_scanned.set(scanned)
+            
+            # 4. Refresh tampilan tabel secara otomatis
+            self._refresh_iv_dataframes_from_lists()
+            return True, f"SKU {clean_input} berhasil dipindahkan ke Tab 3!"
+        else:
+            return False, "Item tidak ada di list!"
         
         def get_instock_diff_minutes(r):
             ts = r.get("disappeared_at") or r.get("created_at")
