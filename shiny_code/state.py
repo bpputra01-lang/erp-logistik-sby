@@ -7364,11 +7364,8 @@ class AppState:
             return False, f"Gagal mengembalikan memo: {e}"
 
 
-    # --------------------------------------------------------------------------
-    # METODE INSTOCK VALIDATION (URUT TERBARU DI ATAS, ABAIKAN TOKO & DONE, TAB 3 5-KOLOM)
-    # --------------------------------------------------------------------------
     def load_instock_daily_from_supabase(self):
-        """Memuat antrean barang terbaru dari Supabase secara cepat dan aman (Anti-Hang)"""
+        """Memuat antrean barang terbaru dari Supabase tanpa memanggil .limit()"""
         try:
             client = get_supabase()
             if not client:
@@ -7377,24 +7374,25 @@ class AppState:
 
             all_data = []
 
-            # 1. Coba query dengan tanggal hari ini
+            # 1. Coba query berdasarkan tanggal hari ini (tanpa .limit())
             try:
                 today_str = datetime.now(WIB).strftime("%Y-%m-%d")
-                res = client.table("jezpro_instock_daily").select("*").eq("sync_date", today_str).limit(300).execute()
+                res = client.table("jezpro_instock_daily").select("*").eq("sync_date", today_str).execute()
                 if res and hasattr(res, "data") and res.data:
-                    all_data = res.data
-            except Exception as e_date:
-                print("Query sync_date dilewati:", e_date)
+                    all_data = res.data[:300]  # 👈 Batasi 300 data langsung di Python
+            except Exception as e_eq:
+                print("Query eq sync_date dilewati:", e_eq)
 
-            # 2. Jika hari ini kosong atau error, ambil data terbaru langsung
+            # 2. Jika hari ini kosong atau gagal, ambil data tabel (tanpa .limit())
             if not all_data:
                 try:
-                    res_all = client.table("jezpro_instock_daily").select("*").limit(200).execute()
+                    res_all = client.table("jezpro_instock_daily").select("*").execute()
                     if res_all and hasattr(res_all, "data") and res_all.data:
-                        all_data = res_all.data
-                except Exception as e_all:
-                    print("Query fallback gagal:", e_all)
-                    return False, f"Tabel Supabase error: {e_all}"
+                        all_data = res_all.data[:300]  # 👈 Batasi 300 data langsung di Python
+                except Exception as e_select:
+                    print("Query fallback select gagal:", e_select)
+                    self.iv_processed.set(True)
+                    return False, f"Gagal query jezpro_instock_daily: {e_select}"
 
             if not all_data:
                 self.iv_instock_data.set([])
@@ -7406,7 +7404,7 @@ class AppState:
 
             df_all = pd.DataFrame(all_data)
             
-            # Pengurutan aman tanpa ketergantungan kolom 'id'
+            # Pengurutan data terbaru di atas
             sort_cols = [c for c in ["created_at", "disappeared_at", "id"] if c in df_all.columns]
             if sort_cols:
                 df_all = df_all.sort_values(by=sort_cols[0], ascending=False)
@@ -7435,7 +7433,6 @@ class AppState:
                     return max(0.0, (now_jakarta - dt).total_seconds() / 60.0)
                 except Exception: return 999999.0
 
-            # 🌟 Pengecekan Status fleksibel (tidak peka huruf besar/kecil)
             need_setup_raw = []
             done_setup_raw = []
             for x in all_data:
@@ -7505,33 +7502,7 @@ class AppState:
             print("Error load_instock_daily_from_supabase:", e)
             self.iv_processed.set(True)
             return False, f"Gagal memuat data: {e}"
-
-    def move_instock_sku_to_mutasi(self, sku_input: str):
-        """Memindahkan item dari Tab 1 ke Tab 3 berdasarkan SKU yang di-input/scan (Dengan Multi-Key Fallback)"""
-        clean_input = str(sku_input).split('.')[0].strip().upper()
-        pending = list(self.iv_tab1_pending())
-        scanned = list(self.iv_tab3_scanned())
-        
-        target_idx = -1
-        for idx, it in enumerate(pending):
-            # 🌟 Cek multi-key (barcode_sku, sku, SKU) agar tidak gagal cocok
-            s_item = str(it.get("barcode_sku") or it.get("sku") or it.get("SKU") or "").split('.')[0].strip().upper()
-            if s_item == clean_input:
-                target_idx = idx
-                break
-        
-        if target_idx != -1:
-            moved_item = pending.pop(target_idx)
-            scanned.append(moved_item)
             
-            self.iv_tab1_pending.set(pending)
-            self.iv_tab3_scanned.set(scanned)
-            
-            self._refresh_iv_dataframes_from_lists()
-            return True, f"SKU {clean_input} berhasil dipindahkan ke Tab 3!"
-        else:
-            return False, "Item tidak ada di list!"
-
     def _refresh_iv_dataframes_from_lists(self):
         """Helper merefresh tabel Tab 1 dan Tab 3 secara akurat"""
         pending = self.iv_tab1_pending()
