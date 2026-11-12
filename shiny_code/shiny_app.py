@@ -821,7 +821,20 @@ def server(input: Inputs, output: Outputs, session: Session):
                     ), open=True
                 )
             )
-
+        elif cur == "Target Progress":
+            guide_body = ui.div(
+                ui.tags.details(
+                    ui.tags.summary("📋 Panduan Target Progress (3 Tab)"),
+                    ui.div(
+                        ui.tags.ul(
+                            ui.tags.li(ui.strong("Tab 1 (Input Target):"), " Pilih Sub Divisi, Week, Bulan, dan Tahun. Tambah isi target secara dinamis tanpa perlu input ulang metadata."),
+                            ui.tags.li(ui.strong("Tab 2 (Progress Daily):"), " Teks target disalin otomatis dari Tab 1. Masukkan persentase (10%-100%), Note jika < 100%, Deadline (1-3 hari), dan Justifikasi (Confirmed / Unconfirmed)."),
+                            ui.tags.li(ui.strong("Tab 3 (Metric & Report):"), " Laporan murni Read-Only. Menampilkan pencapaian efektif di mana status 'JUSTIFIKASI UNCONFIRMED' otomatis memotong persentase pencapaian target harian.")
+                        ),
+                        class_="accordion-content"
+                    ), open=True
+                )
+            )
         # FALLBACK JIKA MENU LAIN
         else:
             guide_body = ui.div(
@@ -837,20 +850,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             footer=ui.modal_button("Tutup", class_="btn-red-gradient")
         ))
 
-        elif cur == "Target Progress":
-            guide_body = ui.div(
-                ui.tags.details(
-                    ui.tags.summary("📋 Panduan Target Progress (3 Tab)"),
-                    ui.div(
-                        ui.tags.ul(
-                            ui.tags.li(ui.strong("Tab 1 (Input Target):"), " Pilih Sub Divisi, Week, Bulan, dan Tahun. Tambah isi target secara dinamis tanpa perlu input ulang metadata."),
-                            ui.tags.li(ui.strong("Tab 2 (Progress Daily):"), " Teks target disalin otomatis dari Tab 1. Masukkan persentase (10%-100%), Note jika < 100%, Deadline (1-3 hari), dan Justifikasi (Confirmed / Unconfirmed)."),
-                            ui.tags.li(ui.strong("Tab 3 (Metric & Report):"), " Laporan murni Read-Only. Menampilkan pencapaian efektif di mana status 'JUSTIFIKASI UNCONFIRMED' otomatis memotong persentase pencapaian target harian.")
-                        ),
-                        class_="accordion-content"
-                    ), open=True
-                )
-            )
+        
 
         
     @render.ui
