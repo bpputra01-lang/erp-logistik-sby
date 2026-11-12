@@ -2992,6 +2992,136 @@ def refill_shelving_view(state: AppState):
         style="width: 100%; padding: 1rem;"
     )
 
+    # ==============================================================================
+# VIEW: TARGET PROGRESS (3 TAB LENGKAP: INPUT TARGET, PROGRESS DAILY, METRICS)
+# ==============================================================================
+def target_progress_view(state: AppState):
+    MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
+    WEEKS = ["Week 1", "Week 2", "Week 3", "Week 4", "Week 5"]
+    YEARS = [str(y) for y in range(2026, 2036)] # 10 Tahun ke depan
+    DIVISI_LIST = ["INBOUND", "OUTBOUND", "INVENTORY"]
+
+    # --- BARIS FILTER UNIVERSAL ATAS ---
+    filter_bar = ui.div(
+        ui.div(
+            ui.div(
+                ui.span("🏢 Sub Divisi:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
+                ui.tags.select(
+                    *[ui.tags.option(d, value=d, selected=(d == state.target_divisi())) for d in DIVISI_LIST],
+                    id="target_filter_divisi",
+                    onchange="Shiny.setInputValue('change_target_divisi', this.value, {priority: 'event'})",
+                    style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 13px; background: white; cursor: pointer; min-width: 160px;"
+                ),
+                style="display: flex; flex-direction: column;"
+            ),
+            ui.div(
+                ui.span("📅 Target Week:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
+                ui.tags.select(
+                    *[ui.tags.option(w, value=w, selected=(w == state.target_week())) for w in WEEKS],
+                    id="target_filter_week",
+                    onchange="Shiny.setInputValue('change_target_week', this.value, {priority: 'event'})",
+                    style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 13px; background: white; cursor: pointer; min-width: 140px;"
+                ),
+                style="display: flex; flex-direction: column;"
+            ),
+            ui.div(
+                ui.span("📆 Bulan:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
+                ui.tags.select(
+                    *[ui.tags.option(m, value=m, selected=(m == state.target_month())) for m in MONTHS],
+                    id="target_filter_month",
+                    onchange="Shiny.setInputValue('change_target_month', this.value, {priority: 'event'})",
+                    style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 13px; background: white; cursor: pointer; min-width: 140px;"
+                ),
+                style="display: flex; flex-direction: column;"
+            ),
+            ui.div(
+                ui.span("🗓️ Tahun:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
+                ui.tags.select(
+                    *[ui.tags.option(y, value=y, selected=(y == state.target_year())) for y in YEARS],
+                    id="target_filter_year",
+                    onchange="Shiny.setInputValue('change_target_year', this.value, {priority: 'event'})",
+                    style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 13px; background: white; cursor: pointer; min-width: 120px;"
+                ),
+                style="display: flex; flex-direction: column;"
+            ),
+            style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;"
+        ),
+        ui.tags.button(
+            ui.tags.i(class_="fa-solid fa-arrows-rotate", style="margin-right: 6px;"), "SINKRONISASI DATA",
+            onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_refresh_target_data', Math.random(), {priority: 'event'})",
+            style="background: linear-gradient(135deg, #3182CE 0%, #2B6CB0 100%); color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer;"
+        ),
+        style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 1.25rem 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 10px;"
+    )
+
+    # --- TAB 1: INPUT TARGET (CRUD Target Text) ---
+    tab1_content = ui.div(
+        ui.div(
+            ui.h4("➕ Tambah Target Kerja Baru", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 6px;"),
+            ui.p(f"Menambahkan target baru untuk Sub Divisi: {state.target_divisi()} ({state.target_week()} - {state.target_month()} {state.target_year()}).", style="color: #718096; font-size: 12px; margin-bottom: 10px;"),
+            ui.div(
+                ui.tags.input(
+                    id="input_target_text_new",
+                    type="text",
+                    placeholder="Ketik isi target di sini (Contoh: Putaway tuntas sebelum jam 15:00)...",
+                    style="flex: 1; padding: 8px 14px; border: 1.5px solid #CBD5E0; border-radius: 6px; font-size: 13px; outline: none;"
+                ),
+                ui.tags.button(
+                    ui.tags.i(class_="fa-solid fa-plus", style="margin-right: 6px;"), "TAMBAH TARGET",
+                    onclick="""
+                        let txt = document.getElementById('input_target_text_new').value;
+                        if (!txt.trim()) { alert('Isi target wajib ditulis!'); return; }
+                        window.showGlobalSpinner();
+                        Shiny.setInputValue('btn_add_target_submit', txt, {priority: 'event'});
+                        document.getElementById('input_target_text_new').value = '';
+                    """,
+                    class_="btn-red-gradient",
+                    style="padding: 8px 18px; font-size: 12px; height: 38px; white-space: nowrap;"
+                ),
+                style="display: flex; gap: 10px; align-items: center; width: 100%;"
+            ),
+            style="background: #F8FAFC; border: 1.5px solid #CBD5E0; padding: 1.25rem; border-radius: 10px; margin-bottom: 1.25rem;"
+        ),
+        ui.output_ui("target_tab1_table_ui"),
+        style="padding: 0.5rem 0;"
+    )
+
+    # --- TAB 2: PROGRESS DAILY (Day 1 - Day 7 Form) ---
+    tab2_content = ui.div(
+        ui.div(
+            ui.div(
+                ui.h4("📝 Pengisian Pencapaian Harian (Day 1 - Day 7)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
+                ui.p("Target disalin otomatis dari Tab 1 (tidak dapat diedit teks targetnya di sini). Lengkapi persentase (10%-100%), Note & Deadline jika di bawah 100%, serta status justifikasi.", style="color: #718096; font-size: 12px; margin: 0;"),
+            ),
+            ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-floppy-disk", style="margin-right: 6px;"), "SIMPAN PROGRESS HARIAN",
+                onclick="window.submitAllTargetDailyProgress();",
+                style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; border: none; padding: 10px 18px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);"
+            ),
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 8px;"
+        ),
+        ui.output_ui("target_tab2_progress_ui"),
+        style="padding: 0.5rem 0;"
+    )
+
+    # --- TAB 3: METRIC CARDS & READ-ONLY REPORT ---
+    tab3_content = ui.div(
+        ui.output_ui("target_tab3_metrics_ui"),
+        ui.output_ui("target_tab3_readonly_table_ui"),
+        style="padding: 0.5rem 0;"
+    )
+
+    return ui.div(
+        filter_bar,
+        ui.navset_card_tab(
+            ui.nav_panel("🎯 1. INPUT TARGET", tab1_content),
+            ui.nav_panel("📈 2. PROGRESS DAILY TARGET", tab2_content),
+            ui.nav_panel("📊 3. METRIC & REPORT (READ-ONLY)", tab3_content),
+            id="target_main_navset"
+        ),
+        style="width: 100%; padding: 1rem;"
+    )
+
 def menu_item(label: str, target_menu: str, current_menu: str):
     import re
     is_active = (current_menu == target_menu)
