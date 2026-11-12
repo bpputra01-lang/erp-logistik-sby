@@ -7891,20 +7891,66 @@ class AppState:
             return False, f"Gagal menghapus target: {e}"
 
     def save_target_daily_progress(self, progress_payload: list):
-        """Menyimpan input Tab 2 (Achievement, Note, Deadline, Justifikasi) ke Supabase"""
+        """Menyimpan progress harian: Cek -> Jika sudah ada di-UPDATE, jika belum ada di-INSERT. TANPA DELETE."""
         try:
             client = get_supabase()
             if not client:
                 return False, "Koneksi Supabase gagal!"
 
-            if progress_payload:
-                client.table("warehouse_target_daily_progress").upsert(
-                    progress_payload, 
-                    on_conflict="target_id,day_num"
-                ).execute()
+            if not progress_payload:
+                return True, "Tidak ada data progress yang dikirim."
 
+            # 1. Kumpulkan seluruh target_id yang sedang diproses
+            target_ids = list(set([
+                safe_int(r.get("target_id")) 
+                for r in progress_payload 
+                if r.get("target_id") is not None
+            ]))
+
+            # 2. Ambil data yang sudah ada di Supabase untuk mencatat ID barisnya (tanpa menghapus apa pun)
+            existing_rows_map = {}
+            if target_ids:
+                try:
+                    res_existing = client.table("warehouse_target_daily_progress").select("*").in_("target_id", target_ids).execute()
+                except Exception:
+                    res_existing = client.table("warehouse_target_daily_progress").select("*").in_("target_id", [str(x) for x in target_ids]).execute()
+
+                if res_existing and hasattr(res_existing, 'data') and res_existing.data:
+                    for row in res_existing.data:
+                        t_id = safe_int(row.get("target_id"))
+                        d_num = safe_int(row.get("day_num"))
+                        # Petakan (target_id, day_num) -> id database
+                        existing_rows_map[(t_id, d_num)] = row.get("id")
+
+            # 3. Proses penyimpanan: UPDATE jika sudah ada, INSERT jika baru
+            for item in progress_payload:
+                t_id = safe_int(item.get("target_id"))
+                d_num = safe_int(item.get("day_num"))
+                key = (t_id, d_num)
+
+                row_payload = {
+                    "target_id": t_id,
+                    "day_num": d_num,
+                    "achievement_pct": safe_int(item.get("achievement_pct", 0)),
+                    "note": str(item.get("note", "")),
+                    "deadline_days": str(item.get("deadline_days", "-")),
+                    "justifikasi_status": str(item.get("justifikasi_status", "-"))
+                }
+
+                if key in existing_rows_map:
+                    # ✅ JIKA SUDAH ADA: HANYA UPDATE NILAINYA (TIDAK DIHAPUS)
+                    db_id = existing_rows_map[key]
+                    try:
+                        client.table("warehouse_target_daily_progress").update(row_payload).eq("id", db_id).execute()
+                    except Exception:
+                        client.table("warehouse_target_daily_progress").update(row_payload).in_("id", [db_id]).execute()
+                else:
+                    # ✅ JIKA BELUM ADA: TAMBAHKAN BARIS BARU
+                    client.table("warehouse_target_daily_progress").insert(row_payload).execute()
+
+            # 4. Refresh tampilan data
             self.load_targets_data()
-            return True, "✅ Progress pencapaian berhasil disimpan!"
+            return True, "✅ Progress pencapaian berhasil disimpan (Data lama diperbarui tanpa dihapus)!"
         except Exception as e:
             return False, f"Gagal menyimpan progress: {e}"
 
