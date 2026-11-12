@@ -7956,48 +7956,66 @@ class AppState:
 
     def get_target_metrics_summary(self):
         """
-        Kalkulasi Metrik Tab 3:
-        1. Pencapaian: Nilai persentase harian. 
-           Jika berstatus JUSTIFIKASI UNCONFIRMED, persentase hari itu menjadi pengurang / hangus (0%).
-        2. Hitung total Justifikasi Confirmed & Unconfirmed.
+        Kalkulasi Metrik Tab 3 Berbasis Bobot Harian (100% Base):
+        - Tiap hari memiliki bobot 1/7 dari target mingguan.
+        - Jika UNCONFIRMED, yang dipotong HANYA porsi bobot defisit hari itu.
+        - Nilai tidak akan anjlok drastis hanya karena 1 hari jelek.
         """
         targets = self.target_items_list()
         daily_map = self.target_daily_map()
+        total_targets = len(targets)
 
-        total_days_logged = 0
-        total_effective_pct = 0.0
+        if total_targets == 0:
+            return {
+                "total_targets": 0,
+                "avg_achievement_pct": 100.0,
+                "confirmed_count": 0,
+                "unconfirmed_count": 0,
+                "total_potongan_pct": 0.0
+            }
+
         confirmed_count = 0
         unconfirmed_count = 0
+        total_potongan_pct = 0.0
+
+        # Bobot per hari per target terhadap total target 100%
+        # 1 Target = 100 / 7 = 14.2857% per hari
+        # 2 Target = 100 / 14 = 7.1428% per hari
+        bobot_per_hari = 100.0 / (total_targets * 7)
 
         for t in targets:
             t_id = t["id"]
             for d in range(1, 8):
                 key = f"{t_id}_{d}"
                 entry = daily_map.get(key, {})
-                achieve = safe_int(entry.get("achievement", 0))
-                justifikasi = entry.get("justifikasi", "-")
 
-                if justifikasi == "JUSTIFIKASI CONFIRMED":
+                raw_achieve = entry.get("achievement")
+                achieve = safe_int(raw_achieve, 100) if raw_achieve is not None else 100
+                justifikasi = str(entry.get("justifikasi", "-")).strip().upper()
+
+                if "CONFIRMED" in justifikasi and "UNCONFIRMED" not in justifikasi:
                     confirmed_count += 1
-                elif justifikasi == "JUSTIFIKASI UNCONFIRMED":
+                    # Terkonfirmasi: Alasan sah, potongan 0% (target terlindungi)
+                elif "UNCONFIRMED" in justifikasi:
                     unconfirmed_count += 1
+                    # Tidak terkonfirmasi: Potong proporsional sesuai bobot defisit hari ini
+                    defisit = max(0, 100 - achieve)
+                    potongan = (defisit / 100.0) * bobot_per_hari
+                    total_potongan_pct += potongan
+                else:
+                    # Tanpa justifikasi khusus (misal lupa isi justifikasi tapi nilai < 100%)
+                    if achieve < 100:
+                        defisit = 100 - achieve
+                        potongan = (defisit / 100.0) * bobot_per_hari
+                        total_potongan_pct += potongan
 
-                # Logika: Jika unconfirmed, pencapaian dipotong / dinolkan
-                if achieve > 0:
-                    total_days_logged += 1
-                    if justifikasi == "JUSTIFIKASI UNCONFIRMED":
-                        effective_achieve = 0  # Pengurang
-                    else:
-                        effective_achieve = achieve
-                    total_effective_pct += effective_achieve
-
-        # Rata-rata pencapaian target
-        avg_pct = (total_effective_pct / total_days_logged) if total_days_logged > 0 else 0.0
+        # Nilai Akhir Mingguan = 100% - Total Akumulasi Potongan Bobot
+        final_score = max(0.0, round(100.0 - total_potongan_pct, 1))
 
         return {
-            "total_targets": len(targets),
-            "avg_achievement_pct": round(avg_pct, 1),
+            "total_targets": total_targets,
+            "avg_achievement_pct": final_score,
             "confirmed_count": confirmed_count,
             "unconfirmed_count": unconfirmed_count,
-            "total_days_logged": total_days_logged
+            "total_potongan_pct": round(total_potongan_pct, 1)
         }

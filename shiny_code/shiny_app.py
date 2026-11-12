@@ -6264,12 +6264,16 @@ def server(input: Inputs, output: Outputs, session: Session):
     def target_tab3_readonly_table_ui():
         targets = state.target_items_list()
         daily_map = state.target_daily_map()
+        total_targets = len(targets)
 
         if not targets:
             return ui.div(
                 ui.p("Tidak ada data target untuk ditampilkan pada laporan ini.", style="color: #718096; font-style: italic; text-align: center; padding: 2rem;"),
                 style="background: white; border-radius: 8px; border: 1px dashed #CBD5E0;"
             )
+
+        # Hitung bobot per hari per target
+        bobot_per_hari = 100.0 / (total_targets * 7) if total_targets > 0 else 14.28
 
         cards = []
         for idx, t in enumerate(targets, start=1):
@@ -6280,33 +6284,47 @@ def server(input: Inputs, output: Outputs, session: Session):
             for d in range(1, 8):
                 key = f"{t_id}_{d}"
                 entry = daily_map.get(key, {})
-                achieve = safe_int(entry.get("achievement", 0))
+
+                raw_achieve = entry.get("achievement")
+                achieve = safe_int(raw_achieve, 100) if raw_achieve is not None else 100
                 note = entry.get("note", "-")
                 deadline = entry.get("deadline", "-")
-                just = entry.get("justifikasi", "-")
+                just = str(entry.get("justifikasi", "-")).strip().upper()
 
-                is_unconf = (just == "JUSTIFIKASI UNCONFIRMED")
-                achieve_display = f"{achieve}%"
-                if is_unconf and achieve > 0:
-                    achieve_badge = ui.span(f"0% (Penalti Unconfirmed: {achieve}%)", style="color: #E53E3E; font-weight: 800;")
-                elif achieve >= 80:
-                    achieve_badge = ui.span(achieve_display, style="color: #10B981; font-weight: 800;")
-                elif achieve > 0:
-                    achieve_badge = ui.span(achieve_display, style="color: #DD6B20; font-weight: 800;")
+                is_unconf = ("UNCONFIRMED" in just)
+                is_conf = ("CONFIRMED" in just and not is_unconf)
+
+                # 🌟 TAMPILAN DENGAN PERHITUNGAN BOBOT TRANSPARAN
+                if is_unconf and achieve < 100:
+                    defisit = 100 - achieve
+                    potongan_bobot = round((defisit / 100.0) * bobot_per_hari, 1)
+                    achieve_badge = ui.div(
+                        ui.span(f"{achieve}% ", style="color: #E53E3E; font-weight: 800; font-size: 13px;"),
+                        ui.span(f"(Penalti Bobot: -{potongan_bobot}% ke Target)", style="color: #C53030; font-weight: 600; font-size: 11px; display: block;")
+                    )
+                elif is_conf and achieve < 100:
+                    achieve_badge = ui.div(
+                        ui.span("100% ", style="color: #10B981; font-weight: 800; font-size: 13px;"),
+                        ui.span(f"(Terkonfirmasi: Real {achieve}%, Potongan 0%)", style="color: #047857; font-weight: 600; font-size: 11px; display: block;")
+                    )
+                elif achieve == 100:
+                    achieve_badge = ui.span("100%", style="color: #10B981; font-weight: 800; font-size: 13px;")
                 else:
-                    achieve_badge = ui.span("0%", style="color: #718096;")
+                    defisit = 100 - achieve
+                    potongan_bobot = round((defisit / 100.0) * bobot_per_hari, 1)
+                    achieve_badge = ui.span(f"{achieve}% (-{potongan_bobot}%)", style="color: #DD6B20; font-weight: 800;")
 
                 badge_just = (
                     ui.span("CONFIRMED", style="background: #C6F6D5; color: #22543D; font-weight: 800; padding: 3px 8px; border-radius: 4px; font-size: 11px;")
-                    if just == "JUSTIFIKASI CONFIRMED" else (
+                    if is_conf else (
                         ui.span("UNCONFIRMED", style="background: #FED7D7; color: #9B2C2C; font-weight: 800; padding: 3px 8px; border-radius: 4px; font-size: 11px;")
-                        if just == "JUSTIFIKASI UNCONFIRMED" else ui.span("-", style="color: #A0AEC0;")
+                        if is_unconf else ui.span("-", style="color: #A0AEC0;")
                     )
                 )
 
                 day_rows.append(ui.tags.tr(
                     ui.tags.td(f"Day {d}", style="text-align: center; font-weight: 700; width: 80px;"),
-                    ui.tags.td(achieve_badge, style="text-align: center; width: 200px;"),
+                    ui.tags.td(achieve_badge, style="text-align: center; width: 280px;"),
                     ui.tags.td(note if note else "-"),
                     ui.tags.td(deadline if deadline else "-", style="text-align: center; width: 100px;"),
                     ui.tags.td(badge_just, style="text-align: center; width: 160px;")
@@ -6321,7 +6339,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                 ui.tags.table(
                     ui.tags.thead(ui.tags.tr(
                         ui.tags.th("HARI", style="text-align: center;"),
-                        ui.tags.th("PENCAPAIAN EFEKTIF", style="text-align: center;"),
+                        ui.tags.th("PENCAPAIAN EFEKTIF & BOBOT", style="text-align: center;"),
                         ui.tags.th("CATATAN KENDALA"),
                         ui.tags.th("DEADLINE", style="text-align: center;"),
                         ui.tags.th("JUSTIFIKASI", style="text-align: center;")
