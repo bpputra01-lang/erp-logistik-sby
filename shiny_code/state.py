@@ -7958,8 +7958,8 @@ class AppState:
         """
         Kalkulasi Metrik Tab 3 Berbasis Bobot Harian (100% Base):
         - Tiap hari memiliki bobot 1/7 dari target mingguan.
-        - Jika UNCONFIRMED, yang dipotong HANYA porsi bobot defisit hari itu.
-        - Nilai tidak akan anjlok drastis hanya karena 1 hari jelek.
+        - Hari yang belum diisi/dijalankan TIDAK boleh memotong nilai target.
+        - Jika UNCONFIRMED, hanya memotong porsi bobot defisit hari itu.
         """
         targets = self.target_items_list()
         daily_map = self.target_daily_map()
@@ -7978,9 +7978,6 @@ class AppState:
         unconfirmed_count = 0
         total_potongan_pct = 0.0
 
-        # Bobot per hari per target terhadap total target 100%
-        # 1 Target = 100 / 7 = 14.2857% per hari
-        # 2 Target = 100 / 14 = 7.1428% per hari
         bobot_per_hari = 100.0 / (total_targets * 7)
 
         for t in targets:
@@ -7990,26 +7987,39 @@ class AppState:
                 entry = daily_map.get(key, {})
 
                 raw_achieve = entry.get("achievement")
-                achieve = safe_int(raw_achieve, 100) if raw_achieve is not None else 100
+                note = str(entry.get("note", "")).strip()
+                deadline = str(entry.get("deadline", "-")).strip()
                 justifikasi = str(entry.get("justifikasi", "-")).strip().upper()
+
+                # Lewati hari yang BELUM diisi sama sekali (agar tidak memotong 14.3% per hari)
+                # Hari dianggap aktif diisi jika achieve > 0 ATAU ada catatan / justifikasi / deadline
+                is_day_active = (
+                    (raw_achieve is not None and safe_int(raw_achieve) > 0) or
+                    (note != "" and note != "-") or
+                    (justifikasi != "-" and justifikasi != "") or
+                    (deadline != "-" and deadline != "")
+                )
+
+                if not is_day_active:
+                    continue  # Hari belum berjalan, JANGAN dipotong!
+
+                achieve = safe_int(raw_achieve, 0)
 
                 if "CONFIRMED" in justifikasi and "UNCONFIRMED" not in justifikasi:
                     confirmed_count += 1
-                    # Terkonfirmasi: Alasan sah, potongan 0% (target terlindungi)
+                    # Terkonfirmasi: Target terlindungi, potongan 0%
                 elif "UNCONFIRMED" in justifikasi:
                     unconfirmed_count += 1
-                    # Tidak terkonfirmasi: Potong proporsional sesuai bobot defisit hari ini
+                    # Tidak terkonfirmasi: Potong sesuai porsi bobot defisit hari ini
                     defisit = max(0, 100 - achieve)
                     potongan = (defisit / 100.0) * bobot_per_hari
                     total_potongan_pct += potongan
                 else:
-                    # Tanpa justifikasi khusus (misal lupa isi justifikasi tapi nilai < 100%)
                     if achieve < 100:
-                        defisit = 100 - achieve
+                        defisit = max(0, 100 - achieve)
                         potongan = (defisit / 100.0) * bobot_per_hari
                         total_potongan_pct += potongan
 
-        # Nilai Akhir Mingguan = 100% - Total Akumulasi Potongan Bobot
         final_score = max(0.0, round(100.0 - total_potongan_pct, 1))
 
         return {
