@@ -3029,9 +3029,7 @@ def sidebar(state: AppState):
         return ui.div(ui.tags.button(ui.tags.i(class_="fa-solid fa-bars", style="font-size: 18px; color: #FFFFFF;"), onclick="Shiny.setInputValue('btn_toggle_sidebar', Math.random(), {priority: 'event'})", style="background: transparent; border: none; cursor: pointer; padding: 0.5rem; border-radius: 6px;"), style="width: 60px; min-width: 60px; padding: 1rem 0.5rem; background: #111318; border-right: 1px solid #2D3748; height: 100vh; display: flex; flex-direction: column; align-items: center;")
 
     monitoring_items = state.get_menu_monitoring()
-    
- 
-
+    target_items = state.get_menu_target()  # 👈 Otomatis [] jika bukan Admin/DC
     auditor_items = state.get_menu_auditor()
     operational_items = state.get_menu_operational()
     inventory_items = state.get_menu_inventory()
@@ -3039,6 +3037,7 @@ def sidebar(state: AppState):
 
     sections = []
 
+    # 1. MONITORING TETAP PALING AWAL
     if monitoring_items:
         sections.append(
             ui.div(
@@ -3051,7 +3050,18 @@ def sidebar(state: AppState):
             )
         )
 
-    
+    # 2. TARGET HANYA DITAMBAHKAN JIKA ADA AKSES (ADMIN / DC)
+    if target_items:
+        sections.append(
+            ui.div(
+                section_dropdown_header("TARGET", "target", state.dropdown_target()), 
+                ui.div(
+                    *[menu_item(item, item, cur_menu) for item in target_items], 
+                    style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_target() else "display: none;"
+                ), 
+                style="width: 100%;"
+            )
+        )
 
     if auditor_items:
         sections.append(

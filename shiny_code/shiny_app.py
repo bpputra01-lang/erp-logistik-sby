@@ -13,7 +13,7 @@ from views import (
     justification_so_view, cycle_count_view, login_page, ppa_audit_view, 
     cycle_count_analyzer_view, global_header, cross_check_real_system_view,
     balancing_stock_view, physical_inventory_list_view, validation_barcode_sku_view, percentage_display_view,excel_practice_view,
-    auditor_view, memo_pengajuan_view, warehouse_activity_monitor_view, compliance_audit_view, instock_validation_view
+    auditor_view, memo_pengajuan_view, warehouse_activity_monitor_view, compliance_audit_view, instock_validation_view, target_progress_view
 )
 
 app_ui = ui.page_fluid(
@@ -137,7 +137,9 @@ def server(input: Inputs, output: Outputs, session: Session):
         "refill-shelving": "Refill Shelving",
         "refill_shelving": "Refill Shelving",
         "reloc-koli-to-koli": "Reloc Koli to Koli",
-        "reloc_koli_to_koli": "Reloc Koli to Koli"
+        "reloc_koli_to_koli": "Reloc Koli to Koli",
+        "target-progress": "Target Progress",
+        "target_progress": "Target Progress"
     }
 
     # 1. Saat menu diklik di sidebar -> URL di browser otomatis berubah
@@ -835,6 +837,21 @@ def server(input: Inputs, output: Outputs, session: Session):
             footer=ui.modal_button("Tutup", class_="btn-red-gradient")
         ))
 
+        elif cur == "Target Progress":
+            guide_body = ui.div(
+                ui.tags.details(
+                    ui.tags.summary("📋 Panduan Target Progress (3 Tab)"),
+                    ui.div(
+                        ui.tags.ul(
+                            ui.tags.li(ui.strong("Tab 1 (Input Target):"), " Pilih Sub Divisi, Week, Bulan, dan Tahun. Tambah isi target secara dinamis tanpa perlu input ulang metadata."),
+                            ui.tags.li(ui.strong("Tab 2 (Progress Daily):"), " Teks target disalin otomatis dari Tab 1. Masukkan persentase (10%-100%), Note jika < 100%, Deadline (1-3 hari), dan Justifikasi (Confirmed / Unconfirmed)."),
+                            ui.tags.li(ui.strong("Tab 3 (Metric & Report):"), " Laporan murni Read-Only. Menampilkan pencapaian efektif di mana status 'JUSTIFIKASI UNCONFIRMED' otomatis memotong persentase pencapaian target harian.")
+                        ),
+                        class_="accordion-content"
+                    ), open=True
+                )
+            )
+
         
     @render.ui
     def stock_minus_action_btn_ui():
@@ -1109,6 +1126,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             
         content_type = state.get_active_content_type()
 
+        # 'if' tetap default / menu awal
         if content_type == "dashboard_ongkir": return main_dashboard_view(state)
         elif content_type == "stock_minus": return stock_minus_view(state)
         elif content_type == "putaway_system": return putaway_view(state)
@@ -1133,6 +1151,20 @@ def server(input: Inputs, output: Outputs, session: Session):
         elif content_type == "refill_shelving": 
             from views import refill_shelving_view
             return refill_shelving_view(state)
+            
+        # 🌟 TARGET MENGGUNAKAN 'ELIF' DENGAN PROTEKSI ROLE ADMIN / DC
+        elif content_type in ["target_progress", "target-progress"]:
+            uname = state.username().lower()
+            role = state.role().upper()
+            if uname == "admin" or (role == "DC" and uname not in ["hub", "toko"]):
+                return target_progress_view(state)
+            else:
+                return ui.div(
+                    ui.h2("⛔ Akses Ditolak", style="color: #E53E3E; font-weight: bold;"),
+                    ui.p("Halaman Target Progress hanya dapat diakses oleh Admin DC.", style="color: #718096;"),
+                    style="padding: 3rem; text-align: center;"
+                )
+
         elif content_type == "access_denied":
             return ui.div(ui.h2("⛔ Akses Ditolak", style="color: #E53E3E; font-weight: bold;"), style="padding: 3rem; text-align: center;")
         else:
@@ -5926,6 +5958,385 @@ def server(input: Inputs, output: Outputs, session: Session):
             state._raw_df_iv_done.to_excel(writer, sheet_name='DONE_SETUP', index=False)
         buf.seek(0)
         yield buf.getvalue()
+
+        # ==========================================================================
+    # CONTROLLER TARGET PROGRESS (TAB 1, TAB 2, TAB 3)
+    # ==========================================================================
+    
+    # 1. Event saat filter dropdown diganti
+    @reactive.Effect
+    @reactive.event(input.change_target_divisi)
+    def _on_chg_target_divisi():
+        state.target_divisi.set(input.change_target_divisi())
+        state.load_targets_data()
+
+    @reactive.Effect
+    @reactive.event(input.change_target_week)
+    def _on_chg_target_week():
+        state.target_week.set(input.change_target_week())
+        state.load_targets_data()
+
+    @reactive.Effect
+    @reactive.event(input.change_target_month)
+    def _on_chg_target_month():
+        state.target_month.set(input.change_target_month())
+        state.load_targets_data()
+
+    @reactive.Effect
+    @reactive.event(input.change_target_year)
+    def _on_chg_target_year():
+        state.target_year.set(input.change_target_year())
+        state.load_targets_data()
+
+    @reactive.Effect
+    @reactive.event(input.btn_refresh_target_data)
+    def _on_btn_refresh_target():
+        succ, msg = state.load_targets_data()
+        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+        if succ:
+            ui.notification_show(f"✅ {msg}", type="message", duration=3)
+        else:
+            ui.notification_show(f"⚠️ {msg}", type="warning", duration=4)
+
+    # 2. Handler Tambah Target (Tab 1)
+    @reactive.Effect
+    @reactive.event(input.btn_add_target_submit)
+    def _on_btn_add_target():
+        txt = input.btn_add_target_submit()
+        succ, msg = state.add_target_item(txt)
+        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+        if succ:
+            ui.notification_show(msg, type="message", duration=3)
+        else:
+            ui.notification_show(msg, type="error", duration=4)
+
+    # 3. Handler Hapus Target (Tab 1)
+    @reactive.Effect
+    @reactive.event(input.btn_delete_target_id)
+    def _on_btn_del_target():
+        t_id = safe_int(input.btn_delete_target_id(), 0)
+        succ, msg = state.delete_target_item(t_id)
+        if succ:
+            ui.notification_show(msg, type="message", duration=2)
+        else:
+            ui.notification_show(msg, type="error", duration=4)
+
+    # 4. Handler Batch Save Progress Harian (Tab 2)
+    @reactive.Effect
+    @reactive.event(input.btn_save_target_daily_submit)
+    def _on_save_daily_submit():
+        payload = input.btn_save_target_daily_submit() or []
+        succ, msg = state.save_target_daily_progress(payload)
+        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+        if succ:
+            state.show_success_modal.set(True)
+            ui.notification_show(msg, type="message", duration=4)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+
+    # --------------------------------------------------------------------------
+    # RENDER TAB 1: TABEL TARGET (BISA EDIT & HAPUS)
+    # --------------------------------------------------------------------------
+    @render.ui
+    def target_tab1_table_ui():
+        targets = state.target_items_list()
+        if not targets:
+            return ui.div(
+                ui.p(f"Belum ada target yang dibuat untuk {state.target_divisi()} ({state.target_week()} - {state.target_month()} {state.target_year()}). Silakan ketik isi target di atas.", style="color: #718096; font-style: italic; text-align: center; padding: 2rem;"),
+                style="background: white; border-radius: 8px; border: 1px dashed #CBD5E0;"
+            )
+
+        rows = []
+        for idx, t in enumerate(targets, start=1):
+            t_id = t["id"]
+            del_btn = ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-trash", style="color: #E53E3E;"),
+                onclick=f"if(confirm('Hapus target ini beserta progress hariannya?')) Shiny.setInputValue('btn_delete_target_id', {t_id}, {{priority: 'event'}})",
+                style="background: #FFF5F5; border: 1px solid #FEB2B2; padding: 6px 12px; border-radius: 6px; cursor: pointer;"
+            )
+            rows.append(ui.tags.tr(
+                ui.tags.td(str(idx), style="text-align: center; font-weight: bold; width: 50px;"),
+                ui.tags.td(ui.tags.span(t.get("sub_divisi", "-"), style="background: #E2E8F0; font-weight: 700; padding: 3px 8px; border-radius: 4px; font-size: 11px;"), style="text-align: center; width: 120px;"),
+                ui.tags.td(f"{t.get('target_week', '')} • {t.get('target_month', '')} {t.get('target_year', '')}", style="font-weight: 600; width: 180px;"),
+                ui.tags.td(str(t.get("target_text", "-")), style="font-weight: 700; color: #1A202C;"),
+                ui.tags.td(del_btn, style="text-align: center; width: 80px;")
+            ))
+
+        return ui.div(
+            ui.tags.table(
+                ui.tags.thead(ui.tags.tr(
+                    ui.tags.th("NO", style="text-align: center;"),
+                    ui.tags.th("DIVISI", style="text-align: center;"),
+                    ui.tags.th("PERIODE"),
+                    ui.tags.th("DESKRIPSI TARGET KERJA"),
+                    ui.tags.th("AKSI", style="text-align: center;")
+                )),
+                ui.tags.tbody(*rows),
+                class_="custom-clean-table", style="width: 100%; border: 1px solid #CBD5E0; border-radius: 8px;"
+            ),
+            style="background: white; border-radius: 12px; border: 1px solid #E2E8F0; padding: 1rem; overflow-x: auto;"
+        )
+
+    # --------------------------------------------------------------------------
+    # RENDER TAB 2: PROGRESS HARIAN PER TARGET (DAY 1 - DAY 7 INPUT ROW)
+    # --------------------------------------------------------------------------
+    @render.ui
+    def target_tab2_progress_ui():
+        targets = state.target_items_list()
+        daily_map = state.target_daily_map()
+
+        if not targets:
+            return ui.div(
+                ui.p("Belum ada target pada periode ini. Silakan input target terlebih dahulu pada Tab 1.", style="color: #718096; font-style: italic; text-align: center; padding: 2rem;"),
+                style="background: white; border-radius: 8px; border: 1px dashed #CBD5E0;"
+            )
+
+        pct_options = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+        deadline_options = ["-", "1 Hari", "2 Hari", "3 Hari"]
+        justifikasi_options = ["-", "JUSTIFIKASI CONFIRMED", "JUSTIFIKASI UNCONFIRMED"]
+
+        cards = []
+        for idx, t in enumerate(targets, start=1):
+            t_id = t["id"]
+            t_text = t.get("target_text", "-")
+
+            day_rows = []
+            for d in range(1, 8):
+                key = f"{t_id}_{d}"
+                entry = daily_map.get(key, {})
+                cur_achieve = safe_int(entry.get("achievement", 0))
+                cur_note = entry.get("note", "")
+                cur_dl = entry.get("deadline", "-")
+                cur_just = entry.get("justifikasi", "-")
+
+                # Dropdown Persentase 10% - 100%
+                opt_achieve = [
+                    ui.tags.option(f"{p}%", value=str(p), selected=(p == cur_achieve))
+                    for p in pct_options
+                ]
+                sel_achieve = ui.tags.select(
+                    *opt_achieve,
+                    id=f"achieve_{t_id}_{d}",
+                    class_="target-daily-input",
+                    data_tid=str(t_id),
+                    data_day=str(d),
+                    data_field="achievement",
+                    onchange=f"window.onDailyAchieveChange({t_id}, {d}, this.value)",
+                    style="padding: 4px 8px; border-radius: 6px; font-weight: 800; font-size: 12px; border: 1.5px solid #CBD5E0; background: #FEFCBF;"
+                )
+
+                # Input Catatan (Wajib/Disorot jika < 100%)
+                is_below = (cur_achieve < 100 and cur_achieve > 0)
+                input_note = ui.tags.input(
+                    id=f"note_{t_id}_{d}",
+                    type="text",
+                    value=cur_note,
+                    placeholder="Catatan kendala..." if is_below else "Catatan (Opsional)...",
+                    class_="target-daily-input",
+                    data_tid=str(t_id),
+                    data_day=str(d),
+                    data_field="note",
+                    style=f"width: 100%; min-width: 180px; padding: 4px 8px; font-size: 12px; border-radius: 6px; border: 1.5px solid {'#E53E3E' if is_below else '#CBD5E0'};"
+                )
+
+                # Dropdown Deadline (1-3 Hari)
+                opt_dl = [
+                    ui.tags.option(dl, value=dl, selected=(dl == cur_dl))
+                    for dl in deadline_options
+                ]
+                sel_dl = ui.tags.select(
+                    *opt_dl,
+                    id=f"dl_{t_id}_{d}",
+                    class_="target-daily-input",
+                    data_tid=str(t_id),
+                    data_day=str(d),
+                    data_field="deadline",
+                    style="padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 12px; border: 1.5px solid #CBD5E0; background: white;"
+                )
+
+                # Dropdown Justifikasi
+                opt_just = [
+                    ui.tags.option(j, value=j, selected=(j == cur_just))
+                    for j in justifikasi_options
+                ]
+                sel_just = ui.tags.select(
+                    *opt_just,
+                    id=f"just_{t_id}_{d}",
+                    class_="target-daily-input",
+                    data_tid=str(t_id),
+                    data_day=str(d),
+                    data_field="justifikasi",
+                    style=f"padding: 4px 8px; border-radius: 6px; font-weight: 800; font-size: 11.5px; border: 1.5px solid #CBD5E0; background: {'#C6F6D5' if cur_just == 'JUSTIFIKASI CONFIRMED' else ('#FED7D7' if cur_just == 'JUSTIFIKASI UNCONFIRMED' else 'white')};"
+                )
+
+                day_rows.append(ui.tags.tr(
+                    ui.tags.td(f"Day {d}", style="text-align: center; font-weight: 800; color: #2B6CB0; width: 80px;"),
+                    ui.tags.td(sel_achieve, style="text-align: center; width: 120px;"),
+                    ui.tags.td(input_note),
+                    ui.tags.td(sel_dl, style="text-align: center; width: 110px;"),
+                    ui.tags.td(sel_just, style="text-align: center; width: 220px;")
+                ))
+
+            cards.append(ui.div(
+                ui.div(
+                    ui.span(f"Target #{idx}: ", style="font-weight: 800; color: #E50914; font-size: 14px;"),
+                    ui.span(t_text, style="font-weight: 700; color: #1A202C; font-size: 14px;"),
+                    style="background: #EDF2F7; padding: 10px 14px; border-radius: 8px 8px 0 0; border: 1px solid #CBD5E0; border-bottom: none;"
+                ),
+                ui.tags.table(
+                    ui.tags.thead(ui.tags.tr(
+                        ui.tags.th("HARI", style="text-align: center;"),
+                        ui.tags.th("ACHIEVEMENT (%)", style="text-align: center;"),
+                        ui.tags.th("NOTE / CATATAN KENDALA"),
+                        ui.tags.th("DEADLINE", style="text-align: center;"),
+                        ui.tags.th("STATUS JUSTIFIKASI", style="text-align: center;")
+                    )),
+                    ui.tags.tbody(*day_rows),
+                    class_="custom-clean-table", style="width: 100%; border: 1px solid #CBD5E0; border-radius: 0 0 8px 8px;"
+                ),
+                style="margin-bottom: 1.5rem;"
+            ))
+
+        # Skrip Javascript untuk mengumpulkan seluruh nilai tabel Tab 2 dan mengirimnya ke backend
+        js_submit = ui.tags.script("""
+            window.onDailyAchieveChange = function(tid, day, val) {
+                let noteInput = document.getElementById('note_' + tid + '_' + day);
+                if (noteInput) {
+                    let v = parseInt(val);
+                    if (v > 0 && v < 100) {
+                        noteInput.style.border = '1.5px solid #E53E3E';
+                        noteInput.placeholder = 'Wajib isi kendala / catatan...';
+                    } else {
+                        noteInput.style.border = '1.5px solid #CBD5E0';
+                        noteInput.placeholder = 'Catatan (Opsional)...';
+                    }
+                }
+            };
+
+            window.submitAllTargetDailyProgress = function() {
+                let inputs = document.querySelectorAll('.target-daily-input');
+                let map = {};
+                inputs.forEach(function(el) {
+                    let tid = el.getAttribute('data-tid');
+                    let day = el.getAttribute('data-day');
+                    let field = el.getAttribute('data-field');
+                    let key = tid + '_' + day;
+                    if (!map[key]) {
+                        map[key] = { target_id: parseInt(tid), day_num: parseInt(day) };
+                    }
+                    if (field === 'achievement') map[key]['achievement_pct'] = parseInt(el.value) || 0;
+                    else if (field === 'note') map[key]['note'] = el.value || '';
+                    else if (field === 'deadline') map[key]['deadline_days'] = el.value || '-';
+                    else if (field === 'justifikasi') map[key]['justifikasi_status'] = el.value || '-';
+                });
+
+                let payload = Object.values(map);
+                window.showGlobalSpinner();
+                Shiny.setInputValue('btn_save_target_daily_submit', payload, {priority: 'event'});
+            };
+        """)
+
+        return ui.div(*cards, js_submit)
+
+    # --------------------------------------------------------------------------
+    # RENDER TAB 3: METRIC CARDS & READ-ONLY REPORT
+    # --------------------------------------------------------------------------
+    @render.ui
+    def target_tab3_metrics_ui():
+        metrics = state.get_target_metrics_summary()
+        avg_pct = metrics["avg_achievement_pct"]
+        conf_cnt = metrics["confirmed_count"]
+        unconf_cnt = metrics["unconfirmed_count"]
+        tot_target = metrics["total_targets"]
+
+        color_achieve = "#10B981" if avg_pct >= 80 else ("#DD6B20" if avg_pct >= 60 else "#E53E3E")
+
+        return ui.div(
+            dark_metric_box("🎯 OVERALL ACHIEVEMENT (PENALIZED)", f"{avg_pct}%", color_achieve),
+            dark_metric_box("✅ JUSTIFIKASI CONFIRMED", f"{conf_cnt} HARI", "#10B981"),
+            dark_metric_box("⚠️ JUSTIFIKASI UNCONFIRMED (PENGURANG)", f"{unconf_cnt} HARI", "#E53E3E"),
+            dark_metric_box("📋 TOTAL TARGET KERJA", f"{tot_target} TARGET", "#3182CE"),
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.5rem;"
+        )
+
+    @render.ui
+    def target_tab3_readonly_table_ui():
+        targets = state.target_items_list()
+        daily_map = state.target_daily_map()
+
+        if not targets:
+            return ui.div(
+                ui.p("Tidak ada data target untuk ditampilkan pada laporan ini.", style="color: #718096; font-style: italic; text-align: center; padding: 2rem;"),
+                style="background: white; border-radius: 8px; border: 1px dashed #CBD5E0;"
+            )
+
+        cards = []
+        for idx, t in enumerate(targets, start=1):
+            t_id = t["id"]
+            t_text = t.get("target_text", "-")
+
+            day_rows = []
+            for d in range(1, 8):
+                key = f"{t_id}_{d}"
+                entry = daily_map.get(key, {})
+                achieve = safe_int(entry.get("achievement", 0))
+                note = entry.get("note", "-")
+                deadline = entry.get("deadline", "-")
+                just = entry.get("justifikasi", "-")
+
+                is_unconf = (just == "JUSTIFIKASI UNCONFIRMED")
+                achieve_display = f"{achieve}%"
+                if is_unconf and achieve > 0:
+                    achieve_badge = ui.span(f"0% (Penalti Unconfirmed: {achieve}%)", style="color: #E53E3E; font-weight: 800;")
+                elif achieve >= 80:
+                    achieve_badge = ui.span(achieve_display, style="color: #10B981; font-weight: 800;")
+                elif achieve > 0:
+                    achieve_badge = ui.span(achieve_display, style="color: #DD6B20; font-weight: 800;")
+                else:
+                    achieve_badge = ui.span("0%", style="color: #718096;")
+
+                badge_just = (
+                    ui.span("CONFIRMED", style="background: #C6F6D5; color: #22543D; font-weight: 800; padding: 3px 8px; border-radius: 4px; font-size: 11px;")
+                    if just == "JUSTIFIKASI CONFIRMED" else (
+                        ui.span("UNCONFIRMED", style="background: #FED7D7; color: #9B2C2C; font-weight: 800; padding: 3px 8px; border-radius: 4px; font-size: 11px;")
+                        if just == "JUSTIFIKASI UNCONFIRMED" else ui.span("-", style="color: #A0AEC0;")
+                    )
+                )
+
+                day_rows.append(ui.tags.tr(
+                    ui.tags.td(f"Day {d}", style="text-align: center; font-weight: 700; width: 80px;"),
+                    ui.tags.td(achieve_badge, style="text-align: center; width: 200px;"),
+                    ui.tags.td(note if note else "-"),
+                    ui.tags.td(deadline if deadline else "-", style="text-align: center; width: 100px;"),
+                    ui.tags.td(badge_just, style="text-align: center; width: 160px;")
+                ))
+
+            cards.append(ui.div(
+                ui.div(
+                    ui.span(f"Target #{idx}: ", style="font-weight: 800; color: #3182CE; font-size: 13.5px;"),
+                    ui.span(t_text, style="font-weight: 700; color: #1A202C; font-size: 13.5px;"),
+                    style="background: #F8FAFC; padding: 8px 14px; border-radius: 8px 8px 0 0; border: 1px solid #CBD5E0; border-bottom: none;"
+                ),
+                ui.tags.table(
+                    ui.tags.thead(ui.tags.tr(
+                        ui.tags.th("HARI", style="text-align: center;"),
+                        ui.tags.th("PENCAPAIAN EFEKTIF", style="text-align: center;"),
+                        ui.tags.th("CATATAN KENDALA"),
+                        ui.tags.th("DEADLINE", style="text-align: center;"),
+                        ui.tags.th("JUSTIFIKASI", style="text-align: center;")
+                    )),
+                    ui.tags.tbody(*day_rows),
+                    class_="custom-clean-table", style="width: 100%; border: 1px solid #CBD5E0; border-radius: 0 0 8px 8px;"
+                ),
+                style="margin-bottom: 1.25rem;"
+            ))
+
+        return ui.div(
+            ui.h4("📋 Laporan Target & Pencapaian Harian (Murni Read-Only)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+            *cards,
+            style="background: white; border-radius: 12px; border: 1px solid #E2E8F0; padding: 1.25rem;"
+        )
 
 from pathlib import Path
 

@@ -493,6 +493,15 @@ class AppState:
         self.pd_last_sync_time = reactive.Value("-")
         self.pd_data_source = reactive.Value("JEZ SURABAYA (Cloud)")
 
+        # --- TARGET PROGRESS STATE ---
+        self.dropdown_target = reactive.Value(True)
+        self.target_divisi = reactive.Value("INBOUND")
+        self.target_week = reactive.Value("Week 1")
+        self.target_month = reactive.Value("Januari")
+        self.target_year = reactive.Value("2026")
+        self.target_items_list = reactive.Value([])  # List target aktif
+        self.target_daily_map = reactive.Value({})   # {f"{t_id}_{day}": {achievement, note, deadline, justifikasi}}
+
         # --- EXCEL PRACTICE EXAM & AUTO-GRADING STATE ---
         self.excel_exam_questions = reactive.Value([])
         self.excel_exam_graded = reactive.Value(False)
@@ -716,8 +725,9 @@ class AppState:
     def set_main_menu(self, menu: str): self.main_menu.set(menu)
     def toggle_sidebar(self): self.sidebar_open.set(not self.sidebar_open())
     def toggle_dropdown(self, key: str):
-        # 🌟 Handle toggle dropdown monitoring
+        # 🌟 'if' tetap monitoring, target menggunakan 'elif'
         if key == "monitoring": self.dropdown_monitoring.set(not self.dropdown_monitoring())
+        elif key == "target": self.dropdown_target.set(not self.dropdown_target())
         elif key == "auditor": self.dropdown_auditor.set(not self.dropdown_auditor())
         elif key == "operational": self.dropdown_operational.set(not self.dropdown_operational())
         elif key == "inventory": self.dropdown_inventory.set(not self.dropdown_inventory())
@@ -769,6 +779,14 @@ class AppState:
         elif uname == "toko":
             return ["Warehouse Activity Monitor"]
         return ["Warehouse Activity Monitor", "Memo Pengajuan", "Balancing Stock", "Database Ongkir In/Out", "Precentage Display"]
+
+    def get_menu_target(self) -> list[str]:
+        uname = self.username().lower()
+        role = self.role().upper()
+        # 🔒 HANYA untuk user admin / DC murni (Toko dan Hub otomatis kosong / terblokir)
+        if uname == "admin" or (role == "DC" and uname not in ["hub", "toko"]):
+            return ["Target Progress"]
+        return []
 
     def get_menu_auditor(self) -> list[str]:
         uname = self.username().lower()
@@ -7778,3 +7796,149 @@ class AppState:
             import traceback
             traceback.print_exc()
             return False, f"Gagal memproses Refill Shelving: {e}"
+
+    def load_targets_data(self):
+        """Memuat target dan progress harian dari Supabase sesuai filter divisi, week, bulan, tahun"""
+        try:
+            client = get_supabase()
+            divisi = self.target_divisi()
+            week = self.target_week()
+            month = self.target_month()
+            year = safe_int(self.target_year(), 2026)
+
+            if not client:
+                return False, "Koneksi Supabase gagal!"
+
+            # 1. Tarik Master Target
+            res_t = client.table("warehouse_targets").select("*") \
+                          .eq("sub_divisi", divisi) \
+                          .eq("target_week", week) \
+                          .eq("target_month", month) \
+                          .eq("target_year", year) \
+                          .order("id", desc=False).execute()
+
+            targets = res_t.data if res_t and res_t.data else []
+            self.target_items_list.set(targets)
+
+            # 2. Tarik Progress Harian untuk target-target tersebut
+            if targets:
+                target_ids = [t["id"] for t in targets]
+                res_p = client.table("warehouse_target_daily_progress").select("*") \
+                              .in_("target_id", target_ids).execute()
+                
+                daily_rows = res_p.data if res_p and res_p.data else []
+                d_map = {}
+                for r in daily_rows:
+                    key = f"{r['target_id']}_{r['day_num']}"
+                    d_map[key] = {
+                        "achievement": r.get("achievement_pct", 0),
+                        "note": r.get("note", ""),
+                        "deadline": r.get("deadline_days", "-"),
+                        "justifikasi": r.get("justifikasi_status", "-")
+                    }
+                self.target_daily_map.set(d_map)
+            else:
+                self.target_daily_map.set({})
+
+            return True, f"Berhasil memuat {len(targets)} target."
+        except Exception as e:
+            print("Gagal load target:", e)
+            return False, str(e)
+
+    def add_target_item(self, target_text: str):
+        """Menambahkan target baru ke Tab 1 & database"""
+        if not target_text.strip():
+            return False, "Isi target tidak boleh kosong!"
+
+        try:
+            client = get_supabase()
+            payload = {
+                "sub_divisi": self.target_divisi(),
+                "target_week": self.target_week(),
+                "target_month": self.target_month(),
+                "target_year": safe_int(self.target_year(), 2026),
+                "target_text": target_text.strip()
+            }
+            if client:
+                client.table("warehouse_targets").insert(payload).execute()
+            self.load_targets_data()
+            return True, "✅ Target berhasil ditambahkan!"
+        except Exception as e:
+            return False, f"Gagal menambahkan target: {e}"
+
+    def delete_target_item(self, target_id: int):
+        """Menghapus target dari Tab 1"""
+        try:
+            client = get_supabase()
+            if client:
+                client.table("warehouse_targets").delete().eq("id", target_id).execute()
+            self.load_targets_data()
+            return True, "🗑️ Target berhasil dihapus!"
+        except Exception as e:
+            return False, f"Gagal menghapus target: {e}"
+
+    def save_target_daily_progress(self, progress_payload: list):
+        """Menyimpan input Tab 2 (Achievement, Note, Deadline, Justifikasi) ke Supabase"""
+        try:
+            client = get_supabase()
+            if not client:
+                return False, "Koneksi Supabase gagal!"
+
+            if progress_payload:
+                client.table("warehouse_target_daily_progress").upsert(
+                    progress_payload, 
+                    on_conflict="target_id,day_num"
+                ).execute()
+
+            self.load_targets_data()
+            return True, "✅ Progress pencapaian berhasil disimpan!"
+        except Exception as e:
+            return False, f"Gagal menyimpan progress: {e}"
+
+    def get_target_metrics_summary(self):
+        """
+        Kalkulasi Metrik Tab 3:
+        1. Pencapaian: Nilai persentase harian. 
+           Jika berstatus JUSTIFIKASI UNCONFIRMED, persentase hari itu menjadi pengurang / hangus (0%).
+        2. Hitung total Justifikasi Confirmed & Unconfirmed.
+        """
+        targets = self.target_items_list()
+        daily_map = self.target_daily_map()
+
+        total_days_logged = 0
+        total_effective_pct = 0.0
+        confirmed_count = 0
+        unconfirmed_count = 0
+
+        for t in targets:
+            t_id = t["id"]
+            for d in range(1, 8):
+                key = f"{t_id}_{d}"
+                entry = daily_map.get(key, {})
+                achieve = safe_int(entry.get("achievement", 0))
+                justifikasi = entry.get("justifikasi", "-")
+
+                if justifikasi == "JUSTIFIKASI CONFIRMED":
+                    confirmed_count += 1
+                elif justifikasi == "JUSTIFIKASI UNCONFIRMED":
+                    unconfirmed_count += 1
+
+                # Logika: Jika unconfirmed, pencapaian dipotong / dinolkan
+                if achieve > 0:
+                    total_days_logged += 1
+                    if justifikasi == "JUSTIFIKASI UNCONFIRMED":
+                        effective_achieve = 0  # Pengurang
+                    else:
+                        effective_achieve = achieve
+                    total_effective_pct += effective_achieve
+
+        # Rata-rata pencapaian target
+        avg_pct = (total_effective_pct / total_days_logged) if total_days_logged > 0 else 0.0
+
+        return {
+            "total_targets": len(targets),
+            "avg_achievement_pct": round(avg_pct, 1),
+            "confirmed_count": confirmed_count,
+            "unconfirmed_count": unconfirmed_count,
+            "total_days_logged": total_days_logged
+        }
