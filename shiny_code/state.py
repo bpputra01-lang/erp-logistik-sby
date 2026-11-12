@@ -823,7 +823,21 @@ class AppState:
 
     def get_active_content_type(self) -> str:
         cur_menu = self.main_menu()
-        if cur_menu in ["Database Ongkir In/Out", "Database Ongkir", "dashboard_ongkir"]:
+
+        # 🌟 1. 'IF' TETAP WAREHOUSE ACTIVITY MONITORING
+        if cur_menu in ["Warehouse Activity Monitor", "Warehouse Monitoring", "warehouse_activity_monitor", "ll01-monitor"]:
+            return "warehouse_activity_monitor"
+
+        # 🌟 2. 'ELIF' TARGET PROGRESS (HANYA AKSES ADMIN / DC)
+        elif cur_menu in ["Target Progress", "target_progress", "target-progress"]:
+            uname = self.username().lower()
+            role = self.role().upper()
+            if uname == "admin" or (role == "DC" and uname not in ["hub", "toko"]):
+                return "target_progress"
+            return "access_denied"
+
+        # 🌟 3. ELIF MENU LAINNYA
+        elif cur_menu in ["Database Ongkir In/Out", "Database Ongkir", "dashboard_ongkir"]:
             return "dashboard_ongkir"
         elif cur_menu == "Stock Minus": return "stock_minus"
         elif cur_menu == "Putaway System": return "putaway_system"
@@ -843,7 +857,6 @@ class AppState:
         elif cur_menu in ["Warehouse Inventory Audit", "Form Auditor", "Audit Form", "form_auditor"]: return "form_auditor"
         elif cur_menu in ["Warehouse Compliance Audit", "compliance_audit", "warehouse_compliance_audit"]: return "compliance_audit"
         elif cur_menu in ["Memo Pengajuan", "memo_pengajuan"]: return "memo_pengajuan"
-        elif cur_menu in ["Warehouse Activity Monitor", "Warehouse Monitoring", "warehouse_activity_monitor"]: return "warehouse_activity_monitor"
         elif cur_menu in ["Instock Validation", "instock_validation", "instock-validation"]: return "instock_validation"
         elif cur_menu in ["Refill Shelving", "refill_shelving"]: return "refill_shelving"
         elif cur_menu in ["Reloc Koli to Koli", "reloc-koli-to-koli"]: return "reloc_koli_to_koli"
