@@ -153,6 +153,7 @@ def create_jezpro_session():
     }, timeout=20)
     print("✅ Berhasil login Jezpro!")
 
+    # Inisialisasi Cookie / Route Jezpro
     session.get("https://jezpro.id/helper_backup", timeout=15)
     session.get("https://jezpro.id/setup_lokasi_stok_v2", timeout=15)
     session.get("https://jezpro.id/transfer_stok", timeout=15)
@@ -162,9 +163,8 @@ def create_jezpro_session():
     return session
 
 def relogin_jezpro(session):
-    """Fungsi untuk memperbarui sesi login tanpa merusak objek session yang sedang dipakai thread"""
     try:
-        print(f"🔄 [{datetime.now(WIB).strftime('%H:%M:%S')}] Sesi habis (401), mencoba login ulang ke Jezpro...")
+        print(f"🔄 [{datetime.now(WIB).strftime('%H:%M:%S')}] Sesi habis (401/419), login ulang ke Jezpro...")
         res = session.get("https://jezpro.id/", timeout=20)
         soup = BeautifulSoup(res.text, "html.parser")
         token_tag = soup.find("input", {"name": "_token"})
@@ -177,16 +177,18 @@ def relogin_jezpro(session):
             "password": JEZPRO_PASSWORD
         }, timeout=20)
 
-        session.get("https://jezpro.id/helper_backup", timeout=15)
+        session.get("https://jezpro.id/transfer_stok", timeout=15)
+        session.get("https://jezpro.id/mass_adjustment", timeout=15)
+        session.get("https://jezpro.id/adjustment", timeout=15)
         session.get("https://jezpro.id/stock_tracking", timeout=15)
-        session.get("https://jezpro.id/setup_lokasi_stok_v2", timeout=15)
         print("✅ Berhasil login ulang ke Jezpro!")
         return True
     except Exception as e:
         print(f"❌ Gagal login ulang: {e}")
         return False
+
 # ==============================================================================
-# MODUL 1: INSTOCK DAILY SURABAYA
+# MODUL 1: INSTOCK DAILY SURABAYA (BACKGROUND THREAD)
 # ==============================================================================
 def run_module_instock_daily(session):
     now_wib = datetime.now(WIB)
@@ -216,15 +218,11 @@ def run_module_instock_daily(session):
 
     try:
         res = session.get(url_stk, params=params, headers=headers_req, timeout=25)
-        
-        # 🌟 JIKA MENDAPAT 401 (UNAUTHORIZED) -> OTOMATIS LOGIN ULANG DAN COBA LAGI
         if res.status_code in [401, 419] or "login" in res.url:
-            print(f"   ⚠️ [INSTOCK SBY] Terdeteksi Sesi Habis (Code: {res.status_code}). Melakukan re-login...")
             if relogin_jezpro(session):
-                # Request ulang setelah berhasil login
                 res = session.get(url_stk, params=params, headers=headers_req, timeout=25)
 
-        if res.status_code != 200: 
+        if res.status_code != 200:
             print(f"   ⚠️ [INSTOCK SBY] Respons Jezpro bukan 200 (Code: {res.status_code})")
             return
         raw_data = res.json().get("data", [])
@@ -481,14 +479,16 @@ def run_module_instock_daily(session):
     print(f"   ✅ [INSTOCK SBY] Selesai! (+{len(new_inserts)} data baru, {updated_to_need} masuk Need Setup, {done_matched} selesai disetup)\n")
 
 # ==============================================================================
-# MODUL 2: WAREHOUSE ACTIVITY MONITOR (ALL AREA)
+# MODUL 2: WAREHOUSE ACTIVITY MONITOR (STAGING + TF + MADJ + SINGLE ADJ)
 # ==============================================================================
-def run_module_warehouse_monitor(session):
-    print(f"\n📊 [{datetime.now(WIB).strftime('%H:%M:%S')}] [MONITOR] Memulai Sinkronisasi Warehouse Activity Monitor (All Area)...")
-    headers_req = {"Accept": "application/json, text/javascript, */*; q=0.01", "X-Requested-With": "XMLHttpRequest"}
 
+# --- A. STAGING TRACKING (ALL CABANG) ---
+def fetch_staging_data(session):
+    print(f"   ⏳ [MONITOR 1/4] Menarik Data Staging & Refund (All Cabang)...")
     url_stg = "https://jezpro.id/stock_tracking_datatables"
     date_range = "2026-01-01|2030-12-31"
+    headers_req = {"Accept": "application/json, text/javascript, */*; q=0.01", "X-Requested-With": "XMLHttpRequest"}
+
     query_targets = [
         {"status": "REFUND", "status_search": ""}, {"status": "", "status_search": "REFUND"},
         {"status": "WAITING OFFLINE", "status_search": ""}, {"status": "WAITING CHECKOUT", "status_search": ""},
@@ -503,7 +503,6 @@ def run_module_warehouse_monitor(session):
 
     for branch_name, b_info in BRANCH_MAP.items():
         st_id = b_info["st_id"]
-        print(f"   ⏳ [MONITOR] Menarik data cabang: {branch_name}...")
         for q in query_targets:
             params = {
                 "draw": "1",
@@ -536,7 +535,6 @@ def run_module_warehouse_monitor(session):
                 if not (is_refund or is_waiting or is_done_online): continue
 
                 dt_raw = strip_html(item.get("datetime") or item.get("plst_created") or "")
-
                 doc_year = None
                 for fmt in ("%d/%m/%Y %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%d-%m-%Y %H:%M:%S", "%d/%m/%Y", "%Y-%m-%d"):
                     try:
@@ -576,14 +574,480 @@ def run_module_warehouse_monitor(session):
                 })
             time.sleep(0.04)
 
-    try:
-        requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_waiting_staging?plst_id=gt.0", headers=HEADERS_SB)
-        if all_staging_records:
-            for i in range(0, len(all_staging_records), 100):
-                requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_waiting_staging", json=all_staging_records[i:i+100], headers=HEADERS_SB)
-        print(f"   ✅ [MONITOR] Warehouse Monitor Staging Selesai! ({len(all_staging_records)} baris terkirim ke Supabase)\n")
-    except Exception as e:
-        print(f"   ❌ [MONITOR] Gagal update Supabase monitor: {e}\n")
+    print(f"   -> Terkumpul {len(all_staging_records)} data Staging/Waiting.")
+    return all_staging_records
+
+# --- B. TRANSFER STOK (ALL STORE) ---
+def fetch_all_items_for_single_tf(session, tf_code, status_txt, headers, now_wib):
+    all_items = []
+    start_item = 0
+    chunk_size = 250
+
+    while True:
+        params_det = {
+            "draw": "1",
+            "columns[0][data]": "article", "columns[0][name]": "article",
+            "columns[1][data]": "pl_code", "columns[1][name]": "pl_code",
+            "columns[2][data]": "stfd_qty", "columns[2][name]": "stfd_qty",
+            "columns[3][data]": "pls_qty", "columns[3][name]": "pls_qty",
+            "columns[4][data]": "st_start", "columns[4][name]": "st_start",
+            "columns[5][data]": "st_end", "columns[5][name]": "st_end",
+            "columns[6][data]": "status", "columns[6][name]": "status",
+            "order[0][column]": "0", "order[0][dir]": "desc",
+            "start": str(start_item), "length": str(chunk_size), "search": "",
+            "stf_code": tf_code
+        }
+
+        res_det = session.get("https://jezpro.id/in_transfer_bin_datatables", params=params_det, headers=headers, timeout=25)
+        data_json = res_det.json() if res_det.status_code == 200 else {}
+        raw_chunk = data_json.get("data", [])
+
+        if not raw_chunk and start_item == 0:
+            res_det2 = session.get("https://jezpro.id/transfer_bin_datatables", params=params_det, headers=headers, timeout=25)
+            data_json = res_det2.json() if res_det2.status_code == 200 else {}
+            raw_chunk = data_json.get("data", [])
+
+        if not raw_chunk:
+            break
+
+        for it in raw_chunk:
+            art_str = strip_html(it.get("article", "-"))
+            all_items.append({
+                "stf_code": tf_code,
+                "article_name": art_str,
+                "bin_asal": strip_html(it.get("pl_code") or it.get("bin") or "-"),
+                "qty_tf": safe_int_val(it.get("stfd_qty") or it.get("qty"), 1),
+                "qty_in_bin": safe_int_val(it.get("pls_qty") or it.get("qty_bin"), 0),
+                "start_store": strip_html(it.get("st_start") or it.get("start_store") or "-"),
+                "end_store": strip_html(it.get("st_end") or it.get("end_store") or "-"),
+                "status": status_txt,
+                "synced_at": now_wib.isoformat()
+            })
+
+        total_records_in_doc = data_json.get("recordsTotal", 0)
+        start_item += len(raw_chunk)
+
+        if (total_records_in_doc > 0 and start_item >= total_records_in_doc) or len(raw_chunk) < chunk_size:
+            break
+        time.sleep(0.05)
+
+    return all_items
+
+def fetch_transfer_data(session):
+    print(f"   ⏳ [MONITOR 2/4] Menarik Seluruh Riwayat Transfer Stok (All Store)...")
+    url_history = "https://jezpro.id/transfer_history_datatables"
+    headers = {"Accept": "application/json, text/javascript, */*; q=0.01", "X-Requested-With": "XMLHttpRequest", "Referer": "https://jezpro.id/transfer_stok"}
+
+    raw_history = []
+    start_row = 0
+    batch_size = 500
+    total_expected = 999999
+
+    while start_row < total_expected:
+        params = {
+            "draw": "1",
+            "columns[0][data]": "DT_RowIndex", "columns[0][name]": "stf_id",
+            "columns[1][data]": "stf_code", "columns[1][name]": "stf_code",
+            "columns[2][data]": "u_name", "columns[2][name]": "u_name",
+            "columns[3][data]": "stf_notes", "columns[3][name]": "stf_notes",
+            "columns[4][data]": "qty_send", "columns[4][name]": "qty_send",
+            "columns[5][data]": "qty_receive", "columns[5][name]": "qty_receive",
+            "columns[6][data]": "start_store", "columns[6][name]": "start_store",
+            "columns[7][data]": "end_store", "columns[7][name]": "end_store",
+            "columns[8][data]": "u_name_receive", "columns[8][name]": "u_name_receive",
+            "columns[9][data]": "stf_created", "columns[9][name]": "stf_created",
+            "columns[10][data]": "stf_status", "columns[10][name]": "stf_status",
+            "order[0][column]": "0", "order[0][dir]": "desc",
+            "start": str(start_row), "length": str(batch_size), "search": "", "status": ""
+        }
+
+        try:
+            res = session.get(url_history, params=params, headers=headers, timeout=30)
+            if res.status_code != 200: break
+            data_json = res.json()
+            data_chunk = data_json.get("data", [])
+            if not data_chunk: break
+
+            total_expected = data_json.get("recordsTotal", total_expected)
+            raw_history.extend(data_chunk)
+            start_row += len(data_chunk)
+        except Exception:
+            break
+
+    open_headers = []
+    open_items = []
+    now_wib = datetime.now(WIB).replace(tzinfo=None)
+
+    for row in raw_history:
+        status_txt = strip_html(row.get("stf_status") or row.get("status") or "").upper()
+        if status_txt not in ["DRAFT", "IN PROGRESS"]:
+            continue
+
+        raw_code = str(row.get("stf_code") or row.get("kode") or "")
+        m_code = re.search(r'TF\d+', raw_code)
+        tf_code = m_code.group(0) if m_code else strip_html(raw_code).strip()
+        if not tf_code: continue
+
+        tgl_str = strip_html(row.get("stf_created") or row.get("tanggal") or "")
+        doc_year = None
+        aging_jam = 0.0
+
+        if tgl_str:
+            for fmt in ("%Y-%m-%d %H:%M:%S", "%d-%m-%Y %H:%M:%S", "%Y-%m-%d", "%d/%m/%Y %H:%M:%S"):
+                try:
+                    dt_tf = datetime.strptime(tgl_str[:19].strip(), fmt)
+                    doc_year = dt_tf.year
+                    diff_sec = (now_wib - dt_tf).total_seconds()
+                    aging_jam = max(0.0, round(diff_sec / 3600.0, 1))
+                    break
+                except Exception: pass
+
+        if doc_year is None:
+            m_year = re.search(r'TF(\d{4})', tf_code)
+            if m_year: doc_year = int(m_year.group(1))
+
+        if doc_year is not None and doc_year < 2026:
+            continue
+
+        open_headers.append({
+            "stf_code": tf_code,
+            "u_name": strip_html(row.get("u_name") or "-"),
+            "stf_notes": strip_html(row.get("stf_notes") or "-"),
+            "qty_send": safe_int_val(row.get("qty_send")),
+            "qty_receive": safe_int_val(row.get("qty_receive")),
+            "start_store": strip_html(row.get("start_store") or "-"),
+            "end_store": strip_html(row.get("end_store") or "-"),
+            "u_name_receive": strip_html(row.get("u_name_receive") or "-"),
+            "stf_created": tgl_str if tgl_str else now_wib.isoformat(),
+            "stf_status": status_txt,
+            "aging_hours": float(aging_jam),
+            "synced_at": now_wib.isoformat()
+        })
+
+        doc_items = fetch_all_items_for_single_tf(session, tf_code, status_txt, headers, now_wib)
+        open_items.extend(doc_items)
+
+    print(f"   -> Ditemukan {len(open_headers)} Surat Jalan TF Aktif & {len(open_items)} Rincian Item.")
+    return open_headers, open_items
+
+# --- C. MASS ADJUSTMENT (ALL STORE - MENGGANTUNG >= 2026) ---
+def fetch_mass_adjustment_data(session):
+    print(f"   ⏳ [MONITOR 3/4] Menarik Data Multiple Adjustment (Menggantung)...")
+    url_ma = "https://jezpro.id/mass_adjustment_datatables"
+    headers = {"Accept": "application/json, text/javascript, */*; q=0.01", "X-Requested-With": "XMLHttpRequest", "Referer": "https://jezpro.id/mass_adjustment"}
+
+    raw_adjustments = []
+    start_row = 0
+    batch_size = 500
+    total_expected = 999999
+
+    while start_row < total_expected:
+        params = {
+            "draw": "1",
+            "columns[0][data]": "DT_RowIndex", "columns[0][name]": "id",
+            "columns[1][data]": "ma_code_show", "columns[1][name]": "ma_code",
+            "columns[2][data]": "st_name", "columns[2][name]": "st_name",
+            "columns[3][data]": "u_name", "columns[3][name]": "u_name",
+            "columns[4][data]": "approve", "columns[4][name]": "",
+            "columns[5][data]": "executor", "columns[5][name]": "",
+            "columns[6][data]": "editor", "columns[6][name]": "",
+            "columns[7][data]": "note", "columns[7][name]": "",
+            "columns[8][data]": "ma_proof_file", "columns[8][name]": "",
+            "columns[9][data]": "tipe", "columns[9][name]": "",
+            "columns[10][data]": "created_at", "columns[10][name]": "",
+            "columns[11][data]": "updated_at", "columns[11][name]": "",
+            "columns[12][data]": "ma_status", "columns[12][name]": "",
+            "columns[13][data]": "action", "columns[13][name]": "",
+            "order[0][column]": "0", "order[0][dir]": "desc",
+            "start": str(start_row), "length": str(batch_size), "search": "", "st_id": ""
+        }
+
+        try:
+            res = session.get(url_ma, params=params, headers=headers, timeout=30)
+            if res.status_code != 200: break
+            data_json = res.json()
+            data_chunk = data_json.get("data", [])
+            if not data_chunk: break
+
+            total_expected = data_json.get("recordsTotal", total_expected)
+            raw_adjustments.extend(data_chunk)
+            start_row += len(data_chunk)
+        except Exception:
+            break
+
+    open_ma_headers = []
+    open_ma_items = []
+    now_wib = datetime.now(WIB).replace(tzinfo=None)
+
+    for row in raw_adjustments:
+        status_raw = strip_html(row.get("ma_status") or "").upper()
+        approve_raw = strip_html(row.get("approve") or "")
+        is_menggantung = any(k in status_raw for k in ["MENUNGGU", "PENDING", "DRAFT", "PROGRESS"]) or "MENUNGGU" in approve_raw.upper()
+        if not is_menggantung: continue
+
+        raw_code = str(row.get("ma_code_show") or row.get("ma_code") or "")
+        m_code = re.search(r'MADJ\d+', raw_code)
+        ma_code = m_code.group(0) if m_code else strip_html(raw_code).strip()
+
+        ma_id_val = safe_int_val(row.get("id"))
+        if not ma_id_val:
+            m_id = re.search(r'detail[/?](\d+)|ma_id=(\d+)', str(row.get("action") or ""))
+            ma_id_val = int(m_id.group(1) or m_id.group(2)) if m_id else None
+        if not ma_id_val and ma_code:
+            ma_id_val = abs(hash(ma_code)) % (10**10)
+
+        tgl_str = strip_html(row.get("created_at") or "")
+        doc_year = None
+        aging_jam = 0.0
+
+        if tgl_str:
+            for fmt in ("%d/%m/%Y %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%d-%m-%Y %H:%M:%S", "%d/%m/%Y"):
+                try:
+                    dt_ma = datetime.strptime(tgl_str[:19].strip(), fmt)
+                    doc_year = dt_ma.year
+                    diff_sec = (now_wib - dt_ma).total_seconds()
+                    aging_jam = max(0.0, round(diff_sec / 3600.0, 1))
+                    break
+                except Exception: pass
+
+        if doc_year is None and ma_code:
+            m_y = re.search(r'MADJ(\d{4})', ma_code)
+            if m_y: doc_year = int(m_y.group(1))
+
+        if doc_year is not None and doc_year < 2026:
+            continue
+
+        open_ma_headers.append({
+            "ma_id": ma_id_val,
+            "ma_code": ma_code,
+            "store_name": strip_html(row.get("st_name") or "-"),
+            "u_name": strip_html(row.get("u_name") or "-"),
+            "approve": approve_raw if approve_raw else "-",
+            "executor": strip_html(row.get("executor") or "-"),
+            "note": strip_html(row.get("note") or "-"),
+            "created_at": tgl_str if tgl_str else now_wib.isoformat(),
+            "ma_status": status_raw if status_raw else "MENGGANTUNG",
+            "status_category": "MENGGANTUNG",
+            "aging_hours": float(aging_jam),
+            "synced_at": now_wib.isoformat()
+        })
+
+        # Ambil rincian detail barang MADJ
+        start_item_ma = 0
+        chunk_ma = 250
+        while True:
+            url_detail = "https://jezpro.id/mass_adjustment_detail_datatables"
+            params_det = {
+                "draw": "1",
+                "columns[0][data]": "DT_RowIndex", "columns[0][name]": "id",
+                "columns[1][data]": "pl_code", "columns[1][name]": "pl_code",
+                "columns[2][data]": "br_name", "columns[2][name]": "br_name",
+                "columns[3][data]": "ps_barcode", "columns[3][name]": "ps_barcode",
+                "columns[4][data]": "p_name", "columns[4][name]": "p_name",
+                "columns[5][data]": "p_color", "columns[5][name]": "p_color",
+                "columns[6][data]": "sz_name", "columns[6][name]": "sz_name",
+                "columns[7][data]": "psc_name", "columns[7][name]": "psc_name",
+                "columns[8][data]": "purchase", "columns[8][name]": "purchase",
+                "columns[9][data]": "sell", "columns[9][name]": "sell",
+                "columns[10][data]": "qty_export", "columns[10][name]": "qty_export",
+                "columns[11][data]": "qty_so", "columns[11][name]": "qty_so",
+                "columns[12][data]": "mad_type", "columns[12][name]": "mad_type",
+                "columns[13][data]": "mad_diff", "columns[13][name]": "mad_diff",
+                "order[0][column]": "0", "order[0][dir]": "desc",
+                "start": str(start_item_ma), "length": str(chunk_ma), "search": "",
+                "ma_id": str(ma_id_val)
+            }
+            try:
+                res_det = session.get(url_detail, params=params_det, headers=headers, timeout=25)
+                data_json_ma = res_det.json() if res_det.status_code == 200 else {}
+                raw_items = data_json_ma.get("data", [])
+                if not raw_items: break
+
+                for it in raw_items:
+                    open_ma_items.append({
+                        "ma_id": ma_id_val,
+                        "bin_code": strip_html(it.get("pl_code") or "-"),
+                        "brand": strip_html(it.get("br_name") or "-"),
+                        "barcode_sku": strip_html(it.get("ps_barcode") or "-"),
+                        "article_name": strip_html(it.get("p_name") or "-"),
+                        "color": strip_html(it.get("p_color") or "-"),
+                        "size_variant": strip_html(it.get("sz_name") or "-"),
+                        "sub_category": strip_html(it.get("psc_name") or "-"),
+                        "cogs_price": safe_int_val(it.get("purchase")),
+                        "qty_system": safe_int_val(it.get("qty_export")),
+                        "qty_so": safe_int_val(it.get("qty_so")),
+                        "diff_qty": safe_int_val(it.get("mad_diff")),
+                        "adj_type": strip_html(it.get("mad_type") or "-"),
+                        "synced_at": now_wib.isoformat()
+                    })
+
+                total_rec_doc = data_json_ma.get("recordsTotal", 0)
+                start_item_ma += len(raw_items)
+                if (total_rec_doc > 0 and start_item_ma >= total_rec_doc) or len(raw_items) < chunk_ma:
+                    break
+                time.sleep(0.05)
+            except Exception:
+                break
+
+    print(f"   -> Ditemukan {len(open_ma_headers)} MADJ Menggantung & {len(open_ma_items)} Rincian Item.")
+    return open_ma_headers, open_ma_items
+
+# --- D. SINGLE ADJUSTMENT (NEED APPROVAL ALL CABANG) ---
+def fetch_single_adjustment_data(session):
+    print(f"   ⏳ [MONITOR 4/4] Menarik Data Single Adjustment (Need Approval All Store)...")
+    url_single = "https://jezpro.id/adjustment_history_datatables"
+    headers = {"Accept": "application/json, text/javascript, */*; q=0.01", "X-Requested-With": "XMLHttpRequest", "Referer": "https://jezpro.id/adjustment"}
+
+    today_str = datetime.now(WIB).strftime("%Y-%m-%d")
+    date_range = f"2026-01-01|{today_str}"
+    now_wib = datetime.now(WIB).replace(tzinfo=None)
+    clean_single_records = []
+
+    for branch_name, b_info in BRANCH_MAP.items():
+        st_id = b_info["st_id"]
+        start_row = 0
+        batch_size = 500
+        total_expected = 999999
+
+        while start_row < total_expected:
+            params = {
+                "draw": "1",
+                "columns[0][data]": "DT_RowIndex", "columns[0][name]": "ba_id",
+                "columns[1][data]": "ba_code", "columns[1][name]": "ba_code",
+                "columns[2][data]": "st_name", "columns[2][name]": "st_name",
+                "columns[3][data]": "pl_code", "columns[3][name]": "pl_code",
+                "columns[4][data]": "u_name", "columns[4][name]": "u_name",
+                "columns[5][data]": "ba_approve", "columns[5][name]": "ba_approve",
+                "columns[6][data]": "ba_executor", "columns[6][name]": "ba_executor",
+                "columns[7][data]": "br_name", "columns[7][name]": "br_name",
+                "columns[8][data]": "p_name", "columns[8][name]": "p_name",
+                "columns[9][data]": "ps_barcode", "columns[9][name]": "ps_barcode",
+                "columns[10][data]": "p_color", "columns[10][name]": "p_color",
+                "columns[11][data]": "sz_name", "columns[11][name]": "sz_name",
+                "columns[12][data]": "cogs", "columns[12][name]": "cogs",
+                "columns[13][data]": "ba_updated_at", "columns[13][name]": "ba_updated_at",
+                "columns[14][data]": "ba_old_qty", "columns[14][name]": "ba_old_qty",
+                "columns[15][data]": "ba_new_qty", "columns[15][name]": "ba_new_qty",
+                "columns[16][data]": "adjust", "columns[16][name]": "adjust",
+                "columns[17][data]": "ba_note", "columns[17][name]": "ba_note",
+                "columns[18][data]": "ba_proof_file", "columns[18][name]": "ba_proof_file",
+                "columns[19][data]": "ba_status", "columns[19][name]": "ba_status",
+                "order[0][column]": "0", "order[0][dir]": "desc",
+                "start": str(start_row), "length": str(batch_size),
+                "search": "", "st_id": str(st_id), "adjustment_date": date_range, "status": ""
+            }
+
+            try:
+                res = session.get(url_single, params=params, headers=headers, timeout=30)
+                if res.status_code != 200: break
+                data_json = res.json()
+                data_chunk = data_json.get("data", [])
+                if not data_chunk: break
+
+                total_expected = data_json.get("recordsTotal", total_expected)
+                start_row += len(data_chunk)
+
+                for idx, row in enumerate(data_chunk):
+                    status_raw = strip_html(row.get("ba_status") or "").upper()
+                    approve_raw = strip_html(row.get("ba_approve") or "").upper()
+
+                    if any(x in status_raw for x in ["DONE", "SELESAI", "CANCEL", "BATAL"]):
+                        continue
+
+                    is_need_approval = (
+                        any(k in status_raw for k in ["MENUNGGU", "PENDING", "NEED", "WAITING", "PROGRESS", "DRAFT"])
+                        or approve_raw in ["-", "", "NONE", "NAN"]
+                        or "MENUNGGU" in approve_raw
+                    )
+                    if not is_need_approval: continue
+
+                    ba_id_val = safe_int_val(row.get("ba_id") or row.get("id"))
+                    raw_code = strip_html(row.get("ba_code") or "-")
+                    if not ba_id_val:
+                        ba_id_val = abs(hash(f"{raw_code}_{st_id}_{start_row}_{idx}")) % (10**10)
+
+                    clean_single_records.append({
+                        "id": ba_id_val,
+                        "ba_code": raw_code,
+                        "store_name": strip_html(row.get("st_name") or branch_name),
+                        "bin_code": strip_html(row.get("pl_code") or "-"),
+                        "creator": strip_html(row.get("u_name") or "-"),
+                        "approval": strip_html(row.get("ba_approve") or "-"),
+                        "executor": strip_html(row.get("ba_executor") or "-"),
+                        "brand": strip_html(row.get("br_name") or "-"),
+                        "article_name": strip_html(row.get("p_name") or "-"),
+                        "barcode_sku": strip_html(row.get("ps_barcode") or "-"),
+                        "color": strip_html(row.get("p_color") or "-"),
+                        "size_variant": strip_html(row.get("sz_name") or "-"),
+                        "cogs": safe_int_val(row.get("cogs")),
+                        "old_qty": safe_int_val(row.get("ba_old_qty")),
+                        "new_qty": safe_int_val(row.get("ba_new_qty")),
+                        "adjust_qty": safe_int_val(row.get("adjust")),
+                        "note": strip_html(row.get("ba_note") or "-"),
+                        "proof_file": strip_html(row.get("ba_proof_file") or "-"),
+                        "status": strip_html(row.get("ba_status") or "Menunggu"),
+                        "updated_at": strip_html(row.get("ba_updated_at") or ""),
+                        "synced_at": now_wib.isoformat()
+                    })
+            except Exception:
+                break
+
+    print(f"   -> Ditemukan {len(clean_single_records)} Single Adjustment Butuh Approval.")
+    return clean_single_records
+
+# --- E. PUSH KE SUPABASE (6 TABEL WAREHOUSE MONITOR) ---
+def push_monitor_to_supabase(staging_data, tf_headers, tf_items, ma_headers, ma_items, single_items):
+    print("🚀 [MONITOR -> SUPABASE] Mengosongkan data lama & mengunggah sinkronisasi...")
+
+    # 1. Staging Waiting
+    requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_waiting_staging?plst_id=gt.0", headers=HEADERS_SB)
+    if staging_data:
+        for i in range(0, len(staging_data), 100):
+            requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_waiting_staging", json=staging_data[i:i+100], headers=HEADERS_SB)
+    print(f"   ✅ [1/6] Staging Waiting: {len(staging_data)} baris disimpan.")
+
+    # 2. Transfer Headers
+    requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_transfer_headers?stf_code=neq.", headers=HEADERS_SB)
+    if tf_headers:
+        for i in range(0, len(tf_headers), 200):
+            requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_transfer_headers", json=tf_headers[i:i+200], headers=HEADERS_SB)
+    print(f"   ✅ [2/6] Transfer Headers: {len(tf_headers)} dokumen disimpan.")
+
+    # 3. Transfer Items
+    requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_transfer_items?id=gt.0", headers=HEADERS_SB)
+    if tf_items:
+        for i in range(0, len(tf_items), 200):
+            requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_transfer_items", json=tf_items[i:i+200], headers=HEADERS_SB)
+    print(f"   ✅ [3/6] Transfer Items: {len(tf_items)} item disimpan.")
+
+    # 4. Mass Adjustment Headers
+    requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_adjustment_headers?ma_id=gt.0", headers=HEADERS_SB)
+    if ma_headers:
+        for i in range(0, len(ma_headers), 200):
+            requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_adjustment_headers", json=ma_headers[i:i+200], headers=HEADERS_SB)
+    print(f"   ✅ [4/6] MADJ Headers: {len(ma_headers)} dokumen disimpan.")
+
+    # 5. Mass Adjustment Items
+    requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_adjustment_items?id=gt.0", headers=HEADERS_SB)
+    if ma_items:
+        for i in range(0, len(ma_items), 200):
+            requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_adjustment_items", json=ma_items[i:i+200], headers=HEADERS_SB)
+    print(f"   ✅ [5/6] MADJ Items: {len(ma_items)} item disimpan.")
+
+    # 6. Single Adjustments
+    requests.delete(f"{SUPABASE_URL}/rest/v1/jezpro_single_adjustments?id=gt.0", headers=HEADERS_SB)
+    if single_items:
+        for i in range(0, len(single_items), 200):
+            requests.post(f"{SUPABASE_URL}/rest/v1/jezpro_single_adjustments", json=single_items[i:i+200], headers=HEADERS_SB)
+    print(f"   ✅ [6/6] Single Adjustments: {len(single_items)} baris disimpan.\n")
+
+def run_module_warehouse_monitor(session):
+    print(f"\n📊 [{datetime.now(WIB).strftime('%H:%M:%S')}] [MONITOR] Memulai Sinkronisasi Warehouse Activity Monitor Lengkap (All Area)...")
+    stg = fetch_staging_data(session)
+    tf_h, tf_i = fetch_transfer_data(session)
+    ma_h, ma_i = fetch_mass_adjustment_data(session)
+    sng = fetch_single_adjustment_data(session)
+    push_monitor_to_supabase(stg, tf_h, tf_i, ma_h, ma_i, sng)
 
 # ==============================================================================
 # MODUL 3: EKSPOR STOK & SALES SURABAYA (HEAVY)
@@ -729,9 +1193,9 @@ def thread_instock_worker(session):
 # MAIN ORCHESTRATOR
 # ==============================================================================
 if __name__ == "__main__":
-    print("=" * 75)
-    print("🚀 MASTER LOCAL ORCHESTRATOR: JEZPRO -> SUPABASE (WITH LIVE LOGGING)")
-    print("=" * 75)
+    print("=" * 80)
+    print("🚀 MASTER LOCAL ORCHESTRATOR: JEZPRO -> SUPABASE (FULL MODULES INTEGRATED)")
+    print("=" * 80)
 
     jez = create_jezpro_session()
 
@@ -752,19 +1216,19 @@ if __name__ == "__main__":
         current_minute = now_wib.minute
         minute_str = now_wib.strftime("%Y-%m-%d-%H-%M")
 
-        # 1. Cek jam khusus: 15:20, 21:20, dan 21:50
+        # 1. Cek jam khusus jadwal sinkronisasi monitor: 15:20, 21:20, dan 21:50
         is_specific_time = (
             (current_hour == 15 and current_minute == 20) or
             (current_hour == 21 and current_minute == 20) or
             (current_hour == 21 and current_minute == 50)
         )
 
-        # 2. Cek interval waktu 2 jam (7200 detik)
+        # 2. Interval rutin monitor tiap 2 jam (7200 detik)
         is_two_hours_passed = (curr - last_monitor >= 7200)
 
         should_run_monitor = is_two_hours_passed or (is_specific_time and minute_str != last_triggered_minute)
 
-        # Eksekusi Warehouse Activity Monitor
+        # Eksekusi Warehouse Activity Monitor (Staging, TF, MADJ, Single Adj)
         if should_run_monitor:
             try:
                 run_module_warehouse_monitor(jez)
@@ -782,13 +1246,13 @@ if __name__ == "__main__":
             except Exception as e:
                 print(f"❌ [HEAVY Error]: {e}")
 
-        # Keterangan Idle / Standby tiap 5 menit sekali agar terlihat program tidak macet
+        # Log heartbeat standby tiap 5 menit sekali
         if curr - last_standby_log >= 300:
             sisa_monitor = max(0, int(7200 - (curr - last_monitor))) // 60
             sisa_heavy = max(0, int(10800 - (curr - last_heavy))) // 60
-            print(f"💤 [{now_wib.strftime('%H:%M:%S')}] [STANDBY] Main loop berjalan normal.")
-            print(f"   -> Sisa waktu menuju Monitor berikutnya: ~{sisa_monitor} menit")
-            print(f"   -> Sisa waktu menuju Heavy Export berikutnya: ~{sisa_heavy} menit")
+            print(f"💤 [{now_wib.strftime('%H:%M:%S')}] [STANDBY] Orchestrator standby normal.")
+            print(f"   -> Sisa waktu menuju Monitor (Staging/TF/Adj): ~{sisa_monitor} menit")
+            print(f"   -> Sisa waktu menuju Heavy Export: ~{sisa_heavy} menit")
             print(f"   -> Instock Surabaya tetap berjalan mandiri di background.\n")
             last_standby_log = curr
 
