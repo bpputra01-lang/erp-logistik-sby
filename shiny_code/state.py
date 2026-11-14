@@ -2588,10 +2588,9 @@ class AppState:
 
             df_s_raw = load_data_from_info(f_scan)
             df_t_raw = load_data_from_info(f_stock)
-            if df_s_raw.empty or df_t_raw.empty:
+            if df_s_raw is None or df_s_raw.empty or df_t_raw is None or df_t_raw.empty:
                 return False, "File Data Scan dan Stock System tidak boleh kosong!"
 
-            # Helper pembersih dasar teks string
             def clean_str(val):
                 if pd.isna(val) or val is None:
                     return ""
@@ -2601,7 +2600,6 @@ class AppState:
                         s = s[:-2]
                 return s
 
-            # Helper strip leading zero HANYA untuk kunci pencocokan (lookup key)
             def get_base_numeric_key(s):
                 if re.match(r'^\d+(\.\d+)?$', s):
                     if '.' in s:
@@ -2615,20 +2613,29 @@ class AppState:
 
             # 1. Bersihkan & Filter Stock System Terlebih Dahulu (Sebagai Master Acuan)
             dt = df_t_raw.copy()
-            col_b, col_s, col_q_sys = dt.columns[1], dt.columns[2], dt.columns[9]
+            col_b = dt.columns[1] if dt.shape[1] > 1 else dt.columns[0]
+            col_s = dt.columns[2] if dt.shape[1] > 2 else dt.columns[0]
+
+            col_q_sys = None
+            for col in dt.columns:
+                c_clean = str(col).strip().upper()
+                if any(k in c_clean for k in ['QTY SYSTEM', 'QTY SYS', 'SYSTEM QTY', 'STOK SYSTEM']):
+                    col_q_sys = col
+                    break
+            if col_q_sys is None:
+                col_q_sys = dt.columns[9] if dt.shape[1] > 9 else dt.columns[-1]
 
             if sub_sel and len(sub_sel) > 0 and dt.shape[1] > 6:
-                dt = dt[dt.iloc[:, 6].astype(str).str.upper().isin([x.upper() for x in sub_sel])]
+                dt = dt[dt.iloc[:, 6].astype(str).str.strip().str.upper().isin([x.upper().strip() for x in sub_sel])]
             if bin_sys_sel and len(bin_sys_sel) > 0 and dt.shape[1] > 1:
-                dt = dt[dt.iloc[:, 1].astype(str).str.upper().apply(lambda x: any(c.upper() in x for c in bin_sys_sel))]
+                pattern_bin = "|".join([re.escape(c.upper().strip()) for c in bin_sys_sel])
+                dt = dt[dt.iloc[:, 1].astype(str).str.strip().str.upper().str.contains(pattern_bin, na=False)]
 
-            dt[col_b] = dt[col_b].astype(str).str.strip().str.upper()
-            dt[col_s] = dt[col_s].apply(clean_str)
-            dt[col_q_sys] = pd.to_numeric(dt[col_q_sys], errors='coerce').fillna(0)
+            dt['BIN_CLEAN'] = dt[col_b].astype(str).str.strip().str.upper()
+            dt['SKU_CLEAN'] = dt[col_s].apply(clean_str)
+            dt['QTY_SYS_NUM'] = pd.to_numeric(dt[col_q_sys], errors='coerce').fillna(0)
 
-            # Master SKU resmi dari Stock System
-            system_skus_set = set(dt[col_s].unique())
-            
+            system_skus_set = set(dt['SKU_CLEAN'].unique())
             base_to_system_sku = {}
             for s_sys in system_skus_set:
                 if s_sys:
@@ -2651,18 +2658,19 @@ class AppState:
                 return scan_sku
 
             ds['SKU'] = ds['SKU'].apply(align_scan_sku_to_stock)
+            ds = ds[(ds['SKU'] != '') & (ds['SKU'] != 'NAN') & (ds['BIN'] != '')]
+            ds_grouped = ds.groupby(['BIN', 'SKU'], as_index=False)['QTY_SCAN'].sum()
 
-            # 3. Aggregasi Stock System
-            dt_sub = dt[[col_b, col_s, col_q_sys]].copy()
-            dt_sub.columns = ['BIN', 'SKU', 'QTY_SYSTEM']
-            dt_grouped = dt_sub.groupby(['BIN', 'SKU'], as_index=False)['QTY_SYSTEM'].sum()
+            # 3. Aggregasi Stock System & Compare Scan ke Stock
+            dt_grouped = dt.groupby(['BIN_CLEAN', 'SKU_CLEAN'], as_index=False)['QTY_SYS_NUM'].sum()
+            dt_grouped.columns = ['BIN', 'SKU', 'QTY_SYSTEM']
 
-            item_map = dt[[col_s, dt.columns[4]]].dropna().astype(str)
-            item_map.columns = ['SKU', 'NAME']
-            item_map['SKU'] = item_map['SKU'].str.strip().str.upper()
-            map_dict = item_map.drop_duplicates('SKU').set_index('SKU')['NAME'].to_dict()
+            res_scan = ds_grouped.merge(dt_grouped, on=['BIN', 'SKU'], how='left')
+            res_scan['QTY_SYSTEM'] = res_scan['QTY_SYSTEM'].fillna(0)
+            res_scan['DIFF'] = res_scan['QTY_SCAN'] - res_scan['QTY_SYSTEM']
+            res_scan['NOTE'] = np.where(res_scan['DIFF'] > 0, "REAL +", np.where(res_scan['DIFF'] < 0, "SYSTEM +", "OK"))
 
-            # 4. Compare Stock ke Scan (Konsep persis Stock Opname)
+            # 4. Compare Stock ke Scan
             ds_g = ds_grouped.copy()
             ds_g.columns = ['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN']
 
@@ -2677,16 +2685,15 @@ class AppState:
             # 5. Mapping Nama Item
             map_dict = {}
             if dt.shape[1] > 4:
-                s_vals = dt.iloc[:, 2].astype(str).str.strip().str.upper().str.replace(r'\.0$', '', regex=True)
+                s_vals = dt.iloc[:, 2].apply(clean_str)
                 n_vals = dt.iloc[:, 4].fillna('-').astype(str).str.strip()
                 map_df = pd.DataFrame({'SKU': s_vals, 'NAME': n_vals}).drop_duplicates('SKU')
                 map_dict = dict(zip(map_df['SKU'], map_df['NAME']))
 
             res_scan['ITEM NAME'] = res_scan['SKU'].map(map_dict).fillna("-")
             
-            # Update ITEM NAME di res_stock dan bersihkan kolom duplikat
             sku_col_stock = col_s if col_s in res_stock.columns else res_stock.columns[2]
-            res_stock['ITEM NAME'] = res_stock[sku_col_stock].astype(str).str.strip().str.upper().str.replace(r'\.0$', '', regex=True).map(map_dict).fillna("-")
+            res_stock['ITEM NAME'] = res_stock[sku_col_stock].apply(clean_str).map(map_dict).fillna("-")
             res_stock = res_stock.loc[:, ~res_stock.columns.duplicated()]
 
             real_plus = res_scan[res_scan['NOTE'] == "REAL +"].copy()
@@ -2713,6 +2720,8 @@ class AppState:
             self.so_step1_done.set(True)
             return True, "Compare Step 1 Berhasil!"
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             return False, f"Gagal Compare Step 1: {e}"
 
      # ==========================================================================
