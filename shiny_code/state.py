@@ -7956,10 +7956,11 @@ class AppState:
 
     def get_target_metrics_summary(self):
         """
-        Kalkulasi Metrik Tab 3 Berbasis Bobot Harian (100% Base):
-        - Tiap hari memiliki bobot 1/7 dari target mingguan.
-        - Hari yang belum diisi/dijalankan TIDAK boleh memotong nilai target.
-        - Jika UNCONFIRMED, hanya memotong porsi bobot defisit hari itu.
+        Kalkulasi Metrik Tab 3:
+        - Tiap hari memegang bobot rata (1/7 dari target).
+        - Jika semua hari 100% -> Hasil 100%.
+        - Jika ada hari yang < 100% (Unconfirmed) -> Progress terpotong proporsional.
+        - Jika status CONFIRMED -> Target terlindungi (tetap dihitung 100%).
         """
         targets = self.target_items_list()
         daily_map = self.target_daily_map()
@@ -7976,9 +7977,8 @@ class AppState:
 
         confirmed_count = 0
         unconfirmed_count = 0
-        total_potongan_pct = 0.0
-
-        bobot_per_hari = 100.0 / (total_targets * 7)
+        total_effective_pct = 0.0
+        total_days = total_targets * 7
 
         for t in targets:
             t_id = t["id"]
@@ -7987,45 +7987,33 @@ class AppState:
                 entry = daily_map.get(key, {})
 
                 raw_achieve = entry.get("achievement")
-                note = str(entry.get("note", "")).strip()
-                deadline = str(entry.get("deadline", "-")).strip()
-                justifikasi = str(entry.get("justifikasi", "-")).strip().upper()
+                # Default hari yang belum diubah adalah 100%
+                achieve = safe_int(raw_achieve, 100) if raw_achieve is not None else 100
+                just = str(entry.get("justifikasi", "-")).strip().upper()
 
-                # Lewati hari yang BELUM diisi sama sekali (agar tidak memotong 14.3% per hari)
-                # Hari dianggap aktif diisi jika achieve > 0 ATAU ada catatan / justifikasi / deadline
-                is_day_active = (
-                    (raw_achieve is not None and safe_int(raw_achieve) > 0) or
-                    (note != "" and note != "-") or
-                    (justifikasi != "-" and justifikasi != "") or
-                    (deadline != "-" and deadline != "")
-                )
+                is_unconf = ("UNCONFIRMED" in just)
+                is_conf = ("CONFIRMED" in just and not is_unconf)
 
-                if not is_day_active:
-                    continue  # Hari belum berjalan, JANGAN dipotong!
-
-                achieve = safe_int(raw_achieve, 0)
-
-                if "CONFIRMED" in justifikasi and "UNCONFIRMED" not in justifikasi:
+                # Jika ada kendala tapi alasan terkonfirmasi (misal server down / mati lampu)
+                if is_conf and achieve < 100:
                     confirmed_count += 1
-                    # Terkonfirmasi: Target terlindungi, potongan 0%
-                elif "UNCONFIRMED" in justifikasi:
+                    effective = 100.0  # Dilindungi, tetap dihitung 100%
+                elif is_unconf and achieve < 100:
                     unconfirmed_count += 1
-                    # Tidak terkonfirmasi: Potong sesuai porsi bobot defisit hari ini
-                    defisit = max(0, 100 - achieve)
-                    potongan = (defisit / 100.0) * bobot_per_hari
-                    total_potongan_pct += potongan
+                    effective = float(achieve)  # Realita lapangan (misal 70%)
                 else:
-                    if achieve < 100:
-                        defisit = max(0, 100 - achieve)
-                        potongan = (defisit / 100.0) * bobot_per_hari
-                        total_potongan_pct += potongan
+                    effective = float(achieve)
 
-        final_score = max(0.0, round(100.0 - total_potongan_pct, 1))
+                total_effective_pct += effective
+
+        # Rata-rata pencapaian dari hari ke-1 sampai hari ke-7
+        final_score = round(total_effective_pct / total_days, 1) if total_days > 0 else 100.0
+        total_potongan = round(100.0 - final_score, 1)
 
         return {
             "total_targets": total_targets,
             "avg_achievement_pct": final_score,
             "confirmed_count": confirmed_count,
             "unconfirmed_count": unconfirmed_count,
-            "total_potongan_pct": round(total_potongan_pct, 1)
+            "total_potongan_pct": total_potongan
         }

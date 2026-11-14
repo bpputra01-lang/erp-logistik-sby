@@ -6286,7 +6286,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                 entry = daily_map.get(key, {})
 
                 raw_achieve = entry.get("achievement")
-                achieve = safe_int(raw_achieve, 100) if raw_achieve is not None else 100
+                cur_achieve = safe_int(raw_achieve, 100) if raw_achieve is not None else 100
                 note = entry.get("note", "-")
                 deadline = entry.get("deadline", "-")
                 just = str(entry.get("justifikasi", "-")).strip().upper()
