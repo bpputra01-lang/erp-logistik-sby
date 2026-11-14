@@ -2691,40 +2691,18 @@ class AppState:
             item_map['SKU'] = item_map['SKU'].str.strip().str.upper()
             map_dict = item_map.drop_duplicates('SKU').set_index('SKU')['NAME'].to_dict()
 
-            # 4. Compare Scan ke Stock
-            res_scan = ds.merge(dt_grouped, on=['BIN', 'SKU'], how='left').fillna(0)
-            res_scan['DIFF'] = res_scan['QTY_SCAN'] - res_scan['QTY_SYSTEM']
+            # 4. Compare Stock ke Scan (Konsep persis Stock Opname)
+            ds_g = ds.groupby(['BIN', 'SKU'], as_index=False)['QTY_SCAN'].sum()
+            ds_g.columns = ['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN']
 
-            cond_scan = [
-                (res_scan['QTY_SYSTEM'] < 0),
-                (res_scan['DIFF'] > 0),
-                (res_scan['DIFF'] < 0)
-            ]
-            choices_scan = ["STOCK MINUS", "REAL +", "SYSTEM +"]
-            res_scan['NOTE'] = np.select(cond_scan, choices_scan, default="OK")
+            dt_merged = dt.merge(ds_g, left_on=['BIN_CLEAN', 'SKU_CLEAN'], right_on=['BIN_SCAN', 'SKU_SCAN'], how='left')
+            dt_merged['QTY SO'] = dt_merged['QTY_TOTAL_SCAN'].fillna(0)
+            dt_merged['DIFF'] = dt_merged['QTY_SYS_NUM'] - dt_merged['QTY SO']
+            dt_merged['NOTE'] = np.where(dt_merged['DIFF'] > 0, "SYSTEM +", np.where(dt_merged['DIFF'] < 0, "REAL +", "OK"))
 
-            scanned_keys = set(zip(res_scan['BIN'], res_scan['SKU']))
-            missing_minus = dt_grouped[dt_grouped['QTY_SYSTEM'] < 0].copy()
+            cols_drop = ['BIN_CLEAN', 'SKU_CLEAN', 'QTY_SYS_NUM', 'BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN']
+            res_stock = dt_merged.drop(columns=[c for c in cols_drop if c in dt_merged.columns], errors='ignore')
             
-            unscanned_rows = []
-            for _, r in missing_minus.iterrows():
-                b_val, s_val, q_sys_val = r['BIN'], r['SKU'], r['QTY_SYSTEM']
-                if (b_val, s_val) not in scanned_keys:
-                    unscanned_rows.append({
-                        'BIN': b_val,
-                        'SKU': s_val,
-                        'QTY_SCAN': 0,
-                        'QTY_SYSTEM': q_sys_val,
-                        'DIFF': abs(q_sys_val),
-                        'NOTE': 'STOCK MINUS'
-                    })
-
-            if unscanned_rows:
-                df_unscanned = pd.DataFrame(unscanned_rows)
-                res_scan = pd.concat([res_scan, df_unscanned], ignore_index=True)
-
-            res_scan['ITEM NAME'] = res_scan['SKU'].map(map_dict).fillna("-")
-
             # 5. Compare Stock ke Scan
             ds_g = ds.groupby(['BIN', 'SKU'], as_index=False)['QTY_SCAN'].sum()
             ds_g.columns = ['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN']

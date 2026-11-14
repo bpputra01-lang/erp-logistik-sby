@@ -1781,35 +1781,38 @@ def server(input: Inputs, output: Outputs, session: Session):
                     ui.nav_panel("📄 Salah Letak (Rak ke Rak)", ui.div(render_clean_table(state.df_cca_miss_loc_headers(), state.df_cca_miss_loc_rows(), "tbl_cca_miss_loc"), style="padding: 0.75rem 0;")),
                     ui.nav_panel("☣️ Miss Loc ke Karantina", ui.div(render_clean_table(state.df_cca_karantina_headers(), state.df_cca_karantina_rows(), "tbl_cca_karan_loc"), style="padding: 0.75rem 0;")),
                     ui.nav_panel("📊 Summary Rekapitulasi", ui.div(render_clean_table(state.df_cca_sum_miss_headers(), state.df_cca_sum_miss_rows(), "tbl_cca_sum_miss"), style="padding: 0.75rem 0;"))
-                ),
-                # 🌟 BANNER DOWNLOAD FULL REPORT PERSIS STOCK OPNAME
-                ui.div(
-                    ui.div(
-                        ui.h4("🏆 Download Full Master Report Cycle Count", style="font-size: 16px; font-weight: 800; color: #065F46; margin: 0;"),
-                        ui.download_button(
-                            "btn_dl_cca_master_all",
-                            ui.tags.span(ui.tags.i(class_="fa-solid fa-file-excel", style="margin-right: 8px; font-size: 16px;"), "DOWNLOAD FULL CYCLE COUNT REPORT (.XLSX)"),
-                            style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; font-weight: 800; border-radius: 8px; border: none; padding: 12px 24px; cursor: pointer; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);"
-                        ),
-                        style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 10px;"
-                    ),
-                    style="background: #D1FAE5; border: 1.5px solid #A7F3D0; padding: 1.5rem; border-radius: 12px; margin-top: 1.5rem;"
                 )
             )
 
         return ui.div(
-            ui.h4("5️⃣ MISS LOCATION REPORT", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+            # Kartu Step 5 Miss Location
             ui.div(
-                ui.tags.button(
-                    ui.tags.span(ui.tags.i(class_="fa-solid fa-chart-pie", style="margin-right: 6px; font-size: 14px;"), "GENERATE MISS LOC REPORT"),
-                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_run_cca_step6', Math.random(), {priority: 'event'});",
-                    class_="btn-red-gradient"
+                ui.h4("5️⃣ MISS LOCATION REPORT", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+                ui.div(
+                    ui.tags.button(
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-chart-pie", style="margin-right: 6px; font-size: 14px;"), "GENERATE MISS LOC REPORT"),
+                        onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_run_cca_step6', Math.random(), {priority: 'event'});",
+                        class_="btn-red-gradient"
+                    ),
+                    style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
                 ),
-                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+                step6_results,
+                class_="step-card-box",
+                style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
             ),
-            step6_results,
-            class_="step-card-box",
-            style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+            # 🌟 BANNER MASTER REPORT (PERSIS SEPERTI STOCK OPNAME)
+            ui.div(
+                ui.div(
+                    ui.h4("🏆 Download Full Master Report Cycle Count", style="font-size: 16px; font-weight: 800; color: #065F46; margin: 0;"),
+                    ui.download_button(
+                        "btn_dl_cca_master_all",
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-file-excel", style="margin-right: 8px; font-size: 16px;"), "DOWNLOAD FULL CYCLE COUNT REPORT (.XLSX)"),
+                        style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; font-weight: 800; border-radius: 8px; border: none; padding: 12px 24px; cursor: pointer; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);"
+                    ),
+                    style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 10px;"
+                ),
+                style="background: #D1FAE5; border: 1.5px solid #A7F3D0; padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem;"
+            )
         )
         
     @reactive.Effect
@@ -1846,68 +1849,43 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         yield buf.getvalue()
 
-    @render.download(filename=lambda: f"FULL_CYCLE_COUNT_REPORT_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx")
+    @render.download(filename="FULL_CYCLE_COUNT_ANALYZER_REPORT.xlsx")
     def btn_dl_cca_master_all():
-        import tempfile
-        import re
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            if not state._raw_df_cca_scan.empty: 
+                state._raw_df_cca_scan.to_excel(writer, sheet_name='1_DATA SCAN', index=False)
+            if not state._raw_df_cca_stock.empty: 
+                state._raw_df_cca_stock.to_excel(writer, sheet_name='2_STOCK SYSTEM', index=False)
+            if not state._raw_df_cca_real_plus.empty: 
+                state._raw_df_cca_real_plus.to_excel(writer, sheet_name='3_REAL PLUS', index=False)
+            if not state._raw_df_cca_sys_plus.empty: 
+                state._raw_df_cca_sys_plus.to_excel(writer, sheet_name='4_SYSTEM PLUS', index=False)
+            if not state._raw_df_cca_alloc.empty: 
+                state._raw_df_cca_alloc.to_excel(writer, sheet_name='5_ALLOCATION DETAIL', index=False)
+            if not state._raw_df_cca_setup_real.empty: 
+                state._raw_df_cca_setup_real.to_excel(writer, sheet_name='6_SET UP REAL PLUS', index=False)
+            if not state._raw_df_cca_rec_real.empty: 
+                state._raw_df_cca_rec_real.to_excel(writer, sheet_name='7_REAL PLUS RECON', index=False)
+            if not state._raw_df_cca_rec_sys.empty: 
+                state._raw_df_cca_rec_sys.to_excel(writer, sheet_name='8_SYSTEM OUTSTANDING', index=False)
+            if not state._raw_df_cca_adj4.empty: 
+                state._raw_df_cca_adj4.to_excel(writer, sheet_name='9_REAL PLUS NEED ADJ', index=False)
+            if not state._raw_df_cca_karantina.empty: 
+                state._raw_df_cca_karantina.to_excel(writer, sheet_name='10_KARANTINA', index=False)
+            if not state._raw_df_cca_check5.empty: 
+                state._raw_df_cca_check5.to_excel(writer, sheet_name='11_CHECK AUDIT', index=False)
+            if not state._raw_df_cca_miss_loc.empty: 
+                state._raw_df_cca_miss_loc.to_excel(writer, sheet_name='12_MISS LOCATION', index=False)
+            if not state._raw_df_cca_sum_miss.empty: 
+                state._raw_df_cca_sum_miss.to_excel(writer, sheet_name='13_SUMMARY MISS LOC', index=False)
 
-        # Buat file temporary di disk agar data tidak corrupt / 0 bytes
-        tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
-        tmp_path = tmp.name
-        tmp.close()
+            # Pengaman bila semua data belum diproses agar file Excel tidak rusak
+            if not writer.sheets:
+                pd.DataFrame({"INFO": ["Data Cycle Count belum diproses"]}).to_excel(writer, sheet_name='INFO', index=False)
 
-        def clean_df(df_in):
-            if df_in is None or df_in.empty:
-                return None
-            df_out = df_in.copy()
-            # 1. Hapus timezone agar openpyxl tidak crash
-            for col in df_out.select_dtypes(include=['datetime', 'datetimetz']).columns:
-                df_out[col] = df_out[col].dt.tz_localize(None)
-            # 2. Bersihkan karakter ilegal XML Excel
-            for col in df_out.select_dtypes(include=['object']).columns:
-                df_out[col] = df_out[col].astype(str).apply(
-                    lambda x: re.sub(r'[\x00-\x08\x0B-\x0C\x0E-\x1F]', '', x) if isinstance(x, str) else x
-                )
-            return df_out
-
-        sheets = [
-            ('1_DATA SCAN', getattr(state, "_raw_df_cca_scan", None)),
-            ('2_STOCK SYSTEM', getattr(state, "_raw_df_cca_stock", None)),
-            ('3_REAL PLUS', getattr(state, "_raw_df_cca_real_plus", None)),
-            ('4_SYSTEM PLUS', getattr(state, "_raw_df_cca_sys_plus", None)),
-            ('5_ALLOCATION DETAIL', getattr(state, "_raw_df_cca_alloc", None)),
-            ('6_SET UP REAL PLUS', getattr(state, "_raw_df_cca_setup_real", None)),
-            ('7_REAL PLUS RECON', getattr(state, "_raw_df_cca_rec_real", None)),
-            ('8_SYSTEM OUTSTANDING', getattr(state, "_raw_df_cca_rec_sys", None)),
-            ('9_REAL PLUS NEED ADJ', getattr(state, "_raw_df_cca_adj4", None)),
-            ('10_KARANTINA', getattr(state, "_raw_df_cca_karantina", None)),
-            ('11_CHECK AUDIT', getattr(state, "_raw_df_cca_check5", None)),
-            ('12_MISS LOCATION', getattr(state, "_raw_df_cca_miss_loc", None)),
-            ('13_SUMMARY MISS LOC', getattr(state, "_raw_df_cca_sum_miss", None)),
-        ]
-
-        has_sheet = False
-        try:
-            with pd.ExcelWriter(tmp_path, engine='openpyxl') as writer:
-                for sheet_name, raw_df in sheets:
-                    cleaned = clean_df(raw_df)
-                    if cleaned is not None and not cleaned.empty:
-                        cleaned.to_excel(writer, sheet_name=sheet_name[:31], index=False)
-                        has_sheet = True
-
-                if not has_sheet:
-                    pd.DataFrame({"STATUS": ["Data Cycle Count belum diproses / kosong"]}).to_excel(
-                        writer, sheet_name='INFO', index=False
-                    )
-        except Exception as e:
-            print("❌ Gagal generate Excel:", e)
-            with pd.ExcelWriter(tmp_path, engine='openpyxl') as err_writer:
-                pd.DataFrame({"ERROR": [f"Terjadi kesalahan: {str(e)}"]}).to_excel(
-                    err_writer, sheet_name='ERROR', index=False
-                )
-
-        # 🌟 RETURN path file langsung (Bukan yield buf.getvalue())
-        return tmp_path
+        buf.seek(0)
+        yield buf.getvalue()
 
 
 # ==========================================================================
