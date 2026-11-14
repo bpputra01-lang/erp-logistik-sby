@@ -1848,20 +1848,22 @@ def server(input: Inputs, output: Outputs, session: Session):
 
     @render.download(filename=lambda: f"FULL_CYCLE_COUNT_REPORT_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx")
     def btn_dl_cca_master_all():
-        import io
+        import tempfile
         import re
-        buf = io.BytesIO()
-        has_sheet = False
 
-        # Helper pembersih karakter terlarang di Excel & datetime timezone
-        def clean_df_for_excel(df_in):
+        # Buat file temporary di disk agar data tidak corrupt / 0 bytes
+        tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
+        tmp_path = tmp.name
+        tmp.close()
+
+        def clean_df(df_in):
             if df_in is None or df_in.empty:
                 return None
             df_out = df_in.copy()
-            # Hapus timezone dari semua kolom datetime
+            # 1. Hapus timezone agar openpyxl tidak crash
             for col in df_out.select_dtypes(include=['datetime', 'datetimetz']).columns:
                 df_out[col] = df_out[col].dt.tz_localize(None)
-            # Bersihkan karakter kontrol ASCII ilegal dari string
+            # 2. Bersihkan karakter ilegal XML Excel
             for col in df_out.select_dtypes(include=['object']).columns:
                 df_out[col] = df_out[col].astype(str).apply(
                     lambda x: re.sub(r'[\x00-\x08\x0B-\x0C\x0E-\x1F]', '', x) if isinstance(x, str) else x
@@ -1884,28 +1886,28 @@ def server(input: Inputs, output: Outputs, session: Session):
             ('13_SUMMARY MISS LOC', getattr(state, "_raw_df_cca_sum_miss", None)),
         ]
 
+        has_sheet = False
         try:
-            with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            with pd.ExcelWriter(tmp_path, engine='openpyxl') as writer:
                 for sheet_name, raw_df in sheets:
-                    clean_df = clean_df_for_excel(raw_df)
-                    if clean_df is not None and not clean_df.empty:
-                        clean_df.to_excel(writer, sheet_name=sheet_name[:31], index=False)
+                    cleaned = clean_df(raw_df)
+                    if cleaned is not None and not cleaned.empty:
+                        cleaned.to_excel(writer, sheet_name=sheet_name[:31], index=False)
                         has_sheet = True
 
-                # Fallback sheet jika semua data kosong
                 if not has_sheet:
-                    pd.DataFrame({"STATUS": ["Tidak ada data Cycle Count yang diproses"]}).to_excel(
+                    pd.DataFrame({"STATUS": ["Data Cycle Count belum diproses / kosong"]}).to_excel(
                         writer, sheet_name='INFO', index=False
                     )
-            buf.seek(0)
-            yield buf.getvalue()
         except Exception as e:
-            print("❌ Gagal generate Excel Master Cycle Count:", e)
-            err_buf = io.BytesIO()
-            with pd.ExcelWriter(err_buf, engine='openpyxl') as err_writer:
-                pd.DataFrame({"ERROR": [f"Gagal generate file: {str(e)}"]}).to_excel(err_writer, sheet_name='ERROR', index=False)
-            err_buf.seek(0)
-            yield err_buf.getvalue()
+            print("❌ Gagal generate Excel:", e)
+            with pd.ExcelWriter(tmp_path, engine='openpyxl') as err_writer:
+                pd.DataFrame({"ERROR": [f"Terjadi kesalahan: {str(e)}"]}).to_excel(
+                    err_writer, sheet_name='ERROR', index=False
+                )
+
+        # 🌟 RETURN path file langsung (Bukan yield buf.getvalue())
+        return tmp_path
 
 
 # ==========================================================================

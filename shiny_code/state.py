@@ -1806,9 +1806,9 @@ class AppState:
             dt_merged['DIFF'] = dt_merged['QTY_SYS_NUM'] - dt_merged['QTY SO']
             dt_merged['NOTE'] = np.where(dt_merged['DIFF'] > 0, "SYSTEM +", np.where(dt_merged['DIFF'] < 0, "REAL +", "OK"))
 
-            cols_drop = ['BIN_CLEAN', 'SKU_CLEAN', 'QTY_SYS_NUM', 'BIN', 'SKU', 'QTY_SCAN']
+            cols_drop = ['BIN_CLEAN', 'SKU_CLEAN', 'QTY_SYS_NUM', 'BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN']
             res_stock = dt_merged.drop(columns=[c for c in cols_drop if c in dt_merged.columns], errors='ignore')
-
+            
             # 5. Mapping Nama Item
             map_dict = {}
             if dt.shape[1] > 4:
