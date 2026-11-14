@@ -1157,7 +1157,8 @@ def server(input: Inputs, output: Outputs, session: Session):
             uname = state.username().lower()
             role = state.role().upper()
             if uname == "admin" or (role == "DC" and uname not in ["hub", "toko"]):
-                return target_progress_view(state)
+                with reactive.isolate():
+                    return target_progress_view(state)
             else:
                 return ui.div(
                     ui.h2("⛔ Akses Ditolak", style="color: #E53E3E; font-weight: bold;"),

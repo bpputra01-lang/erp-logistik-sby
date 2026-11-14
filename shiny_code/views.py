@@ -2995,11 +2995,23 @@ def refill_shelving_view(state: AppState):
     # ==============================================================================
 # VIEW: TARGET PROGRESS (3 TAB LENGKAP: INPUT TARGET, PROGRESS DAILY, METRICS)
 # ==============================================================================
+# ==============================================================================
+# VIEW: TARGET PROGRESS (3 TAB LENGKAP: TAB STATIS ANTI-LONCAT KE TAB 1)
+# ==============================================================================
 def target_progress_view(state: AppState):
+    from shiny import reactive
+
     MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
     WEEKS = ["Week 1", "Week 2", "Week 3", "Week 4", "Week 5"]
-    YEARS = [str(y) for y in range(2026, 2036)] # 10 Tahun ke depan
+    YEARS = [str(y) for y in range(2026, 2036)]
     DIVISI_LIST = ["INBOUND", "OUTBOUND", "INVENTORY"]
+
+    # 🌟 KUNCI UTAMA: Baca nilai awal secara terisolasi agar TIDAK mereset wadah tab!
+    with reactive.isolate():
+        cur_divisi = state.target_divisi()
+        cur_week = state.target_week()
+        cur_month = state.target_month()
+        cur_year = state.target_year()
 
     # --- BARIS FILTER UNIVERSAL ATAS ---
     filter_bar = ui.div(
@@ -3007,7 +3019,7 @@ def target_progress_view(state: AppState):
             ui.div(
                 ui.span("🏢 Sub Divisi:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
                 ui.tags.select(
-                    *[ui.tags.option(d, value=d, selected=(d == state.target_divisi())) for d in DIVISI_LIST],
+                    *[ui.tags.option(d, value=d, selected=(d == cur_divisi)) for d in DIVISI_LIST],
                     id="target_filter_divisi",
                     onchange="Shiny.setInputValue('change_target_divisi', this.value, {priority: 'event'})",
                     style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 13px; background: white; cursor: pointer; min-width: 160px;"
@@ -3017,7 +3029,7 @@ def target_progress_view(state: AppState):
             ui.div(
                 ui.span("📅 Target Week:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
                 ui.tags.select(
-                    *[ui.tags.option(w, value=w, selected=(w == state.target_week())) for w in WEEKS],
+                    *[ui.tags.option(w, value=w, selected=(w == cur_week)) for w in WEEKS],
                     id="target_filter_week",
                     onchange="Shiny.setInputValue('change_target_week', this.value, {priority: 'event'})",
                     style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 13px; background: white; cursor: pointer; min-width: 140px;"
@@ -3027,7 +3039,7 @@ def target_progress_view(state: AppState):
             ui.div(
                 ui.span("📆 Bulan:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
                 ui.tags.select(
-                    *[ui.tags.option(m, value=m, selected=(m == state.target_month())) for m in MONTHS],
+                    *[ui.tags.option(m, value=m, selected=(m == cur_month)) for m in MONTHS],
                     id="target_filter_month",
                     onchange="Shiny.setInputValue('change_target_month', this.value, {priority: 'event'})",
                     style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 13px; background: white; cursor: pointer; min-width: 140px;"
@@ -3037,7 +3049,7 @@ def target_progress_view(state: AppState):
             ui.div(
                 ui.span("🗓️ Tahun:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
                 ui.tags.select(
-                    *[ui.tags.option(y, value=y, selected=(y == state.target_year())) for y in YEARS],
+                    *[ui.tags.option(y, value=y, selected=(y == cur_year)) for y in YEARS],
                     id="target_filter_year",
                     onchange="Shiny.setInputValue('change_target_year', this.value, {priority: 'event'})",
                     style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 13px; background: white; cursor: pointer; min-width: 120px;"
@@ -3054,11 +3066,12 @@ def target_progress_view(state: AppState):
         style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 1.25rem 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 10px;"
     )
 
-    # --- TAB 1: INPUT TARGET (CRUD Target Text) ---
+    # --- TAB 1: INPUT TARGET ---
     tab1_content = ui.div(
         ui.div(
             ui.h4("➕ Tambah Target Kerja Baru", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 6px;"),
-            ui.p(f"Menambahkan target baru untuk Sub Divisi: {state.target_divisi()} ({state.target_week()} - {state.target_month()} {state.target_year()}).", style="color: #718096; font-size: 12px; margin-bottom: 10px;"),
+            # Deskripsi ini dibuat dinamis via output_ui agar tidak merender ulang seluruh halaman
+            ui.output_ui("target_tab1_subtitle_ui"),
             ui.div(
                 ui.tags.input(
                     id="input_target_text_new",
@@ -3086,12 +3099,12 @@ def target_progress_view(state: AppState):
         style="padding: 0.5rem 0;"
     )
 
-    # --- TAB 2: PROGRESS DAILY (Day 1 - Day 7 Form) ---
+    # --- TAB 2: PROGRESS DAILY ---
     tab2_content = ui.div(
         ui.div(
             ui.div(
                 ui.h4("📝 Pengisian Pencapaian Harian (Day 1 - Day 7)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
-                ui.p("Target disalin otomatis dari Tab 1 (tidak dapat diedit teks targetnya di sini). Lengkapi persentase (10%-100%), Note & Deadline jika di bawah 100%, serta status justifikasi.", style="color: #718096; font-size: 12px; margin: 0;"),
+                ui.p("Target disalin otomatis dari Tab 1. Lengkapi persentase (10%-100%), Note & Deadline jika di bawah 100%, serta status justifikasi.", style="color: #718096; font-size: 12px; margin: 0;"),
             ),
             ui.tags.button(
                 ui.tags.i(class_="fa-solid fa-floppy-disk", style="margin-right: 6px;"), "SIMPAN PROGRESS HARIAN",
