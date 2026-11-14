@@ -1852,29 +1852,32 @@ def server(input: Inputs, output: Outputs, session: Session):
     @render.download(filename="FULL_CYCLE_COUNT_ANALYZER_REPORT.xlsx")
     def btn_dl_cca_master_all():
         buf = io.BytesIO()
+        has_data = False
+
         with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-            # Helper untuk membersihkan kolom duplikat agar file Excel tidak corrupt
-            def write_sheet(df, sheet_name):
+            def safe_write(df, sheet_name):
+                nonlocal has_data
                 if df is not None and not df.empty:
                     clean_df = df.loc[:, ~df.columns.duplicated()].copy()
                     clean_df.to_excel(writer, sheet_name=sheet_name, index=False)
+                    has_data = True
 
-            write_sheet(getattr(state, "_raw_df_cca_scan", None), '1_DATA SCAN')
-            write_sheet(getattr(state, "_raw_df_cca_stock", None), '2_STOCK SYSTEM')
-            write_sheet(getattr(state, "_raw_df_cca_real_plus", None), '3_REAL PLUS')
-            write_sheet(getattr(state, "_raw_df_cca_sys_plus", None), '4_SYSTEM PLUS')
-            write_sheet(getattr(state, "_raw_df_cca_alloc", None), '5_ALLOCATION DETAIL')
-            write_sheet(getattr(state, "_raw_df_cca_setup_real", None), '6_SET UP REAL PLUS')
-            write_sheet(getattr(state, "_raw_df_cca_rec_real", None), '7_REAL PLUS RECON')
-            write_sheet(getattr(state, "_raw_df_cca_rec_sys", None), '8_SYSTEM OUTSTANDING')
-            write_sheet(getattr(state, "_raw_df_cca_adj4", None), '9_REAL PLUS NEED ADJ')
-            write_sheet(getattr(state, "_raw_df_cca_karantina", None), '10_KARANTINA')
-            write_sheet(getattr(state, "_raw_df_cca_check5", None), '11_CHECK AUDIT')
-            write_sheet(getattr(state, "_raw_df_cca_miss_loc", None), '12_MISS LOCATION')
-            write_sheet(getattr(state, "_raw_df_cca_sum_miss", None), '13_SUMMARY MISS LOC')
+            safe_write(getattr(state, "_raw_df_cca_scan", None), '1_DATA SCAN')
+            safe_write(getattr(state, "_raw_df_cca_stock", None), '2_STOCK SYSTEM')
+            safe_write(getattr(state, "_raw_df_cca_real_plus", None), '3_REAL PLUS')
+            safe_write(getattr(state, "_raw_df_cca_sys_plus", None), '4_SYSTEM PLUS')
+            safe_write(getattr(state, "_raw_df_cca_alloc", None), '5_ALLOCATION DETAIL')
+            safe_write(getattr(state, "_raw_df_cca_setup_real", None), '6_SET UP REAL PLUS')
+            safe_write(getattr(state, "_raw_df_cca_rec_real", None), '7_REAL PLUS RECON')
+            safe_write(getattr(state, "_raw_df_cca_rec_sys", None), '8_SYSTEM OUTSTANDING')
+            safe_write(getattr(state, "_raw_df_cca_adj4", None), '9_REAL PLUS NEED ADJ')
+            safe_write(getattr(state, "_raw_df_cca_karantina", None), '10_KARANTINA')
+            safe_write(getattr(state, "_raw_df_cca_check5", None), '11_CHECK AUDIT')
+            safe_write(getattr(state, "_raw_df_cca_miss_loc", None), '12_MISS LOCATION')
+            safe_write(getattr(state, "_raw_df_cca_sum_miss", None), '13_SUMMARY MISS LOC')
 
-            # Jika seluruh sheet di atas kosong, buat 1 sheet info agar openpyxl tidak crash
-            if not writer.sheets:
+            # Jika belum ada data yang terproses sama sekali
+            if not has_data:
                 pd.DataFrame({"INFO": ["Data Cycle Count belum diproses"]}).to_excel(writer, sheet_name='INFO', index=False)
 
         buf.seek(0)

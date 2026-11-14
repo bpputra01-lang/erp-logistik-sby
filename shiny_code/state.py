@@ -1692,12 +1692,11 @@ class AppState:
             return False, f"Terjadi kesalahan saat memproses data: {e}"
 
 # ==========================================================================
-    # CYCLE COUNT ANALYZER - STEP 1 (STREAM READ & ULTRA FAST ANTI-CRASH)
+    # CYCLE COUNT ANALYZER - STEP 1 (FIXED: STANDARISASI IDENTIK DENGAN STOCK OPNAME)
     # ==========================================================================
     def run_cca_step1(self, f_scan, f_stock, sub_sel, brand_sel, bin_sys_sel):
         try:
             import re
-            import io
             import numpy as np
             import pandas as pd
 
@@ -1708,45 +1707,13 @@ class AppState:
             self.cca_step5_done.set(False)
             self.cca_step6_done.set(False)
 
-            # Pembaca Cepat Khusus File Excel Raksasa (Streamlined Reader)
-            def fast_stream_read(file_info):
-                if not file_info: return pd.DataFrame()
-                path = file_info[0]["datapath"]
-                name = file_info[0]["name"].lower()
-
-                if name.endswith(('.xlsx', '.xls', '.xlsm')):
-                    # 1. Coba mesin Calamine jika tersedia (0.5 detik)
-                    try:
-                        return pd.read_excel(path, engine='calamine')
-                    except Exception:
-                        pass
-                    # 2. Streaming read-only openpyxl (5x-10x lebih cepat dari read_excel biasa)
-                    try:
-                        import openpyxl
-                        wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
-                        ws = wb.worksheets[0]
-                        data_gen = ws.values
-                        raw_headers = next(data_gen, None)
-                        if raw_headers:
-                            cols = [str(h).strip() if h is not None else f"Col_{i}" for i, h in enumerate(raw_headers)]
-                            rows = list(data_gen)
-                            wb.close()
-                            return pd.DataFrame(rows, columns=cols)
-                    except Exception:
-                        pass
-                    return pd.read_excel(path)
-                elif name.endswith('.csv'):
-                    try: return pd.read_csv(path)
-                    except Exception: return pd.read_csv(path, sep=';')
-                return load_data_from_info(file_info)
-
-            df_s_raw = fast_stream_read(f_scan)
-            df_t_raw = fast_stream_read(f_stock)
+            # Gunakan loader standar yang stabil seperti pada Stock Opname
+            df_s_raw = load_data_from_info(f_scan)
+            df_t_raw = load_data_from_info(f_stock)
 
             if df_s_raw is None or df_s_raw.empty or df_t_raw is None or df_t_raw.empty:
                 return False, "File Data Scan dan Stock System tidak boleh kosong!"
 
-            # Helper pembersih teks
             def clean_text_series(series):
                 return series.fillna('').astype(str).str.strip().str.upper().str.replace(r'\.0$', '', regex=True)
 
@@ -1757,7 +1724,6 @@ class AppState:
 
             ds = pd.DataFrame({'BIN': b_scan, 'SKU': s_scan, 'QTY_SCAN': q_scan})
             ds = ds[(ds['SKU'] != '') & (ds['SKU'] != 'NAN') & (ds['BIN'] != '')]
-            # Agregasi data scan jika ada barcode SKU yang discan berulang
             ds_grouped = ds.groupby(['BIN', 'SKU'], as_index=False)['QTY_SCAN'].sum()
 
             # 2. Identifikasi Kolom Stock System
@@ -1774,7 +1740,7 @@ class AppState:
             if col_q_sys is None:
                 col_q_sys = dt.columns[9] if dt.shape[1] > 9 else dt.columns[-1]
 
-            # Filter Cepat (Vectorized)
+            # Filter Cabang / Sub Kategori / Brand / BIN
             if sub_sel and len(sub_sel) > 0 and dt.shape[1] > 6:
                 subs_upper = [x.upper().strip() for x in sub_sel]
                 dt = dt[dt.iloc[:, 6].astype(str).str.strip().str.upper().isin(subs_upper)]
@@ -1791,7 +1757,7 @@ class AppState:
             dt['SKU_CLEAN'] = clean_text_series(dt[col_s])
             dt['QTY_SYS_NUM'] = pd.to_numeric(dt[col_q_sys], errors='coerce').fillna(0)
 
-            # 3. Compare Scan ke Stock
+            # 3. Aggregasi Stock System & Compare Scan ke Stock
             dt_agg = dt.groupby(['BIN_CLEAN', 'SKU_CLEAN'], as_index=False)['QTY_SYS_NUM'].sum()
             dt_agg.columns = ['BIN', 'SKU', 'QTY_SYSTEM']
 
@@ -1800,10 +1766,14 @@ class AppState:
             res_scan['DIFF'] = res_scan['QTY_SCAN'] - res_scan['QTY_SYSTEM']
             res_scan['NOTE'] = np.where(res_scan['DIFF'] > 0, "REAL +", np.where(res_scan['DIFF'] < 0, "SYSTEM +", "OK"))
 
-            # 4. Compare Stock ke Scan
-            dt_merged = dt.merge(ds_grouped, left_on=['BIN_CLEAN', 'SKU_CLEAN'], right_on=['BIN', 'SKU'], how='left')
-            dt_merged['QTY SO'] = dt_merged['QTY_SCAN'].fillna(0)
+            # 4. Compare Stock ke Scan (Gunakan nama unik agar tidak terjadi tabrakan nama kolom BIN_x / SKU_x)
+            ds_g = ds_grouped.copy()
+            ds_g.columns = ['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN']
+
+            dt_merged = dt.merge(ds_g, left_on=['BIN_CLEAN', 'SKU_CLEAN'], right_on=['BIN_SCAN', 'SKU_SCAN'], how='left')
+            dt_merged['QTY SO'] = dt_merged['QTY_TOTAL_SCAN'].fillna(0)
             dt_merged['DIFF'] = dt_merged['QTY_SYS_NUM'] - dt_merged['QTY SO']
+            # ✅ FIX: Formula NOTE ditutup dengan sempurna
             dt_merged['NOTE'] = np.where(dt_merged['DIFF'] > 0, "SYSTEM +", np.where(dt_merged['DIFF'] < 0, "REAL +", "OK"))
 
             cols_drop = ['BIN_CLEAN', 'SKU_CLEAN', 'QTY_SYS_NUM', 'BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN']
@@ -1820,6 +1790,9 @@ class AppState:
             res_scan['ITEM NAME'] = res_scan['SKU'].map(map_dict).fillna("-")
             sku_col_stock = res_stock.columns[2] if res_stock.shape[1] > 2 else res_stock.columns[0]
             res_stock['ITEM NAME'] = res_stock[sku_col_stock].astype(str).str.strip().str.upper().str.replace(r'\.0$', '', regex=True).map(map_dict).fillna("-")
+            
+            # ✅ FIX: Bersihkan kolom duplikat agar tidak corrupt
+            res_stock = res_stock.loc[:, ~res_stock.columns.duplicated()]
 
             real_plus = res_scan[res_scan['NOTE'] == "REAL +"].copy()
             system_plus = res_stock[res_stock['NOTE'] == "SYSTEM +"].copy()
@@ -1827,15 +1800,14 @@ class AppState:
             self.cca_qty_real_plus.set(int(real_plus['DIFF'].sum()) if not real_plus.empty else 0)
             self.cca_qty_sys_plus.set(int(system_plus['DIFF'].sum()) if not system_plus.empty else 0)
 
-            # 🌟 SIMPAN 100% DATA UTUH (UNTUK STEP 2 DAN DOWNLOAD FILE EXCEL)
+            # Simpan 100% data untuk Step 2 dan download Full Report
             self._raw_df_cca_scan = res_scan.copy()
             self._raw_df_cca_stock = res_stock.copy()
             self._raw_df_cca_real_plus = real_plus.copy()
             self._raw_df_cca_sys_plus = system_plus.copy()
             self._cca_map_dict = map_dict
 
-            # 🌟 KUNCI PENCEGAHAN CRASH/HANG:
-            # Batasi hanya 300 baris pertama untuk preview tabel di browser (muatan turun dari 50MB ke 80KB)
+            # Batasi 300 baris pertama untuk preview browser agar responsif
             self.df_cca_scan_headers.set(res_scan.columns.tolist())
             self.df_cca_scan_rows.set(res_scan.head(300).fillna("").astype(str).values.tolist())
 
