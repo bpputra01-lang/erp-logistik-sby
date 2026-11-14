@@ -194,7 +194,7 @@ CUSTOM_HEAD = ui.head_content(
             clearTimeout(window.spinnerSafetyTimer);
             window.spinnerSafetyTimer = setTimeout(function() {
                 window.hideGlobalSpinner();
-            }, 8000);
+            }, 120000); // 👈 Diubah menjadi 120 detik (2 menit)
         };
 
 

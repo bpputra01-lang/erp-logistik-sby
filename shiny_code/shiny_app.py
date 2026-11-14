@@ -1440,9 +1440,10 @@ def server(input: Inputs, output: Outputs, session: Session):
         brand = input.cca_brand() if "cca_brand" in input else []
         bin_sys = input.cca_bin_sys() if "cca_bin_sys" in input else []
         succ, msg = state.run_cca_step1(f_scan, f_stock, sub, brand, bin_sys)
-        # Hilangkan tirai loading spinner seketika
+        # Menutup tirai loading seketika proses selesai
         ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
-        if succ: state.show_success_modal.set(True)
+        if succ: 
+            state.show_success_modal.set(True)
         else:
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
