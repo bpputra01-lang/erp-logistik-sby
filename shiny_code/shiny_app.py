@@ -26,61 +26,52 @@ app_ui = ui.page_fluid(
     style="padding: 0; margin: 0; background-color: #111318;"
 )
 
+import io
 import re
+import pandas as pd
 from openpyxl import Workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
 
+# Regex resmi karakter ilegal XML bawaan Excel
 ILLEGAL_CHAR_REGEX = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f]')
 
-def create_excel_with_sheets(sheet_dict: dict) -> bytes:
-    """Membuat file Excel langsung via OpenPyXL murni (Anti-0 bytes & Anti-error sheet)."""
+def build_full_report_bytes(sheets_list: list) -> bytes:
+    """Menggabungkan seluruh sheet ke 1 file Excel tanpa risiko crash/0 byte."""
     wb = Workbook()
     first_sheet = True
 
-    if not sheet_dict:
-        ws = wb.active
-        ws.title = "INFO"
-        ws.append(["INFO"])
-        ws.append(["Tidak ada data yang diproses."])
-        buf = io.BytesIO()
-        wb.save(buf)
-        buf.seek(0)
-        return buf.getvalue()
-
-    for sheet_name, df in sheet_dict.items():
-        clean_name = re.sub(r'[\\/*?:\[\]]', '', str(sheet_name))[:31].strip()
-        if not clean_name:
-            clean_name = "SHEET"
-
-        if first_sheet:
-            ws = wb.active
-            ws.title = clean_name
-            first_sheet = False
-        else:
-            ws = wb.create_sheet(title=clean_name)
-
+    for sheet_title, df in sheets_list:
+        # Hanya tulis sheet yang datanya ada / tidak kosong
         if df is None or not isinstance(df, pd.DataFrame) or df.empty:
-            cols = list(df.columns) if (df is not None and hasattr(df, 'columns') and len(df.columns) > 0) else ["INFO"]
-            ws.append([str(c) for c in cols])
-            ws.append(["(Data kosong)"])
             continue
 
+        clean_title = re.sub(r'[\\/*?:\[\]]', '', str(sheet_title))[:31].strip() or "Sheet"
+        
+        if first_sheet:
+            ws = wb.active
+            ws.title = clean_title
+            first_sheet = False
+        else:
+            ws = wb.create_sheet(title=clean_title)
+
+        # 1. Pastikan nama kolom unik (tidak ada duplikat nama kolom dari Jezpro)
         df_clean = df.copy()
-        clean_cols = []
+        unique_cols = []
         seen = {}
-        for c in df_clean.columns:
-            c_str = str(c).strip()
+        for col in df_clean.columns:
+            c_str = str(col).strip()
             if c_str in seen:
                 seen[c_str] += 1
-                clean_cols.append(f"{c_str}_{seen[c_str]}")
+                unique_cols.append(f"{c_str}_{seen[c_str]}")
             else:
                 seen[c_str] = 0
-                clean_cols.append(c_str)
-        df_clean.columns = clean_cols
+                unique_cols.append(c_str)
+        df_clean.columns = unique_cols
 
-        for r in dataframe_to_rows(df_clean, index=False, header=True):
+        # 2. Tulis baris demi baris sambil membersihkan karakter ilegal dan timezone
+        for row in dataframe_to_rows(df_clean, index=False, header=True):
             clean_row = []
-            for val in r:
+            for val in row:
                 if isinstance(val, str):
                     clean_row.append(ILLEGAL_CHAR_REGEX.sub('', val))
                 elif hasattr(val, 'tzinfo') and val.tzinfo is not None:
@@ -93,6 +84,13 @@ def create_excel_with_sheets(sheet_dict: dict) -> bytes:
                 else:
                     clean_row.append(val)
             ws.append(clean_row)
+
+    # Jika semua step belum dijalankan sama sekali
+    if first_sheet:
+        ws = wb.active
+        ws.title = "INFO"
+        ws.append(["INFO"])
+        ws.append(["Belum ada step yang dijalankan. Silakan proses minimal Step 1."])
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -1909,33 +1907,27 @@ def server(input: Inputs, output: Outputs, session: Session):
     # ==========================================================================
     # FULL REPORT CYCLE COUNT
     # ==========================================================================
+    # ==========================================================================
+    # FULL CYCLE COUNT REPORT (LANGSUNG BIKIN 13 SHEET TANPA CRASH)
+    # ==========================================================================
     @render.download(filename="FULL_CYCLE_COUNT_ANALYZER_REPORT.xlsx")
     def btn_dl_cca_master_all():
         sheets_list = [
-            ('1_DATA SCAN', '_raw_df_cca_scan'),
-            ('2_STOCK SYSTEM', '_raw_df_cca_stock'),
-            ('3_REAL PLUS', '_raw_df_cca_real_plus'),
-            ('4_SYSTEM PLUS', '_raw_df_cca_sys_plus'),
-            ('5_ALLOCATION DETAIL', '_raw_df_cca_alloc'),
-            ('6_SET UP REAL PLUS', '_raw_df_cca_setup_real'),
-            ('7_REAL PLUS RECON', '_raw_df_cca_rec_real'),
-            ('8_SYSTEM OUTSTANDING', '_raw_df_cca_rec_sys'),
-            ('9_REAL PLUS NEED ADJ', '_raw_df_cca_adj4'),
-            ('10_KARANTINA', '_raw_df_cca_karantina'),
-            ('11_CHECK AUDIT', '_raw_df_cca_check5'),
-            ('12_MISS LOCATION', '_raw_df_cca_miss_loc'),
-            ('13_SUMMARY MISS LOC', '_raw_df_cca_sum_miss')
+            ('1_DATA SCAN', getattr(state, "_raw_df_cca_scan", pd.DataFrame())),
+            ('2_STOCK SYSTEM', getattr(state, "_raw_df_cca_stock", pd.DataFrame())),
+            ('3_REAL PLUS', getattr(state, "_raw_df_cca_real_plus", pd.DataFrame())),
+            ('4_SYSTEM PLUS', getattr(state, "_raw_df_cca_sys_plus", pd.DataFrame())),
+            ('5_ALLOCATION DETAIL', getattr(state, "_raw_df_cca_alloc", pd.DataFrame())),
+            ('6_SET UP REAL PLUS', getattr(state, "_raw_df_cca_setup_real", pd.DataFrame())),
+            ('7_REAL PLUS RECON', getattr(state, "_raw_df_cca_rec_real", pd.DataFrame())),
+            ('8_SYSTEM OUTSTANDING', getattr(state, "_raw_df_cca_rec_sys", pd.DataFrame())),
+            ('9_REAL PLUS NEED ADJ', getattr(state, "_raw_df_cca_adj4", pd.DataFrame())),
+            ('10_KARANTINA', getattr(state, "_raw_df_cca_karantina", pd.DataFrame())),
+            ('11_CHECK AUDIT', getattr(state, "_raw_df_cca_check5", pd.DataFrame())),
+            ('12_MISS LOCATION', getattr(state, "_raw_df_cca_miss_loc", pd.DataFrame())),
+            ('13_SUMMARY MISS LOC', getattr(state, "_raw_df_cca_sum_miss", pd.DataFrame())),
         ]
-        sheets = {}
-        for sname, attr in sheets_list:
-            df = getattr(state, attr, None)
-            if df is not None and isinstance(df, pd.DataFrame) and not df.empty:
-                sheets[sname] = df
-
-        if not sheets:
-            sheets['INFO'] = pd.DataFrame({"INFO": ["Data Cycle Count belum diproses. Silakan jalankan minimal Step 1."]})
-
-        yield create_excel_with_sheets(sheets)
+        yield build_full_report_bytes(sheets_list)
 
 # ==========================================================================
     # COMPARE RTO CONTROLLER & HANDLERS
@@ -2726,35 +2718,29 @@ def server(input: Inputs, output: Outputs, session: Session):
     # ==========================================================================
     # FULL REPORT STOCK OPNAME
     # ==========================================================================
+    # ==========================================================================
+    # FULL STOCK OPNAME REPORT (LANGSUNG BIKIN 15 SHEET TANPA CRASH)
+    # ==========================================================================
     @render.download(filename="FULL_SO_ANALYZER_REPORT.xlsx")
     def btn_dl_so_master_all():
         sheets_list = [
-            ('1_DATA SCAN', '_raw_df_so_scan'),
-            ('2_STOCK SYSTEM', '_raw_df_so_stock'),
-            ('3_REAL PLUS', '_raw_df_so_real_plus'),
-            ('4_SYSTEM PLUS', '_raw_df_so_sys_plus'),
-            ('5_SET UP REAL PLUS', '_raw_df_so_setup_real'),
-            ('6_REAL PLUS RECON', '_raw_df_so_rec_real'),
-            ('7_SYSTEM OUTSTANDING', '_raw_df_so_rec_sys'),
-            ('8_MULTIPLE ADJ PLUS', '_raw_df_so_mult'),
-            ('9_SINGLE ADJ PLUS', '_raw_df_so_sing'),
-            ('10_HASIL CEK ADJ', '_raw_df_so_res4'),
-            ('11_KARANTINA', '_raw_df_so_karantina'),
-            ('12_MISS LOCATION', '_raw_df_so_miss_loc'),
-            ('13_SUMMARY MISS LOC', '_raw_df_so_sum_miss'),
-            ('14_DETAIL ADJUSTMENT', '_raw_df_so_adj_detail'),
-            ('15_SUMMARY ADJ', '_raw_df_so_adj_sum')
+            ('1_DATA SCAN', getattr(state, "_raw_df_so_scan", pd.DataFrame())),
+            ('2_STOCK SYSTEM', getattr(state, "_raw_df_so_stock", pd.DataFrame())),
+            ('3_REAL PLUS', getattr(state, "_raw_df_so_real_plus", pd.DataFrame())),
+            ('4_SYSTEM PLUS', getattr(state, "_raw_df_so_sys_plus", pd.DataFrame())),
+            ('5_SET UP REAL PLUS', getattr(state, "_raw_df_so_setup_real", pd.DataFrame())),
+            ('6_REAL PLUS RECON', getattr(state, "_raw_df_so_rec_real", pd.DataFrame())),
+            ('7_SYSTEM OUTSTANDING', getattr(state, "_raw_df_so_rec_sys", pd.DataFrame())),
+            ('8_MULTIPLE ADJ PLUS', getattr(state, "_raw_df_so_mult", pd.DataFrame())),
+            ('9_SINGLE ADJ PLUS', getattr(state, "_raw_df_so_sing", pd.DataFrame())),
+            ('10_HASIL CEK ADJ', getattr(state, "_raw_df_so_res4", pd.DataFrame())),
+            ('11_KARANTINA', getattr(state, "_raw_df_so_karantina", pd.DataFrame())),
+            ('12_MISS LOCATION', getattr(state, "_raw_df_so_miss_loc", pd.DataFrame())),
+            ('13_SUMMARY MISS LOC', getattr(state, "_raw_df_so_sum_miss", pd.DataFrame())),
+            ('14_DETAIL ADJUSTMENT', getattr(state, "_raw_df_so_adj_detail", pd.DataFrame())),
+            ('15_SUMMARY ADJ', getattr(state, "_raw_df_so_adj_sum", pd.DataFrame())),
         ]
-        sheets = {}
-        for sname, attr in sheets_list:
-            df = getattr(state, attr, None)
-            if df is not None and isinstance(df, pd.DataFrame) and not df.empty:
-                sheets[sname] = df
-
-        if not sheets:
-            sheets['INFO'] = pd.DataFrame({"INFO": ["Data Stock Opname belum diproses. Silakan jalankan minimal Step 1."]})
-
-        yield create_excel_with_sheets(sheets)
+        yield build_full_report_bytes(sheets_list)
 
 # ==========================================================================
     # JUSTIFICATION SO CONTROLLER (DYNAMIC MODE: REVERSAL & NON REVERSAL)
