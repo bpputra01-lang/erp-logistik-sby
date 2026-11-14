@@ -2085,12 +2085,14 @@ class AppState:
         except Exception as e:
             return False, f"Gagal Step 4: {e}"
 
-    # --- CCA STEP 5: RECON SYSTEM + (DENGAN LOGIC CEK ADJUSTMENT) ---
+    # ==========================================================================
+    # CCA STEP 5: RECON SYSTEM + (HILANGKAN ITEM NAME DI HASIL KARANTINA)
+    # ==========================================================================
     def run_cca_step5(self, f_recon_sys=None, f_adj_sys=None):
         try:
             # Jika dari Step 3 memang tidak ada outstanding
             if self._raw_df_cca_rec_sys.empty or len(self._raw_df_cca_rec_sys) == 0:
-                df_karantina = pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'ITEM NAME', 'QUANTITY', 'NOTES'])
+                df_karantina = pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
                 df_check = pd.DataFrame(columns=['BIN', 'SKU', 'ITEM NAME', 'QTY_SYSTEM_J', 'QTY_RECON_N', 'SELISIH'])
                 self.cca_qty_karantina.set(0)
                 self.cca_sku_karantina.set(0)
@@ -2107,7 +2109,7 @@ class AppState:
             df_recon_adj = load_data_from_info(f_adj_sys) if f_adj_sys else pd.DataFrame()
 
             if df_outstanding.empty or len(df_outstanding) == 0:
-                df_karantina = pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'ITEM NAME', 'QUANTITY', 'NOTES'])
+                df_karantina = pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
                 df_check = pd.DataFrame(columns=['BIN', 'SKU', 'ITEM NAME', 'QTY_SYSTEM_J', 'QTY_RECON_N', 'SELISIH'])
                 self.cca_qty_karantina.set(0)
                 self.cca_sku_karantina.set(0)
@@ -2162,12 +2164,13 @@ class AppState:
                             'QTY_SYSTEM_J': int(q_sys), 'QTY_RECON_N': int(q_rec), 'SELISIH': int(diff)
                         })
                         if diff > 0:
+                            # HILANGKAN 'ITEM NAME' DI SINI (MURNI 5 KOLOM)
                             karantina_results.append({
                                 "BIN AWAL": bin_val, "BIN TUJUAN": "KARANTINA", "SKU": sku_val,
-                                "ITEM NAME": item_name, "QUANTITY": int(diff), "NOTES": "MISS LOCATION"
+                                "QUANTITY": int(diff), "NOTES": "MISS LOCATION"
                             })
             else:
-                # 2. Mode Single File (Fallback pembacaan langsung dari file recon)
+                # 2. Mode Single File
                 df_outstanding.columns = df_outstanding.columns.astype(str).str.strip().str.upper()
                 for _, row in df_outstanding.iterrows():
                     try:
@@ -2186,13 +2189,14 @@ class AppState:
                                 'QTY_SYSTEM_J': int(q_sys_num), 'QTY_RECON_N': int(q_rec_num), 'SELISIH': int(diff)
                             })
                             if diff > 0:
+                                # HILANGKAN 'ITEM NAME' DI SINI (MURNI 5 KOLOM)
                                 karantina_results.append({
                                     "BIN AWAL": bin_val, "BIN TUJUAN": "KARANTINA", "SKU": sku_val,
-                                    "ITEM NAME": item_name, "QUANTITY": int(abs(diff)), "NOTES": "MISS LOCATION"
+                                    "QUANTITY": int(abs(diff)), "NOTES": "MISS LOCATION"
                                 })
                     except: continue
 
-            df_karantina = pd.DataFrame(karantina_results) if karantina_results else pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'ITEM NAME', 'QUANTITY', 'NOTES'])
+            df_karantina = pd.DataFrame(karantina_results) if karantina_results else pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
             df_check = pd.DataFrame(audit_results) if audit_results else pd.DataFrame(columns=['BIN', 'SKU', 'ITEM NAME', 'QTY_SYSTEM_J', 'QTY_RECON_N', 'SELISIH'])
 
             self.cca_qty_karantina.set(int(df_karantina['QUANTITY'].sum()) if not df_karantina.empty and 'QUANTITY' in df_karantina.columns else 0)
