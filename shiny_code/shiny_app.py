@@ -6105,6 +6105,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             for d in range(1, 8):
                 key = f"{t_id}_{d}"
                 entry = daily_map.get(key, {})
+                # Default 0% untuk hari yang belum diisi
                 cur_achieve = safe_int(entry.get("achievement", 0))
                 cur_note = entry.get("note", "")
                 cur_dl = entry.get("deadline", "-")
@@ -6250,12 +6251,12 @@ def server(input: Inputs, output: Outputs, session: Session):
         unconf_cnt = metrics["unconfirmed_count"]
         tot_target = metrics["total_targets"]
 
-        color_achieve = "#10B981" if avg_pct >= 80 else ("#DD6B20" if avg_pct >= 60 else "#E53E3E")
+        color_achieve = "#10B981" if avg_pct >= 80 else ("#DD6B20" if avg_pct >= 50 else "#3182CE")
 
         return ui.div(
-            dark_metric_box("🎯 OVERALL ACHIEVEMENT (PENALIZED)", f"{avg_pct}%", color_achieve),
+            dark_metric_box("📈 TOTAL PROGRESS PENCAPAIAN", f"{avg_pct}%", color_achieve),
             dark_metric_box("✅ JUSTIFIKASI CONFIRMED", f"{conf_cnt} HARI", "#10B981"),
-            dark_metric_box("⚠️ JUSTIFIKASI UNCONFIRMED (PENGURANG)", f"{unconf_cnt} HARI", "#E53E3E"),
+            dark_metric_box("⚠️ KENDALA UNCONFIRMED", f"{unconf_cnt} HARI", "#E53E3E"),
             dark_metric_box("📋 TOTAL TARGET KERJA", f"{tot_target} TARGET", "#3182CE"),
             style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.5rem;"
         )
@@ -6272,7 +6273,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                 style="background: white; border-radius: 8px; border: 1px dashed #CBD5E0;"
             )
 
-        # Hitung bobot per hari per target
+        # Bobot maksimal per hari (14.3% per hari jika 1 target)
         bobot_per_hari = 100.0 / (total_targets * 7) if total_targets > 0 else 14.28
 
         cards = []
@@ -6286,7 +6287,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                 entry = daily_map.get(key, {})
 
                 raw_achieve = entry.get("achievement")
-                cur_achieve = safe_int(raw_achieve, 100) if raw_achieve is not None else 100
+                achieve = safe_int(raw_achieve, 0) if raw_achieve is not None else 0
                 note = entry.get("note", "-")
                 deadline = entry.get("deadline", "-")
                 just = str(entry.get("justifikasi", "-")).strip().upper()
@@ -6294,25 +6295,27 @@ def server(input: Inputs, output: Outputs, session: Session):
                 is_unconf = ("UNCONFIRMED" in just)
                 is_conf = ("CONFIRMED" in just and not is_unconf)
 
-                # 🌟 TAMPILAN DENGAN PERHITUNGAN BOBOT TRANSPARAN
-                if is_unconf and achieve < 100:
-                    defisit = 100 - achieve
-                    potongan_bobot = round((defisit / 100.0) * bobot_per_hari, 1)
+                # Kontribusi penambahan bobot harian ke total progress mingguan
+                kontribusi = round((achieve / 100.0) * bobot_per_hari, 1)
+                max_bobot = round(bobot_per_hari, 1)
+
+                if is_conf and achieve < 100 and achieve > 0:
                     achieve_badge = ui.div(
-                        ui.span(f"{achieve}% ", style="color: #E53E3E; font-weight: 800; font-size: 13px;"),
-                        ui.span(f"(Penalti Bobot: -{potongan_bobot}% ke Target)", style="color: #C53030; font-weight: 600; font-size: 11px; display: block;")
+                        ui.span(f"{achieve}% ➔ 100% ", style="color: #10B981; font-weight: 800; font-size: 13px;"),
+                        ui.span(f"(Terkonfirmasi: +{max_bobot}% Penuh)", style="color: #047857; font-weight: 600; font-size: 11px; display: block;")
                     )
-                elif is_conf and achieve < 100:
+                elif achieve > 0 and achieve < 100:
                     achieve_badge = ui.div(
-                        ui.span("100% ", style="color: #10B981; font-weight: 800; font-size: 13px;"),
-                        ui.span(f"(Terkonfirmasi: Real {achieve}%, Potongan 0%)", style="color: #047857; font-weight: 600; font-size: 11px; display: block;")
+                        ui.span(f"{achieve}% ", style="color: #DD6B20; font-weight: 800; font-size: 13px;"),
+                        ui.span(f"(Kontribusi: +{kontribusi}% / {max_bobot}%)", style="color: #C05621; font-weight: 600; font-size: 11px; display: block;")
                     )
                 elif achieve == 100:
-                    achieve_badge = ui.span("100%", style="color: #10B981; font-weight: 800; font-size: 13px;")
+                    achieve_badge = ui.div(
+                        ui.span("100% ", style="color: #10B981; font-weight: 800; font-size: 13px;"),
+                        ui.span(f"(Sempurna: +{max_bobot}%)", style="color: #047857; font-weight: 600; font-size: 11px; display: block;")
+                    )
                 else:
-                    defisit = 100 - achieve
-                    potongan_bobot = round((defisit / 100.0) * bobot_per_hari, 1)
-                    achieve_badge = ui.span(f"{achieve}% (-{potongan_bobot}%)", style="color: #DD6B20; font-weight: 800;")
+                    achieve_badge = ui.span("0% (Belum Berjalan)", style="color: #A0AEC0; font-weight: 600; font-size: 12px;")
 
                 badge_just = (
                     ui.span("CONFIRMED", style="background: #C6F6D5; color: #22543D; font-weight: 800; padding: 3px 8px; border-radius: 4px; font-size: 11px;")
@@ -6339,7 +6342,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                 ui.tags.table(
                     ui.tags.thead(ui.tags.tr(
                         ui.tags.th("HARI", style="text-align: center;"),
-                        ui.tags.th("PENCAPAIAN EFEKTIF & BOBOT", style="text-align: center;"),
+                        ui.tags.th("PROGRESS HARIAN & KONTRIBUSI", style="text-align: center;"),
                         ui.tags.th("CATATAN KENDALA"),
                         ui.tags.th("DEADLINE", style="text-align: center;"),
                         ui.tags.th("JUSTIFIKASI", style="text-align: center;")
