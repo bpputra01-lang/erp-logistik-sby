@@ -1397,7 +1397,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             return ui.div(
                 ui.tags.button(
                     ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "RUN COMPARE"),
-                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_run_cca_step1', Math.random(), {priority: 'event'});",
+                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_cca_step1', Math.random(), {priority: 'event'});",
                     class_="btn-red-gradient"
                 ), style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
             )
@@ -1405,6 +1405,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             ui.tags.button("UPLOAD DATA SCAN & STOCK SYSTEM UNTUK MEMULAI", disabled=True, class_="btn-locked"),
             style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
         )
+
     @render.ui
     def cca_step1_results_ui():
         if not state.cca_step1_done(): return ui.div()
@@ -1439,8 +1440,6 @@ def server(input: Inputs, output: Outputs, session: Session):
         brand = input.cca_brand() if "cca_brand" in input else []
         bin_sys = input.cca_bin_sys() if "cca_bin_sys" in input else []
         succ, msg = state.run_cca_step1(f_scan, f_stock, sub, brand, bin_sys)
-        # Menutup spinner seketika setelah proses selesai
-        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
         if succ: state.show_success_modal.set(True)
         else:
             state.error_modal_message.set(msg)
