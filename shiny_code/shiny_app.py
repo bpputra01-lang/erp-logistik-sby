@@ -1397,7 +1397,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             return ui.div(
                 ui.tags.button(
                     ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "RUN COMPARE"),
-                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_cca_step1', Math.random(), {priority: 'event'});",
+                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_run_cca_step1', Math.random(), {priority: 'event'});",
                     class_="btn-red-gradient"
                 ), style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
             )
@@ -1405,7 +1405,6 @@ def server(input: Inputs, output: Outputs, session: Session):
             ui.tags.button("UPLOAD DATA SCAN & STOCK SYSTEM UNTUK MEMULAI", disabled=True, class_="btn-locked"),
             style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
         )
-
     @render.ui
     def cca_step1_results_ui():
         if not state.cca_step1_done(): return ui.div()
@@ -1440,6 +1439,8 @@ def server(input: Inputs, output: Outputs, session: Session):
         brand = input.cca_brand() if "cca_brand" in input else []
         bin_sys = input.cca_bin_sys() if "cca_bin_sys" in input else []
         succ, msg = state.run_cca_step1(f_scan, f_stock, sub, brand, bin_sys)
+        # Menutup spinner seketika setelah proses selesai
+        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
         if succ: state.show_success_modal.set(True)
         else:
             state.error_modal_message.set(msg)
@@ -1778,6 +1779,19 @@ def server(input: Inputs, output: Outputs, session: Session):
                     ui.nav_panel("📄 Salah Letak (Rak ke Rak)", ui.div(render_clean_table(state.df_cca_miss_loc_headers(), state.df_cca_miss_loc_rows(), "tbl_cca_miss_loc"), style="padding: 0.75rem 0;")),
                     ui.nav_panel("☣️ Miss Loc ke Karantina", ui.div(render_clean_table(state.df_cca_karantina_headers(), state.df_cca_karantina_rows(), "tbl_cca_karan_loc"), style="padding: 0.75rem 0;")),
                     ui.nav_panel("📊 Summary Rekapitulasi", ui.div(render_clean_table(state.df_cca_sum_miss_headers(), state.df_cca_sum_miss_rows(), "tbl_cca_sum_miss"), style="padding: 0.75rem 0;"))
+                ),
+                # 🌟 BANNER DOWNLOAD FULL REPORT PERSIS STOCK OPNAME
+                ui.div(
+                    ui.div(
+                        ui.h4("🏆 Download Full Master Report Cycle Count", style="font-size: 16px; font-weight: 800; color: #065F46; margin: 0;"),
+                        ui.download_button(
+                            "btn_dl_cca_master_all",
+                            ui.tags.span(ui.tags.i(class_="fa-solid fa-file-excel", style="margin-right: 8px; font-size: 16px;"), "DOWNLOAD FULL CYCLE COUNT REPORT (.XLSX)"),
+                            style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; font-weight: 800; border-radius: 8px; border: none; padding: 12px 24px; cursor: pointer; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);"
+                        ),
+                        style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 10px;"
+                    ),
+                    style="background: #D1FAE5; border: 1.5px solid #A7F3D0; padding: 1.5rem; border-radius: 12px; margin-top: 1.5rem;"
                 )
             )
 
@@ -1795,7 +1809,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             class_="step-card-box",
             style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
         )
-
+        
     @reactive.Effect
     @reactive.event(input.btn_run_cca_step6)
     def _proc_cca_step6():
@@ -1815,6 +1829,52 @@ def server(input: Inputs, output: Outputs, session: Session):
             state._raw_df_cca_sum_miss.to_excel(writer, sheet_name='SUMMARY_MISS_LOCATION', index=False)
         buf.seek(0)
         yield buf.getvalue()
+
+    # ==========================================================================
+    # HANDLER DOWNLOAD CYCLE COUNT STEP 5 (KARANTINA) & FULL MASTER REPORT
+    # ==========================================================================
+    @render.download(filename="Hasil_Karantina_Cycle_Count.xlsx")
+    def btn_dl_cca_karantina():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            df = getattr(state, "_raw_df_cca_karantina", pd.DataFrame())
+            if df.empty:
+                df = pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'ITEM NAME', 'QUANTITY', 'NOTES'])
+            df.to_excel(writer, sheet_name='KARANTINA_CCA', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    @render.download(filename="FULL_CYCLE_COUNT_ANALYZER_REPORT.xlsx")
+    def btn_dl_cca_master_all():
+        buf = io.BytesIO()
+        has_sheet = False
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            sheets = [
+                ('1_DATA SCAN', getattr(state, "_raw_df_cca_scan", None)),
+                ('2_STOCK SYSTEM', getattr(state, "_raw_df_cca_stock", None)),
+                ('3_REAL PLUS', getattr(state, "_raw_df_cca_real_plus", None)),
+                ('4_SYSTEM PLUS', getattr(state, "_raw_df_cca_sys_plus", None)),
+                ('5_ALLOCATION DETAIL', getattr(state, "_raw_df_cca_alloc", None)),
+                ('6_SET UP REAL PLUS', getattr(state, "_raw_df_cca_setup_real", None)),
+                ('7_REAL PLUS RECON', getattr(state, "_raw_df_cca_rec_real", None)),
+                ('8_SYSTEM OUTSTANDING', getattr(state, "_raw_df_cca_rec_sys", None)),
+                ('9_REAL PLUS NEED ADJ', getattr(state, "_raw_df_cca_adj4", None)),
+                ('10_KARANTINA', getattr(state, "_raw_df_cca_karantina", None)),
+                ('11_CHECK AUDIT', getattr(state, "_raw_df_cca_check5", None)),
+                ('12_MISS LOCATION', getattr(state, "_raw_df_cca_miss_loc", None)),
+                ('13_SUMMARY MISS LOC', getattr(state, "_raw_df_cca_sum_miss", None)),
+            ]
+            for sheet_name, df in sheets:
+                if df is not None and not df.empty:
+                    df.to_excel(writer, sheet_name=sheet_name, index=False)
+                    has_sheet = True
+            
+            # Jika semua dataframe kosong, sediakan 1 sheet fallback agar Excel tidak corrupt
+            if not has_sheet:
+                pd.DataFrame({"INFO": ["Tidak ada data yang diproses"]}).to_excel(writer, sheet_name='INFO', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
 
 # ==========================================================================
     # COMPARE RTO CONTROLLER & HANDLERS
