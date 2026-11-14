@@ -1692,13 +1692,25 @@ class AppState:
             return False, f"Terjadi kesalahan saat memproses data: {e}"
 
 # ==========================================================================
-    # CYCLE COUNT ANALYZER - STEP 1 (FIXED & DEDUPLICATED)
+    # CYCLE COUNT ANALYZER - STEP 1 (SANITIZED & ANTI-CORRUPT)
     # ==========================================================================
     def run_cca_step1(self, f_scan, f_stock, sub_sel, brand_sel, bin_sys_sel):
         try:
             import re
             import numpy as np
             import pandas as pd
+
+            # Regex pembersih karakter kontrol ASCII yang ditolak OpenPyXL
+            ILLEGAL_CHAR_RE = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f]')
+
+            def sanitize_df(d):
+                if d is None or not isinstance(d, pd.DataFrame) or d.empty:
+                    return pd.DataFrame()
+                d_clean = d.loc[:, ~d.columns.duplicated()].copy()
+                for col in d_clean.columns:
+                    if d_clean[col].dtype == object or pd.api.types.is_string_dtype(d_clean[col]):
+                        d_clean[col] = d_clean[col].astype(str).str.replace(ILLEGAL_CHAR_RE, '', regex=True)
+                return d_clean
 
             # Reset state step berikutnya jika re-run Step 1
             self.cca_step2_done.set(False)
@@ -1707,7 +1719,6 @@ class AppState:
             self.cca_step5_done.set(False)
             self.cca_step6_done.set(False)
 
-            # Gunakan loader standar yang stabil seperti pada Stock Opname
             df_s_raw = load_data_from_info(f_scan)
             df_t_raw = load_data_from_info(f_stock)
 
@@ -1726,8 +1737,13 @@ class AppState:
             ds = ds[(ds['SKU'] != '') & (ds['SKU'] != 'NAN') & (ds['BIN'] != '')]
             ds_grouped = ds.groupby(['BIN', 'SKU'], as_index=False)['QTY_SCAN'].sum()
 
-            # 2. Identifikasi Kolom Stock System
+            # 2. Identifikasi Kolom Stock System & Hapus Kolom Overlap
             dt = df_t_raw.copy()
+            # Buang kolom yang berpotensi tabrakan nama dari file asal
+            overlap_cols = [c for c in dt.columns if str(c).strip().upper() in ['QTY SO', 'QTY_SO', 'DIFF', 'NOTE', 'ITEM NAME']]
+            if overlap_cols:
+                dt = dt.drop(columns=overlap_cols, errors='ignore')
+
             col_b = dt.columns[1] if dt.shape[1] > 1 else dt.columns[0]
             col_s = dt.columns[2] if dt.shape[1] > 2 else dt.columns[0]
 
@@ -1766,7 +1782,7 @@ class AppState:
             res_scan['DIFF'] = res_scan['QTY_SCAN'] - res_scan['QTY_SYSTEM']
             res_scan['NOTE'] = np.where(res_scan['DIFF'] > 0, "REAL +", np.where(res_scan['DIFF'] < 0, "SYSTEM +", "OK"))
 
-            # 4. Compare Stock ke Scan (Gunakan nama unik agar tidak terjadi tabrakan nama kolom BIN_x / SKU_x)
+            # 4. Compare Stock ke Scan
             ds_g = ds_grouped.copy()
             ds_g.columns = ['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN']
 
@@ -1777,7 +1793,7 @@ class AppState:
 
             cols_drop = ['BIN_CLEAN', 'SKU_CLEAN', 'QTY_SYS_NUM', 'BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN']
             res_stock = dt_merged.drop(columns=[c for c in cols_drop if c in dt_merged.columns], errors='ignore')
-            
+
             # 5. Mapping Nama Item
             map_dict = {}
             if dt.shape[1] > 4:
@@ -1789,9 +1805,10 @@ class AppState:
             res_scan['ITEM NAME'] = res_scan['SKU'].map(map_dict).fillna("-")
             sku_col_stock = res_stock.columns[2] if res_stock.shape[1] > 2 else res_stock.columns[0]
             res_stock['ITEM NAME'] = res_stock[sku_col_stock].astype(str).str.strip().str.upper().str.replace(r'\.0$', '', regex=True).map(map_dict).fillna("-")
-            
-            # Hapus kolom duplikat agar openpyxl tidak melempar error
-            res_stock = res_stock.loc[:, ~res_stock.columns.duplicated()]
+
+            # Sanitasi kolom duplikat & karakter ilegal
+            res_scan = sanitize_df(res_scan)
+            res_stock = sanitize_df(res_stock)
 
             real_plus = res_scan[res_scan['NOTE'] == "REAL +"].copy()
             system_plus = res_stock[res_stock['NOTE'] == "SYSTEM +"].copy()
@@ -1799,23 +1816,19 @@ class AppState:
             self.cca_qty_real_plus.set(int(real_plus['DIFF'].sum()) if not real_plus.empty else 0)
             self.cca_qty_sys_plus.set(int(system_plus['DIFF'].sum()) if not system_plus.empty else 0)
 
-            # Simpan data mentah lengkap
+            # Simpan data yang sudah bersih 100%
             self._raw_df_cca_scan = res_scan.copy()
             self._raw_df_cca_stock = res_stock.copy()
             self._raw_df_cca_real_plus = real_plus.copy()
             self._raw_df_cca_sys_plus = system_plus.copy()
             self._cca_map_dict = map_dict
 
-            # Batasi preview browser agar tidak lag
             self.df_cca_scan_headers.set(res_scan.columns.tolist())
             self.df_cca_scan_rows.set(res_scan.head(300).fillna("").astype(str).values.tolist())
-
             self.df_cca_stock_headers.set(res_stock.columns.tolist())
             self.df_cca_stock_rows.set(res_stock.head(300).fillna("").astype(str).values.tolist())
-
             self.df_cca_real_headers.set(real_plus.columns.tolist())
             self.df_cca_real_rows.set(real_plus.head(300).fillna("").astype(str).values.tolist())
-
             self.df_cca_sys_headers.set(system_plus.columns.tolist())
             self.df_cca_sys_rows.set(system_plus.head(300).fillna("").astype(str).values.tolist())
 
@@ -2571,14 +2584,26 @@ class AppState:
             return False, f"Gagal Generate New Draft: {e}"
 
 # ==========================================================================
-    # STOCK OPNAME ANALYZER (STEP 1 & STEP 2 - DENGAN INTEGRASI STOCK MINUS)
-    # ================================================# --- STEP 1: COMPARE SCAN VS STOCK (PATOKAN FORMAT: STOCK SYSTEM) ---
-    # --- STEP 1: COMPARE SCAN VS STOCK (PATOKAN FORMAT: STOCK SYSTEM) ---
+    # STOCK OPNAME ANALYZER - STEP 1 (SANITIZED & ANTI-CORRUPT)
+    # ==========================================================================
     def run_so_step1(self, f_scan, f_stock, sub_sel, bin_sys_sel):
         try:
             import re
+            import numpy as np
+            import pandas as pd
 
-            # Reset state step berikutnya jika re-run Step 1
+            ILLEGAL_CHAR_RE = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f]')
+
+            def sanitize_df(d):
+                if d is None or not isinstance(d, pd.DataFrame) or d.empty:
+                    return pd.DataFrame()
+                d_clean = d.loc[:, ~d.columns.duplicated()].copy()
+                for col in d_clean.columns:
+                    if d_clean[col].dtype == object or pd.api.types.is_string_dtype(d_clean[col]):
+                        d_clean[col] = d_clean[col].astype(str).str.replace(ILLEGAL_CHAR_RE, '', regex=True)
+                return d_clean
+
+            # Reset state step berikutnya
             self.so_step2_done.set(False)
             self.so_step4_done.set(False)
             self.so_step4_setup_done.set(False)
@@ -2596,8 +2621,7 @@ class AppState:
                     return ""
                 s = str(val).strip().upper()
                 if s.endswith('.0') and s[:-2].replace('.', '', 1).isdigit():
-                    if isinstance(val, (float, int)) or (isinstance(val, str) and val.endswith('.0')):
-                        s = s[:-2]
+                    s = s[:-2]
                 return s
 
             def get_base_numeric_key(s):
@@ -2611,8 +2635,12 @@ class AppState:
                         return s_clean if s_clean != "" else "0"
                 return s
 
-            # 1. Bersihkan & Filter Stock System Terlebih Dahulu (Sebagai Master Acuan)
+            # 1. Bersihkan & Filter Stock System
             dt = df_t_raw.copy()
+            overlap_cols = [c for c in dt.columns if str(c).strip().upper() in ['QTY SO', 'QTY_SO', 'DIFF', 'NOTE', 'ITEM NAME']]
+            if overlap_cols:
+                dt = dt.drop(columns=overlap_cols, errors='ignore')
+
             col_b = dt.columns[1] if dt.shape[1] > 1 else dt.columns[0]
             col_s = dt.columns[2] if dt.shape[1] > 2 else dt.columns[0]
 
@@ -2642,7 +2670,7 @@ class AppState:
                     k = get_base_numeric_key(s_sys)
                     base_to_system_sku[k] = s_sys
 
-            # 2. Bersihkan Data Scan & SESUAIKAN DENGAN FORMAT STOCK SYSTEM
+            # 2. Bersihkan Data Scan
             ds = df_s_raw.iloc[:, [0, 1, 2]].copy()
             ds.columns = ['BIN', 'SKU', 'QTY_SCAN']
             ds['BIN'] = ds['BIN'].astype(str).str.strip().str.upper()
@@ -2661,7 +2689,7 @@ class AppState:
             ds = ds[(ds['SKU'] != '') & (ds['SKU'] != 'NAN') & (ds['BIN'] != '')]
             ds_grouped = ds.groupby(['BIN', 'SKU'], as_index=False)['QTY_SCAN'].sum()
 
-            # 3. Aggregasi Stock System & Compare Scan ke Stock
+            # 3. Aggregasi & Merge
             dt_grouped = dt.groupby(['BIN_CLEAN', 'SKU_CLEAN'], as_index=False)['QTY_SYS_NUM'].sum()
             dt_grouped.columns = ['BIN', 'SKU', 'QTY_SYSTEM']
 
@@ -2691,10 +2719,12 @@ class AppState:
                 map_dict = dict(zip(map_df['SKU'], map_df['NAME']))
 
             res_scan['ITEM NAME'] = res_scan['SKU'].map(map_dict).fillna("-")
-            
             sku_col_stock = col_s if col_s in res_stock.columns else res_stock.columns[2]
             res_stock['ITEM NAME'] = res_stock[sku_col_stock].apply(clean_str).map(map_dict).fillna("-")
-            res_stock = res_stock.loc[:, ~res_stock.columns.duplicated()]
+
+            # Sanitasi kolom duplikat & karakter ilegal
+            res_scan = sanitize_df(res_scan)
+            res_stock = sanitize_df(res_stock)
 
             real_plus = res_scan[res_scan['NOTE'] == "REAL +"].copy()
             system_plus = res_stock[res_stock['NOTE'] == "SYSTEM +"].copy()

@@ -1451,11 +1451,19 @@ def server(input: Inputs, output: Outputs, session: Session):
     @render.download(filename="Step1_Compare_Scan_Stock.xlsx")
     def btn_dl_cca_step1():
         buf = io.BytesIO()
-        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-            state._raw_df_cca_scan.to_excel(writer, sheet_name='DATA_SCAN', index=False)
-            state._raw_df_cca_stock.to_excel(writer, sheet_name='STOCK_SYSTEM', index=False)
-            state._raw_df_cca_real_plus.to_excel(writer, sheet_name='REAL_PLUS', index=False)
-            state._raw_df_cca_sys_plus.to_excel(writer, sheet_name='SYSTEM_PLUS', index=False)
+        try:
+            with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+                export_clean_sheet(getattr(state, "_raw_df_cca_scan", pd.DataFrame()), writer, 'DATA_SCAN')
+                export_clean_sheet(getattr(state, "_raw_df_cca_stock", pd.DataFrame()), writer, 'STOCK_SYSTEM')
+                export_clean_sheet(getattr(state, "_raw_df_cca_real_plus", pd.DataFrame()), writer, 'REAL_PLUS')
+                export_clean_sheet(getattr(state, "_raw_df_cca_sys_plus", pd.DataFrame()), writer, 'SYSTEM_PLUS')
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            buf = io.BytesIO()
+            with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+                pd.DataFrame({"ERROR": [f"Gagal generate Excel: {str(e)}"]}).to_excel(writer, sheet_name='ERROR', index=False)
+
         buf.seek(0)
         yield buf.getvalue()
 
@@ -1851,62 +1859,45 @@ def server(input: Inputs, output: Outputs, session: Session):
         yield buf.getvalue()
 
     # ==========================================================================
-    # HANDLER DOWNLOAD FULL MASTER REPORT CYCLE COUNT (PERSIS POLA STOCK OPNAME)
-    # ==========================================================================
-# ==========================================================================
-    # HANDLER DOWNLOAD FULL MASTER REPORT CYCLE COUNT (IDENTIK DENGAN STOCK OPNAME)
+    # CYCLE COUNT - DOWNLOAD FULL MASTER REPORT (SAFE)
     # ==========================================================================
     @render.download(filename="FULL_CYCLE_COUNT_ANALYZER_REPORT.xlsx")
     def btn_dl_cca_master_all():
         buf = io.BytesIO()
-        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-            has_written = False
+        try:
+            with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+                sheets_to_write = [
+                    ('_raw_df_cca_scan', '1_DATA SCAN'),
+                    ('_raw_df_cca_stock', '2_STOCK SYSTEM'),
+                    ('_raw_df_cca_real_plus', '3_REAL PLUS'),
+                    ('_raw_df_cca_sys_plus', '4_SYSTEM PLUS'),
+                    ('_raw_df_cca_alloc', '5_ALLOCATION DETAIL'),
+                    ('_raw_df_cca_setup_real', '6_SET UP REAL PLUS'),
+                    ('_raw_df_cca_rec_real', '7_REAL PLUS RECON'),
+                    ('_raw_df_cca_rec_sys', '8_SYSTEM OUTSTANDING'),
+                    ('_raw_df_cca_adj4', '9_REAL PLUS NEED ADJ'),
+                    ('_raw_df_cca_karantina', '10_KARANTINA'),
+                    ('_raw_df_cca_check5', '11_CHECK AUDIT'),
+                    ('_raw_df_cca_miss_loc', '12_MISS LOCATION'),
+                    ('_raw_df_cca_sum_miss', '13_SUMMARY MISS LOC'),
+                ]
+                has_written = False
+                for attr, sname in sheets_to_write:
+                    df = getattr(state, attr, None)
+                    if df is not None and isinstance(df, pd.DataFrame) and not df.empty:
+                        export_clean_sheet(df, writer, sname)
+                        has_written = True
 
-            if hasattr(state, "_raw_df_cca_scan") and not state._raw_df_cca_scan.empty:
-                state._raw_df_cca_scan.to_excel(writer, sheet_name='1_DATA SCAN', index=False)
-                has_written = True
-            if hasattr(state, "_raw_df_cca_stock") and not state._raw_df_cca_stock.empty:
-                state._raw_df_cca_stock.to_excel(writer, sheet_name='2_STOCK SYSTEM', index=False)
-                has_written = True
-            if hasattr(state, "_raw_df_cca_real_plus") and not state._raw_df_cca_real_plus.empty:
-                state._raw_df_cca_real_plus.to_excel(writer, sheet_name='3_REAL PLUS', index=False)
-                has_written = True
-            if hasattr(state, "_raw_df_cca_sys_plus") and not state._raw_df_cca_sys_plus.empty:
-                state._raw_df_cca_sys_plus.to_excel(writer, sheet_name='4_SYSTEM PLUS', index=False)
-                has_written = True
-            if hasattr(state, "_raw_df_cca_alloc") and not state._raw_df_cca_alloc.empty:
-                state._raw_df_cca_alloc.to_excel(writer, sheet_name='5_ALLOCATION DETAIL', index=False)
-                has_written = True
-            if hasattr(state, "_raw_df_cca_setup_real") and not state._raw_df_cca_setup_real.empty:
-                state._raw_df_cca_setup_real.to_excel(writer, sheet_name='6_SET UP REAL PLUS', index=False)
-                has_written = True
-            if hasattr(state, "_raw_df_cca_rec_real") and not state._raw_df_cca_rec_real.empty:
-                state._raw_df_cca_rec_real.to_excel(writer, sheet_name='7_REAL PLUS RECON', index=False)
-                has_written = True
-            if hasattr(state, "_raw_df_cca_rec_sys") and not state._raw_df_cca_rec_sys.empty:
-                state._raw_df_cca_rec_sys.to_excel(writer, sheet_name='8_SYSTEM OUTSTANDING', index=False)
-                has_written = True
-            if hasattr(state, "_raw_df_cca_adj4") and not state._raw_df_cca_adj4.empty:
-                state._raw_df_cca_adj4.to_excel(writer, sheet_name='9_REAL PLUS NEED ADJ', index=False)
-                has_written = True
-            if hasattr(state, "_raw_df_cca_karantina") and not state._raw_df_cca_karantina.empty:
-                state._raw_df_cca_karantina.to_excel(writer, sheet_name='10_KARANTINA', index=False)
-                has_written = True
-            if hasattr(state, "_raw_df_cca_check5") and not state._raw_df_cca_check5.empty:
-                state._raw_df_cca_check5.to_excel(writer, sheet_name='11_CHECK AUDIT', index=False)
-                has_written = True
-            if hasattr(state, "_raw_df_cca_miss_loc") and not state._raw_df_cca_miss_loc.empty:
-                state._raw_df_cca_miss_loc.to_excel(writer, sheet_name='12_MISS LOCATION', index=False)
-                has_written = True
-            if hasattr(state, "_raw_df_cca_sum_miss") and not state._raw_df_cca_sum_miss.empty:
-                state._raw_df_cca_sum_miss.to_excel(writer, sheet_name='13_SUMMARY MISS LOC', index=False)
-                has_written = True
-
-            # Mencegah crash jika ditekan sebelum step dijalankan
-            if not has_written:
-                pd.DataFrame({"INFO": ["Data Cycle Count belum diproses. Silakan jalankan minimal Step 1."]}).to_excel(
-                    writer, sheet_name='INFO', index=False
-                )
+                if not has_written:
+                    pd.DataFrame({"INFO": ["Data Cycle Count belum diproses. Silakan jalankan minimal Step 1."]}).to_excel(
+                        writer, sheet_name='INFO', index=False
+                    )
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            buf = io.BytesIO()
+            with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+                pd.DataFrame({"ERROR": [f"Gagal generate Master Excel: {str(e)}"]}).to_excel(writer, sheet_name='ERROR', index=False)
 
         buf.seek(0)
         yield buf.getvalue()
@@ -2222,14 +2213,25 @@ def server(input: Inputs, output: Outputs, session: Session):
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
 
+    # ==========================================================================
+    # STOCK OPNAME - DOWNLOAD STEP 1 (SAFE)
+    # ==========================================================================
     @render.download(filename="Step1_SO_Compare.xlsx")
     def btn_dl_so_step1():
         buf = io.BytesIO()
-        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-            state._raw_df_so_scan.to_excel(writer, sheet_name='DATA_SCAN', index=False)
-            state._raw_df_so_stock.to_excel(writer, sheet_name='STOCK_SYSTEM', index=False)
-            state._raw_df_so_real_plus.to_excel(writer, sheet_name='REAL_PLUS', index=False)
-            state._raw_df_so_sys_plus.to_excel(writer, sheet_name='SYSTEM_PLUS', index=False)
+        try:
+            with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+                export_clean_sheet(getattr(state, "_raw_df_so_scan", pd.DataFrame()), writer, 'DATA_SCAN')
+                export_clean_sheet(getattr(state, "_raw_df_so_stock", pd.DataFrame()), writer, 'STOCK_SYSTEM')
+                export_clean_sheet(getattr(state, "_raw_df_so_real_plus", pd.DataFrame()), writer, 'REAL_PLUS')
+                export_clean_sheet(getattr(state, "_raw_df_so_sys_plus", pd.DataFrame()), writer, 'SYSTEM_PLUS')
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            buf = io.BytesIO()
+            with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+                pd.DataFrame({"ERROR": [f"Gagal generate Excel: {str(e)}"]}).to_excel(writer, sheet_name='ERROR', index=False)
+
         buf.seek(0)
         yield buf.getvalue()
 
