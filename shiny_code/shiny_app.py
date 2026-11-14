@@ -26,6 +26,79 @@ app_ui = ui.page_fluid(
     style="padding: 0; margin: 0; background-color: #111318;"
 )
 
+import re
+from openpyxl import Workbook
+from openpyxl.utils.dataframe import dataframe_to_rows
+
+ILLEGAL_CHAR_REGEX = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f]')
+
+def create_excel_with_sheets(sheet_dict: dict) -> bytes:
+    """Membuat file Excel langsung via OpenPyXL murni (Anti-0 bytes & Anti-error sheet)."""
+    wb = Workbook()
+    first_sheet = True
+
+    if not sheet_dict:
+        ws = wb.active
+        ws.title = "INFO"
+        ws.append(["INFO"])
+        ws.append(["Tidak ada data yang diproses."])
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        return buf.getvalue()
+
+    for sheet_name, df in sheet_dict.items():
+        clean_name = re.sub(r'[\\/*?:\[\]]', '', str(sheet_name))[:31].strip()
+        if not clean_name:
+            clean_name = "SHEET"
+
+        if first_sheet:
+            ws = wb.active
+            ws.title = clean_name
+            first_sheet = False
+        else:
+            ws = wb.create_sheet(title=clean_name)
+
+        if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+            cols = list(df.columns) if (df is not None and hasattr(df, 'columns') and len(df.columns) > 0) else ["INFO"]
+            ws.append([str(c) for c in cols])
+            ws.append(["(Data kosong)"])
+            continue
+
+        df_clean = df.copy()
+        clean_cols = []
+        seen = {}
+        for c in df_clean.columns:
+            c_str = str(c).strip()
+            if c_str in seen:
+                seen[c_str] += 1
+                clean_cols.append(f"{c_str}_{seen[c_str]}")
+            else:
+                seen[c_str] = 0
+                clean_cols.append(c_str)
+        df_clean.columns = clean_cols
+
+        for r in dataframe_to_rows(df_clean, index=False, header=True):
+            clean_row = []
+            for val in r:
+                if isinstance(val, str):
+                    clean_row.append(ILLEGAL_CHAR_REGEX.sub('', val))
+                elif hasattr(val, 'tzinfo') and val.tzinfo is not None:
+                    try:
+                        clean_row.append(val.tz_localize(None))
+                    except Exception:
+                        clean_row.append(str(val))
+                elif pd.isna(val):
+                    clean_row.append("")
+                else:
+                    clean_row.append(val)
+            ws.append(clean_row)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf.getvalue()
+
 def server(input: Inputs, output: Outputs, session: Session):
     state = AppState()
     _last_filter_state = {"c_brands": [], "c_subs": [], "c_bins": []}
@@ -1416,14 +1489,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                 dark_metric_box("🔐 QTY SYSTEM +", f"{state.cca_qty_sys_plus():,}", "#E53E3E"),
                 style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
             ),
-            ui.div(
-                ui.download_button(
-                    "btn_dl_cca_step1",
-                    ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD EXCEL STEP 1 (.xlsx)"),
-                    style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
-                ),
-                style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
-            ),
+            # (Tombol download Step 1 dihilangkan)
             ui.navset_card_tab(
                 ui.nav_panel("📋 DATA SCAN", ui.div(render_clean_table(state.df_cca_scan_headers(), state.df_cca_scan_rows(), "tbl_cca_scan"), style="padding: 0.75rem 0;")),
                 ui.nav_panel("📊 STOCK SYSTEM", ui.div(render_clean_table(state.df_cca_stock_headers(), state.df_cca_stock_rows(), "tbl_cca_stock"), style="padding: 0.75rem 0;")),
@@ -1448,24 +1514,6 @@ def server(input: Inputs, output: Outputs, session: Session):
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
 
-    @render.download(filename="Step1_Compare_Scan_Stock.xlsx")
-    def btn_dl_cca_step1():
-        buf = io.BytesIO()
-        try:
-            with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-                export_clean_sheet(getattr(state, "_raw_df_cca_scan", pd.DataFrame()), writer, 'DATA_SCAN')
-                export_clean_sheet(getattr(state, "_raw_df_cca_stock", pd.DataFrame()), writer, 'STOCK_SYSTEM')
-                export_clean_sheet(getattr(state, "_raw_df_cca_real_plus", pd.DataFrame()), writer, 'REAL_PLUS')
-                export_clean_sheet(getattr(state, "_raw_df_cca_sys_plus", pd.DataFrame()), writer, 'SYSTEM_PLUS')
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            buf = io.BytesIO()
-            with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-                pd.DataFrame({"ERROR": [f"Gagal generate Excel: {str(e)}"]}).to_excel(writer, sheet_name='ERROR', index=False)
-
-        buf.seek(0)
-        yield buf.getvalue()
 
     # --- KARTU MANDIRI STEP 2 & 3 (CYCLE COUNT) ---
     @render.ui
@@ -1859,48 +1907,35 @@ def server(input: Inputs, output: Outputs, session: Session):
         yield buf.getvalue()
 
     # ==========================================================================
-    # CYCLE COUNT - DOWNLOAD FULL MASTER REPORT (SAFE)
+    # FULL REPORT CYCLE COUNT
     # ==========================================================================
     @render.download(filename="FULL_CYCLE_COUNT_ANALYZER_REPORT.xlsx")
     def btn_dl_cca_master_all():
-        buf = io.BytesIO()
-        try:
-            with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-                sheets_to_write = [
-                    ('_raw_df_cca_scan', '1_DATA SCAN'),
-                    ('_raw_df_cca_stock', '2_STOCK SYSTEM'),
-                    ('_raw_df_cca_real_plus', '3_REAL PLUS'),
-                    ('_raw_df_cca_sys_plus', '4_SYSTEM PLUS'),
-                    ('_raw_df_cca_alloc', '5_ALLOCATION DETAIL'),
-                    ('_raw_df_cca_setup_real', '6_SET UP REAL PLUS'),
-                    ('_raw_df_cca_rec_real', '7_REAL PLUS RECON'),
-                    ('_raw_df_cca_rec_sys', '8_SYSTEM OUTSTANDING'),
-                    ('_raw_df_cca_adj4', '9_REAL PLUS NEED ADJ'),
-                    ('_raw_df_cca_karantina', '10_KARANTINA'),
-                    ('_raw_df_cca_check5', '11_CHECK AUDIT'),
-                    ('_raw_df_cca_miss_loc', '12_MISS LOCATION'),
-                    ('_raw_df_cca_sum_miss', '13_SUMMARY MISS LOC'),
-                ]
-                has_written = False
-                for attr, sname in sheets_to_write:
-                    df = getattr(state, attr, None)
-                    if df is not None and isinstance(df, pd.DataFrame) and not df.empty:
-                        export_clean_sheet(df, writer, sname)
-                        has_written = True
+        sheets_list = [
+            ('1_DATA SCAN', '_raw_df_cca_scan'),
+            ('2_STOCK SYSTEM', '_raw_df_cca_stock'),
+            ('3_REAL PLUS', '_raw_df_cca_real_plus'),
+            ('4_SYSTEM PLUS', '_raw_df_cca_sys_plus'),
+            ('5_ALLOCATION DETAIL', '_raw_df_cca_alloc'),
+            ('6_SET UP REAL PLUS', '_raw_df_cca_setup_real'),
+            ('7_REAL PLUS RECON', '_raw_df_cca_rec_real'),
+            ('8_SYSTEM OUTSTANDING', '_raw_df_cca_rec_sys'),
+            ('9_REAL PLUS NEED ADJ', '_raw_df_cca_adj4'),
+            ('10_KARANTINA', '_raw_df_cca_karantina'),
+            ('11_CHECK AUDIT', '_raw_df_cca_check5'),
+            ('12_MISS LOCATION', '_raw_df_cca_miss_loc'),
+            ('13_SUMMARY MISS LOC', '_raw_df_cca_sum_miss')
+        ]
+        sheets = {}
+        for sname, attr in sheets_list:
+            df = getattr(state, attr, None)
+            if df is not None and isinstance(df, pd.DataFrame) and not df.empty:
+                sheets[sname] = df
 
-                if not has_written:
-                    pd.DataFrame({"INFO": ["Data Cycle Count belum diproses. Silakan jalankan minimal Step 1."]}).to_excel(
-                        writer, sheet_name='INFO', index=False
-                    )
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            buf = io.BytesIO()
-            with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-                pd.DataFrame({"ERROR": [f"Gagal generate Master Excel: {str(e)}"]}).to_excel(writer, sheet_name='ERROR', index=False)
+        if not sheets:
+            sheets['INFO'] = pd.DataFrame({"INFO": ["Data Cycle Count belum diproses. Silakan jalankan minimal Step 1."]})
 
-        buf.seek(0)
-        yield buf.getvalue()
+        yield create_excel_with_sheets(sheets)
 
 # ==========================================================================
     # COMPARE RTO CONTROLLER & HANDLERS
@@ -2180,14 +2215,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                 dark_metric_box("🔐 QTY SYSTEM +", f"{state.so_qty_sys_plus():,}", "#E53E3E"),
                 style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
             ),
-            ui.div(
-                ui.download_button(
-                    "btn_dl_so_step1",
-                    ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD EXCEL STEP 1 (.xlsx)"),
-                    style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
-                ),
-                style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
-            ),
+            # (Tombol download Step 1 dihilangkan)
             ui.navset_card_tab(
                 ui.nav_panel("📋 DATA SCAN", ui.div(render_clean_table(state.df_so_scan_headers(), state.df_so_scan_rows(), "tbl_so_scan"), style="padding: 0.75rem 0;")),
                 ui.nav_panel("📊 STOCK SYSTEM", ui.div(render_clean_table(state.df_so_stock_headers(), state.df_so_stock_rows(), "tbl_so_stock"), style="padding: 0.75rem 0;")),
@@ -2213,27 +2241,6 @@ def server(input: Inputs, output: Outputs, session: Session):
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
 
-    # ==========================================================================
-    # STOCK OPNAME - DOWNLOAD STEP 1 (SAFE)
-    # ==========================================================================
-    @render.download(filename="Step1_SO_Compare.xlsx")
-    def btn_dl_so_step1():
-        buf = io.BytesIO()
-        try:
-            with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-                export_clean_sheet(getattr(state, "_raw_df_so_scan", pd.DataFrame()), writer, 'DATA_SCAN')
-                export_clean_sheet(getattr(state, "_raw_df_so_stock", pd.DataFrame()), writer, 'STOCK_SYSTEM')
-                export_clean_sheet(getattr(state, "_raw_df_so_real_plus", pd.DataFrame()), writer, 'REAL_PLUS')
-                export_clean_sheet(getattr(state, "_raw_df_so_sys_plus", pd.DataFrame()), writer, 'SYSTEM_PLUS')
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            buf = io.BytesIO()
-            with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-                pd.DataFrame({"ERROR": [f"Gagal generate Excel: {str(e)}"]}).to_excel(writer, sheet_name='ERROR', index=False)
-
-        buf.seek(0)
-        yield buf.getvalue()
 
     # --- KARTU MANDIRI STEP 2 & 3 (STOCK OPNAME) ---
     @render.ui
@@ -2716,23 +2723,38 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         yield buf.getvalue()
 
+    # ==========================================================================
+    # FULL REPORT STOCK OPNAME
+    # ==========================================================================
     @render.download(filename="FULL_SO_ANALYZER_REPORT.xlsx")
     def btn_dl_so_master_all():
-        buf = io.BytesIO()
-        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-            if not state._raw_df_so_scan.empty: state._raw_df_so_scan.to_excel(writer, sheet_name='1_DATA SCAN', index=False)
-            if not state._raw_df_so_stock.empty: state._raw_df_so_stock.to_excel(writer, sheet_name='2_STOCK SYSTEM', index=False)
-            if not state._raw_df_so_real_plus.empty: state._raw_df_so_real_plus.to_excel(writer, sheet_name='3_REAL PLUS', index=False)
-            if not state._raw_df_so_sys_plus.empty: state._raw_df_so_sys_plus.to_excel(writer, sheet_name='4_SYSTEM PLUS', index=False)
-            if not state._raw_df_so_setup_real.empty: state._raw_df_so_setup_real.to_excel(writer, sheet_name='5_SET UP REAL PLUS', index=False)
-            if not state._raw_df_so_rec_real.empty: state._raw_df_so_rec_real.to_excel(writer, sheet_name='6_REAL PLUS RECON', index=False)
-            if not state._raw_df_so_rec_sys.empty: state._raw_df_so_rec_sys.to_excel(writer, sheet_name='7_SYSTEM OUTSTANDING', index=False)
-            if not state._raw_df_so_mult.empty: state._raw_df_so_mult.to_excel(writer, sheet_name='8_MULTIPLE ADJ PLUS', index=False)
-            if not state._raw_df_so_sing.empty: state._raw_df_so_sing.to_excel(writer, sheet_name='9_SINGLE ADJ PLUS', index=False)
-            if not state._raw_df_so_res4.empty: state._raw_df_so_res4.to_excel(writer, sheet_name='10_HASIL CEK ADJ', index=False)
-            if not state._raw_df_so_karantina.empty: state._raw_df_so_karantina.to_excel(writer, sheet_name='11_KARANTINA', index=False)
-        buf.seek(0)
-        yield buf.getvalue()
+        sheets_list = [
+            ('1_DATA SCAN', '_raw_df_so_scan'),
+            ('2_STOCK SYSTEM', '_raw_df_so_stock'),
+            ('3_REAL PLUS', '_raw_df_so_real_plus'),
+            ('4_SYSTEM PLUS', '_raw_df_so_sys_plus'),
+            ('5_SET UP REAL PLUS', '_raw_df_so_setup_real'),
+            ('6_REAL PLUS RECON', '_raw_df_so_rec_real'),
+            ('7_SYSTEM OUTSTANDING', '_raw_df_so_rec_sys'),
+            ('8_MULTIPLE ADJ PLUS', '_raw_df_so_mult'),
+            ('9_SINGLE ADJ PLUS', '_raw_df_so_sing'),
+            ('10_HASIL CEK ADJ', '_raw_df_so_res4'),
+            ('11_KARANTINA', '_raw_df_so_karantina'),
+            ('12_MISS LOCATION', '_raw_df_so_miss_loc'),
+            ('13_SUMMARY MISS LOC', '_raw_df_so_sum_miss'),
+            ('14_DETAIL ADJUSTMENT', '_raw_df_so_adj_detail'),
+            ('15_SUMMARY ADJ', '_raw_df_so_adj_sum')
+        ]
+        sheets = {}
+        for sname, attr in sheets_list:
+            df = getattr(state, attr, None)
+            if df is not None and isinstance(df, pd.DataFrame) and not df.empty:
+                sheets[sname] = df
+
+        if not sheets:
+            sheets['INFO'] = pd.DataFrame({"INFO": ["Data Stock Opname belum diproses. Silakan jalankan minimal Step 1."]})
+
+        yield create_excel_with_sheets(sheets)
 
 # ==========================================================================
     # JUSTIFICATION SO CONTROLLER (DYNAMIC MODE: REVERSAL & NON REVERSAL)

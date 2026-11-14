@@ -10,6 +10,7 @@ import pandas as pd
 from config import format_datetime_wib, get_supabase, load_data_from_info, safe_int
 from shiny import reactive
 
+
 WIB = timezone(timedelta(hours=7))
 
 class AppState:
