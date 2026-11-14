@@ -1692,7 +1692,7 @@ class AppState:
             return False, f"Terjadi kesalahan saat memproses data: {e}"
 
 # ==========================================================================
-    # CYCLE COUNT ANALYZER - STEP 1 (FIXED: STANDARISASI IDENTIK DENGAN STOCK OPNAME)
+    # CYCLE COUNT ANALYZER - STEP 1 (FIXED & DEDUPLICATED)
     # ==========================================================================
     def run_cca_step1(self, f_scan, f_stock, sub_sel, brand_sel, bin_sys_sel):
         try:
@@ -1773,7 +1773,6 @@ class AppState:
             dt_merged = dt.merge(ds_g, left_on=['BIN_CLEAN', 'SKU_CLEAN'], right_on=['BIN_SCAN', 'SKU_SCAN'], how='left')
             dt_merged['QTY SO'] = dt_merged['QTY_TOTAL_SCAN'].fillna(0)
             dt_merged['DIFF'] = dt_merged['QTY_SYS_NUM'] - dt_merged['QTY SO']
-            # ✅ FIX: Formula NOTE ditutup dengan sempurna
             dt_merged['NOTE'] = np.where(dt_merged['DIFF'] > 0, "SYSTEM +", np.where(dt_merged['DIFF'] < 0, "REAL +", "OK"))
 
             cols_drop = ['BIN_CLEAN', 'SKU_CLEAN', 'QTY_SYS_NUM', 'BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN']
@@ -1791,7 +1790,7 @@ class AppState:
             sku_col_stock = res_stock.columns[2] if res_stock.shape[1] > 2 else res_stock.columns[0]
             res_stock['ITEM NAME'] = res_stock[sku_col_stock].astype(str).str.strip().str.upper().str.replace(r'\.0$', '', regex=True).map(map_dict).fillna("-")
             
-            # ✅ FIX: Bersihkan kolom duplikat agar tidak corrupt
+            # Hapus kolom duplikat agar openpyxl tidak melempar error
             res_stock = res_stock.loc[:, ~res_stock.columns.duplicated()]
 
             real_plus = res_scan[res_scan['NOTE'] == "REAL +"].copy()
@@ -1800,14 +1799,14 @@ class AppState:
             self.cca_qty_real_plus.set(int(real_plus['DIFF'].sum()) if not real_plus.empty else 0)
             self.cca_qty_sys_plus.set(int(system_plus['DIFF'].sum()) if not system_plus.empty else 0)
 
-            # Simpan 100% data untuk Step 2 dan download Full Report
+            # Simpan data mentah lengkap
             self._raw_df_cca_scan = res_scan.copy()
             self._raw_df_cca_stock = res_stock.copy()
             self._raw_df_cca_real_plus = real_plus.copy()
             self._raw_df_cca_sys_plus = system_plus.copy()
             self._cca_map_dict = map_dict
 
-            # Batasi 300 baris pertama untuk preview browser agar responsif
+            # Batasi preview browser agar tidak lag
             self.df_cca_scan_headers.set(res_scan.columns.tolist())
             self.df_cca_scan_rows.set(res_scan.head(300).fillna("").astype(str).values.tolist())
 
