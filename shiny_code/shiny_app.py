@@ -1853,91 +1853,63 @@ def server(input: Inputs, output: Outputs, session: Session):
     # ==========================================================================
     # HANDLER DOWNLOAD FULL MASTER REPORT CYCLE COUNT (PERSIS POLA STOCK OPNAME)
     # ==========================================================================
+# ==========================================================================
+    # HANDLER DOWNLOAD FULL MASTER REPORT CYCLE COUNT (IDENTIK DENGAN STOCK OPNAME)
+    # ==========================================================================
     @render.download(filename="FULL_CYCLE_COUNT_ANALYZER_REPORT.xlsx")
     def btn_dl_cca_master_all():
-        import re
-        import traceback
-        from openpyxl import Workbook
-
-        print("🔥 [DEBUG CCA] Tombol Download Full Report diklik!")
-        illegal_re = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f]')
-
-        def clean_cell(val):
-            if val is None:
-                return ""
-            try:
-                if pd.isna(val):
-                    return ""
-            except Exception:
-                pass
-            if isinstance(val, bool):
-                return val
-            if isinstance(val, int):
-                return val
-            if isinstance(val, float):
-                return val if pd.notna(val) else ""
-            if hasattr(val, "item"):
-                try:
-                    v_py = val.item()
-                    return "" if (isinstance(v_py, float) and pd.isna(v_py)) else v_py
-                except Exception:
-                    pass
-            return illegal_re.sub("", str(val))
-
         buf = io.BytesIO()
-        try:
-            wb = Workbook(write_only=True)
-            sheets = [
-                ('1_DATA SCAN', getattr(state, "_raw_df_cca_scan", pd.DataFrame())),
-                ('2_STOCK SYSTEM', getattr(state, "_raw_df_cca_stock", pd.DataFrame())),
-                ('3_REAL PLUS', getattr(state, "_raw_df_cca_real_plus", pd.DataFrame())),
-                ('4_SYSTEM PLUS', getattr(state, "_raw_df_cca_sys_plus", pd.DataFrame())),
-                ('5_ALLOCATION DETAIL', getattr(state, "_raw_df_cca_alloc", pd.DataFrame())),
-                ('6_SET UP REAL PLUS', getattr(state, "_raw_df_cca_setup_real", pd.DataFrame())),
-                ('7_REAL PLUS RECON', getattr(state, "_raw_df_cca_rec_real", pd.DataFrame())),
-                ('8_SYSTEM OUTSTANDING', getattr(state, "_raw_df_cca_rec_sys", pd.DataFrame())),
-                ('9_REAL PLUS NEED ADJ', getattr(state, "_raw_df_cca_adj4", pd.DataFrame())),
-                ('10_KARANTINA', getattr(state, "_raw_df_cca_karantina", pd.DataFrame())),
-                ('11_CHECK AUDIT', getattr(state, "_raw_df_cca_check5", pd.DataFrame())),
-                ('12_MISS LOCATION', getattr(state, "_raw_df_cca_miss_loc", pd.DataFrame())),
-                ('13_SUMMARY MISS LOC', getattr(state, "_raw_df_cca_sum_miss", pd.DataFrame())),
-            ]
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            has_written = False
 
-            has_sheet = False
-            for s_name, df in sheets:
-                if df is not None and isinstance(df, pd.DataFrame) and not df.empty:
-                    print(f"   -> Menulis {s_name}: {len(df)} baris")
-                    ws = wb.create_sheet(title=s_name[:31])
-                    ws.append([illegal_re.sub("", str(c).strip()) for c in df.columns])
-                    for row in df.itertuples(index=False, name=None):
-                        ws.append([clean_cell(v) for v in row])
-                    has_sheet = True
+            if hasattr(state, "_raw_df_cca_scan") and not state._raw_df_cca_scan.empty:
+                state._raw_df_cca_scan.to_excel(writer, sheet_name='1_DATA SCAN', index=False)
+                has_written = True
+            if hasattr(state, "_raw_df_cca_stock") and not state._raw_df_cca_stock.empty:
+                state._raw_df_cca_stock.to_excel(writer, sheet_name='2_STOCK SYSTEM', index=False)
+                has_written = True
+            if hasattr(state, "_raw_df_cca_real_plus") and not state._raw_df_cca_real_plus.empty:
+                state._raw_df_cca_real_plus.to_excel(writer, sheet_name='3_REAL PLUS', index=False)
+                has_written = True
+            if hasattr(state, "_raw_df_cca_sys_plus") and not state._raw_df_cca_sys_plus.empty:
+                state._raw_df_cca_sys_plus.to_excel(writer, sheet_name='4_SYSTEM PLUS', index=False)
+                has_written = True
+            if hasattr(state, "_raw_df_cca_alloc") and not state._raw_df_cca_alloc.empty:
+                state._raw_df_cca_alloc.to_excel(writer, sheet_name='5_ALLOCATION DETAIL', index=False)
+                has_written = True
+            if hasattr(state, "_raw_df_cca_setup_real") and not state._raw_df_cca_setup_real.empty:
+                state._raw_df_cca_setup_real.to_excel(writer, sheet_name='6_SET UP REAL PLUS', index=False)
+                has_written = True
+            if hasattr(state, "_raw_df_cca_rec_real") and not state._raw_df_cca_rec_real.empty:
+                state._raw_df_cca_rec_real.to_excel(writer, sheet_name='7_REAL PLUS RECON', index=False)
+                has_written = True
+            if hasattr(state, "_raw_df_cca_rec_sys") and not state._raw_df_cca_rec_sys.empty:
+                state._raw_df_cca_rec_sys.to_excel(writer, sheet_name='8_SYSTEM OUTSTANDING', index=False)
+                has_written = True
+            if hasattr(state, "_raw_df_cca_adj4") and not state._raw_df_cca_adj4.empty:
+                state._raw_df_cca_adj4.to_excel(writer, sheet_name='9_REAL PLUS NEED ADJ', index=False)
+                has_written = True
+            if hasattr(state, "_raw_df_cca_karantina") and not state._raw_df_cca_karantina.empty:
+                state._raw_df_cca_karantina.to_excel(writer, sheet_name='10_KARANTINA', index=False)
+                has_written = True
+            if hasattr(state, "_raw_df_cca_check5") and not state._raw_df_cca_check5.empty:
+                state._raw_df_cca_check5.to_excel(writer, sheet_name='11_CHECK AUDIT', index=False)
+                has_written = True
+            if hasattr(state, "_raw_df_cca_miss_loc") and not state._raw_df_cca_miss_loc.empty:
+                state._raw_df_cca_miss_loc.to_excel(writer, sheet_name='12_MISS LOCATION', index=False)
+                has_written = True
+            if hasattr(state, "_raw_df_cca_sum_miss") and not state._raw_df_cca_sum_miss.empty:
+                state._raw_df_cca_sum_miss.to_excel(writer, sheet_name='13_SUMMARY MISS LOC', index=False)
+                has_written = True
 
-            if not has_sheet:
-                ws_info = wb.create_sheet(title="INFO")
-                ws_info.append(["INFO"])
-                ws_info.append(["Data Cycle Count belum diproses."])
+            # Mencegah crash jika ditekan sebelum step dijalankan
+            if not has_written:
+                pd.DataFrame({"INFO": ["Data Cycle Count belum diproses. Silakan jalankan minimal Step 1."]}).to_excel(
+                    writer, sheet_name='INFO', index=False
+                )
 
-            wb.save(buf)
-            total_size = buf.tell()
-            print(f"✅ [DEBUG CCA] Berhasil dibuat! Ukuran: {total_size:,} bytes")
-            buf.seek(0)
-            while True:
-                chunk = buf.read(65536)
-                if not chunk:
-                    break
-                yield chunk
-
-        except Exception as e:
-            print(f"❌ [DEBUG CCA] ERROR: {e}")
-            traceback.print_exc()
-            err_buf = io.BytesIO()
-            wb_err = Workbook(write_only=True)
-            ws_err = wb_err.create_sheet(title="ERROR")
-            ws_err.append(["ERROR"])
-            ws_err.append([illegal_re.sub("", str(e))])
-            wb_err.save(err_buf)
-            yield err_buf.getvalue()
+        buf.seek(0)
+        yield buf.getvalue()
 
 # ==========================================================================
     # COMPARE RTO CONTROLLER & HANDLERS
