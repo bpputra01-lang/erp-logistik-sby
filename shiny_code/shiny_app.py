@@ -1836,51 +1836,80 @@ def server(input: Inputs, output: Outputs, session: Session):
         yield buf.getvalue()
 
 # ==========================================================================
-    # HANDLER DOWNLOAD FULL MASTER REPORT CYCLE COUNT (ANTI-CORRUPT & SAFE WRITE)
+    # HANDLER DOWNLOAD EXCEL STEP 5 KARANTINA (YANG SEBELUMNYA HILANG)
+    # ==========================================================================
+    @render.download(filename="Hasil_Karantina_CCA.xlsx")
+    def btn_dl_cca_karantina():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            df = getattr(state, "_raw_df_cca_karantina", pd.DataFrame())
+            if not df.empty:
+                df.to_excel(writer, sheet_name='KARANTINA_CCA', index=False)
+            else:
+                pd.DataFrame({"INFO": ["Tidak ada data karantina"]}).to_excel(writer, sheet_name='INFO', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    # ==========================================================================
+    # HANDLER DOWNLOAD FULL MASTER REPORT CYCLE COUNT (PERSIS POLA STOCK OPNAME)
     # ==========================================================================
     @render.download(filename="FULL_CYCLE_COUNT_ANALYZER_REPORT.xlsx")
     def btn_dl_cca_master_all():
         buf = io.BytesIO()
-        has_written_sheet = False
+        try:
+            with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+                # Daftar seluruh 13 sheet Cycle Count persis seperti Stock Opname
+                sheets = [
+                    ('1_DATA SCAN', getattr(state, "_raw_df_cca_scan", pd.DataFrame())),
+                    ('2_STOCK SYSTEM', getattr(state, "_raw_df_cca_stock", pd.DataFrame())),
+                    ('3_REAL PLUS', getattr(state, "_raw_df_cca_real_plus", pd.DataFrame())),
+                    ('4_SYSTEM PLUS', getattr(state, "_raw_df_cca_sys_plus", pd.DataFrame())),
+                    ('5_ALLOCATION DETAIL', getattr(state, "_raw_df_cca_alloc", pd.DataFrame())),
+                    ('6_SET UP REAL PLUS', getattr(state, "_raw_df_cca_setup_real", pd.DataFrame())),
+                    ('7_REAL PLUS RECON', getattr(state, "_raw_df_cca_rec_real", pd.DataFrame())),
+                    ('8_SYSTEM OUTSTANDING', getattr(state, "_raw_df_cca_rec_sys", pd.DataFrame())),
+                    ('9_REAL PLUS NEED ADJ', getattr(state, "_raw_df_cca_adj4", pd.DataFrame())),
+                    ('10_KARANTINA', getattr(state, "_raw_df_cca_karantina", pd.DataFrame())),
+                    ('11_CHECK AUDIT', getattr(state, "_raw_df_cca_check5", pd.DataFrame())),
+                    ('12_MISS LOCATION', getattr(state, "_raw_df_cca_miss_loc", pd.DataFrame())),
+                    ('13_SUMMARY MISS LOC', getattr(state, "_raw_df_cca_sum_miss", pd.DataFrame()))
+                ]
 
-        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-            # Helper aman: membersihkan kolom, nama string, dan mencegah crash jika 1 sheet bermasalah
-            def safe_export_sheet(df, sheet_name):
-                nonlocal has_written_sheet
-                try:
+                has_sheet = False
+                for s_name, df in sheets:
                     if df is not None and isinstance(df, pd.DataFrame) and not df.empty:
                         clean_df = df.copy()
-                        # 1. Pastikan seluruh nama kolom adalah string bersih
+                        # 1. Bersihkan nama kolom menjadi string
                         clean_df.columns = [str(c).strip() for c in clean_df.columns]
-                        # 2. Hapus kolom duplikat agar openpyxl tidak melempar ValueError
-                        clean_df = clean_df.loc[:, ~clean_df.columns.duplicated()].copy()
-                        # 3. Tulis ke Excel
-                        clean_df.to_excel(writer, sheet_name=sheet_name, index=False)
-                        has_written_sheet = True
-                except Exception as err:
-                    print(f"⚠️ Gagal export sheet '{sheet_name}': {err}")
+                        # 2. Hapus duplikat kolom menggunakan iloc posisi (bukan .loc yang rawan error)
+                        if clean_df.columns.duplicated().any():
+                            clean_df = clean_df.iloc[:, ~pd.Series(clean_df.columns).duplicated().values]
+                        # 3. Hilangkan timezone jika ada kolom tanggal agar openpyxl tidak crash
+                        for col in clean_df.select_dtypes(include=['datetimetz']).columns:
+                            clean_df[col] = clean_df[col].dt.tz_localize(None)
 
-            # Tulis seluruh 13 sheet secara berurutan dan aman
-            safe_export_sheet(getattr(state, "_raw_df_cca_scan", None), '1_DATA SCAN')
-            safe_export_sheet(getattr(state, "_raw_df_cca_stock", None), '2_STOCK SYSTEM')
-            safe_export_sheet(getattr(state, "_raw_df_cca_real_plus", None), '3_REAL PLUS')
-            safe_export_sheet(getattr(state, "_raw_df_cca_sys_plus", None), '4_SYSTEM PLUS')
-            safe_export_sheet(getattr(state, "_raw_df_cca_alloc", None), '5_ALLOCATION DETAIL')
-            safe_export_sheet(getattr(state, "_raw_df_cca_setup_real", None), '6_SET UP REAL PLUS')
-            safe_export_sheet(getattr(state, "_raw_df_cca_rec_real", None), '7_REAL PLUS RECON')
-            safe_export_sheet(getattr(state, "_raw_df_cca_rec_sys", None), '8_SYSTEM OUTSTANDING')
-            safe_export_sheet(getattr(state, "_raw_df_cca_adj4", None), '9_REAL PLUS NEED ADJ')
-            safe_export_sheet(getattr(state, "_raw_df_cca_karantina", None), '10_KARANTINA')
-            safe_export_sheet(getattr(state, "_raw_df_cca_check5", None), '11_CHECK AUDIT')
-            safe_export_sheet(getattr(state, "_raw_df_cca_miss_loc", None), '12_MISS LOCATION')
-            safe_export_sheet(getattr(state, "_raw_df_cca_sum_miss", None), '13_SUMMARY MISS LOC')
+                        clean_df.to_excel(writer, sheet_name=s_name, index=False)
+                        has_sheet = True
 
-            # Jika seluruh sheet di atas kosong, buat 1 sheet info agar openpyxl tidak corrupt
-            if not has_written_sheet:
-                pd.DataFrame({"INFO": ["Data Cycle Count belum diproses"]}).to_excel(writer, sheet_name='INFO', index=False)
+                # Jika belum ada step yang dijalankan, buat sheet info (mencegah openpyxl korup)
+                if not has_sheet:
+                    pd.DataFrame({"INFO": ["Data Cycle Count belum diproses. Silakan jalankan minimal Step 1."]}).to_excel(
+                        writer, sheet_name='INFO', index=False
+                    )
 
-        buf.seek(0)
-        yield buf.getvalue()
+            buf.seek(0)
+            yield buf.getvalue()
+        except Exception as e:
+            # Fallback darurat: jika ada error tidak terduga, cetak sheet error (tidak akan pernah 0 bytes lagi)
+            import traceback
+            traceback.print_exc()
+            err_buf = io.BytesIO()
+            with pd.ExcelWriter(err_buf, engine='openpyxl') as err_writer:
+                pd.DataFrame({"ERROR": [f"Gagal generate laporan: {str(e)}"]}).to_excel(
+                    err_writer, sheet_name='ERROR', index=False
+                )
+            err_buf.seek(0)
+            yield err_buf.getvalue()
 
 
 # ==========================================================================
