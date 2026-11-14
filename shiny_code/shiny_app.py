@@ -1853,34 +1853,27 @@ def server(input: Inputs, output: Outputs, session: Session):
     def btn_dl_cca_master_all():
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-            if not state._raw_df_cca_scan.empty: 
-                state._raw_df_cca_scan.to_excel(writer, sheet_name='1_DATA SCAN', index=False)
-            if not state._raw_df_cca_stock.empty: 
-                state._raw_df_cca_stock.to_excel(writer, sheet_name='2_STOCK SYSTEM', index=False)
-            if not state._raw_df_cca_real_plus.empty: 
-                state._raw_df_cca_real_plus.to_excel(writer, sheet_name='3_REAL PLUS', index=False)
-            if not state._raw_df_cca_sys_plus.empty: 
-                state._raw_df_cca_sys_plus.to_excel(writer, sheet_name='4_SYSTEM PLUS', index=False)
-            if not state._raw_df_cca_alloc.empty: 
-                state._raw_df_cca_alloc.to_excel(writer, sheet_name='5_ALLOCATION DETAIL', index=False)
-            if not state._raw_df_cca_setup_real.empty: 
-                state._raw_df_cca_setup_real.to_excel(writer, sheet_name='6_SET UP REAL PLUS', index=False)
-            if not state._raw_df_cca_rec_real.empty: 
-                state._raw_df_cca_rec_real.to_excel(writer, sheet_name='7_REAL PLUS RECON', index=False)
-            if not state._raw_df_cca_rec_sys.empty: 
-                state._raw_df_cca_rec_sys.to_excel(writer, sheet_name='8_SYSTEM OUTSTANDING', index=False)
-            if not state._raw_df_cca_adj4.empty: 
-                state._raw_df_cca_adj4.to_excel(writer, sheet_name='9_REAL PLUS NEED ADJ', index=False)
-            if not state._raw_df_cca_karantina.empty: 
-                state._raw_df_cca_karantina.to_excel(writer, sheet_name='10_KARANTINA', index=False)
-            if not state._raw_df_cca_check5.empty: 
-                state._raw_df_cca_check5.to_excel(writer, sheet_name='11_CHECK AUDIT', index=False)
-            if not state._raw_df_cca_miss_loc.empty: 
-                state._raw_df_cca_miss_loc.to_excel(writer, sheet_name='12_MISS LOCATION', index=False)
-            if not state._raw_df_cca_sum_miss.empty: 
-                state._raw_df_cca_sum_miss.to_excel(writer, sheet_name='13_SUMMARY MISS LOC', index=False)
+            # Helper untuk membersihkan kolom duplikat agar file Excel tidak corrupt
+            def write_sheet(df, sheet_name):
+                if df is not None and not df.empty:
+                    clean_df = df.loc[:, ~df.columns.duplicated()].copy()
+                    clean_df.to_excel(writer, sheet_name=sheet_name, index=False)
 
-            # Pengaman bila semua data belum diproses agar file Excel tidak rusak
+            write_sheet(getattr(state, "_raw_df_cca_scan", None), '1_DATA SCAN')
+            write_sheet(getattr(state, "_raw_df_cca_stock", None), '2_STOCK SYSTEM')
+            write_sheet(getattr(state, "_raw_df_cca_real_plus", None), '3_REAL PLUS')
+            write_sheet(getattr(state, "_raw_df_cca_sys_plus", None), '4_SYSTEM PLUS')
+            write_sheet(getattr(state, "_raw_df_cca_alloc", None), '5_ALLOCATION DETAIL')
+            write_sheet(getattr(state, "_raw_df_cca_setup_real", None), '6_SET UP REAL PLUS')
+            write_sheet(getattr(state, "_raw_df_cca_rec_real", None), '7_REAL PLUS RECON')
+            write_sheet(getattr(state, "_raw_df_cca_rec_sys", None), '8_SYSTEM OUTSTANDING')
+            write_sheet(getattr(state, "_raw_df_cca_adj4", None), '9_REAL PLUS NEED ADJ')
+            write_sheet(getattr(state, "_raw_df_cca_karantina", None), '10_KARANTINA')
+            write_sheet(getattr(state, "_raw_df_cca_check5", None), '11_CHECK AUDIT')
+            write_sheet(getattr(state, "_raw_df_cca_miss_loc", None), '12_MISS LOCATION')
+            write_sheet(getattr(state, "_raw_df_cca_sum_miss", None), '13_SUMMARY MISS LOC')
+
+            # Jika seluruh sheet di atas kosong, buat 1 sheet info agar openpyxl tidak crash
             if not writer.sheets:
                 pd.DataFrame({"INFO": ["Data Cycle Count belum diproses"]}).to_excel(writer, sheet_name='INFO', index=False)
 

@@ -2692,7 +2692,7 @@ class AppState:
             map_dict = item_map.drop_duplicates('SKU').set_index('SKU')['NAME'].to_dict()
 
             # 4. Compare Stock ke Scan (Konsep persis Stock Opname)
-            ds_g = ds.groupby(['BIN', 'SKU'], as_index=False)['QTY_SCAN'].sum()
+            ds_g = ds_grouped.copy()
             ds_g.columns = ['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN']
 
             dt_merged = dt.merge(ds_g, left_on=['BIN_CLEAN', 'SKU_CLEAN'], right_on=['BIN_SCAN', 'SKU_SCAN'], how='left')
@@ -2702,27 +2702,23 @@ class AppState:
 
             cols_drop = ['BIN_CLEAN', 'SKU_CLEAN', 'QTY_SYS_NUM', 'BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN']
             res_stock = dt_merged.drop(columns=[c for c in cols_drop if c in dt_merged.columns], errors='ignore')
+
+            # 5. Mapping Nama Item
+            map_dict = {}
+            if dt.shape[1] > 4:
+                s_vals = dt.iloc[:, 2].astype(str).str.strip().str.upper().str.replace(r'\.0$', '', regex=True)
+                n_vals = dt.iloc[:, 4].fillna('-').astype(str).str.strip()
+                map_df = pd.DataFrame({'SKU': s_vals, 'NAME': n_vals}).drop_duplicates('SKU')
+                map_dict = dict(zip(map_df['SKU'], map_df['NAME']))
+
+            res_scan['ITEM NAME'] = res_scan['SKU'].map(map_dict).fillna("-")
             
-            # 5. Compare Stock ke Scan
-            ds_g = ds.groupby(['BIN', 'SKU'], as_index=False)['QTY_SCAN'].sum()
-            ds_g.columns = ['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN']
+            # Update ITEM NAME di res_stock dan bersihkan kolom duplikat
+            sku_col_stock = col_s if col_s in res_stock.columns else res_stock.columns[2]
+            res_stock['ITEM NAME'] = res_stock[sku_col_stock].astype(str).str.strip().str.upper().str.replace(r'\.0$', '', regex=True).map(map_dict).fillna("-")
+            res_stock = res_stock.loc[:, ~res_stock.columns.duplicated()]
 
-            dt_merged = dt.merge(ds_g, left_on=[col_b, col_s], right_on=['BIN_SCAN', 'SKU_SCAN'], how='left')
-            dt_merged['QTY SO'] = dt_merged['QTY_TOTAL_SCAN'].fillna(0)
-            dt_merged['DIFF'] = dt_merged[col_q_sys] - dt_merged['QTY SO']
-
-            cond_stock = [
-                (dt_merged[col_q_sys] < 0),
-                (dt_merged['DIFF'] > 0),
-                (dt_merged['DIFF'] < 0)
-            ]
-            choices_stock = ["STOCK MINUS", "SYSTEM +", "REAL +"]
-            dt_merged['NOTE'] = np.select(cond_stock, choices_stock, default="OK")
-
-            res_stock = dt_merged.drop(columns=['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN'], errors='ignore')
-            res_stock['ITEM NAME'] = res_stock[col_s].map(map_dict).fillna("-")
-
-            real_plus = res_scan[res_scan['NOTE'].isin(["REAL +", "STOCK MINUS"])].copy()
+            real_plus = res_scan[res_scan['NOTE'] == "REAL +"].copy()
             system_plus = res_stock[res_stock['NOTE'] == "SYSTEM +"].copy()
 
             self.so_qty_real_plus.set(int(real_plus['DIFF'].sum()) if not real_plus.empty else 0)
