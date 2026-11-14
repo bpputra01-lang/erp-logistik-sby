@@ -1846,36 +1846,66 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         yield buf.getvalue()
 
-    @render.download(filename="FULL_CYCLE_COUNT_ANALYZER_REPORT.xlsx")
+    @render.download(filename=lambda: f"FULL_CYCLE_COUNT_REPORT_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx")
     def btn_dl_cca_master_all():
+        import io
+        import re
         buf = io.BytesIO()
         has_sheet = False
-        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-            sheets = [
-                ('1_DATA SCAN', getattr(state, "_raw_df_cca_scan", None)),
-                ('2_STOCK SYSTEM', getattr(state, "_raw_df_cca_stock", None)),
-                ('3_REAL PLUS', getattr(state, "_raw_df_cca_real_plus", None)),
-                ('4_SYSTEM PLUS', getattr(state, "_raw_df_cca_sys_plus", None)),
-                ('5_ALLOCATION DETAIL', getattr(state, "_raw_df_cca_alloc", None)),
-                ('6_SET UP REAL PLUS', getattr(state, "_raw_df_cca_setup_real", None)),
-                ('7_REAL PLUS RECON', getattr(state, "_raw_df_cca_rec_real", None)),
-                ('8_SYSTEM OUTSTANDING', getattr(state, "_raw_df_cca_rec_sys", None)),
-                ('9_REAL PLUS NEED ADJ', getattr(state, "_raw_df_cca_adj4", None)),
-                ('10_KARANTINA', getattr(state, "_raw_df_cca_karantina", None)),
-                ('11_CHECK AUDIT', getattr(state, "_raw_df_cca_check5", None)),
-                ('12_MISS LOCATION', getattr(state, "_raw_df_cca_miss_loc", None)),
-                ('13_SUMMARY MISS LOC', getattr(state, "_raw_df_cca_sum_miss", None)),
-            ]
-            for sheet_name, df in sheets:
-                if df is not None and not df.empty:
-                    df.to_excel(writer, sheet_name=sheet_name, index=False)
-                    has_sheet = True
-            
-            # Jika semua dataframe kosong, sediakan 1 sheet fallback agar Excel tidak corrupt
-            if not has_sheet:
-                pd.DataFrame({"INFO": ["Tidak ada data yang diproses"]}).to_excel(writer, sheet_name='INFO', index=False)
-        buf.seek(0)
-        yield buf.getvalue()
+
+        # Helper pembersih karakter terlarang di Excel & datetime timezone
+        def clean_df_for_excel(df_in):
+            if df_in is None or df_in.empty:
+                return None
+            df_out = df_in.copy()
+            # Hapus timezone dari semua kolom datetime
+            for col in df_out.select_dtypes(include=['datetime', 'datetimetz']).columns:
+                df_out[col] = df_out[col].dt.tz_localize(None)
+            # Bersihkan karakter kontrol ASCII ilegal dari string
+            for col in df_out.select_dtypes(include=['object']).columns:
+                df_out[col] = df_out[col].astype(str).apply(
+                    lambda x: re.sub(r'[\x00-\x08\x0B-\x0C\x0E-\x1F]', '', x) if isinstance(x, str) else x
+                )
+            return df_out
+
+        sheets = [
+            ('1_DATA SCAN', getattr(state, "_raw_df_cca_scan", None)),
+            ('2_STOCK SYSTEM', getattr(state, "_raw_df_cca_stock", None)),
+            ('3_REAL PLUS', getattr(state, "_raw_df_cca_real_plus", None)),
+            ('4_SYSTEM PLUS', getattr(state, "_raw_df_cca_sys_plus", None)),
+            ('5_ALLOCATION DETAIL', getattr(state, "_raw_df_cca_alloc", None)),
+            ('6_SET UP REAL PLUS', getattr(state, "_raw_df_cca_setup_real", None)),
+            ('7_REAL PLUS RECON', getattr(state, "_raw_df_cca_rec_real", None)),
+            ('8_SYSTEM OUTSTANDING', getattr(state, "_raw_df_cca_rec_sys", None)),
+            ('9_REAL PLUS NEED ADJ', getattr(state, "_raw_df_cca_adj4", None)),
+            ('10_KARANTINA', getattr(state, "_raw_df_cca_karantina", None)),
+            ('11_CHECK AUDIT', getattr(state, "_raw_df_cca_check5", None)),
+            ('12_MISS LOCATION', getattr(state, "_raw_df_cca_miss_loc", None)),
+            ('13_SUMMARY MISS LOC', getattr(state, "_raw_df_cca_sum_miss", None)),
+        ]
+
+        try:
+            with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+                for sheet_name, raw_df in sheets:
+                    clean_df = clean_df_for_excel(raw_df)
+                    if clean_df is not None and not clean_df.empty:
+                        clean_df.to_excel(writer, sheet_name=sheet_name[:31], index=False)
+                        has_sheet = True
+
+                # Fallback sheet jika semua data kosong
+                if not has_sheet:
+                    pd.DataFrame({"STATUS": ["Tidak ada data Cycle Count yang diproses"]}).to_excel(
+                        writer, sheet_name='INFO', index=False
+                    )
+            buf.seek(0)
+            yield buf.getvalue()
+        except Exception as e:
+            print("❌ Gagal generate Excel Master Cycle Count:", e)
+            err_buf = io.BytesIO()
+            with pd.ExcelWriter(err_buf, engine='openpyxl') as err_writer:
+                pd.DataFrame({"ERROR": [f"Gagal generate file: {str(e)}"]}).to_excel(err_writer, sheet_name='ERROR', index=False)
+            err_buf.seek(0)
+            yield err_buf.getvalue()
 
 
 # ==========================================================================
