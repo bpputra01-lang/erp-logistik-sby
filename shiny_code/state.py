@@ -1,6 +1,7 @@
 import io
 import json
 import os
+import tempfile
 import random
 import time
 import urllib.parse
@@ -352,7 +353,17 @@ class AppState:
 
         self._raw_df_so_adj_detail = pd.DataFrame()
         self._raw_df_so_adj_sum = pd.DataFrame()
+    # --- PRE-COMPILED MASTER REPORT CACHE (SISTEM CICIL) ---
+        
+        self.cca_report_path = tempfile.mktemp(prefix="master_cca_", suffix=".xlsx")
+        self.cca_report_status = reactive.Value("Belum ada step yang dijalankan.")
+        self.cca_report_ready = reactive.Value(False)
+        self.cca_saved_sheets_count = reactive.Value(0)
 
+        self.so_report_path = tempfile.mktemp(prefix="master_so_", suffix=".xlsx")
+        self.so_report_status = reactive.Value("Belum ada step yang dijalankan.")
+        self.so_report_ready = reactive.Value(False)
+        self.so_saved_sheets_count = reactive.Value(0)
        # --- JUSTIFICATION SO STATE ---
         self.jso_mode = reactive.Value("")  # "JUSTIFIKASI REVERSAL" atau "JUSTIFIKASI NON REVERSAL"
         self.jso_rev_start_date = reactive.Value(datetime.now().strftime("%Y-%m-01"))
@@ -8066,3 +8077,108 @@ class AppState:
             "unconfirmed_count": unconfirmed_count,
             "total_potongan_pct": total_potongan
         }
+
+        # ==========================================================================
+    # HELPER PENCICIL FULL MASTER REPORT KE FILE CACHE
+    # ==========================================================================
+    def _write_cached_report_file(self, filepath: str, sheets_list: list):
+        """Menulis kumpulan sheet yang sudah siap langsung ke file disk secara instan."""
+        import re
+        ILLEGAL_CHAR_REGEX = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f]')
+        
+        valid_sheets = [(t, df) for t, df in sheets_list if df is not None and isinstance(df, pd.DataFrame) and not df.empty]
+        if not valid_sheets:
+            return 0
+
+        with pd.ExcelWriter(filepath, engine='openpyxl') as writer:
+            seen_sheets = set()
+            for raw_title, df in valid_sheets:
+                clean_title = re.sub(r'[\\/*?:\[\]]', '', str(raw_title))[:31].strip() or "Sheet"
+                orig_title = clean_title[:28]
+                counter = 1
+                while clean_title.upper() in seen_sheets:
+                    clean_title = f"{orig_title}_{counter}"
+                    counter += 1
+                seen_sheets.add(clean_title.upper())
+
+                df_export = df.copy()
+
+                # Buat nama kolom unik
+                unique_cols, seen_c = [], {}
+                for col in df_export.columns:
+                    c_str = ILLEGAL_CHAR_REGEX.sub('', str(col).strip()) or "COL"
+                    if c_str in seen_c:
+                        seen_c[c_str] += 1
+                        unique_cols.append(f"{c_str}_{seen_c[c_str]}")
+                    else:
+                        seen_c[c_str] = 0
+                        unique_cols.append(c_str)
+                df_export.columns = unique_cols
+
+                # Bersihkan karakter & timezone
+                for col in df_export.columns:
+                    if pd.api.types.is_datetime64_any_dtype(df_export[col]):
+                        try: df_export[col] = df_export[col].dt.tz_localize(None)
+                        except Exception: df_export[col] = df_export[col].astype(str)
+                    elif df_export[col].dtype == object:
+                        df_export[col] = df_export[col].apply(
+                            lambda v: ILLEGAL_CHAR_REGEX.sub('', str(v)) if isinstance(v, str)
+                            else (str(v) if isinstance(v, (list, dict, set)) else v)
+                        )
+
+                df_export.to_excel(writer, sheet_name=clean_title, index=False)
+        return len(valid_sheets)
+
+    def update_cca_master_file(self, step_name: str):
+        """Mencicil file Master Cycle Count setiap kali step selesai."""
+        sheets = [
+            ('1_DATA SCAN', getattr(self, "_raw_df_cca_scan", pd.DataFrame())),
+            ('2_STOCK SYSTEM', getattr(self, "_raw_df_cca_stock", pd.DataFrame())),
+            ('3_REAL PLUS', getattr(self, "_raw_df_cca_real_plus", pd.DataFrame())),
+            ('4_SYSTEM PLUS', getattr(self, "_raw_df_cca_sys_plus", pd.DataFrame())),
+            ('5_ALLOCATION DETAIL', getattr(self, "_raw_df_cca_alloc", pd.DataFrame())),
+            ('6_SET UP REAL PLUS', getattr(self, "_raw_df_cca_setup_real", pd.DataFrame())),
+            ('7_REAL PLUS RECON', getattr(self, "_raw_df_cca_rec_real", pd.DataFrame())),
+            ('8_SYSTEM OUTSTANDING', getattr(self, "_raw_df_cca_rec_sys", pd.DataFrame())),
+            ('9_REAL PLUS NEED ADJ', getattr(self, "_raw_df_cca_adj4", pd.DataFrame())),
+            ('10_KARANTINA', getattr(self, "_raw_df_cca_karantina", pd.DataFrame())),
+            ('11_CHECK AUDIT', getattr(self, "_raw_df_cca_check5", pd.DataFrame())),
+            ('12_MISS LOCATION', getattr(self, "_raw_df_cca_miss_loc", pd.DataFrame())),
+            ('13_SUMMARY MISS LOC', getattr(self, "_raw_df_cca_sum_miss", pd.DataFrame())),
+        ]
+        try:
+            cnt = self._write_cached_report_file(self.cca_report_path, sheets)
+            if cnt > 0:
+                self.cca_saved_sheets_count.set(cnt)
+                self.cca_report_ready.set(True)
+                self.cca_report_status.set(f"✅ Berhasil menyimpan data {step_name} ({cnt} Sheet tersimpan di file report).")
+        except Exception as e:
+            print(f"Gagal mencicil file CCA: {e}")
+
+    def update_so_master_file(self, step_name: str):
+        """Mencicil file Master Stock Opname setiap kali step selesai."""
+        sheets = [
+            ('1_DATA SCAN', getattr(self, "_raw_df_so_scan", pd.DataFrame())),
+            ('2_STOCK SYSTEM', getattr(self, "_raw_df_so_stock", pd.DataFrame())),
+            ('3_REAL PLUS', getattr(self, "_raw_df_so_real_plus", pd.DataFrame())),
+            ('4_SYSTEM PLUS', getattr(self, "_raw_df_so_sys_plus", pd.DataFrame())),
+            ('5_SET UP REAL PLUS', getattr(self, "_raw_df_so_setup_real", pd.DataFrame())),
+            ('6_REAL PLUS RECON', getattr(self, "_raw_df_so_rec_real", pd.DataFrame())),
+            ('7_SYSTEM OUTSTANDING', getattr(self, "_raw_df_so_rec_sys", pd.DataFrame())),
+            ('8_MULTIPLE ADJ PLUS', getattr(self, "_raw_df_so_mult", pd.DataFrame())),
+            ('9_SINGLE ADJ PLUS', getattr(self, "_raw_df_so_sing", pd.DataFrame())),
+            ('10_HASIL CEK ADJ', getattr(self, "_raw_df_so_res4", pd.DataFrame())),
+            ('11_KARANTINA', getattr(self, "_raw_df_so_karantina", pd.DataFrame())),
+            ('12_MISS LOCATION', getattr(self, "_raw_df_so_miss_loc", pd.DataFrame())),
+            ('13_SUMMARY MISS LOC', getattr(self, "_raw_df_so_sum_miss", pd.DataFrame())),
+            ('14_DETAIL ADJUSTMENT', getattr(self, "_raw_df_so_adj_detail", pd.DataFrame())),
+            ('15_SUMMARY ADJ', getattr(self, "_raw_df_so_adj_sum", pd.DataFrame())),
+        ]
+        try:
+            cnt = self._write_cached_report_file(self.so_report_path, sheets)
+            if cnt > 0:
+                self.so_saved_sheets_count.set(cnt)
+                self.so_report_ready.set(True)
+                self.so_report_status.set(f"✅ Berhasil menyimpan data {step_name} ({cnt} Sheet tersimpan di file report).")
+        except Exception as e:
+            print(f"Gagal mencicil file SO: {e}")

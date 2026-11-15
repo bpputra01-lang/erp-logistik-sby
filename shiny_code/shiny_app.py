@@ -6476,6 +6476,54 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="background: white; border-radius: 12px; border: 1px solid #E2E8F0; padding: 1.25rem;"
         )
 
+        # ==========================================================================
+    # BANNER DOWNLOAD MASTER REPORT CYCLE COUNT (STATUS CICILAN REALTIME)
+    # ==========================================================================
+    @render.ui
+    def cca_master_report_banner_ui():
+        if not state.cca_report_ready():
+            return ui.div()
+
+        return ui.div(
+            ui.div(
+                ui.div(
+                    ui.h4("🏆 Download Full Master Report Cycle Count", style="font-size: 16px; font-weight: 800; color: #065F46; margin: 0 0 4px 0;"),
+                    ui.p(state.cca_report_status(), style="color: #047857; font-weight: 700; font-size: 12.5px; margin: 0;"),
+                ),
+                ui.download_button(
+                    "btn_dl_cca_master_all",
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-cloud-arrow-down", style="margin-right: 8px; font-size: 15px;"), f"DOWNLOAD MASTER REPORT ({state.cca_saved_sheets_count()} SHEET)"),
+                    style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; font-weight: 800; border-radius: 8px; border: none; padding: 12px 24px; cursor: pointer; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); font-size: 13px;"
+                ),
+                style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 12px;"
+            ),
+            style="background: #D1FAE5; border: 1.5px solid #6EE7B7; padding: 1.25rem 1.5rem; border-radius: 12px; margin-top: 1rem; margin-bottom: 1.25rem; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.1);"
+        )
+
+    # ==========================================================================
+    # BANNER DOWNLOAD MASTER REPORT STOCK OPNAME (STATUS CICILAN REALTIME)
+    # ==========================================================================
+    @render.ui
+    def so_master_report_banner_ui():
+        if not state.so_report_ready():
+            return ui.div()
+
+        return ui.div(
+            ui.div(
+                ui.div(
+                    ui.h4("🏆 Download Full Master Report Stock Opname", style="font-size: 16px; font-weight: 800; color: #065F46; margin: 0 0 4px 0;"),
+                    ui.p(state.so_report_status(), style="color: #047857; font-weight: 700; font-size: 12.5px; margin: 0;"),
+                ),
+                ui.download_button(
+                    "btn_dl_so_master_all",
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-cloud-arrow-down", style="margin-right: 8px; font-size: 15px;"), f"DOWNLOAD MASTER REPORT ({state.so_saved_sheets_count()} SHEET)"),
+                    style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; font-weight: 800; border-radius: 8px; border: none; padding: 12px 24px; cursor: pointer; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); font-size: 13px;"
+                ),
+                style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 12px;"
+            ),
+            style="background: #D1FAE5; border: 1.5px solid #6EE7B7; padding: 1.25rem 1.5rem; border-radius: 12px; margin-top: 1rem; margin-bottom: 1.25rem; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.1);"
+        )
+
 from pathlib import Path
 
 app = App(app_ui, server)

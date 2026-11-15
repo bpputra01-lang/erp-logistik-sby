@@ -1025,6 +1025,7 @@ def cycle_count_analyzer_view(state: AppState):
     return ui.div(
         filter_section,
         step1_ui,
+        ui.output_ui("cca_master_report_banner_ui"),
         ui.output_ui("cca_step2_card_ui"),
         ui.output_ui("cca_step4_card_ui"),
         ui.output_ui("cca_step5_card_ui"),
@@ -1102,6 +1103,7 @@ def stock_opname_view(state: AppState):
     return ui.div(
         filter_section,
         step1_ui,
+        ui.output_ui("so_master_report_banner_ui"),
         ui.output_ui("so_step2_card_ui"),
         ui.output_ui("so_step4_card_ui"),
         ui.output_ui("so_step5_card_ui"),
