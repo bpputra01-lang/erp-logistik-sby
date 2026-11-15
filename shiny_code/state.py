@@ -1849,6 +1849,9 @@ class AppState:
             self.df_cca_sys_rows.set(system_plus.head(300).fillna("").astype(str).values.tolist())
 
             self.cca_step1_done.set(True)
+            # Tambahkan baris ini:
+            self.update_cca_master_file("Step 1 (Scan & Stock)")
+            self.cca_step1_done.set(True)
             return True, "Compare Step 1 Berhasil!"
         except Exception as e:
             import traceback
@@ -2051,8 +2054,11 @@ class AppState:
                 self._raw_df_cca_karantina = pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
             else:
                 self.cca_step5_done.set(False)
-
+                # Tambahkan baris ini:
+            self.update_cca_master_file("Step 2 & 3 (Alokasi & Recon)")
+            self.cca_step2_done.set(True)
             return True, "Allocation Step 2 & Recon Step 3 Selesai!"
+
         except Exception as e:
             return False, f"Gagal Allocation Step 2: {e}"
             
@@ -2095,6 +2101,9 @@ class AppState:
             self.df_cca_adj4_headers.set(df_res.columns.tolist())
             self.df_cca_adj4_rows.set(df_res.fillna("").astype(str).values.tolist())
 
+            self.cca_step4_done.set(True)
+            # Tambahkan baris ini:
+            self.update_cca_master_file("Step 4 (Recon Real+)")
             self.cca_step4_done.set(True)
             return True, "Analisis Step 4 Berhasil!"
         except Exception as e:
@@ -2225,6 +2234,9 @@ class AppState:
             self.df_cca_check5_rows.set(df_check.fillna("").astype(str).values.tolist())
 
             self.cca_step5_done.set(True)
+            # Tambahkan baris ini:
+            self.update_cca_master_file("Step 5 (Karantina & Audit)")
+            self.cca_step5_done.set(True)
             return True, "Analisis Karantina Step 5 Selesai!"
         except Exception as e:
             return False, f"Gagal Step 5: {e}"
@@ -2290,6 +2302,9 @@ class AppState:
             self.df_cca_sum_miss_headers.set(df_sum.columns.tolist())
             self.df_cca_sum_miss_rows.set(df_sum.fillna("").astype(str).values.tolist())
 
+            self.cca_step6_done.set(True)
+            # Tambahkan baris ini:
+            self.update_cca_master_file("Step 6 (Miss Location Full)")
             self.cca_step6_done.set(True)
             return True, "Miss Location Report Berhasil Dibuat!"
         except Exception as e:
