@@ -1926,8 +1926,10 @@ def server(input: Inputs, output: Outputs, session: Session):
             ('12_MISS LOCATION', getattr(state, "_raw_df_cca_miss_loc", pd.DataFrame())),
             ('13_SUMMARY MISS LOC', getattr(state, "_raw_df_cca_sum_miss", pd.DataFrame())),
         ]
+        # Dijalankan di thread terpisah (hanya butuh ~1 detik) tanpa membuat web freeze
         content = await asyncio.to_thread(build_full_report_bytes, sheets_list)
         yield content
+
 # ==========================================================================
     # COMPARE RTO CONTROLLER & HANDLERS
     # ==========================================================================
@@ -2717,7 +2719,6 @@ def server(input: Inputs, output: Outputs, session: Session):
     # ==========================================================================
     # FULL REPORT STOCK OPNAME
     # ==========================================================================
-    # Unduhan Full Report Stock Opname (Non-blocking Async)
     @render.download(filename="FULL_SO_ANALYZER_REPORT.xlsx")
     async def btn_dl_so_master_all():
         import asyncio
