@@ -1701,7 +1701,6 @@ class AppState:
             import numpy as np
             import pandas as pd
 
-            # Regex pembersih karakter kontrol ASCII yang ditolak OpenPyXL
             ILLEGAL_CHAR_RE = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f]')
 
             def sanitize_df(d):
@@ -1713,7 +1712,6 @@ class AppState:
                         d_clean[col] = d_clean[col].astype(str).str.replace(ILLEGAL_CHAR_RE, '', regex=True)
                 return d_clean
 
-            # Reset state step berikutnya jika re-run Step 1
             self.cca_step2_done.set(False)
             self.cca_step3_done.set(False)
             self.cca_step4_done.set(False)
@@ -1729,6 +1727,25 @@ class AppState:
             def clean_text_series(series):
                 return series.fillna('').astype(str).str.strip().str.upper().str.replace(r'\.0$', '', regex=True)
 
+            # 🌟 EKSTRAK MAPPING ITEM NAME DARI KOLOM E (INDEX 4) DARI FILE ASLI SEBELUM DROP!
+            map_dict = {}
+            col_sku_raw = df_t_raw.columns[2] if df_t_raw.shape[1] > 2 else df_t_raw.columns[0]
+            
+            # Cari kolom ITEM NAME berdasarkan nama header atau index 4 (Kolom E)
+            col_item_raw = None
+            for c in df_t_raw.columns:
+                if any(k in str(c).strip().upper() for k in ['ITEM NAME', 'ARTIKEL', 'NAMA BARANG', 'DESCRIPTION']):
+                    col_item_raw = c
+                    break
+            if col_item_raw is None and df_t_raw.shape[1] > 4:
+                col_item_raw = df_t_raw.columns[4]
+
+            if col_item_raw is not None:
+                s_vals = clean_text_series(df_t_raw[col_sku_raw])
+                n_vals = df_t_raw[col_item_raw].fillna('-').astype(str).str.strip()
+                map_df = pd.DataFrame({'SKU': s_vals, 'NAME': n_vals}).drop_duplicates('SKU')
+                map_dict = dict(zip(map_df['SKU'], map_df['NAME']))
+
             # 1. Bersihkan Data Scan
             b_scan = clean_text_series(df_s_raw.iloc[:, 0])
             s_scan = clean_text_series(df_s_raw.iloc[:, 1])
@@ -1738,10 +1755,9 @@ class AppState:
             ds = ds[(ds['SKU'] != '') & (ds['SKU'] != 'NAN') & (ds['BIN'] != '')]
             ds_grouped = ds.groupby(['BIN', 'SKU'], as_index=False)['QTY_SCAN'].sum()
 
-            # 2. Identifikasi Kolom Stock System & Hapus Kolom Overlap
+            # 2. Bersihkan Kolom Overlap (JANGAN HAPUS 'ITEM NAME' LAGI!)
             dt = df_t_raw.copy()
-            # Buang kolom yang berpotensi tabrakan nama dari file asal
-            overlap_cols = [c for c in dt.columns if str(c).strip().upper() in ['QTY SO', 'QTY_SO', 'DIFF', 'NOTE', 'ITEM NAME']]
+            overlap_cols = [c for c in dt.columns if str(c).strip().upper() in ['QTY SO', 'QTY_SO', 'DIFF', 'NOTE']]
             if overlap_cols:
                 dt = dt.drop(columns=overlap_cols, errors='ignore')
 
@@ -1757,7 +1773,6 @@ class AppState:
             if col_q_sys is None:
                 col_q_sys = dt.columns[9] if dt.shape[1] > 9 else dt.columns[-1]
 
-            # Filter Cabang / Sub Kategori / Brand / BIN
             if sub_sel and len(sub_sel) > 0 and dt.shape[1] > 6:
                 subs_upper = [x.upper().strip() for x in sub_sel]
                 dt = dt[dt.iloc[:, 6].astype(str).str.strip().str.upper().isin(subs_upper)]
@@ -1774,7 +1789,6 @@ class AppState:
             dt['SKU_CLEAN'] = clean_text_series(dt[col_s])
             dt['QTY_SYS_NUM'] = pd.to_numeric(dt[col_q_sys], errors='coerce').fillna(0)
 
-            # 3. Aggregasi Stock System & Compare Scan ke Stock
             dt_agg = dt.groupby(['BIN_CLEAN', 'SKU_CLEAN'], as_index=False)['QTY_SYS_NUM'].sum()
             dt_agg.columns = ['BIN', 'SKU', 'QTY_SYSTEM']
 
@@ -1783,7 +1797,6 @@ class AppState:
             res_scan['DIFF'] = res_scan['QTY_SCAN'] - res_scan['QTY_SYSTEM']
             res_scan['NOTE'] = np.where(res_scan['DIFF'] > 0, "REAL +", np.where(res_scan['DIFF'] < 0, "SYSTEM +", "OK"))
 
-            # 4. Compare Stock ke Scan
             ds_g = ds_grouped.copy()
             ds_g.columns = ['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN']
 
@@ -1795,19 +1808,11 @@ class AppState:
             cols_drop = ['BIN_CLEAN', 'SKU_CLEAN', 'QTY_SYS_NUM', 'BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN']
             res_stock = dt_merged.drop(columns=[c for c in cols_drop if c in dt_merged.columns], errors='ignore')
 
-            # 5. Mapping Nama Item
-            map_dict = {}
-            if dt.shape[1] > 4:
-                s_vals = dt.iloc[:, 2].astype(str).str.strip().str.upper().str.replace(r'\.0$', '', regex=True)
-                n_vals = dt.iloc[:, 4].fillna('-').astype(str).str.strip()
-                map_df = pd.DataFrame({'SKU': s_vals, 'NAME': n_vals}).drop_duplicates('SKU')
-                map_dict = dict(zip(map_df['SKU'], map_df['NAME']))
-
+            # 🌟 Pasang nama artikel dari Kolom E yang sah
             res_scan['ITEM NAME'] = res_scan['SKU'].map(map_dict).fillna("-")
             sku_col_stock = res_stock.columns[2] if res_stock.shape[1] > 2 else res_stock.columns[0]
             res_stock['ITEM NAME'] = res_stock[sku_col_stock].astype(str).str.strip().str.upper().str.replace(r'\.0$', '', regex=True).map(map_dict).fillna("-")
 
-            # Sanitasi kolom duplikat & karakter ilegal
             res_scan = sanitize_df(res_scan)
             res_stock = sanitize_df(res_stock)
 
@@ -1817,7 +1822,6 @@ class AppState:
             self.cca_qty_real_plus.set(int(real_plus['DIFF'].sum()) if not real_plus.empty else 0)
             self.cca_qty_sys_plus.set(int(system_plus['DIFF'].sum()) if not system_plus.empty else 0)
 
-            # Simpan data yang sudah bersih 100%
             self._raw_df_cca_scan = res_scan.copy()
             self._raw_df_cca_stock = res_stock.copy()
             self._raw_df_cca_real_plus = real_plus.copy()
@@ -2608,7 +2612,6 @@ class AppState:
                         d_clean[col] = d_clean[col].astype(str).str.replace(ILLEGAL_CHAR_RE, '', regex=True)
                 return d_clean
 
-            # Reset state step berikutnya
             self.so_step2_done.set(False)
             self.so_step4_done.set(False)
             self.so_step4_setup_done.set(False)
@@ -2640,9 +2643,26 @@ class AppState:
                         return s_clean if s_clean != "" else "0"
                 return s
 
-            # 1. Bersihkan & Filter Stock System
+            # 🌟 1. EKSTRAK MAPPING ITEM NAME DARI KOLOM E (INDEX 4) LANGSUNG DARI FILE ASLI!
+            map_dict = {}
+            col_sku_raw = df_t_raw.columns[2] if df_t_raw.shape[1] > 2 else df_t_raw.columns[0]
+            col_item_raw = None
+            for c in df_t_raw.columns:
+                if any(k in str(c).strip().upper() for k in ['ITEM NAME', 'ARTIKEL', 'NAMA BARANG', 'DESCRIPTION']):
+                    col_item_raw = c
+                    break
+            if col_item_raw is None and df_t_raw.shape[1] > 4:
+                col_item_raw = df_t_raw.columns[4]
+
+            if col_item_raw is not None:
+                s_vals = df_t_raw[col_sku_raw].apply(clean_str)
+                n_vals = df_t_raw[col_item_raw].fillna('-').astype(str).str.strip()
+                map_df = pd.DataFrame({'SKU': s_vals, 'NAME': n_vals}).drop_duplicates('SKU')
+                map_dict = dict(zip(map_df['SKU'], map_df['NAME']))
+
+            # 2. Bersihkan & Filter Stock System (JANGAN HAPUS 'ITEM NAME' DARI OVERLAP!)
             dt = df_t_raw.copy()
-            overlap_cols = [c for c in dt.columns if str(c).strip().upper() in ['QTY SO', 'QTY_SO', 'DIFF', 'NOTE', 'ITEM NAME']]
+            overlap_cols = [c for c in dt.columns if str(c).strip().upper() in ['QTY SO', 'QTY_SO', 'DIFF', 'NOTE']]
             if overlap_cols:
                 dt = dt.drop(columns=overlap_cols, errors='ignore')
 
@@ -2675,7 +2695,7 @@ class AppState:
                     k = get_base_numeric_key(s_sys)
                     base_to_system_sku[k] = s_sys
 
-            # 2. Bersihkan Data Scan
+            # 3. Bersihkan Data Scan
             ds = df_s_raw.iloc[:, [0, 1, 2]].copy()
             ds.columns = ['BIN', 'SKU', 'QTY_SCAN']
             ds['BIN'] = ds['BIN'].astype(str).str.strip().str.upper()
@@ -2694,7 +2714,7 @@ class AppState:
             ds = ds[(ds['SKU'] != '') & (ds['SKU'] != 'NAN') & (ds['BIN'] != '')]
             ds_grouped = ds.groupby(['BIN', 'SKU'], as_index=False)['QTY_SCAN'].sum()
 
-            # 3. Aggregasi & Merge
+            # 4. Aggregasi & Merge
             dt_grouped = dt.groupby(['BIN_CLEAN', 'SKU_CLEAN'], as_index=False)['QTY_SYS_NUM'].sum()
             dt_grouped.columns = ['BIN', 'SKU', 'QTY_SYSTEM']
 
@@ -2703,7 +2723,6 @@ class AppState:
             res_scan['DIFF'] = res_scan['QTY_SCAN'] - res_scan['QTY_SYSTEM']
             res_scan['NOTE'] = np.where(res_scan['DIFF'] > 0, "REAL +", np.where(res_scan['DIFF'] < 0, "SYSTEM +", "OK"))
 
-            # 4. Compare Stock ke Scan
             ds_g = ds_grouped.copy()
             ds_g.columns = ['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN']
 
@@ -2715,19 +2734,11 @@ class AppState:
             cols_drop = ['BIN_CLEAN', 'SKU_CLEAN', 'QTY_SYS_NUM', 'BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN']
             res_stock = dt_merged.drop(columns=[c for c in cols_drop if c in dt_merged.columns], errors='ignore')
 
-            # 5. Mapping Nama Item
-            map_dict = {}
-            if dt.shape[1] > 4:
-                s_vals = dt.iloc[:, 2].apply(clean_str)
-                n_vals = dt.iloc[:, 4].fillna('-').astype(str).str.strip()
-                map_df = pd.DataFrame({'SKU': s_vals, 'NAME': n_vals}).drop_duplicates('SKU')
-                map_dict = dict(zip(map_df['SKU'], map_df['NAME']))
-
+            # 🌟 Pasang nama artikel sah dari Kolom E
             res_scan['ITEM NAME'] = res_scan['SKU'].map(map_dict).fillna("-")
             sku_col_stock = col_s if col_s in res_stock.columns else res_stock.columns[2]
             res_stock['ITEM NAME'] = res_stock[sku_col_stock].apply(clean_str).map(map_dict).fillna("-")
 
-            # Sanitasi kolom duplikat & karakter ilegal
             res_scan = sanitize_df(res_scan)
             res_stock = sanitize_df(res_stock)
 
@@ -2737,6 +2748,7 @@ class AppState:
             self.so_qty_real_plus.set(int(real_plus['DIFF'].sum()) if not real_plus.empty else 0)
             self.so_qty_sys_plus.set(int(system_plus['DIFF'].sum()) if not system_plus.empty else 0)
 
+            # Simpan 100% data mentah untuk download Excel lengkap
             self._raw_df_so_scan = res_scan.copy()
             self._raw_df_so_stock = res_stock.copy()
             self._raw_df_so_real_plus = real_plus.copy()
@@ -2744,13 +2756,14 @@ class AppState:
             self._so_map_dict = map_dict
 
             self.df_so_scan_headers.set(res_scan.columns.tolist())
-            self.df_so_scan_rows.set(res_scan.fillna("").astype(str).values.tolist())
+            # 🌟 BATASI KE head(500) AGAR BROWSER TIDAK NGE-FREEZE SAAT RENDER TABEL!
+            self.df_so_scan_rows.set(res_scan.head(500).fillna("").astype(str).values.tolist())
             self.df_so_stock_headers.set(res_stock.columns.tolist())
-            self.df_so_stock_rows.set(res_stock.fillna("").astype(str).values.tolist())
+            self.df_so_stock_rows.set(res_stock.head(500).fillna("").astype(str).values.tolist())
             self.df_so_real_headers.set(real_plus.columns.tolist())
-            self.df_so_real_rows.set(real_plus.fillna("").astype(str).values.tolist())
+            self.df_so_real_rows.set(real_plus.head(500).fillna("").astype(str).values.tolist())
             self.df_so_sys_headers.set(system_plus.columns.tolist())
-            self.df_so_sys_rows.set(system_plus.fillna("").astype(str).values.tolist())
+            self.df_so_sys_rows.set(system_plus.head(500).fillna("").astype(str).values.tolist())
 
             self.so_step1_done.set(True)
             return True, "Compare Step 1 Berhasil!"
@@ -2758,7 +2771,6 @@ class AppState:
             import traceback
             traceback.print_exc()
             return False, f"Gagal Compare Step 1: {e}"
-
      # ==========================================================================
     # STOCK OPNAME ANALYZER - STEP 2: ALLOCATION 4 PRIORITAS
     # ==========================================================================

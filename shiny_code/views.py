@@ -75,6 +75,37 @@ CUSTOM_HEAD = ui.head_content(
         setBrandTab();
         setInterval(setBrandTab, 1000);
 
+        // --- AUTO-RECONNECT SAAT KEMBALI DARI TAB LAIN ---
+        document.addEventListener("visibilitychange", function() {
+            if (!document.hidden) {
+                // Tab aktif kembali: periksa apakah WebSocket terputus
+                if (window.Shiny && window.Shiny.shinyapp) {
+                    let socket = window.Shiny.shinyapp.$socket;
+                    if (!socket || socket.readyState > 1) { // 2 = CLOSING, 3 = CLOSED
+                        console.warn("WebSocket terputus saat berada di tab lain. Memuat ulang sesi...");
+                        window.location.reload();
+                    }
+                }
+            }
+        });
+
+        // Deteksi event disconnected dari Shiny dan reload otomatis dalam 1 detik
+        if (window.jQuery) {
+            $(document).on('shiny:disconnected', function() {
+                console.warn("Sesi Shiny terputus. Mencoba reconnect otomatis...");
+                setTimeout(function() {
+                    window.location.reload();
+                }, 1000);
+            });
+        }
+
+        // --- CLIENT-SIDE KEEPALIVE (Mencegah Browser/Nginx Memutus Koneksi) ---
+        setInterval(function() {
+            if (!document.hidden && window.Shiny && window.Shiny.setInputValue) {
+                Shiny.setInputValue('_app_heartbeat', Date.now());
+            }
+        }, 25000); // Kirim sinyal setiap 25 detik
+
         // --- 3. ENGINE PAGINASI CEPAT (0ms) ---
         window.fastTables = window.fastTables || {};
         window.renderFastTablePage = function(tableId) {
@@ -192,11 +223,12 @@ CUSTOM_HEAD = ui.head_content(
             if (document.body) document.body.classList.add('process-running');
 
             clearTimeout(window.spinnerSafetyTimer);
+            // 🌟 Turunkan timeout keamanan menjadi 12 detik (bukan 120 detik)
+            // Jika kalkulasi selesai atau tertunda, tirai otomatis diangkat agar web tidak nge-freeze!
             window.spinnerSafetyTimer = setTimeout(function() {
                 window.hideGlobalSpinner();
-            }, 120000); // 👈 Diubah menjadi 120 detik (2 menit)
+            }, 12000);
         };
-
 
         // AMAN: Tunggu DOMContentLoaded agar document.body tidak NULL saat di-observe
         document.addEventListener("DOMContentLoaded", function() {
