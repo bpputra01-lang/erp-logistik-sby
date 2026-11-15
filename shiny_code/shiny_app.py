@@ -26,48 +26,40 @@ app_ui = ui.page_fluid(
     style="padding: 0; margin: 0; background-color: #111318;"
 )
 
-import tempfile
-import os
+import re  # di bagian import atas
 
 def build_full_report_file(sheets_list: list) -> str:
-    """Menulis seluruh sheet langsung ke file temporary di disk (Cepat, Anti 0 Bytes, Anti MemoryError)."""
     tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
     tmp_path = tmp.name
     tmp.close()
 
+    seen_sheets = set()
+    valid = []
+    for raw_title, df in sheets_list:
+        if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+            continue
+        clean_title = re.sub(r'[\\/*?:\[\]]', '', str(raw_title))[:31].strip() or "Sheet"
+        base = clean_title[:28]
+        n = 1
+        while clean_title.upper() in seen_sheets:
+            clean_title = f"{base}_{n}"
+            n += 1
+        seen_sheets.add(clean_title.upper())
+        valid.append((clean_title, df))
+
+    if not valid:
+        valid = [("INFO", pd.DataFrame({"INFO": ["Belum ada step yang dijalankan atau data kosong."]}))]
+
     try:
-        with pd.ExcelWriter(tmp_path, engine='openpyxl') as writer:
-            has_data = False
-            seen_sheets = set()
-
-            for raw_title, df in sheets_list:
-                if df is None or not isinstance(df, pd.DataFrame) or df.empty:
-                    continue
-
-                # 1. Bersihkan nama sheet (Maks 31 karakter & karakter ilegal Excel)
-                clean_title = re.sub(r'[\\/*?:\[\]]', '', str(raw_title))[:31].strip() or "Sheet"
-                orig_title = clean_title[:28]
-                counter = 1
-                while clean_title.upper() in seen_sheets:
-                    clean_title = f"{orig_title}_{counter}"
-                    counter += 1
-                seen_sheets.add(clean_title.upper())
-
-                # 2. Tulis langsung ke ExcelWriter (C-engine pandas, instan & hemat RAM)
-                df.to_excel(writer, sheet_name=clean_title, index=False)
-                has_data = True
-
-            if not has_data:
-                pd.DataFrame({"INFO": ["Belum ada step yang dijalankan atau data kosong."]}).to_excel(writer, sheet_name="INFO", index=False)
-
-        return tmp_path
+        with pd.ExcelWriter(tmp_path, engine="openpyxl") as writer:
+            for title, df in valid:
+                df.to_excel(writer, sheet_name=title, index=False)
     except Exception as e:
         import traceback
-        print("ERROR BUILD FULL REPORT:", e)
         traceback.print_exc()
-        with pd.ExcelWriter(tmp_path, engine='openpyxl') as writer:
-            pd.DataFrame({"ERROR": [f"Gagal generate report: {str(e)}"]}).to_excel(writer, sheet_name="ERROR", index=False)
-        return tmp_path
+        with pd.ExcelWriter(tmp_path, engine="openpyxl") as writer:
+            pd.DataFrame({"ERROR": [f"Gagal generate report: {e}"]}).to_excel(writer, sheet_name="ERROR", index=False)
+    return tmp_path
         
 def server(input: Inputs, output: Outputs, session: Session):
     state = AppState()
@@ -1884,7 +1876,15 @@ def server(input: Inputs, output: Outputs, session: Session):
             ('12_MISS LOCATION', getattr(state, "_raw_df_cca_miss_loc", pd.DataFrame())),
             ('13_SUMMARY MISS LOC', getattr(state, "_raw_df_cca_sum_miss", pd.DataFrame())),
         ]
-        return build_full_report_file(sheets_list)
+        tmp_path = build_full_report_file(sheets_list)
+        try:
+            with open(tmp_path, "rb") as f:
+                yield f.read()
+        finally:
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
         
 # ==========================================================================
     # COMPARE RTO CONTROLLER & HANDLERS
@@ -2694,7 +2694,15 @@ def server(input: Inputs, output: Outputs, session: Session):
             ('14_DETAIL ADJUSTMENT', getattr(state, "_raw_df_so_adj_detail", pd.DataFrame())),
             ('15_SUMMARY ADJ', getattr(state, "_raw_df_so_adj_sum", pd.DataFrame())),
         ]
-        return build_full_report_file(sheets_list)
+        tmp_path = build_full_report_file(sheets_list)
+        try:
+            with open(tmp_path, "rb") as f:
+                yield f.read()
+        finally:
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
 
 # ==========================================================================
     # JUSTIFICATION SO CONTROLLER (DYNAMIC MODE: REVERSAL & NON REVERSAL)
