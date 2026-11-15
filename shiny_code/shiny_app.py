@@ -26,22 +26,17 @@ app_ui = ui.page_fluid(
     style="padding: 0; margin: 0; background-color: #111318;"
 )
 
-import io
-import re
-import pandas as pd
-from openpyxl import Workbook
-from openpyxl.utils.dataframe import dataframe_to_rows
+import tempfile
+import os
 
-# ==============================================================================
-# BUILD FULL REPORT (SUPER CEPAT, HEMAT RAM, ANTI-CRASH & ANTI 0 BYTE)
-# ==============================================================================
-ILLEGAL_CHAR_REGEX = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f]')
+def build_full_report_file(sheets_list: list) -> str:
+    """Menulis seluruh sheet langsung ke file temporary di disk (Cepat, Anti 0 Bytes, Anti MemoryError)."""
+    tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
+    tmp_path = tmp.name
+    tmp.close()
 
-def build_full_report_bytes(sheets_list: list) -> bytes:
-    """Menggabungkan seluruh sheet ke 1 file Excel tanpa timeout/MemoryError/0 byte."""
     try:
-        buf = io.BytesIO()
-        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+        with pd.ExcelWriter(tmp_path, engine='openpyxl') as writer:
             has_data = False
             seen_sheets = set()
 
@@ -58,56 +53,21 @@ def build_full_report_bytes(sheets_list: list) -> bytes:
                     counter += 1
                 seen_sheets.add(clean_title.upper())
 
-                df_export = df.copy()
-
-                # 2. Pastikan nama kolom unik & bersih
-                unique_cols = []
-                seen_c = {}
-                for col in df_export.columns:
-                    c_str = ILLEGAL_CHAR_REGEX.sub('', str(col).strip()) or "COL"
-                    if c_str in seen_c:
-                        seen_c[c_str] += 1
-                        unique_cols.append(f"{c_str}_{seen_c[c_str]}")
-                    else:
-                        seen_c[c_str] = 0
-                        unique_cols.append(c_str)
-                df_export.columns = unique_cols
-
-                # 3. Vectorized Clean: Cepat membersihkan timezone, string, & non-scalar types
-                for col in df_export.columns:
-                    if pd.api.types.is_datetime64_any_dtype(df_export[col]):
-                        try:
-                            df_export[col] = df_export[col].dt.tz_localize(None)
-                        except Exception:
-                            df_export[col] = df_export[col].astype(str)
-                    elif df_export[col].dtype == object:
-                        df_export[col] = df_export[col].apply(
-                            lambda v: ILLEGAL_CHAR_REGEX.sub('', str(v)) if isinstance(v, str)
-                            else (str(v) if isinstance(v, (list, dict, set)) else v)
-                        )
-
-                df_export.to_excel(writer, sheet_name=clean_title, index=False)
+                # 2. Tulis langsung ke ExcelWriter (C-engine pandas, instan & hemat RAM)
+                df.to_excel(writer, sheet_name=clean_title, index=False)
                 has_data = True
 
             if not has_data:
                 pd.DataFrame({"INFO": ["Belum ada step yang dijalankan atau data kosong."]}).to_excel(writer, sheet_name="INFO", index=False)
 
-        # Setelah keluar dari blok 'with', writer sudah melakukan flush & save ke buffer
-        buf.seek(0)
-        output_bytes = buf.getvalue()
-        if len(output_bytes) == 0:
-            raise ValueError("Buffer byte kosong.")
-        return output_bytes
-
+        return tmp_path
     except Exception as e:
         import traceback
         print("ERROR BUILD FULL REPORT:", e)
         traceback.print_exc()
-        err_buf = io.BytesIO()
-        with pd.ExcelWriter(err_buf, engine='openpyxl') as writer:
+        with pd.ExcelWriter(tmp_path, engine='openpyxl') as writer:
             pd.DataFrame({"ERROR": [f"Gagal generate report: {str(e)}"]}).to_excel(writer, sheet_name="ERROR", index=False)
-        err_buf.seek(0)
-        return err_buf.getvalue()
+        return tmp_path
         
 def server(input: Inputs, output: Outputs, session: Session):
     state = AppState()
@@ -1924,10 +1884,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             ('12_MISS LOCATION', getattr(state, "_raw_df_cca_miss_loc", pd.DataFrame())),
             ('13_SUMMARY MISS LOC', getattr(state, "_raw_df_cca_sum_miss", pd.DataFrame())),
         ]
-        
-        # Panggil generator bytes secara langsung
-        content = build_full_report_bytes(sheets_list)
-        yield content
+        return build_full_report_file(sheets_list)
         
 # ==========================================================================
     # COMPARE RTO CONTROLLER & HANDLERS
@@ -2716,9 +2673,6 @@ def server(input: Inputs, output: Outputs, session: Session):
         yield buf.getvalue()
 
     # ==========================================================================
-    # FULL REPORT STOCK OPNAME
-    # ==========================================================================
-    # ==========================================================================
     # FULL REPORT STOCK OPNAME (FIXED: ANTI 0 BYTES)
     # ==========================================================================
     @render.download(filename="FULL_SO_ANALYZER_REPORT.xlsx")
@@ -2740,9 +2694,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             ('14_DETAIL ADJUSTMENT', getattr(state, "_raw_df_so_adj_detail", pd.DataFrame())),
             ('15_SUMMARY ADJ', getattr(state, "_raw_df_so_adj_sum", pd.DataFrame())),
         ]
-        
-        content = build_full_report_bytes(sheets_list)
-        yield content
+        return build_full_report_file(sheets_list)
 
 # ==========================================================================
     # JUSTIFICATION SO CONTROLLER (DYNAMIC MODE: REVERSAL & NON REVERSAL)
