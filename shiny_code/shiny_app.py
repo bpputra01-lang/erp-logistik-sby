@@ -60,7 +60,7 @@ def build_full_report_bytes(sheets_list: list) -> bytes:
 
                 df_export = df.copy()
 
-                # 2. Pastikan nama kolom unik
+                # 2. Pastikan nama kolom unik & bersih
                 unique_cols = []
                 seen_c = {}
                 for col in df_export.columns:
@@ -86,13 +86,13 @@ def build_full_report_bytes(sheets_list: list) -> bytes:
                             else (str(v) if isinstance(v, (list, dict, set)) else v)
                         )
 
-                # Tulis langsung lewat engine C-pandas (ribuan baris selesai dalam 0.5 detik)
                 df_export.to_excel(writer, sheet_name=clean_title, index=False)
                 has_data = True
 
             if not has_data:
                 pd.DataFrame({"INFO": ["Belum ada step yang dijalankan atau data kosong."]}).to_excel(writer, sheet_name="INFO", index=False)
 
+        # Setelah keluar dari blok 'with', writer sudah melakukan flush & save ke buffer
         buf.seek(0)
         output_bytes = buf.getvalue()
         if len(output_bytes) == 0:
@@ -103,7 +103,6 @@ def build_full_report_bytes(sheets_list: list) -> bytes:
         import traceback
         print("ERROR BUILD FULL REPORT:", e)
         traceback.print_exc()
-        # Fallback darurat: Jika terjadi kendala pada data, jangan pernah kirim 0 byte!
         err_buf = io.BytesIO()
         with pd.ExcelWriter(err_buf, engine='openpyxl') as writer:
             pd.DataFrame({"ERROR": [f"Gagal generate report: {str(e)}"]}).to_excel(writer, sheet_name="ERROR", index=False)
@@ -1906,11 +1905,10 @@ def server(input: Inputs, output: Outputs, session: Session):
         yield buf.getvalue()
 
     # ==========================================================================
-    # FULL REPORT CYCLE COUNT
+    # FULL REPORT CYCLE COUNT (FIXED: ANTI 0 BYTES)
     # ==========================================================================
     @render.download(filename="FULL_CYCLE_COUNT_ANALYZER_REPORT.xlsx")
-    async def btn_dl_cca_master_all():
-        import asyncio
+    def btn_dl_cca_master_all():
         sheets_list = [
             ('1_DATA SCAN', getattr(state, "_raw_df_cca_scan", pd.DataFrame())),
             ('2_STOCK SYSTEM', getattr(state, "_raw_df_cca_stock", pd.DataFrame())),
@@ -1926,8 +1924,9 @@ def server(input: Inputs, output: Outputs, session: Session):
             ('12_MISS LOCATION', getattr(state, "_raw_df_cca_miss_loc", pd.DataFrame())),
             ('13_SUMMARY MISS LOC', getattr(state, "_raw_df_cca_sum_miss", pd.DataFrame())),
         ]
-        # Dijalankan di thread terpisah (hanya butuh ~1 detik) tanpa membuat web freeze
-        content = await asyncio.to_thread(build_full_report_bytes, sheets_list)
+        
+        # Panggil generator bytes secara langsung
+        content = build_full_report_bytes(sheets_list)
         yield content
         
 # ==========================================================================
@@ -2719,10 +2718,11 @@ def server(input: Inputs, output: Outputs, session: Session):
     # ==========================================================================
     # FULL REPORT STOCK OPNAME
     # ==========================================================================
-    # Unduhan Full Report Stock Opname (Non-blocking Async)
+    # ==========================================================================
+    # FULL REPORT STOCK OPNAME (FIXED: ANTI 0 BYTES)
+    # ==========================================================================
     @render.download(filename="FULL_SO_ANALYZER_REPORT.xlsx")
-    async def btn_dl_so_master_all():
-        import asyncio
+    def btn_dl_so_master_all():
         sheets_list = [
             ('1_DATA SCAN', getattr(state, "_raw_df_so_scan", pd.DataFrame())),
             ('2_STOCK SYSTEM', getattr(state, "_raw_df_so_stock", pd.DataFrame())),
@@ -2740,7 +2740,8 @@ def server(input: Inputs, output: Outputs, session: Session):
             ('14_DETAIL ADJUSTMENT', getattr(state, "_raw_df_so_adj_detail", pd.DataFrame())),
             ('15_SUMMARY ADJ', getattr(state, "_raw_df_so_adj_sum", pd.DataFrame())),
         ]
-        content = await asyncio.to_thread(build_full_report_bytes, sheets_list)
+        
+        content = build_full_report_bytes(sheets_list)
         yield content
 
 # ==========================================================================
