@@ -209,7 +209,7 @@ CUSTOM_HEAD = ui.head_content(
             }
         }, true);
 
-        // --- 5. SPINNER CONTROLLER ---
+        // --- 5. SPINNER CONTROLLER (STABIL & TIDAK HILANG SEBELUM PROSES SELESAI) ---
         window.hideGlobalSpinner = function() {
             clearTimeout(window.spinnerSafetyTimer);
             if (document.body) document.body.classList.remove('process-running');
@@ -223,34 +223,20 @@ CUSTOM_HEAD = ui.head_content(
             if (document.body) document.body.classList.add('process-running');
 
             clearTimeout(window.spinnerSafetyTimer);
-            // 🌟 Turunkan timeout keamanan menjadi 12 detik (bukan 120 detik)
-            // Jika kalkulasi selesai atau tertunda, tirai otomatis diangkat agar web tidak nge-freeze!
+            // Safety timeout 180 detik (3 menit) agar proses kalkulasi besar tidak diputus di tengah jalan
             window.spinnerSafetyTimer = setTimeout(function() {
                 window.hideGlobalSpinner();
-            }, 12000);
+            }, 180000);
         };
 
-        // AMAN: Tunggu DOMContentLoaded agar document.body tidak NULL saat di-observe
         document.addEventListener("DOMContentLoaded", function() {
-            if (document.body) {
-                let modalObserver = new MutationObserver(function() {
-                    let hasModal = document.getElementById('success-modal-overlay') || 
-                                   document.getElementById('error-modal-overlay') ||
-                                   document.querySelector('.shiny-notification');
-                    if (hasModal) {
-                        window.hideGlobalSpinner();
-                    }
-                });
-                modalObserver.observe(document.body, { childList: true, subtree: true });
-            }
-
             let h = window.location.hash.replace('#', '').trim();
             if (h && window.Shiny) {
                 setTimeout(function() { Shiny.setInputValue('initial_url_hash', h, {priority: 'event'}); }, 500);
             }
         });
 
-        // --- 6. SHINY EVENT LISTENERS ---
+        // --- 6. SHINY EVENT LISTENERS (HANYA TUTUP SAAT BENAR-BENAR SELESAI / IDLE) ---
         if (window.jQuery) {
             $(document).on('shiny:fileuploaded shiny:inputchanged', function() {
                 let c = getContainer();
@@ -259,16 +245,28 @@ CUSTOM_HEAD = ui.head_content(
                 }
             });
 
-            // Otomatis bersihkan tirai hitam begitu Shiny selesai menghitung (Idle)
-            $(document).on('shiny:idle shiny:value shiny:error', function() {
-                if (window.hideGlobalSpinner) {
+            // HANYA tutup spinner ketika Shiny selesai memproses SEMUA kalkulasi (shiny:idle) atau terjadi error
+            // (shiny:value sengaja dihapus agar spinner tidak menutup sebelum waktunya)
+            $(document).on('shiny:idle shiny:error', function() {
+                window.hideGlobalSpinner();
+            });
+
+            // Tutup spinner jika modal berhasil / modal error muncul di layar
+            $(document).on('shiny:visualchange', function() {
+                let hasModal = document.getElementById('success-modal-overlay') || 
+                               document.getElementById('error-modal-overlay');
+                if (hasModal) {
                     window.hideGlobalSpinner();
-                }
-                if (document.body) {
-                    document.body.classList.remove('process-running');
                 }
             });
         }
+
+        // --- 7. KEEPALIVE RINGAN (Mencegah Browser Memutus WebSocket Saat Tab Ditinggal) ---
+        setInterval(function() {
+            if (!document.hidden && window.Shiny && window.Shiny.setInputValue) {
+                Shiny.setInputValue('_app_keepalive', Date.now());
+            }
+        }, 20000);
     """),
 
     # --- 3. FONT AWESOME ICONS ---

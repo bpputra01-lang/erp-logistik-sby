@@ -32,71 +32,84 @@ import pandas as pd
 from openpyxl import Workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
 
-# Regex resmi karakter ilegal XML bawaan Excel
+# ==============================================================================
+# BUILD FULL REPORT (SUPER CEPAT, HEMAT RAM, ANTI-CRASH & ANTI 0 BYTE)
+# ==============================================================================
 ILLEGAL_CHAR_REGEX = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f]')
 
 def build_full_report_bytes(sheets_list: list) -> bytes:
-    """Menggabungkan seluruh sheet ke 1 file Excel tanpa risiko crash/0 byte."""
-    wb = Workbook()
-    first_sheet = True
+    """Menggabungkan seluruh sheet ke 1 file Excel tanpa timeout/MemoryError/0 byte."""
+    try:
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            has_data = False
+            seen_sheets = set()
 
-    for sheet_title, df in sheets_list:
-        # Hanya tulis sheet yang datanya ada / tidak kosong
-        if df is None or not isinstance(df, pd.DataFrame) or df.empty:
-            continue
+            for raw_title, df in sheets_list:
+                if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+                    continue
 
-        clean_title = re.sub(r'[\\/*?:\[\]]', '', str(sheet_title))[:31].strip() or "Sheet"
+                # 1. Bersihkan nama sheet (Maks 31 karakter & karakter ilegal Excel)
+                clean_title = re.sub(r'[\\/*?:\[\]]', '', str(raw_title))[:31].strip() or "Sheet"
+                orig_title = clean_title[:28]
+                counter = 1
+                while clean_title.upper() in seen_sheets:
+                    clean_title = f"{orig_title}_{counter}"
+                    counter += 1
+                seen_sheets.add(clean_title.upper())
+
+                df_export = df.copy()
+
+                # 2. Pastikan nama kolom unik
+                unique_cols = []
+                seen_c = {}
+                for col in df_export.columns:
+                    c_str = ILLEGAL_CHAR_REGEX.sub('', str(col).strip()) or "COL"
+                    if c_str in seen_c:
+                        seen_c[c_str] += 1
+                        unique_cols.append(f"{c_str}_{seen_c[c_str]}")
+                    else:
+                        seen_c[c_str] = 0
+                        unique_cols.append(c_str)
+                df_export.columns = unique_cols
+
+                # 3. Vectorized Clean: Cepat membersihkan timezone, string, & non-scalar types
+                for col in df_export.columns:
+                    if pd.api.types.is_datetime64_any_dtype(df_export[col]):
+                        try:
+                            df_export[col] = df_export[col].dt.tz_localize(None)
+                        except Exception:
+                            df_export[col] = df_export[col].astype(str)
+                    elif df_export[col].dtype == object:
+                        df_export[col] = df_export[col].apply(
+                            lambda v: ILLEGAL_CHAR_REGEX.sub('', str(v)) if isinstance(v, str)
+                            else (str(v) if isinstance(v, (list, dict, set)) else v)
+                        )
+
+                # Tulis langsung lewat engine C-pandas (ribuan baris selesai dalam 0.5 detik)
+                df_export.to_excel(writer, sheet_name=clean_title, index=False)
+                has_data = True
+
+            if not has_data:
+                pd.DataFrame({"INFO": ["Belum ada step yang dijalankan atau data kosong."]}).to_excel(writer, sheet_name="INFO", index=False)
+
+        buf.seek(0)
+        output_bytes = buf.getvalue()
+        if len(output_bytes) == 0:
+            raise ValueError("Buffer byte kosong.")
+        return output_bytes
+
+    except Exception as e:
+        import traceback
+        print("ERROR BUILD FULL REPORT:", e)
+        traceback.print_exc()
+        # Fallback darurat: Jika terjadi kendala pada data, jangan pernah kirim 0 byte!
+        err_buf = io.BytesIO()
+        with pd.ExcelWriter(err_buf, engine='openpyxl') as writer:
+            pd.DataFrame({"ERROR": [f"Gagal generate report: {str(e)}"]}).to_excel(writer, sheet_name="ERROR", index=False)
+        err_buf.seek(0)
+        return err_buf.getvalue()
         
-        if first_sheet:
-            ws = wb.active
-            ws.title = clean_title
-            first_sheet = False
-        else:
-            ws = wb.create_sheet(title=clean_title)
-
-        # 1. Pastikan nama kolom unik (tidak ada duplikat nama kolom dari Jezpro)
-        df_clean = df.copy()
-        unique_cols = []
-        seen = {}
-        for col in df_clean.columns:
-            c_str = str(col).strip()
-            if c_str in seen:
-                seen[c_str] += 1
-                unique_cols.append(f"{c_str}_{seen[c_str]}")
-            else:
-                seen[c_str] = 0
-                unique_cols.append(c_str)
-        df_clean.columns = unique_cols
-
-        # 2. Tulis baris demi baris sambil membersihkan karakter ilegal dan timezone
-        for row in dataframe_to_rows(df_clean, index=False, header=True):
-            clean_row = []
-            for val in row:
-                if isinstance(val, str):
-                    clean_row.append(ILLEGAL_CHAR_REGEX.sub('', val))
-                elif hasattr(val, 'tzinfo') and val.tzinfo is not None:
-                    try:
-                        clean_row.append(val.tz_localize(None))
-                    except Exception:
-                        clean_row.append(str(val))
-                elif pd.isna(val):
-                    clean_row.append("")
-                else:
-                    clean_row.append(val)
-            ws.append(clean_row)
-
-    # Jika semua step belum dijalankan sama sekali
-    if first_sheet:
-        ws = wb.active
-        ws.title = "INFO"
-        ws.append(["INFO"])
-        ws.append(["Belum ada step yang dijalankan. Silakan proses minimal Step 1."])
-
-    buf = io.BytesIO()
-    wb.save(buf)
-    buf.seek(0)
-    return buf.getvalue()
-
 def server(input: Inputs, output: Outputs, session: Session):
     state = AppState()
     _last_filter_state = {"c_brands": [], "c_subs": [], "c_bins": []}
@@ -1907,11 +1920,9 @@ def server(input: Inputs, output: Outputs, session: Session):
     # ==========================================================================
     # FULL REPORT CYCLE COUNT
     # ==========================================================================
-    # ==========================================================================
-    # FULL CYCLE COUNT REPORT (LANGSUNG BIKIN 13 SHEET TANPA CRASH)
-    # ==========================================================================
     @render.download(filename="FULL_CYCLE_COUNT_ANALYZER_REPORT.xlsx")
-    def btn_dl_cca_master_all():
+    async def btn_dl_cca_master_all():
+        import asyncio
         sheets_list = [
             ('1_DATA SCAN', getattr(state, "_raw_df_cca_scan", pd.DataFrame())),
             ('2_STOCK SYSTEM', getattr(state, "_raw_df_cca_stock", pd.DataFrame())),
@@ -1927,8 +1938,8 @@ def server(input: Inputs, output: Outputs, session: Session):
             ('12_MISS LOCATION', getattr(state, "_raw_df_cca_miss_loc", pd.DataFrame())),
             ('13_SUMMARY MISS LOC', getattr(state, "_raw_df_cca_sum_miss", pd.DataFrame())),
         ]
-        yield build_full_report_bytes(sheets_list)
-
+        content = await asyncio.to_thread(build_full_report_bytes, sheets_list)
+        yield content
 # ==========================================================================
     # COMPARE RTO CONTROLLER & HANDLERS
     # ==========================================================================
@@ -2718,11 +2729,10 @@ def server(input: Inputs, output: Outputs, session: Session):
     # ==========================================================================
     # FULL REPORT STOCK OPNAME
     # ==========================================================================
-    # ==========================================================================
-    # FULL STOCK OPNAME REPORT (LANGSUNG BIKIN 15 SHEET TANPA CRASH)
-    # ==========================================================================
+    # Unduhan Full Report Stock Opname (Non-blocking Async)
     @render.download(filename="FULL_SO_ANALYZER_REPORT.xlsx")
-    def btn_dl_so_master_all():
+    async def btn_dl_so_master_all():
+        import asyncio
         sheets_list = [
             ('1_DATA SCAN', getattr(state, "_raw_df_so_scan", pd.DataFrame())),
             ('2_STOCK SYSTEM', getattr(state, "_raw_df_so_stock", pd.DataFrame())),
@@ -2740,7 +2750,8 @@ def server(input: Inputs, output: Outputs, session: Session):
             ('14_DETAIL ADJUSTMENT', getattr(state, "_raw_df_so_adj_detail", pd.DataFrame())),
             ('15_SUMMARY ADJ', getattr(state, "_raw_df_so_adj_sum", pd.DataFrame())),
         ]
-        yield build_full_report_bytes(sheets_list)
+        content = await asyncio.to_thread(build_full_report_bytes, sheets_list)
+        yield content
 
 # ==========================================================================
     # JUSTIFICATION SO CONTROLLER (DYNAMIC MODE: REVERSAL & NON REVERSAL)
