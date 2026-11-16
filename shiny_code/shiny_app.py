@@ -26,66 +26,77 @@ app_ui = ui.page_fluid(
     style="padding: 0; margin: 0; background-color: #111318;"
 )
 
-import re
 import io
+import re
 import pandas as pd
 
 def build_full_report_bytes(sheets_list: list) -> bytes:
-    ILLEGAL_XML_CHARS = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f]')
-    seen = set()
-    valid = []
+    """
+    Kompilasi Full Report Multi-Sheet berkecepatan tinggi.
+    Diadaptasi dari arsitektur Streamlit:
+    - Menggunakan engine 'xlsxwriter' (Ringan & Cepat, Anti-Timeout)
+    - Auto-rename kolom kembar/duplikat (Penyebab utama crash pada HASIL CEK ADJ)
+    - Anti-crash karakter XML ilegal & pembersihan timezone
+    """
+    seen_sheets = set()
+    valid_sheets = []
 
     for raw_title, df in sheets_list:
         if df is None or not isinstance(df, pd.DataFrame) or df.empty:
             continue
-        
-        # 1. Bersihkan nama Sheet (Maks 31 karakter Excel)
+
+        # 1. Pastikan nama Sheet legal di Excel (Maks 31 karakter, tanpa karakter terlarang)
         title = re.sub(r'[\\/*?:\[\]]', '', str(raw_title))[:31].strip() or "Sheet"
         base, n = title[:28], 1
-        while title.upper() in seen:
+        while title.upper() in seen_sheets:
             title = f"{base}_{n}"
             n += 1
-        seen.add(title.upper())
+        seen_sheets.add(title.upper())
 
-        # 2. Sanitasi DataFrame agar openpyxl tidak crash
-        d_clean = df.loc[:, ~df.columns.duplicated()].copy()
-        
-        for col in d_clean.columns:
-            # Hilangkan timezone jika bertipe datetime (Penyebab utama openpyxl crash)
-            if pd.api.types.is_datetime64_any_dtype(d_clean[col]):
+        # 2. Tangani Kolom Duplikat / Kembar (Persis seperti script Streamlit Anda)
+        df_clean = df.copy()
+        cols = pd.Series([str(c).strip() for c in df_clean.columns])
+        if cols.duplicated().any():
+            for dup in cols[cols.duplicated()].unique():
+                cols[cols == dup] = [f"{dup}_{i}" if i != 0 else dup for i in range((cols == dup).sum())]
+            df_clean.columns = cols.values
+
+        # 3. Sanitasi Tipe Data agar tidak crash di xlsxwriter
+        for col in df_clean.columns:
+            # Hilangkan timezone jika bertipe datetime (xlsxwriter tidak mendukung timezone)
+            if pd.api.types.is_datetime64_any_dtype(df_clean[col]):
                 try:
-                    if hasattr(d_clean[col].dt, 'tz') and d_clean[col].dt.tz is not None:
-                        d_clean[col] = d_clean[col].dt.tz_localize(None)
+                    if hasattr(df_clean[col].dt, 'tz') and df_clean[col].dt.tz is not None:
+                        df_clean[col] = df_clean[col].dt.tz_localize(None)
                 except Exception:
-                    d_clean[col] = d_clean[col].astype(str)
-            # Hilangkan karakter ilegal XML pada string/object
-            elif d_clean[col].dtype == object or pd.api.types.is_string_dtype(d_clean[col]):
-                d_clean[col] = d_clean[col].astype(str).str.replace(ILLEGAL_XML_CHARS, '', regex=True)
+                    df_clean[col] = df_clean[col].astype(str)
+            # Hilangkan karakter ASCII kontrol ilegal
+            elif df_clean[col].dtype == object:
+                df_clean[col] = df_clean[col].astype(str).str.replace(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', regex=True)
 
-        valid.append((title, d_clean))
+        valid_sheets.append((title, df_clean))
 
-    if not valid:
-        valid = [("INFO", pd.DataFrame({"STATUS": ["Belum ada step yang dijalankan atau data kosong."]}))]
+    if not valid_sheets:
+        valid_sheets = [("INFO", pd.DataFrame({"KETERANGAN": ["Belum ada step yang dijalankan atau data kosong."]}))]
 
+    # 4. Tulis menggunakan engine 'xlsxwriter' seperti di Streamlit
     buf = io.BytesIO()
+    
+    # Coba gunakan xlsxwriter (prioritas utama), fallback ke openpyxl jika belum terpasang
     try:
+        writer_engine = "xlsxwriter"
+        with pd.ExcelWriter(buf, engine=writer_engine) as writer:
+            for sheet_name, df_data in valid_sheets:
+                df_data.to_excel(writer, sheet_name=sheet_name, index=False)
+    except Exception:
+        # Fallback darurat
+        buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine="openpyxl") as writer:
-            for title, d in valid:
-                d.to_excel(writer, sheet_name=title, index=False)
-        buf.seek(0)
-        out_bytes = buf.getvalue()
-        if len(out_bytes) == 0:
-            raise ValueError("Buffer kosong setelah diexport")
-        return out_bytes
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        # Fallback darurat bila openpyxl gagal
-        buf_err = io.BytesIO()
-        with pd.ExcelWriter(buf_err, engine="openpyxl") as writer:
-            pd.DataFrame({"ERROR": [f"Gagal generate report: {str(e)}"]}).to_excel(writer, sheet_name="ERROR", index=False)
-        buf_err.seek(0)
-        return buf_err.getvalue()
+            for sheet_name, df_data in valid_sheets:
+                df_data.to_excel(writer, sheet_name=sheet_name, index=False)
+
+    buf.seek(0)
+    return buf.getvalue()
         
 def server(input: Inputs, output: Outputs, session: Session):
     state = AppState()
@@ -1883,9 +1894,8 @@ def server(input: Inputs, output: Outputs, session: Session):
         yield buf.getvalue()
 
     # ==========================================================================
-    # FULL REPORT CYCLE COUNT (FIXED: ANTI 0 BYTES)
+    # FULL REPORT CYCLE COUNT (ENGINE XLSWRITER STREAMLIT)
     # ==========================================================================
-    # FULL REPORT CYCLE COUNT
     @render.download(filename="FULL_CYCLE_COUNT_ANALYZER_REPORT.xlsx")
     def btn_dl_cca_master_all():
         sheets_list = [
@@ -1903,9 +1913,8 @@ def server(input: Inputs, output: Outputs, session: Session):
             ('12_MISS LOCATION', getattr(state, "_raw_df_cca_miss_loc", pd.DataFrame())),
             ('13_SUMMARY MISS LOC', getattr(state, "_raw_df_cca_sum_miss", pd.DataFrame())),
         ]
-        file_bytes = build_full_report_bytes(sheets_list)
-        yield file_bytes
-
+        excel_bytes = build_full_report_bytes(sheets_list)
+        yield excel_bytes
         
 # ==========================================================================
     # COMPARE RTO CONTROLLER & HANDLERS
@@ -2694,9 +2703,8 @@ def server(input: Inputs, output: Outputs, session: Session):
         yield buf.getvalue()
 
     # ==========================================================================
-    # FULL REPORT STOCK OPNAME (FIXED: ANTI 0 BYTES)
+    # FULL REPORT STOCK OPNAME (ENGINE XLSWRITER STREAMLIT)
     # ==========================================================================
-    # FULL REPORT STOCK OPNAME
     @render.download(filename="FULL_SO_ANALYZER_REPORT.xlsx")
     def btn_dl_so_master_all():
         sheets_list = [
@@ -2716,8 +2724,8 @@ def server(input: Inputs, output: Outputs, session: Session):
             ('14_DETAIL ADJUSTMENT', getattr(state, "_raw_df_so_adj_detail", pd.DataFrame())),
             ('15_SUMMARY ADJ', getattr(state, "_raw_df_so_adj_sum", pd.DataFrame())),
         ]
-        file_bytes = build_full_report_bytes(sheets_list)
-        yield file_bytes
+        excel_bytes = build_full_report_bytes(sheets_list)
+        yield excel_bytes
 
 # ==========================================================================
     # JUSTIFICATION SO CONTROLLER (DYNAMIC MODE: REVERSAL & NON REVERSAL)
