@@ -26,77 +26,40 @@ app_ui = ui.page_fluid(
     style="padding: 0; margin: 0; background-color: #111318;"
 )
 
-import io
-import re
-import pandas as pd
+import re  # di bagian import atas
 
-def build_full_report_bytes(sheets_list: list) -> bytes:
-    """
-    Kompilasi Full Report Multi-Sheet berkecepatan tinggi.
-    Diadaptasi dari arsitektur Streamlit:
-    - Menggunakan engine 'xlsxwriter' (Ringan & Cepat, Anti-Timeout)
-    - Auto-rename kolom kembar/duplikat (Penyebab utama crash pada HASIL CEK ADJ)
-    - Anti-crash karakter XML ilegal & pembersihan timezone
-    """
+def build_full_report_file(sheets_list: list) -> str:
+    tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
+    tmp_path = tmp.name
+    tmp.close()
+
     seen_sheets = set()
-    valid_sheets = []
-
+    valid = []
     for raw_title, df in sheets_list:
         if df is None or not isinstance(df, pd.DataFrame) or df.empty:
             continue
-
-        # 1. Pastikan nama Sheet legal di Excel (Maks 31 karakter, tanpa karakter terlarang)
-        title = re.sub(r'[\\/*?:\[\]]', '', str(raw_title))[:31].strip() or "Sheet"
-        base, n = title[:28], 1
-        while title.upper() in seen_sheets:
-            title = f"{base}_{n}"
+        clean_title = re.sub(r'[\\/*?:\[\]]', '', str(raw_title))[:31].strip() or "Sheet"
+        base = clean_title[:28]
+        n = 1
+        while clean_title.upper() in seen_sheets:
+            clean_title = f"{base}_{n}"
             n += 1
-        seen_sheets.add(title.upper())
+        seen_sheets.add(clean_title.upper())
+        valid.append((clean_title, df))
 
-        # 2. Tangani Kolom Duplikat / Kembar (Persis seperti script Streamlit Anda)
-        df_clean = df.copy()
-        cols = pd.Series([str(c).strip() for c in df_clean.columns])
-        if cols.duplicated().any():
-            for dup in cols[cols.duplicated()].unique():
-                cols[cols == dup] = [f"{dup}_{i}" if i != 0 else dup for i in range((cols == dup).sum())]
-            df_clean.columns = cols.values
+    if not valid:
+        valid = [("INFO", pd.DataFrame({"INFO": ["Belum ada step yang dijalankan atau data kosong."]}))]
 
-        # 3. Sanitasi Tipe Data agar tidak crash di xlsxwriter
-        for col in df_clean.columns:
-            # Hilangkan timezone jika bertipe datetime (xlsxwriter tidak mendukung timezone)
-            if pd.api.types.is_datetime64_any_dtype(df_clean[col]):
-                try:
-                    if hasattr(df_clean[col].dt, 'tz') and df_clean[col].dt.tz is not None:
-                        df_clean[col] = df_clean[col].dt.tz_localize(None)
-                except Exception:
-                    df_clean[col] = df_clean[col].astype(str)
-            # Hilangkan karakter ASCII kontrol ilegal
-            elif df_clean[col].dtype == object:
-                df_clean[col] = df_clean[col].astype(str).str.replace(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', regex=True)
-
-        valid_sheets.append((title, df_clean))
-
-    if not valid_sheets:
-        valid_sheets = [("INFO", pd.DataFrame({"KETERANGAN": ["Belum ada step yang dijalankan atau data kosong."]}))]
-
-    # 4. Tulis menggunakan engine 'xlsxwriter' seperti di Streamlit
-    buf = io.BytesIO()
-    
-    # Coba gunakan xlsxwriter (prioritas utama), fallback ke openpyxl jika belum terpasang
     try:
-        writer_engine = "xlsxwriter"
-        with pd.ExcelWriter(buf, engine=writer_engine) as writer:
-            for sheet_name, df_data in valid_sheets:
-                df_data.to_excel(writer, sheet_name=sheet_name, index=False)
-    except Exception:
-        # Fallback darurat
-        buf = io.BytesIO()
-        with pd.ExcelWriter(buf, engine="openpyxl") as writer:
-            for sheet_name, df_data in valid_sheets:
-                df_data.to_excel(writer, sheet_name=sheet_name, index=False)
-
-    buf.seek(0)
-    return buf.getvalue()
+        with pd.ExcelWriter(tmp_path, engine="openpyxl") as writer:
+            for title, df in valid:
+                df.to_excel(writer, sheet_name=title, index=False)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        with pd.ExcelWriter(tmp_path, engine="openpyxl") as writer:
+            pd.DataFrame({"ERROR": [f"Gagal generate report: {e}"]}).to_excel(writer, sheet_name="ERROR", index=False)
+    return tmp_path
         
 def server(input: Inputs, output: Outputs, session: Session):
     state = AppState()
@@ -1894,38 +1857,34 @@ def server(input: Inputs, output: Outputs, session: Session):
         yield buf.getvalue()
 
     # ==========================================================================
-    # EVENT PREPARE EXCEL (TAHAP 1: DIJALANKAN DULU SEPERTI DI STREAMLIT)
-    # ==========================================================================
-    @reactive.Effect
-    @reactive.event(input.btn_prepare_so_full_report)
-    def _on_prepare_so():
-        succ, msg = state.compile_so_full_report()
-        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
-        if succ:
-            ui.notification_show(msg, type="message", duration=4)
-        else:
-            ui.notification_show(msg, type="warning", duration=4)
-
-    @reactive.Effect
-    @reactive.event(input.btn_prepare_cca_full_report)
-    def _on_prepare_cca():
-        succ, msg = state.compile_cca_full_report()
-        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
-        if succ:
-            ui.notification_show(msg, type="message", duration=4)
-        else:
-            ui.notification_show(msg, type="warning", duration=4)
-    # ==========================================================================
-    # FULL REPORT CYCLE COUNT (ENGINE XLSWRITER STREAMLIT)
+    # FULL REPORT CYCLE COUNT (FIXED: ANTI 0 BYTES)
     # ==========================================================================
     @render.download(filename="FULL_CYCLE_COUNT_ANALYZER_REPORT.xlsx")
     def btn_dl_cca_master_all():
-        import os
-        if hasattr(state, "cca_report_path") and os.path.exists(state.cca_report_path):
-            with open(state.cca_report_path, "rb") as f:
+        sheets_list = [
+            ('1_DATA SCAN', getattr(state, "_raw_df_cca_scan", pd.DataFrame())),
+            ('2_STOCK SYSTEM', getattr(state, "_raw_df_cca_stock", pd.DataFrame())),
+            ('3_REAL PLUS', getattr(state, "_raw_df_cca_real_plus", pd.DataFrame())),
+            ('4_SYSTEM PLUS', getattr(state, "_raw_df_cca_sys_plus", pd.DataFrame())),
+            ('5_ALLOCATION DETAIL', getattr(state, "_raw_df_cca_alloc", pd.DataFrame())),
+            ('6_SET UP REAL PLUS', getattr(state, "_raw_df_cca_setup_real", pd.DataFrame())),
+            ('7_REAL PLUS RECON', getattr(state, "_raw_df_cca_rec_real", pd.DataFrame())),
+            ('8_SYSTEM OUTSTANDING', getattr(state, "_raw_df_cca_rec_sys", pd.DataFrame())),
+            ('9_REAL PLUS NEED ADJ', getattr(state, "_raw_df_cca_adj4", pd.DataFrame())),
+            ('10_KARANTINA', getattr(state, "_raw_df_cca_karantina", pd.DataFrame())),
+            ('11_CHECK AUDIT', getattr(state, "_raw_df_cca_check5", pd.DataFrame())),
+            ('12_MISS LOCATION', getattr(state, "_raw_df_cca_miss_loc", pd.DataFrame())),
+            ('13_SUMMARY MISS LOC', getattr(state, "_raw_df_cca_sum_miss", pd.DataFrame())),
+        ]
+        tmp_path = build_full_report_file(sheets_list)
+        try:
+            with open(tmp_path, "rb") as f:
                 yield f.read()
-        else:
-            yield b""
+        finally:
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
         
 # ==========================================================================
     # COMPARE RTO CONTROLLER & HANDLERS
@@ -2714,17 +2673,36 @@ def server(input: Inputs, output: Outputs, session: Session):
         yield buf.getvalue()
 
     # ==========================================================================
-    # HANDLER DOWNLOAD EXCEL (TAHAP 2: UNDUH LANGSUNG FILE YANG SUDAH JADI)
+    # FULL REPORT STOCK OPNAME (FIXED: ANTI 0 BYTES)
     # ==========================================================================
     @render.download(filename="FULL_SO_ANALYZER_REPORT.xlsx")
     def btn_dl_so_master_all():
-        import os
-        # Mengembalikan file yang sudah jadi 100% di server (Instan 0 detik)
-        if hasattr(state, "so_report_path") and os.path.exists(state.so_report_path):
-            with open(state.so_report_path, "rb") as f:
+        sheets_list = [
+            ('1_DATA SCAN', getattr(state, "_raw_df_so_scan", pd.DataFrame())),
+            ('2_STOCK SYSTEM', getattr(state, "_raw_df_so_stock", pd.DataFrame())),
+            ('3_REAL PLUS', getattr(state, "_raw_df_so_real_plus", pd.DataFrame())),
+            ('4_SYSTEM PLUS', getattr(state, "_raw_df_so_sys_plus", pd.DataFrame())),
+            ('5_SET UP REAL PLUS', getattr(state, "_raw_df_so_setup_real", pd.DataFrame())),
+            ('6_REAL PLUS RECON', getattr(state, "_raw_df_so_rec_real", pd.DataFrame())),
+            ('7_SYSTEM OUTSTANDING', getattr(state, "_raw_df_so_rec_sys", pd.DataFrame())),
+            ('8_MULTIPLE ADJ PLUS', getattr(state, "_raw_df_so_mult", pd.DataFrame())),
+            ('9_SINGLE ADJ PLUS', getattr(state, "_raw_df_so_sing", pd.DataFrame())),
+            ('10_HASIL CEK ADJ', getattr(state, "_raw_df_so_res4", pd.DataFrame())),
+            ('11_KARANTINA', getattr(state, "_raw_df_so_karantina", pd.DataFrame())),
+            ('12_MISS LOCATION', getattr(state, "_raw_df_so_miss_loc", pd.DataFrame())),
+            ('13_SUMMARY MISS LOC', getattr(state, "_raw_df_so_sum_miss", pd.DataFrame())),
+            ('14_DETAIL ADJUSTMENT', getattr(state, "_raw_df_so_adj_detail", pd.DataFrame())),
+            ('15_SUMMARY ADJ', getattr(state, "_raw_df_so_adj_sum", pd.DataFrame())),
+        ]
+        tmp_path = build_full_report_file(sheets_list)
+        try:
+            with open(tmp_path, "rb") as f:
                 yield f.read()
-        else:
-            yield b""
+        finally:
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
 
 # ==========================================================================
     # JUSTIFICATION SO CONTROLLER (DYNAMIC MODE: REVERSAL & NON REVERSAL)
@@ -6450,7 +6428,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         )
 
 # ==========================================================================
-    # UI BANNER CYCLE COUNT (2 TOMBOL: PREPARE LALU DOWNLOAD)
+    # BANNER DOWNLOAD MASTER REPORT CYCLE COUNT (STATUS CICILAN REALTIME)
     # ==========================================================================
     @render.ui
     def cca_master_report_banner_ui():
@@ -6458,39 +6436,38 @@ def server(input: Inputs, output: Outputs, session: Session):
         status_txt = state.cca_report_status()
         sheet_cnt = state.cca_saved_sheets_count()
 
-        btn_prepare = ui.tags.button(
-            ui.tags.span(ui.tags.i(class_="fa-solid fa-gears", style="margin-right: 6px;"), "1. RAKIT FULL REPORT"),
-            onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_prepare_cca_full_report', Math.random(), {priority: 'event'});",
-            style="background: #2563EB; color: white; font-weight: 800; border-radius: 8px; border: none; padding: 10px 18px; cursor: pointer; font-size: 13px;"
-        )
+        # Warna banner: Hijau segar jika sudah ada step yang dicicil, abu-abu lembut jika belum
+        bg_color = "#D1FAE5" if is_ready else "#F8FAFC"
+        border_color = "#6EE7B7" if is_ready else "#CBD5E0"
+        title_color = "#065F46" if is_ready else "#2D3748"
+        desc_color = "#047857" if is_ready else "#718096"
 
-        if is_ready:
-            btn_download = ui.download_button(
-                "btn_dl_cca_master_all",
-                ui.tags.span(ui.tags.i(class_="fa-solid fa-cloud-arrow-down", style="margin-right: 6px;"), f"2. DOWNLOAD ({sheet_cnt} SHEET)"),
-                style="background: #10B981; color: white; font-weight: 800; border-radius: 8px; border: none; padding: 10px 18px; cursor: pointer; font-size: 13px;"
-            )
-        else:
-            btn_download = ui.tags.button(
-                "2. DOWNLOAD (KLIK RAKIT DULU)",
-                disabled=True,
-                style="background: #CBD5E0; color: #718096; font-weight: 700; border-radius: 8px; border: none; padding: 10px 18px; cursor: not-allowed; font-size: 13px;"
-            )
+        btn_ui = ui.download_button(
+            "btn_dl_cca_master_all",
+            ui.tags.span(
+                ui.tags.i(class_="fa-solid fa-cloud-arrow-down", style="margin-right: 8px; font-size: 15px;"),
+                f"DOWNLOAD FULL REPORT ({sheet_cnt} SHEET)" if is_ready else "DOWNLOAD BELUM TERSEDIA"
+            ),
+            style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; font-weight: 800; border-radius: 8px; border: none; padding: 12px 24px; cursor: pointer; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); font-size: 13px;" if is_ready else "background: #A0AEC0; color: white; font-weight: 800; border-radius: 8px; border: none; padding: 12px 24px; cursor: not-allowed; font-size: 13px;"
+        )
 
         return ui.div(
             ui.div(
                 ui.div(
-                    ui.h4("🏆 Master Report Cycle Count", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
-                    ui.p(status_txt, style="color: #4A5568; font-size: 12px; margin: 0;"),
+                    ui.h4("🏆 Download Full Master Report Cycle Count", style=f"font-size: 16px; font-weight: 800; color: {title_color}; margin: 0 0 4px 0;"),
+                    ui.p(
+                        status_txt, 
+                        style=f"color: {desc_color}; font-weight: 700; font-size: 13px; margin: 0;"
+                    ),
                 ),
-                ui.div(btn_prepare, btn_download, style="display: flex; gap: 8px; align-items: center;"),
-                style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 10px;"
+                btn_ui,
+                style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 12px;"
             ),
-            style="background: #F8FAFC; border: 1.5px solid #CBD5E0; border-radius: 12px; padding: 1rem 1.25rem; margin-top: 1rem;"
+            style=f"background: {bg_color}; border: 1.5px solid {border_color}; padding: 1.25rem 1.5rem; border-radius: 12px; margin-top: 1rem; margin-bottom: 1.25rem; box-shadow: 0 2px 8px rgba(0,0,0,0.04);"
         )
 
     # ==========================================================================
-    # UI BANNER STOCK OPNAME (2 TOMBOL: PREPARE LALU DOWNLOAD)
+    # BANNER DOWNLOAD MASTER REPORT STOCK OPNAME (STATUS CICILAN REALTIME)
     # ==========================================================================
     @render.ui
     def so_master_report_banner_ui():
@@ -6498,66 +6475,35 @@ def server(input: Inputs, output: Outputs, session: Session):
         status_txt = state.so_report_status()
         sheet_cnt = state.so_saved_sheets_count()
 
-        btn_prepare = ui.tags.button(
-            ui.tags.span(ui.tags.i(class_="fa-solid fa-gears", style="margin-right: 6px;"), "1. RAKIT FULL REPORT"),
-            onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_prepare_so_full_report', Math.random(), {priority: 'event'});",
-            style="background: #2563EB; color: white; font-weight: 800; border-radius: 8px; border: none; padding: 10px 18px; cursor: pointer; font-size: 13px;"
-        )
+        bg_color = "#D1FAE5" if is_ready else "#F8FAFC"
+        border_color = "#6EE7B7" if is_ready else "#CBD5E0"
+        title_color = "#065F46" if is_ready else "#2D3748"
+        desc_color = "#047857" if is_ready else "#718096"
 
-        if is_ready:
-            btn_download = ui.download_button(
-                "btn_dl_so_master_all",
-                ui.tags.span(ui.tags.i(class_="fa-solid fa-cloud-arrow-down", style="margin-right: 6px;"), f"2. DOWNLOAD ({sheet_cnt} SHEET)"),
-                style="background: #10B981; color: white; font-weight: 800; border-radius: 8px; border: none; padding: 10px 18px; cursor: pointer; font-size: 13px;"
-            )
-        else:
-            btn_download = ui.tags.button(
-                "2. DOWNLOAD (KLIK RAKIT DULU)",
-                disabled=True,
-                style="background: #CBD5E0; color: #718096; font-weight: 700; border-radius: 8px; border: none; padding: 10px 18px; cursor: not-allowed; font-size: 13px;"
-            )
+        btn_ui = ui.download_button(
+            "btn_dl_so_master_all",
+            ui.tags.span(
+                ui.tags.i(class_="fa-solid fa-cloud-arrow-down", style="margin-right: 8px; font-size: 15px;"),
+                f"DOWNLOAD FULL REPORT ({sheet_cnt} SHEET)" if is_ready else "DOWNLOAD BELUM TERSEDIA"
+            ),
+            style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; font-weight: 800; border-radius: 8px; border: none; padding: 12px 24px; cursor: pointer; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); font-size: 13px;" if is_ready else "background: #A0AEC0; color: white; font-weight: 800; border-radius: 8px; border: none; padding: 12px 24px; cursor: not-allowed; font-size: 13px;"
+        )
 
         return ui.div(
             ui.div(
                 ui.div(
-                    ui.h4("🏆 Master Report Stock Opname", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
-                    ui.p(status_txt, style="color: #4A5568; font-size: 12px; margin: 0;"),
+                    ui.h4("🏆 Download Full Master Report Stock Opname", style=f"font-size: 16px; font-weight: 800; color: {title_color}; margin: 0 0 4px 0;"),
+                    ui.p(
+                        status_txt, 
+                        style=f"color: {desc_color}; font-weight: 700; font-size: 13px; margin: 0;"
+                    ),
                 ),
-                ui.div(btn_prepare, btn_download, style="display: flex; gap: 8px; align-items: center;"),
-                style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 10px;"
+                btn_ui,
+                style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 12px;"
             ),
-            style="background: #F8FAFC; border: 1.5px solid #CBD5E0; border-radius: 12px; padding: 1rem 1.25rem; margin-top: 1rem;"
+            style=f"background: {bg_color}; border: 1.5px solid {border_color}; padding: 1.25rem 1.5rem; border-radius: 12px; margin-top: 1rem; margin-bottom: 1.25rem; box-shadow: 0 2px 8px rgba(0,0,0,0.04);"
         )
 
-# ==========================================================================
-    # PENCATAT STATUS LIVE CYCLE COUNT & STOCK OPNAME (MENCEGAH ERROR STEP 4)
-    # ==========================================================================
-    def update_cca_master_file(self, step_name: str, sheet_count: int = 0):
-        """Memperbarui status sheet Cycle Count secara instan saat step dijalankan."""
-        try:
-            if sheet_count <= 0:
-                sheets = [
-                    getattr(self, "_raw_df_cca_scan", None),
-                    getattr(self, "_raw_df_cca_stock", None),
-                    getattr(self, "_raw_df_cca_real_plus", None),
-                    getattr(self, "_raw_df_cca_sys_plus", None),
-                    getattr(self, "_raw_df_cca_alloc", None),
-                    getattr(self, "_raw_df_cca_setup_real", None),
-                    getattr(self, "_raw_df_cca_rec_real", None),
-                    getattr(self, "_raw_df_cca_rec_sys", None),
-                    getattr(self, "_raw_df_cca_adj4", None),
-                    getattr(self, "_raw_df_cca_karantina", None),
-                    getattr(self, "_raw_df_cca_check5", None),
-                    getattr(self, "_raw_df_cca_miss_loc", None),
-                    getattr(self, "_raw_df_cca_sum_miss", None)
-                ]
-                sheet_count = sum(1 for df in sheets if df is not None and isinstance(df, pd.DataFrame) and not df.empty)
-
-            self.cca_saved_sheets_count.set(sheet_count)
-            self.cca_report_ready.set(True)
-            self.cca_report_status.set(f"✅ Data {step_name} siap ({sheet_count} Sheet siap dirangkum).")
-        except Exception:
-            pass
 from pathlib import Path
 
 app = App(app_ui, server)
