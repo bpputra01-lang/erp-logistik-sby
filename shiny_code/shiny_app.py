@@ -6529,6 +6529,35 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="background: #F8FAFC; border: 1.5px solid #CBD5E0; border-radius: 12px; padding: 1rem 1.25rem; margin-top: 1rem;"
         )
 
+# ==========================================================================
+    # PENCATAT STATUS LIVE CYCLE COUNT & STOCK OPNAME (MENCEGAH ERROR STEP 4)
+    # ==========================================================================
+    def update_cca_master_file(self, step_name: str, sheet_count: int = 0):
+        """Memperbarui status sheet Cycle Count secara instan saat step dijalankan."""
+        try:
+            if sheet_count <= 0:
+                sheets = [
+                    getattr(self, "_raw_df_cca_scan", None),
+                    getattr(self, "_raw_df_cca_stock", None),
+                    getattr(self, "_raw_df_cca_real_plus", None),
+                    getattr(self, "_raw_df_cca_sys_plus", None),
+                    getattr(self, "_raw_df_cca_alloc", None),
+                    getattr(self, "_raw_df_cca_setup_real", None),
+                    getattr(self, "_raw_df_cca_rec_real", None),
+                    getattr(self, "_raw_df_cca_rec_sys", None),
+                    getattr(self, "_raw_df_cca_adj4", None),
+                    getattr(self, "_raw_df_cca_karantina", None),
+                    getattr(self, "_raw_df_cca_check5", None),
+                    getattr(self, "_raw_df_cca_miss_loc", None),
+                    getattr(self, "_raw_df_cca_sum_miss", None)
+                ]
+                sheet_count = sum(1 for df in sheets if df is not None and isinstance(df, pd.DataFrame) and not df.empty)
+
+            self.cca_saved_sheets_count.set(sheet_count)
+            self.cca_report_ready.set(True)
+            self.cca_report_status.set(f"✅ Data {step_name} siap ({sheet_count} Sheet siap dirangkum).")
+        except Exception:
+            pass
 from pathlib import Path
 
 app = App(app_ui, server)
