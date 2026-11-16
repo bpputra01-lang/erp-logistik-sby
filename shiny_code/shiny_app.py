@@ -1,5 +1,9 @@
 import io
 import time
+import os
+import re
+import tempfile
+import asyncio
 from datetime import datetime
 import pandas as pd
 from config import get_supabase, safe_int
@@ -26,9 +30,7 @@ app_ui = ui.page_fluid(
     style="padding: 0; margin: 0; background-color: #111318;"
 )
 
-import re  # di bagian import atas
-
-def build_full_report_file(sheets_list: list) -> str:
+def build_full_report_file_sync(sheets_list: list) -> str:
     tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
     tmp_path = tmp.name
     tmp.close()
@@ -51,14 +53,20 @@ def build_full_report_file(sheets_list: list) -> str:
         valid = [("INFO", pd.DataFrame({"INFO": ["Belum ada step yang dijalankan atau data kosong."]}))]
 
     try:
+        # Gunakan xlsxwriter dengan constant_memory agar RAM hemat & super cepat
+        with pd.ExcelWriter(
+            tmp_path, 
+            engine="xlsxwriter", 
+            engine_kwargs={'options': {'constant_memory': True}}
+        ) as writer:
+            for title, df in valid:
+                df.to_excel(writer, sheet_name=title, index=False)
+    except Exception:
+        # Fallback ke openpyxl jika xlsxwriter belum terinstall
         with pd.ExcelWriter(tmp_path, engine="openpyxl") as writer:
             for title, df in valid:
                 df.to_excel(writer, sheet_name=title, index=False)
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        with pd.ExcelWriter(tmp_path, engine="openpyxl") as writer:
-            pd.DataFrame({"ERROR": [f"Gagal generate report: {e}"]}).to_excel(writer, sheet_name="ERROR", index=False)
+
     return tmp_path
         
 def server(input: Inputs, output: Outputs, session: Session):
@@ -1860,7 +1868,7 @@ def server(input: Inputs, output: Outputs, session: Session):
     # FULL REPORT CYCLE COUNT (FIXED: ANTI 0 BYTES)
     # ==========================================================================
     @render.download(filename="FULL_CYCLE_COUNT_ANALYZER_REPORT.xlsx")
-    def btn_dl_cca_master_all():
+    async def btn_dl_cca_master_all():
         sheets_list = [
             ('1_DATA SCAN', getattr(state, "_raw_df_cca_scan", pd.DataFrame())),
             ('2_STOCK SYSTEM', getattr(state, "_raw_df_cca_stock", pd.DataFrame())),
@@ -1876,10 +1884,14 @@ def server(input: Inputs, output: Outputs, session: Session):
             ('12_MISS LOCATION', getattr(state, "_raw_df_cca_miss_loc", pd.DataFrame())),
             ('13_SUMMARY MISS LOC', getattr(state, "_raw_df_cca_sum_miss", pd.DataFrame())),
         ]
-        tmp_path = build_full_report_file(sheets_list)
+        
+        # Jalankan di background worker agar WebSocket Shiny TIDAK terputus
+        tmp_path = await asyncio.to_thread(build_full_report_file_sync, sheets_list)
+        
         try:
             with open(tmp_path, "rb") as f:
-                yield f.read()
+                while chunk := f.read(65536):  # Stream 64KB per chunk
+                    yield chunk
         finally:
             try:
                 os.remove(tmp_path)
@@ -2676,7 +2688,7 @@ def server(input: Inputs, output: Outputs, session: Session):
     # FULL REPORT STOCK OPNAME (FIXED: ANTI 0 BYTES)
     # ==========================================================================
     @render.download(filename="FULL_SO_ANALYZER_REPORT.xlsx")
-    def btn_dl_so_master_all():
+    async def btn_dl_so_master_all():
         sheets_list = [
             ('1_DATA SCAN', getattr(state, "_raw_df_so_scan", pd.DataFrame())),
             ('2_STOCK SYSTEM', getattr(state, "_raw_df_so_stock", pd.DataFrame())),
@@ -2694,10 +2706,13 @@ def server(input: Inputs, output: Outputs, session: Session):
             ('14_DETAIL ADJUSTMENT', getattr(state, "_raw_df_so_adj_detail", pd.DataFrame())),
             ('15_SUMMARY ADJ', getattr(state, "_raw_df_so_adj_sum", pd.DataFrame())),
         ]
-        tmp_path = build_full_report_file(sheets_list)
+        
+        tmp_path = await asyncio.to_thread(build_full_report_file_sync, sheets_list)
+        
         try:
             with open(tmp_path, "rb") as f:
-                yield f.read()
+                while chunk := f.read(65536):
+                    yield chunk
         finally:
             try:
                 os.remove(tmp_path)
@@ -5065,16 +5080,17 @@ def server(input: Inputs, output: Outputs, session: Session):
     # MEMO PENGAJUAN: DIRECT SCRAPING & 2 MODEL PDF (TANPA APPROVAL)
     # ==========================================================================
 
-    # 1. TIMER OTOMATIS SCRAPING SETIAP 5 MENIT (300 DETIK)
-    # 1. TIMER OTOMATIS SCRAPING SETIAP 15 MENIT (900 DETIK) DI BACKGROUND THREAD
     @reactive.Effect
     def _auto_scrape_markom_timer():
-        reactive.invalidate_later(900)  # 900 detik = 15 menit
+        reactive.invalidate_later(900)  # 15 menit
         with reactive.isolate():
             if state.logged_in():
-                import threading
-                threading.Thread(target=state.sync_markom_event_requests, kwargs={"silent": True}, daemon=True).start()
-
+                # Jalankan sync secara aman di loop Shiny tanpa membuat thread liar
+                try:
+                    state.load_memo_data()
+                except Exception as e:
+                    print("Auto refresh memo error:", e)
+                    
     # 2. TRIGGER MANUAL SYNC DARI TOMBOL TAB 1
     @reactive.Effect
     @reactive.event(input.btn_trigger_sync_markom_event)

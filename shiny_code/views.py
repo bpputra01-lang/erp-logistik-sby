@@ -539,19 +539,33 @@ def ongkir_dark_card(title: str, val_str: str, border_color: str, text_color: st
     )
 def render_clean_table(headers: list, rows: list, table_id: str = None):
     if not rows or len(rows) == 0:
-        return ui.div(ui.div("Tidak ada data untuk ditampilkan.", style="color: #718096; padding: 1.5rem; font-style: italic; text-align: center;"), style="background: white; border-radius: 8px; border: 1px solid #E2E8F0; width: 100%;")
+        return ui.div(
+            ui.div("Tidak ada data untuk ditampilkan.", style="color: #718096; padding: 1.5rem; font-style: italic; text-align: center;"), 
+            style="background: white; border-radius: 8px; border: 1px solid #E2E8F0; width: 100%;"
+        )
     
     if not table_id:
         table_id = f"tbl_{random.randint(100000, 999999)}"
 
-    # Hanya render header di HTML
     th_cells = [ui.tags.th(str(h)) for h in headers]
 
-    # Ubah data baris ke JSON (0.01 detik instan)
-    json_data = json.dumps(rows)
+    # 🌟 PROTEKSI: Batasi data preview di browser maksimal 250 baris agar browser tidak macet
+    MAX_PREVIEW = 250
+    total_asli = len(rows)
+    display_rows = rows[:MAX_PREVIEW]
+    is_truncated = total_asli > MAX_PREVIEW
+
+    json_data = json.dumps(display_rows)
+
+    warning_banner = ui.div()
+    if is_truncated:
+        warning_banner = ui.div(
+            f"ℹ️ Menampilkan preview {MAX_PREVIEW:,} dari total {total_asli:,} baris. Silakan klik tombol Download Excel untuk mengunduh seluruh data lengkap.",
+            style="background: #EBF8FF; color: #2B6CB0; font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 6px; margin-bottom: 8px; border: 1px solid #BEE3F8;"
+        )
 
     return ui.div(
-        # --- KONTROL ATAS: FILTER BARIS DI KIRI ATAS ---
+        warning_banner,
         ui.div(
             ui.div(
                 ui.span("Tampilkan", style="font-size: 13px; font-weight: 700; color: #4A5568;"),
@@ -560,7 +574,7 @@ def render_clean_table(headers: list, rows: list, table_id: str = None):
                     ui.tags.option("25", value="25"),
                     ui.tags.option("50", value="50"),
                     ui.tags.option("100", value="100"),
-                    ui.tags.option("Semua", value="-1"),
+                    ui.tags.option("Semua Preview", value="-1"),
                     onchange=f"window.changeFastPageSize('{table_id}', this.value)",
                     style="padding: 4px 10px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; outline: none; background: white; cursor: pointer;"
                 ),
@@ -569,8 +583,6 @@ def render_clean_table(headers: list, rows: list, table_id: str = None):
             ),
             style="display: flex; justify-content: flex-start; align-items: center; width: 100%; margin-bottom: 0.6rem;"
         ),
-
-        # --- TABEL DATA (Hanya 10 baris yang dibuat oleh JS) ---
         ui.div(
             ui.tags.table(
                 ui.tags.thead(ui.tags.tr(*th_cells)),
@@ -580,13 +592,8 @@ def render_clean_table(headers: list, rows: list, table_id: str = None):
             ),
             style="overflow-x: auto; width: 100%; background: white; border-radius: 8px; border: 1px solid #E2E8F0;"
         ),
-
-        # --- KONTROL BAWAH: INFO DI KIRI BAWAH, NEXT/PREV DI KANAN BAWAH ---
         ui.div(
-            ui.div(
-                id=f"{table_id}_info",
-                style="font-size: 12px; font-weight: 600; color: #718096;"
-            ),
+            ui.div(id=f"{table_id}_info", style="font-size: 12px; font-weight: 600; color: #718096;"),
             ui.div(
                 ui.tags.button("❮ Prev", id=f"{table_id}_prev_btn", onclick=f"window.navFastTablePage('{table_id}', -1)", class_="btn-page-nav"),
                 ui.span("Hal 1 / 1", id=f"{table_id}_page_num", style="font-weight: 800; font-size: 12px; color: #1A202C; padding: 0 6px;"),
@@ -595,8 +602,6 @@ def render_clean_table(headers: list, rows: list, table_id: str = None):
             ),
             style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 0.75rem; padding: 0 4px;"
         ),
-
-        # Script render instan 10 baris pertama
         ui.tags.script(f"""
             (function() {{
                 window.fastTables = window.fastTables || {{}};
