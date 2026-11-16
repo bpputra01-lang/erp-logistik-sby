@@ -192,13 +192,19 @@ class AppState:
         self._raw_df_cca_rec_real = pd.DataFrame()
         self._raw_df_cca_rec_sys = pd.DataFrame()
 
-        # Step 4: Recon Real + Analysis
+        # Step 4: Recon Real + Analysis & Cek Stock Adj
         self.cca_step4_done = reactive.Value(False)
         self.cca_qty_need_adj = reactive.Value(0)
         self.cca_sku_need_adj = reactive.Value(0)
         self.df_cca_adj4_headers = reactive.Value([])
         self.df_cca_adj4_rows = reactive.Value([])
+        self.df_cca_res4_headers = reactive.Value([])   # <-- BARU: Hasil Cek Stock Adj
+        self.df_cca_res4_rows = reactive.Value([])      # <-- BARU
+        self.df_cca_miss4_headers = reactive.Value([])  # <-- BARU: Miss Lookup SKU on BIN
+        self.df_cca_miss4_rows = reactive.Value([])     # <-- BARU
         self._raw_df_cca_adj4 = pd.DataFrame()
+        self._raw_df_cca_res4 = pd.DataFrame()          # <-- BARU
+        self._raw_df_cca_miss4 = pd.DataFrame()         # <-- BARU
 
         # Step 5: Karantina Generator
         self.cca_step5_done = reactive.Value(False)
@@ -2062,51 +2068,133 @@ class AppState:
         except Exception as e:
             return False, f"Gagal Allocation Step 2: {e}"
             
-    # --- CCA STEP 4: RECON REAL + ANALYSIS (ANTI ERROR BILA KOSONG) ---
-    def run_cca_step4(self, f_recon_real=None):
+    # ==========================================================================
+    # CCA STEP 4: RECON REAL + DENGAN CEK STOCK ADJ (+) (TANPA FILE INBOUND)
+    # ==========================================================================
+    def run_cca_step4(self, f_recon_real=None, f_stock_adj=None):
         try:
-            # Jika memang tidak ada item yang direcon dari Step 3
+            # Jika memang tidak ada item yang direkon dari Step 3
             if self._raw_df_cca_rec_real.empty or len(self._raw_df_cca_rec_real) == 0:
-                df_res = pd.DataFrame(columns=['BIN', 'SKU', 'ITEM NAME', 'QTY_SCAN', 'QTY_SYSTEM', 'DIFF', 'NEED_ADJ'])
+                df_empty = pd.DataFrame(columns=['BIN', 'SKU', 'ITEM NAME', 'QTY_SYSTEM', 'QTY_RECON', 'DIFF', 'NEED_ADJ'])
                 self.cca_qty_need_adj.set(0)
                 self.cca_sku_need_adj.set(0)
-                self._raw_df_cca_adj4 = df_res.copy()
-                self.df_cca_adj4_headers.set(df_res.columns.tolist())
+                self._raw_df_cca_adj4 = df_empty.copy()
+                self._raw_df_cca_res4 = pd.DataFrame()
+                self._raw_df_cca_miss4 = pd.DataFrame()
+                self.df_cca_adj4_headers.set(df_empty.columns.tolist())
                 self.df_cca_adj4_rows.set([])
+                self.df_cca_res4_headers.set([])
+                self.df_cca_res4_rows.set([])
+                self.df_cca_miss4_headers.set([])
+                self.df_cca_miss4_rows.set([])
                 self.cca_step4_done.set(True)
                 return True, "Tidak ada data Real + yang perlu direkonsiliasi (Semua tercover)."
 
             df_r = load_data_from_info(f_recon_real) if f_recon_real else pd.DataFrame()
+            df_s = load_data_from_info(f_stock_adj) if f_stock_adj else pd.DataFrame()
+
             if df_r.empty or len(df_r) == 0:
-                df_res = pd.DataFrame(columns=['BIN', 'SKU', 'ITEM NAME', 'QTY_SCAN', 'QTY_SYSTEM', 'DIFF', 'NEED_ADJ'])
-                self.cca_qty_need_adj.set(0)
-                self.cca_sku_need_adj.set(0)
+                return False, "File Hasil Recon Real + wajib diupload!"
+
+            def clean_series(series):
+                return series.fillna('').astype(str).str.strip().str.upper().str.replace(r'\.0$', '', regex=True)
+
+            # MODE A: DUAL UPLOAD (RECON REAL + & CEK STOCK ADJ)
+            if not df_s.empty:
+                b_s = clean_series(df_s.iloc[:, 1])
+                s_s = clean_series(df_s.iloc[:, 2])
+                df_s['JOIN_KEY'] = b_s + "|" + s_s
+
+                b_r = clean_series(df_r.iloc[:, 0])
+                s_r = clean_series(df_r.iloc[:, 1])
+                df_r['JOIN_KEY'] = b_r + "|" + s_r
+
+                # Ambil QTY hasil rekonsiliasi (Kolom index 6 / terakhir)
+                q_col_idx = 6 if df_r.shape[1] > 6 else (df_r.shape[1] - 1)
+                q_r_val = pd.to_numeric(df_r.iloc[:, q_col_idx], errors='coerce').fillna(0.0)
+                mask_r_valid = (b_r != "") & (s_r != "")
+                recon_map = dict(zip(df_r.loc[mask_r_valid, 'JOIN_KEY'], q_r_val[mask_r_valid]))
+
+                # Pemetaan ke file Stock Adj
+                new_qty_so = df_s['JOIN_KEY'].map(recon_map)
+                col_sys_idx = 9 if df_s.shape[1] > 9 else (df_s.shape[1] - 1)
+                sys_qty = pd.to_numeric(df_s.iloc[:, col_sys_idx], errors='coerce').fillna(0.0)
+                so_clean = new_qty_so.fillna(0.0)
+
+                needed_adj = np.where(sys_qty < 0, np.abs(sys_qty) + so_clean, np.abs(so_clean - sys_qty))
+                new_diff = np.where(new_qty_so.notna(), needed_adj, np.nan)
+
+                cols_keep = [i for i in range(len(df_s.columns)) if i not in [10, 11] and df_s.columns[i] != 'JOIN_KEY']
+                df_final_stock = df_s.iloc[:, cols_keep].copy()
+                df_final_stock.insert(10, "QTY SO", so_clean)
+                df_final_stock.insert(11, "DIFF", new_diff)
+
+                # Deteksi Miss Lookup SKU on BIN (Ada di file Recon tapi tidak ada di file Stock Adj)
+                matched_keys = set(df_s.loc[new_qty_so.notna(), 'JOIN_KEY'])
+                mask_not_matched = ~df_r['JOIN_KEY'].isin(matched_keys)
+                if mask_not_matched.any():
+                    df_missing = df_r[mask_not_matched].copy()
+                    q_rec_cand = pd.to_numeric(df_missing.iloc[:, q_col_idx], errors='coerce').fillna(0.0)
+                    q_sys_cand = pd.to_numeric(df_missing.iloc[:, 4], errors='coerce').fillna(0.0) if df_missing.shape[1] > 4 else pd.Series(0.0, index=df_missing.index)
+                    val_mask = (q_rec_cand > 0) | (q_sys_cand < 0)
+                    df_missing = df_missing[val_mask].copy()
+                    df_missing['FINAL_RECON_QTY'] = q_rec_cand[val_mask]
+                    df_missing['QTY_SYSTEM'] = q_sys_cand[val_mask]
+                else:
+                    df_missing = pd.DataFrame(columns=df_r.columns.tolist() + ['FINAL_RECON_QTY', 'QTY_SYSTEM'])
+
+                df_final_stock.drop(columns=['JOIN_KEY'], errors='ignore', inplace=True)
+                df_missing.drop(columns=['JOIN_KEY'], errors='ignore', inplace=True)
+
+                # Saring Need Adj (Selisih positif yang wajib di-adjustment)
+                mask_adj = (pd.to_numeric(df_final_stock["DIFF"], errors='coerce') > 0) & (pd.to_numeric(df_final_stock["QTY SO"], errors='coerce') > pd.to_numeric(df_final_stock.iloc[:, col_sys_idx], errors='coerce'))
+                df_need_adj = df_final_stock[mask_adj].copy()
+
+                tot_need_qty = int(pd.to_numeric(df_need_adj["DIFF"], errors='coerce').sum()) if not df_need_adj.empty else 0
+                tot_need_sku = df_need_adj.iloc[:, 2].nunique() if not df_need_adj.empty else 0
+
+                self.cca_qty_need_adj.set(tot_need_qty)
+                self.cca_sku_need_adj.set(tot_need_sku)
+                self._raw_df_cca_res4 = df_final_stock.copy()
+                self._raw_df_cca_adj4 = df_need_adj.copy()
+                self._raw_df_cca_miss4 = df_missing.copy()
+
+                self.df_cca_res4_headers.set(df_final_stock.columns.tolist())
+                self.df_cca_res4_rows.set(df_final_stock.head(400).fillna("").astype(str).values.tolist())
+                self.df_cca_adj4_headers.set(df_need_adj.columns.tolist())
+                self.df_cca_adj4_rows.set(df_need_adj.head(400).fillna("").astype(str).values.tolist())
+                self.df_cca_miss4_headers.set(df_missing.columns.tolist())
+                self.df_cca_miss4_rows.set(df_missing.head(400).fillna("").astype(str).values.tolist())
+
+            # MODE B: SINGLE UPLOAD (FALLBACK JIKA HANYA FILE RECON)
+            else:
+                q_recon = np.nan_to_num(pd.to_numeric(df_r.iloc[:, 6], errors='coerce').values, nan=0.0)
+                q_sys = np.nan_to_num(pd.to_numeric(df_r.iloc[:, 4], errors='coerce').values, nan=0.0)
+                diff = q_recon - q_sys
+                mask = diff > 0
+
+                df_res = df_r[mask].copy()
+                df_res['NEED_ADJ'] = diff[mask]
+
+                self.cca_qty_need_adj.set(int(np.sum(diff[mask])))
+                self.cca_sku_need_adj.set(len(df_res))
                 self._raw_df_cca_adj4 = df_res.copy()
+                self._raw_df_cca_res4 = pd.DataFrame()
+                self._raw_df_cca_miss4 = pd.DataFrame()
+
                 self.df_cca_adj4_headers.set(df_res.columns.tolist())
-                self.df_cca_adj4_rows.set([])
-                self.cca_step4_done.set(True)
-                return True, "Data Recon Real + kosong / tidak ada selisih."
-
-            q_recon = np.nan_to_num(pd.to_numeric(df_r.iloc[:, 6], errors='coerce').values, nan=0.0)
-            q_sys = np.nan_to_num(pd.to_numeric(df_r.iloc[:, 4], errors='coerce').values, nan=0.0)
-            diff = q_recon - q_sys
-            mask = diff != 0
-
-            df_res = df_r[mask].copy()
-            df_res['NEED_ADJ'] = diff[mask]
-
-            self.cca_qty_need_adj.set(int(np.sum(diff[mask])))
-            self.cca_sku_need_adj.set(len(df_res))
-            self._raw_df_cca_adj4 = df_res.copy()
-            self.df_cca_adj4_headers.set(df_res.columns.tolist())
-            self.df_cca_adj4_rows.set(df_res.fillna("").astype(str).values.tolist())
+                self.df_cca_adj4_rows.set(df_res.head(400).fillna("").astype(str).values.tolist())
+                self.df_cca_res4_headers.set([])
+                self.df_cca_res4_rows.set([])
+                self.df_cca_miss4_headers.set([])
+                self.df_cca_miss4_rows.set([])
 
             self.cca_step4_done.set(True)
-            # Tambahkan baris ini:
             self.update_cca_master_file("Step 4 (Recon Real+)")
-            self.cca_step4_done.set(True)
-            return True, "Analisis Step 4 Berhasil!"
+            return True, f"Recon Real + Berhasil Dianalisis! ({self.cca_qty_need_adj()} Qty Need Adj)"
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             return False, f"Gagal Step 4: {e}"
 
     # ==========================================================================

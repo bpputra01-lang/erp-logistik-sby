@@ -1638,8 +1638,9 @@ def server(input: Inputs, output: Outputs, session: Session):
     @reactive.Effect
     @reactive.event(input.btn_run_cca_step4)
     def _proc_cca_step4():
-        f = input.cca_up_recon_real() if "cca_up_recon_real" in input else None
-        succ, msg = state.run_cca_step4(f)
+        f_recon = input.cca_up_recon_real() if "cca_up_recon_real" in input else None
+        f_adj = input.cca_up_stock_adj() if "cca_up_stock_adj" in input else None
+        succ, msg = state.run_cca_step4(f_recon, f_adj)
         ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
         if succ:
             state.show_success_modal.set(True)
@@ -1647,15 +1648,23 @@ def server(input: Inputs, output: Outputs, session: Session):
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
 
-    @render.download(filename="Hasil_Recon_Real_Plus_CCA.xlsx")
-    def btn_dl_cca_step4():
+    @render.download(filename="Hasil_Cek_Stock_Adj_CCA.xlsx")
+    def btn_dl_cca_res4():
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-            state._raw_df_cca_adj4.to_excel(writer, sheet_name='REAL_PLUS_ADJ', index=False)
+            state._raw_df_cca_res4.to_excel(writer, sheet_name='HASIL_CEK_STOCK_ADJ', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    @render.download(filename="Miss_Lookup_SKU_CCA.xlsx")
+    def btn_dl_cca_miss4():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_cca_miss4.to_excel(writer, sheet_name='MISS_LOOKUP_SKU', index=False)
         buf.seek(0)
         yield buf.getvalue()
     # ==========================================================================
-    # CYCLE COUNT ANALYZER CONTROLLER (STEP 4, 5, & 6)
+    # CYCLE COUNT ANALYZER CONTROLLER (STEP 4: RECON REAL + & CEK STOCK ADJ)
     # ==========================================================================
     @render.ui
     def cca_step4_card_ui():
@@ -1674,7 +1683,6 @@ def server(input: Inputs, output: Outputs, session: Session):
                 style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
             )
 
-        # JIKA ADA DATA: Tampilkan uploader dan hasil
         step4_results = ui.div()
         if state.cca_step4_done():
             step4_results = ui.div(
@@ -1684,17 +1692,47 @@ def server(input: Inputs, output: Outputs, session: Session):
                     dark_metric_box("📦 TOTAL SKU", f"{state.cca_sku_need_adj():,} SKU", "#3182CE"),
                     style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
                 ),
-                ui.div(
-                    ui.download_button("btn_dl_cca_step4", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD HASIL RECON REAL + (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"),
-                    style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
-                ),
-                render_clean_table(state.df_cca_adj4_headers(), state.df_cca_adj4_rows(), "tbl_cca_adj4")
+                ui.navset_card_tab(
+                    ui.nav_panel(
+                        "⚠️ REAL + NEED ADJ",
+                        ui.div(
+                            ui.div(
+                                ui.download_button("btn_dl_cca_step4", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 12px;"), "Download Need Adj (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 6px 14px; cursor: pointer; font-size: 12px;"),
+                                style="display: flex; justify-content: flex-end; margin-bottom: 0.5rem;"
+                            ),
+                            render_clean_table(state.df_cca_adj4_headers(), state.df_cca_adj4_rows(), "tbl_cca_adj4")
+                        )
+                    ),
+                    ui.nav_panel(
+                        "🔍 HASIL CEK STOCK ADJ",
+                        ui.div(
+                            ui.div(
+                                ui.download_button("btn_dl_cca_res4", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 12px;"), "Download Cek Adj (.xlsx)"), style="background-color: #3182CE; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 6px 14px; cursor: pointer; font-size: 12px;"),
+                                style="display: flex; justify-content: flex-end; margin-bottom: 0.5rem;"
+                            ),
+                            render_clean_table(state.df_cca_res4_headers(), state.df_cca_res4_rows(), "tbl_cca_res4")
+                        )
+                    ),
+                    ui.nav_panel(
+                        "❌ MISS LOOKUP SKU ON BIN",
+                        ui.div(
+                            ui.div(
+                                ui.download_button("btn_dl_cca_miss4", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 12px;"), "Download Missing Items (.xlsx)"), style="background-color: #E53E3E; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 6px 14px; cursor: pointer; font-size: 12px;"),
+                                style="display: flex; justify-content: flex-end; margin-bottom: 0.5rem;"
+                            ),
+                            render_clean_table(state.df_cca_miss4_headers(), state.df_cca_miss4_rows(), "tbl_cca_miss4")
+                        )
+                    )
+                )
             )
 
         return ui.div(
-            ui.h4("3️⃣ RECON REAL + PROCESS", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
-            custom_uploader_box("cca_up_recon_real", "📥 Upload HASIL RECON REAL +"),
-            # 👇 TOMBOL LANGSUNG (PASTI MUNCUL) 👇
+            ui.h4("3️⃣ RECON REAL + PROCESS (DENGAN CEK STOCK ADJ)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+            ui.div(
+                custom_uploader_box("cca_up_recon_real", "1. Sheet REAL + RECON"),
+                custom_uploader_box("cca_up_stock_adj", "2. Sheet CEK STOCK ADJ (+) (Opsional/Rekomendasi)"),
+                style="display: flex; gap: 1rem; width: 100%; margin-bottom: 0.5rem; flex-wrap: wrap;"
+            ),
             ui.div(
                 ui.tags.button(
                     ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "RUN RECON ANALYSIS"),
@@ -6444,7 +6482,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         )
 
 # ==========================================================================
-    # BANNER DOWNLOAD MASTER REPORT CYCLE COUNT (STATUS CICILAN REALTIME)
+    # BANNER DOWNLOAD MASTER REPORT CYCLE COUNT (DILENGKAPI TOMBOL OVERVIEW)
     # ==========================================================================
     @render.ui
     def cca_master_report_banner_ui():
@@ -6452,38 +6490,47 @@ def server(input: Inputs, output: Outputs, session: Session):
         status_txt = state.cca_report_status()
         sheet_cnt = state.cca_saved_sheets_count()
 
-        # Warna banner: Hijau segar jika sudah ada step yang dicicil, abu-abu lembut jika belum
         bg_color = "#D1FAE5" if is_ready else "#F8FAFC"
         border_color = "#6EE7B7" if is_ready else "#CBD5E0"
         title_color = "#065F46" if is_ready else "#2D3748"
         desc_color = "#047857" if is_ready else "#718096"
 
-        btn_ui = ui.download_button(
+        btn_dl = ui.download_button(
             "btn_dl_cca_master_all",
             ui.tags.span(
-                ui.tags.i(class_="fa-solid fa-cloud-arrow-down", style="margin-right: 8px; font-size: 15px;"),
+                ui.tags.i(class_="fa-solid fa-cloud-arrow-down", style="margin-right: 8px; font-size: 14px;"),
                 f"DOWNLOAD FULL REPORT ({sheet_cnt} SHEET)" if is_ready else "DOWNLOAD BELUM TERSEDIA"
             ),
-            style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; font-weight: 800; border-radius: 8px; border: none; padding: 12px 24px; cursor: pointer; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); font-size: 13px;" if is_ready else "background: #A0AEC0; color: white; font-weight: 800; border-radius: 8px; border: none; padding: 12px 24px; cursor: not-allowed; font-size: 13px;"
+            style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; font-weight: 800; border-radius: 8px; border: none; padding: 10px 20px; cursor: pointer; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); font-size: 13px;" if is_ready else "background: #A0AEC0; color: white; font-weight: 800; border-radius: 8px; border: none; padding: 10px 20px; cursor: not-allowed; font-size: 13px;"
+        )
+
+        btn_overview = ui.tags.button(
+            ui.tags.span(
+                ui.tags.i(class_="fa-solid fa-chart-pie", style="margin-right: 8px; font-size: 14px;"),
+                "📊 OVERVIEW ALL HASIL (VISUAL)"
+            ),
+            onclick="Shiny.setInputValue('btn_open_cca_overview_modal', Math.random(), {priority: 'event'});",
+            style="background: #1A202C; color: #FFFFFF; font-weight: 800; border-radius: 8px; border: 1.5px solid #4A5568; padding: 10px 20px; cursor: pointer; font-size: 13px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: inline-flex; align-items: center;"
         )
 
         return ui.div(
             ui.div(
                 ui.div(
-                    ui.h4("🏆 Download Full Master Report Cycle Count", style=f"font-size: 16px; font-weight: 800; color: {title_color}; margin: 0 0 4px 0;"),
-                    ui.p(
-                        status_txt, 
-                        style=f"color: {desc_color}; font-weight: 700; font-size: 13px; margin: 0;"
-                    ),
+                    ui.h4("🏆 Master Report & Executive Overview (Cycle Count)", style=f"font-size: 16px; font-weight: 800; color: {title_color}; margin: 0 0 4px 0;"),
+                    ui.p(status_txt, style=f"color: {desc_color}; font-weight: 700; font-size: 13px; margin: 0;"),
                 ),
-                btn_ui,
+                ui.div(
+                    btn_overview,
+                    btn_dl,
+                    style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;"
+                ),
                 style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 12px;"
             ),
             style=f"background: {bg_color}; border: 1.5px solid {border_color}; padding: 1.25rem 1.5rem; border-radius: 12px; margin-top: 1rem; margin-bottom: 1.25rem; box-shadow: 0 2px 8px rgba(0,0,0,0.04);"
         )
 
     # ==========================================================================
-    # BANNER DOWNLOAD MASTER REPORT STOCK OPNAME (STATUS CICILAN REALTIME)
+    # BANNER DOWNLOAD MASTER REPORT STOCK OPNAME (DILENGKAPI TOMBOL OVERVIEW)
     # ==========================================================================
     @render.ui
     def so_master_report_banner_ui():
@@ -6496,29 +6543,91 @@ def server(input: Inputs, output: Outputs, session: Session):
         title_color = "#065F46" if is_ready else "#2D3748"
         desc_color = "#047857" if is_ready else "#718096"
 
-        btn_ui = ui.download_button(
+        btn_dl = ui.download_button(
             "btn_dl_so_master_all",
             ui.tags.span(
-                ui.tags.i(class_="fa-solid fa-cloud-arrow-down", style="margin-right: 8px; font-size: 15px;"),
+                ui.tags.i(class_="fa-solid fa-cloud-arrow-down", style="margin-right: 8px; font-size: 14px;"),
                 f"DOWNLOAD FULL REPORT ({sheet_cnt} SHEET)" if is_ready else "DOWNLOAD BELUM TERSEDIA"
             ),
-            style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; font-weight: 800; border-radius: 8px; border: none; padding: 12px 24px; cursor: pointer; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); font-size: 13px;" if is_ready else "background: #A0AEC0; color: white; font-weight: 800; border-radius: 8px; border: none; padding: 12px 24px; cursor: not-allowed; font-size: 13px;"
+            style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; font-weight: 800; border-radius: 8px; border: none; padding: 10px 20px; cursor: pointer; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); font-size: 13px;" if is_ready else "background: #A0AEC0; color: white; font-weight: 800; border-radius: 8px; border: none; padding: 10px 20px; cursor: not-allowed; font-size: 13px;"
+        )
+
+        btn_overview = ui.tags.button(
+            ui.tags.span(
+                ui.tags.i(class_="fa-solid fa-chart-pie", style="margin-right: 8px; font-size: 14px;"),
+                "📊 OVERVIEW ALL HASIL (VISUAL)"
+            ),
+            onclick="Shiny.setInputValue('btn_open_so_overview_modal', Math.random(), {priority: 'event'});",
+            style="background: #1A202C; color: #FFFFFF; font-weight: 800; border-radius: 8px; border: 1.5px solid #4A5568; padding: 10px 20px; cursor: pointer; font-size: 13px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: inline-flex; align-items: center;"
         )
 
         return ui.div(
             ui.div(
                 ui.div(
-                    ui.h4("🏆 Download Full Master Report Stock Opname", style=f"font-size: 16px; font-weight: 800; color: {title_color}; margin: 0 0 4px 0;"),
-                    ui.p(
-                        status_txt, 
-                        style=f"color: {desc_color}; font-weight: 700; font-size: 13px; margin: 0;"
-                    ),
+                    ui.h4("🏆 Master Report & Executive Overview (Stock Opname)", style=f"font-size: 16px; font-weight: 800; color: {title_color}; margin: 0 0 4px 0;"),
+                    ui.p(status_txt, style=f"color: {desc_color}; font-weight: 700; font-size: 13px; margin: 0;"),
                 ),
-                btn_ui,
+                ui.div(
+                    btn_overview,
+                    btn_dl,
+                    style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;"
+                ),
                 style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 12px;"
             ),
             style=f"background: {bg_color}; border: 1.5px solid {border_color}; padding: 1.25rem 1.5rem; border-radius: 12px; margin-top: 1rem; margin-bottom: 1.25rem; box-shadow: 0 2px 8px rgba(0,0,0,0.04);"
         )
+
+    # ==========================================================================
+    # EVENT LISTENER: POP-UP EXECUTIVE VISUAL OVERVIEW
+    # ==========================================================================
+    @reactive.Effect
+    @reactive.event(input.btn_open_cca_overview_modal)
+    def _open_cca_overview():
+        from views import render_executive_overview_modal
+        data_m = {
+            "q_real_init": state.cca_qty_real_plus(),
+            "q_sys_init": state.cca_qty_sys_plus(),
+            "q_miss_loc": state.cca_qty_miss_loc(),
+            "sku_miss_loc": state.cca_sku_miss_loc(),
+            "q_need_adj": state.cca_qty_need_adj(),
+            "sku_need_adj": state.cca_sku_need_adj(),
+            "q_karantina": state.cca_qty_karantina(),
+            "sku_karantina": state.cca_sku_karantina(),
+        }
+        modal_content = render_executive_overview_modal("Cycle Count", "SURABAYA", data_m)
+        ui.modal_show(ui.modal(
+            modal_content,
+            title=ui.div(ui.tags.i(class_="fa-solid fa-chart-line", style="color: #C5A059; margin-right: 8px;"), "Executive Summary: Cycle Count Analyzer"),
+            size="xl",
+            easy_close=True,
+            footer=ui.modal_button("Tutup", class_="btn-red-gradient")
+        ))
+
+    @reactive.Effect
+    @reactive.event(input.btn_open_so_overview_modal)
+    def _open_so_overview():
+        from views import render_executive_overview_modal
+        q_need_so = int(state._raw_df_so_mult['QTY SO'].sum()) if hasattr(state, '_raw_df_so_mult') and not state._raw_df_so_mult.empty and 'QTY SO' in state._raw_df_so_mult.columns else 0
+        sku_need_so = state._raw_df_so_mult.shape[0] if hasattr(state, '_raw_df_so_mult') and not state._raw_df_so_mult.empty else 0
+
+        data_m = {
+            "q_real_init": state.so_qty_real_plus(),
+            "q_sys_init": state.so_qty_sys_plus(),
+            "q_miss_loc": state.so_qty_miss_loc(),
+            "sku_miss_loc": state.so_sku_miss_loc(),
+            "q_need_adj": q_need_so,
+            "sku_need_adj": sku_need_so,
+            "q_karantina": state.so_qty_karantina(),
+            "sku_karantina": state.so_sku_karantina(),
+        }
+        modal_content = render_executive_overview_modal("Stock Opname", "SURABAYA", data_m)
+        ui.modal_show(ui.modal(
+            modal_content,
+            title=ui.div(ui.tags.i(class_="fa-solid fa-chart-line", style="color: #C5A059; margin-right: 8px;"), "Executive Summary: Stock Opname Analyzer"),
+            size="xl",
+            easy_close=True,
+            footer=ui.modal_button("Tutup", class_="btn-red-gradient")
+        ))
 
 from pathlib import Path
 

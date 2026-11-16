@@ -3161,6 +3161,157 @@ def target_progress_view(state: AppState):
         style="width: 100%; padding: 1rem;"
     )
 
+# ==============================================================================
+# MODAL OVERVIEW ALL HASIL VISUAL (CYCLE COUNT & STOCK OPNAME)
+# ==============================================================================
+def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict):
+    q_real_init = metrics.get("q_real_init", 0)
+    q_sys_init = metrics.get("q_sys_init", 0)
+    q_miss_loc = metrics.get("q_miss_loc", 0)
+    sku_miss_loc = metrics.get("sku_miss_loc", 0)
+    q_need_adj = metrics.get("q_need_adj", 0)
+    sku_need_adj = metrics.get("sku_need_adj", 0)
+    q_karantina = metrics.get("q_karantina", 0)
+    sku_karantina = metrics.get("sku_karantina", 0)
+
+    tot_resolusi = q_miss_loc + q_need_adj + q_karantina
+    pct_miss = (q_miss_loc / tot_resolusi * 100) if tot_resolusi > 0 else 0.0
+    pct_karan = (q_karantina / tot_resolusi * 100) if tot_resolusi > 0 else 0.0
+    pct_adj = (q_need_adj / tot_resolusi * 100) if tot_resolusi > 0 else 0.0
+
+    return ui.div(
+        # --- HEADER EXECUTIVE ---
+        ui.div(
+            ui.div(
+                ui.span("EXECUTIVE AUDIT SUMMARY", style="font-size: 11px; font-weight: 900; letter-spacing: 2px; color: #C5A059; text-transform: uppercase; display: block; margin-bottom: 2px;"),
+                ui.h3(f"{title_menu} Overview Dashboard", style="font-size: 20px; font-weight: 900; color: #FFFFFF; margin: 0;"),
+                ui.p(f"Cabang: {branch} • Waktu Analisis: {datetime.now().strftime('%d %B %Y %H:%M')} WIB", style="font-size: 12px; color: #A0AEC0; margin: 4px 0 0 0;"),
+            ),
+            ui.div(
+                ui.span("STATUS AUDIT:", style="font-size: 10px; font-weight: 800; color: #A0AEC0; margin-right: 6px;"),
+                ui.span("COMPLETED & RECONCILED", style="background: rgba(16, 185, 129, 0.2); color: #10B981; border: 1px solid #10B981; font-weight: 800; font-size: 11px; padding: 4px 10px; border-radius: 6px;"),
+                style="display: flex; align-items: center;"
+            ),
+            style="display: flex; justify-content: space-between; align-items: center; background: #1A1D24; padding: 1.25rem 1.5rem; border-radius: 12px; border: 1px solid #2D3748; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 10px;"
+        ),
+
+        # --- 4 PILAR UTAMA KPI CARDS ---
+        ui.div(
+            # Card 1: Selisih Awal
+            ui.div(
+                ui.div(
+                    ui.span("1. SELISIH AWAL (STEP 1)", style="font-size: 11px; font-weight: 800; color: #A0AEC0; letter-spacing: 0.5px;"),
+                    ui.tags.i(class_="fa-solid fa-arrows-split-up-and-left", style="color: #38BDF8; font-size: 16px;"),
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;"
+                ),
+                ui.div(
+                    ui.div(
+                        ui.span(f"{q_real_init:,}", style="color: #C5A059; font-size: 22px; font-weight: 900; display: block; line-height: 1.1;"),
+                        ui.span("Real + (Fisik Lebih)", style="color: #718096; font-size: 11px; font-weight: 600;"),
+                        style="flex: 1;"
+                    ),
+                    ui.div(style="width: 1px; height: 32px; background: #2D3748; margin: 0 10px;"),
+                    ui.div(
+                        ui.span(f"{q_sys_init:,}", style="color: #E53E3E; font-size: 22px; font-weight: 900; display: block; line-height: 1.1;"),
+                        ui.span("System + (Sistem Lebih)", style="color: #718096; font-size: 11px; font-weight: 600;"),
+                        style="flex: 1;"
+                    ),
+                    style="display: flex; align-items: center;"
+                ),
+                style="background: #161920; padding: 1rem 1.25rem; border-radius: 10px; border-left: 4px solid #38BDF8; border-top: 1px solid #2D3748; border-right: 1px solid #2D3748; border-bottom: 1px solid #2D3748;"
+            ),
+
+            # Card 2: Miss Lokasi Antar BIN
+            ui.div(
+                ui.div(
+                    ui.span("2. MISS LOKASI RAK KE RAK", style="font-size: 11px; font-weight: 800; color: #A0AEC0; letter-spacing: 0.5px;"),
+                    ui.tags.i(class_="fa-solid fa-people-carry-box", style="color: #10B981; font-size: 16px;"),
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;"
+                ),
+                ui.span(f"{q_miss_loc:,} PCS", style="color: #10B981; font-size: 24px; font-weight: 900; display: block; line-height: 1.1;"),
+                ui.span(f"📦 Tersebar di {sku_miss_loc:,} SKU • Terselesaikan tanpa adjustment", style="color: #718096; font-size: 11.5px; margin-top: 4px; display: block;"),
+                style="background: #161920; padding: 1rem 1.25rem; border-radius: 10px; border-left: 4px solid #10B981; border-top: 1px solid #2D3748; border-right: 1px solid #2D3748; border-bottom: 1px solid #2D3748;"
+            ),
+
+            # Card 3: Real + Need Adjustment
+            ui.div(
+                ui.div(
+                    ui.span("3. REAL + NEED ADJ (+)", style="font-size: 11px; font-weight: 800; color: #A0AEC0; letter-spacing: 0.5px;"),
+                    ui.tags.i(class_="fa-solid fa-circle-plus", style="color: #F59E0B; font-size: 16px;"),
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;"
+                ),
+                ui.span(f"{q_need_adj:,} PCS", style="color: #F59E0B; font-size: 24px; font-weight: 900; display: block; line-height: 1.1;"),
+                ui.span(f"🏷️ Sebanyak {sku_need_adj:,} SKU • Fisik lebih murni wajib di-adj (+)", style="color: #718096; font-size: 11.5px; margin-top: 4px; display: block;"),
+                style="background: #161920; padding: 1rem 1.25rem; border-radius: 10px; border-left: 4px solid #F59E0B; border-top: 1px solid #2D3748; border-right: 1px solid #2D3748; border-bottom: 1px solid #2D3748;"
+            ),
+
+            # Card 4: Mutasi Karantina
+            ui.div(
+                ui.div(
+                    ui.span("4. MUTASI KE KARANTINA", style="font-size: 11px; font-weight: 800; color: #A0AEC0; letter-spacing: 0.5px;"),
+                    ui.tags.i(class_="fa-solid fa-shield-virus", style="color: #EF4444; font-size: 16px;"),
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;"
+                ),
+                ui.span(f"{q_karantina:,} PCS", style="color: #EF4444; font-size: 24px; font-weight: 900; display: block; line-height: 1.1;"),
+                ui.span(f"☣️ Sebanyak {sku_karantina:,} SKU • Sistem tidak ada fisik (Not Found)", style="color: #718096; font-size: 11.5px; margin-top: 4px; display: block;"),
+                style="background: #161920; padding: 1rem 1.25rem; border-radius: 10px; border-left: 4px solid #EF4444; border-top: 1px solid #2D3748; border-right: 1px solid #2D3748; border-bottom: 1px solid #2D3748;"
+            ),
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.5rem;"
+        ),
+
+        # --- VISUAL BREAKDOWN & PROPORTION BAR ---
+        ui.div(
+            ui.div(
+                ui.h4("📊 Distribusi Resolusi Selisih Audit Fisik", style="font-size: 14px; font-weight: 800; color: #FFFFFF; margin: 0 0 6px 0;"),
+                ui.p("Proporsi bagaimana selisih fisik diuraikan: Ditata ulang antar rak, diamankan ke karantina, atau diajukan penyesuaian stok baru.", style="color: #A0AEC0; font-size: 12px; margin: 0;"),
+            ),
+            # Visual Multi-Color Stacked Bar
+            ui.div(
+                ui.div(style=f"width: {max(2.0, pct_miss):.1f}%; height: 18px; background: #10B981; border-radius: 4px 0 0 4px; transition: width 0.5s ease; position: relative;", title=f"Miss Location: {pct_miss:.1f}%"),
+                ui.div(style=f"width: {max(2.0, pct_adj):.1f}%; height: 18px; background: #F59E0B; transition: width 0.5s ease; position: relative;", title=f"Need Adj (+): {pct_adj:.1f}%"),
+                ui.div(style=f"width: {max(2.0, pct_karan):.1f}%; height: 18px; background: #EF4444; border-radius: 0 4px 4px 0; transition: width 0.5s ease; position: relative;", title=f"Karantina: {pct_karan:.1f}%"),
+                style="display: flex; width: 100%; background: #2D3748; border-radius: 6px; overflow: hidden; height: 18px; margin: 12px 0 16px 0;"
+            ),
+            # Legenda & Persentase
+            ui.div(
+                ui.div(
+                    ui.div(style="width: 12px; height: 12px; background: #10B981; border-radius: 3px; margin-right: 6px;"),
+                    ui.span(f"Miss Location ({pct_miss:.1f}%) : ", style="color: #A0AEC0; font-size: 12px; font-weight: 600;"),
+                    ui.strong(f"{q_miss_loc:,} PCS", style="color: #FFFFFF; font-size: 12px; margin-left: 4px;"),
+                    style="display: flex; align-items: center;"
+                ),
+                ui.div(
+                    ui.div(style="width: 12px; height: 12px; background: #F59E0B; border-radius: 3px; margin-right: 6px;"),
+                    ui.span(f"Real + Need Adj ({pct_adj:.1f}%) : ", style="color: #A0AEC0; font-size: 12px; font-weight: 600;"),
+                    ui.strong(f"{q_need_adj:,} PCS", style="color: #FFFFFF; font-size: 12px; margin-left: 4px;"),
+                    style="display: flex; align-items: center;"
+                ),
+                ui.div(
+                    ui.div(style="width: 12px; height: 12px; background: #EF4444; border-radius: 3px; margin-right: 6px;"),
+                    ui.span(f"Karantina ({pct_karan:.1f}%) : ", style="color: #A0AEC0; font-size: 12px; font-weight: 600;"),
+                    ui.strong(f"{q_karantina:,} PCS", style="color: #FFFFFF; font-size: 12px; margin-left: 4px;"),
+                    style="display: flex; align-items: center;"
+                ),
+                style="display: flex; justify-content: space-around; width: 100%; flex-wrap: wrap; gap: 12px;"
+            ),
+            style="background: #161920; border: 1px solid #2D3748; padding: 1.25rem 1.5rem; border-radius: 12px; margin-bottom: 1.25rem;"
+        ),
+
+        # --- INSIGHT KESIMPULAN AUDITOR ---
+        ui.div(
+            ui.div(
+                ui.tags.i(class_="fa-solid fa-lightbulb", style="color: #C5A059; font-size: 18px; margin-right: 10px;"),
+                ui.strong("Insight Manajerial Gudang:", style="color: #C5A059; font-size: 13px;"),
+                style="display: flex; align-items: center; margin-bottom: 6px;"
+            ),
+            ui.p(
+                f"Dari total resolusi selisih sebanyak {tot_resolusi:,} pcs, sebesar {pct_miss:.1f}% merupakan kesalahan penempatan barang (Miss Location) yang dapat diselesaikan murni melalui mutasi rak tanpa perlu koreksi finansial adjustment. Barang hilang ke karantina sebesar {pct_karan:.1f}%, dan temuan fisik lebih sebesar {pct_adj:.1f}%.",
+                style="color: #CBD5E0; font-size: 12.5px; line-height: 1.5; margin: 0;"
+            ),
+            style="background: rgba(197, 160, 89, 0.08); border-left: 4px solid #C5A059; border-top: 1px solid rgba(197, 160, 89, 0.2); border-right: 1px solid rgba(197, 160, 89, 0.2); border-bottom: 1px solid rgba(197, 160, 89, 0.2); padding: 1rem 1.25rem; border-radius: 8px;"
+        ),
+        style="padding: 0.5rem 0; width: 100%;"
+    )
 def menu_item(label: str, target_menu: str, current_menu: str):
     import re
     is_active = (current_menu == target_menu)
