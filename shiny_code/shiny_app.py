@@ -26,40 +26,38 @@ app_ui = ui.page_fluid(
     style="padding: 0; margin: 0; background-color: #111318;"
 )
 
-import re  # di bagian import atas
+import re  # <-- wajib, sebelumnya tidak ada
 
-def build_full_report_file(sheets_list: list) -> str:
-    tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
-    tmp_path = tmp.name
-    tmp.close()
-
-    seen_sheets = set()
+def build_full_report_bytes(sheets_list: list) -> bytes:
+    seen = set()
     valid = []
     for raw_title, df in sheets_list:
         if df is None or not isinstance(df, pd.DataFrame) or df.empty:
             continue
-        clean_title = re.sub(r'[\\/*?:\[\]]', '', str(raw_title))[:31].strip() or "Sheet"
-        base = clean_title[:28]
-        n = 1
-        while clean_title.upper() in seen_sheets:
-            clean_title = f"{base}_{n}"
+        title = re.sub(r'[\\/*?:\[\]]', '', str(raw_title))[:31].strip() or "Sheet"
+        base, n = title[:28], 1
+        while title.upper() in seen:
+            title = f"{base}_{n}"
             n += 1
-        seen_sheets.add(clean_title.upper())
-        valid.append((clean_title, df))
+        seen.add(title.upper())
+        valid.append((title, df))
 
     if not valid:
         valid = [("INFO", pd.DataFrame({"INFO": ["Belum ada step yang dijalankan atau data kosong."]}))]
 
+    buf = io.BytesIO()
     try:
-        with pd.ExcelWriter(tmp_path, engine="openpyxl") as writer:
+        with pd.ExcelWriter(buf, engine="openpyxl") as writer:
             for title, df in valid:
                 df.to_excel(writer, sheet_name=title, index=False)
     except Exception as e:
         import traceback
         traceback.print_exc()
-        with pd.ExcelWriter(tmp_path, engine="openpyxl") as writer:
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine="openpyxl") as writer:
             pd.DataFrame({"ERROR": [f"Gagal generate report: {e}"]}).to_excel(writer, sheet_name="ERROR", index=False)
-    return tmp_path
+    buf.seek(0)
+    return buf.getvalue()
         
 def server(input: Inputs, output: Outputs, session: Session):
     state = AppState()
@@ -1876,15 +1874,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             ('12_MISS LOCATION', getattr(state, "_raw_df_cca_miss_loc", pd.DataFrame())),
             ('13_SUMMARY MISS LOC', getattr(state, "_raw_df_cca_sum_miss", pd.DataFrame())),
         ]
-        tmp_path = build_full_report_file(sheets_list)
-        try:
-            with open(tmp_path, "rb") as f:
-                yield f.read()
-        finally:
-            try:
-                os.remove(tmp_path)
-            except OSError:
-                pass
+        yield build_full_report_bytes(sheets_list)
         
 # ==========================================================================
     # COMPARE RTO CONTROLLER & HANDLERS
@@ -2694,15 +2684,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             ('14_DETAIL ADJUSTMENT', getattr(state, "_raw_df_so_adj_detail", pd.DataFrame())),
             ('15_SUMMARY ADJ', getattr(state, "_raw_df_so_adj_sum", pd.DataFrame())),
         ]
-        tmp_path = build_full_report_file(sheets_list)
-        try:
-            with open(tmp_path, "rb") as f:
-                yield f.read()
-        finally:
-            try:
-                os.remove(tmp_path)
-            except OSError:
-                pass
+        yield build_full_report_bytes(sheets_list)
 
 # ==========================================================================
     # JUSTIFICATION SO CONTROLLER (DYNAMIC MODE: REVERSAL & NON REVERSAL)
