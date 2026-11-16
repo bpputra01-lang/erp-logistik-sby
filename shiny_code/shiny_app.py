@@ -1905,7 +1905,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             ui.notification_show(msg, type="message", duration=4)
         else:
             ui.notification_show(msg, type="warning", duration=4)
-x   
+
     @reactive.Effect
     @reactive.event(input.btn_prepare_cca_full_report)
     def _on_prepare_cca():
