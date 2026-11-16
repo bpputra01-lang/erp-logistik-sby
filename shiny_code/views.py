@@ -75,27 +75,18 @@ CUSTOM_HEAD = ui.head_content(
         setBrandTab();
         setInterval(setBrandTab, 1000);
 
-        // --- AUTO-RECONNECT SAAT KEMBALI DARI TAB LAIN ---
+        // --- AMAN: JANGAN RELOAD HALAMAN AGAR SESI & DATA TIDAK HILANG ---
         document.addEventListener("visibilitychange", function() {
-            if (!document.hidden) {
-                // Tab aktif kembali: periksa apakah WebSocket terputus
-                if (window.Shiny && window.Shiny.shinyapp) {
-                    let socket = window.Shiny.shinyapp.$socket;
-                    if (!socket || socket.readyState > 1) { // 2 = CLOSING, 3 = CLOSED
-                        console.warn("WebSocket terputus saat berada di tab lain. Memuat ulang sesi...");
-                        window.location.reload();
-                    }
-                }
+            if (!document.hidden && window.Shiny && window.Shiny.setInputValue) {
+                // Cukup kirim ping ringan agar websocket bangun kembali tanpa merusak halaman
+                Shiny.setInputValue('_app_heartbeat', Date.now());
             }
         });
 
-        // Deteksi event disconnected dari Shiny dan reload otomatis dalam 1 detik
+        // Hapus reload otomatis saat disconnected; biarkan UI tetap utuh
         if (window.jQuery) {
             $(document).on('shiny:disconnected', function() {
-                console.warn("Sesi Shiny terputus. Mencoba reconnect otomatis...");
-                setTimeout(function() {
-                    window.location.reload();
-                }, 1000);
+                console.warn("Koneksi server sempat terputus, data di layar tetap dipertahankan.");
             });
         }
 
