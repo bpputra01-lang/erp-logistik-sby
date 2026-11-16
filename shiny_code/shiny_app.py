@@ -31,15 +31,21 @@ app_ui = ui.page_fluid(
 )
 
 def build_full_report_file_sync(sheets_list: list) -> str:
+    # Buat file sementara
     tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
     tmp_path = tmp.name
     tmp.close()
 
     seen_sheets = set()
     valid = []
+    
+    # Regex untuk membersihkan karakter ilegal XML agar Excel tidak korup
+    illegal_xml_re = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f]')
+
     for raw_title, df in sheets_list:
         if df is None or not isinstance(df, pd.DataFrame) or df.empty:
             continue
+            
         clean_title = re.sub(r'[\\/*?:\[\]]', '', str(raw_title))[:31].strip() or "Sheet"
         base = clean_title[:28]
         n = 1
@@ -47,13 +53,22 @@ def build_full_report_file_sync(sheets_list: list) -> str:
             clean_title = f"{base}_{n}"
             n += 1
         seen_sheets.add(clean_title.upper())
-        valid.append((clean_title, df))
+
+        # Sanitasi data: buang timezone dan buang karakter kontrol
+        df_clean = df.copy()
+        for col in df_clean.columns:
+            if pd.api.types.is_datetime64_any_dtype(df_clean[col]):
+                df_clean[col] = df_clean[col].astype(str)
+            elif df_clean[col].dtype == object or pd.api.types.is_string_dtype(df_clean[col]):
+                df_clean[col] = df_clean[col].astype(str).str.replace(illegal_xml_re, '', regex=True)
+
+        valid.append((clean_title, df_clean))
 
     if not valid:
-        valid = [("INFO", pd.DataFrame({"INFO": ["Belum ada step yang dijalankan atau data kosong."]}))]
+        valid = [("INFO", pd.DataFrame({"STATUS": ["Belum ada step yang dijalankan atau data kosong."]}))]
 
+    # Tulis menggunakan xlsxwriter (hemat RAM & cepat) atau fallback ke openpyxl
     try:
-        # Gunakan xlsxwriter dengan constant_memory agar RAM hemat & super cepat
         with pd.ExcelWriter(
             tmp_path, 
             engine="xlsxwriter", 
@@ -61,8 +76,8 @@ def build_full_report_file_sync(sheets_list: list) -> str:
         ) as writer:
             for title, df in valid:
                 df.to_excel(writer, sheet_name=title, index=False)
-    except Exception:
-        # Fallback ke openpyxl jika xlsxwriter belum terinstall
+    except Exception as e_writer:
+        print(f"xlsxwriter error: {e_writer}, mencoba openpyxl...")
         with pd.ExcelWriter(tmp_path, engine="openpyxl") as writer:
             for title, df in valid:
                 df.to_excel(writer, sheet_name=title, index=False)
@@ -1865,10 +1880,10 @@ def server(input: Inputs, output: Outputs, session: Session):
         yield buf.getvalue()
 
     # ==========================================================================
-    # FULL REPORT CYCLE COUNT (FIXED: ANTI 0 BYTES)
+    # FULL REPORT CYCLE COUNT
     # ==========================================================================
     @render.download(filename="FULL_CYCLE_COUNT_ANALYZER_REPORT.xlsx")
-    async def btn_dl_cca_master_all():
+    def btn_dl_cca_master_all():
         sheets_list = [
             ('1_DATA SCAN', getattr(state, "_raw_df_cca_scan", pd.DataFrame())),
             ('2_STOCK SYSTEM', getattr(state, "_raw_df_cca_stock", pd.DataFrame())),
@@ -1885,18 +1900,9 @@ def server(input: Inputs, output: Outputs, session: Session):
             ('13_SUMMARY MISS LOC', getattr(state, "_raw_df_cca_sum_miss", pd.DataFrame())),
         ]
         
-        # Jalankan di background worker agar WebSocket Shiny TIDAK terputus
-        tmp_path = await asyncio.to_thread(build_full_report_file_sync, sheets_list)
-        
-        try:
-            with open(tmp_path, "rb") as f:
-                while chunk := f.read(65536):  # Stream 64KB per chunk
-                    yield chunk
-        finally:
-            try:
-                os.remove(tmp_path)
-            except OSError:
-                pass
+        # LANGSUNG RETURN PATH FILE: Shiny akan menanganinya via Starlette FileResponse resmi
+        file_path = build_full_report_file_sync(sheets_list)
+        return file_path
         
 # ==========================================================================
     # COMPARE RTO CONTROLLER & HANDLERS
@@ -2687,8 +2693,11 @@ def server(input: Inputs, output: Outputs, session: Session):
     # ==========================================================================
     # FULL REPORT STOCK OPNAME (FIXED: ANTI 0 BYTES)
     # ==========================================================================
+    # ==========================================================================
+    # FULL REPORT STOCK OPNAME
+    # ==========================================================================
     @render.download(filename="FULL_SO_ANALYZER_REPORT.xlsx")
-    async def btn_dl_so_master_all():
+    def btn_dl_so_master_all():
         sheets_list = [
             ('1_DATA SCAN', getattr(state, "_raw_df_so_scan", pd.DataFrame())),
             ('2_STOCK SYSTEM', getattr(state, "_raw_df_so_stock", pd.DataFrame())),
@@ -2707,17 +2716,8 @@ def server(input: Inputs, output: Outputs, session: Session):
             ('15_SUMMARY ADJ', getattr(state, "_raw_df_so_adj_sum", pd.DataFrame())),
         ]
         
-        tmp_path = await asyncio.to_thread(build_full_report_file_sync, sheets_list)
-        
-        try:
-            with open(tmp_path, "rb") as f:
-                while chunk := f.read(65536):
-                    yield chunk
-        finally:
-            try:
-                os.remove(tmp_path)
-            except OSError:
-                pass
+        file_path = build_full_report_file_sync(sheets_list)
+        return file_path
 
 # ==========================================================================
     # JUSTIFICATION SO CONTROLLER (DYNAMIC MODE: REVERSAL & NON REVERSAL)
@@ -5090,7 +5090,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                     state.load_memo_data()
                 except Exception as e:
                     print("Auto refresh memo error:", e)
-                    
+
     # 2. TRIGGER MANUAL SYNC DARI TOMBOL TAB 1
     @reactive.Effect
     @reactive.event(input.btn_trigger_sync_markom_event)
