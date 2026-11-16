@@ -8095,38 +8095,160 @@ class AppState:
 
 
     # ==========================================================================
-    # PENCATAT STATUS RINGAN (INSTAN 0 DETIK, ANTI-ERROR ARGUMEN)
+    # PRE-COMPILER MASTER REPORT (DIADAPTASI DARI LOGIKA STREAMLIT)
     # ==========================================================================
-    def update_cca_master_file(self, step_name: str, sheet_count: int = 0):
-        """Memperbarui status sheet Cycle Count secara instan (0 detik di RAM)."""
-        if sheet_count <= 0:
-            # Otomatis hitung berapa sheet yang sudah ada datanya
-            sheets = [
-                self._raw_df_cca_scan, self._raw_df_cca_stock, self._raw_df_cca_real_plus,
-                self._raw_df_cca_sys_plus, self._raw_df_cca_alloc, self._raw_df_cca_setup_real,
-                self._raw_df_cca_rec_real, self._raw_df_cca_rec_sys, self._raw_df_cca_adj4,
-                self._raw_df_cca_karantina, self._raw_df_cca_check5, self._raw_df_cca_miss_loc,
-                self._raw_df_cca_sum_miss
-            ]
-            sheet_count = sum(1 for df in sheets if df is not None and isinstance(df, pd.DataFrame) and not df.empty)
+    def compile_so_full_report(self):
+        """Merender seluruh sheet Stock Opname ke file sementara sebelum diunduh"""
+        import os
+        import re
+        import tempfile
+        import pandas as pd
 
-        self.cca_saved_sheets_count.set(sheet_count)
-        self.cca_report_ready.set(True)
-        self.cca_report_status.set(f"✅ Data {step_name} siap ({sheet_count} Sheet siap dirangkum).")
+        sheets_list = [
+            ('1_DATA SCAN', getattr(self, "_raw_df_so_scan", pd.DataFrame())),
+            ('2_STOCK SYSTEM', getattr(self, "_raw_df_so_stock", pd.DataFrame())),
+            ('3_REAL PLUS', getattr(self, "_raw_df_so_real_plus", pd.DataFrame())),
+            ('4_SYSTEM PLUS', getattr(self, "_raw_df_so_sys_plus", pd.DataFrame())),
+            ('5_SET UP REAL PLUS', getattr(self, "_raw_df_so_setup_real", pd.DataFrame())),
+            ('6_REAL PLUS RECON', getattr(self, "_raw_df_so_rec_real", pd.DataFrame())),
+            ('7_SYSTEM OUTSTANDING', getattr(self, "_raw_df_so_rec_sys", pd.DataFrame())),
+            ('8_MULTIPLE ADJ PLUS', getattr(self, "_raw_df_so_mult", pd.DataFrame())),
+            ('9_SINGLE ADJ PLUS', getattr(self, "_raw_df_so_sing", pd.DataFrame())),
+            ('10_HASIL CEK ADJ', getattr(self, "_raw_df_so_res4", pd.DataFrame())),
+            ('11_KARANTINA', getattr(self, "_raw_df_so_karantina", pd.DataFrame())),
+            ('12_MISS LOCATION', getattr(self, "_raw_df_so_miss_loc", pd.DataFrame())),
+            ('13_SUMMARY MISS LOC', getattr(self, "_raw_df_so_sum_miss", pd.DataFrame())),
+            ('14_DETAIL ADJUSTMENT', getattr(self, "_raw_df_so_adj_detail", pd.DataFrame())),
+            ('15_SUMMARY ADJ', getattr(self, "_raw_df_so_adj_sum", pd.DataFrame())),
+        ]
 
-    def update_so_master_file(self, step_name: str, sheet_count: int = 0):
-        """Memperbarui status sheet Stock Opname secara instan (0 detik di RAM)."""
-        if sheet_count <= 0:
-            # Otomatis hitung berapa sheet yang sudah ada datanya
-            sheets = [
-                self._raw_df_so_scan, self._raw_df_so_stock, self._raw_df_so_real_plus,
-                self._raw_df_so_sys_plus, self._raw_df_so_setup_real, self._raw_df_so_rec_real,
-                self._raw_df_so_rec_sys, self._raw_df_so_mult, self._raw_df_so_sing,
-                self._raw_df_so_res4, self._raw_df_so_karantina, self._raw_df_so_miss_loc,
-                self._raw_df_so_sum_miss, self._raw_df_so_adj_detail, self._raw_df_so_adj_sum
-            ]
-            sheet_count = sum(1 for df in sheets if df is not None and isinstance(df, pd.DataFrame) and not df.empty)
+        valid_sheets = []
+        seen = set()
 
-        self.so_saved_sheets_count.set(sheet_count)
+        for raw_title, df in sheets_list:
+            if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+                continue
+
+            # Bersihkan nama sheet
+            title = re.sub(r'[\\/*?:\[\]]', '', str(raw_title))[:31].strip() or "Sheet"
+            base, n = title[:28], 1
+            while title.upper() in seen:
+                title = f"{base}_{n}"
+                n += 1
+            seen.add(title.upper())
+
+            # Bersihkan kolom kembar / duplikat (seperti di Streamlit)
+            d_clean = df.copy()
+            cols = pd.Series([str(c).strip() for c in d_clean.columns])
+            if cols.duplicated().any():
+                for dup in cols[cols.duplicated()].unique():
+                    cols[cols == dup] = [f"{dup}_{i}" if i != 0 else dup for i in range((cols == dup).sum())]
+                d_clean.columns = cols.values
+
+            # Bersihkan timezone
+            for col in d_clean.columns:
+                if pd.api.types.is_datetime64_any_dtype(d_clean[col]):
+                    try:
+                        if hasattr(d_clean[col].dt, 'tz') and d_clean[col].dt.tz is not None:
+                            d_clean[col] = d_clean[col].dt.tz_localize(None)
+                    except Exception:
+                        d_clean[col] = d_clean[col].astype(str)
+
+            valid_sheets.append((title, d_clean))
+
+        if not valid_sheets:
+            return False, "Belum ada step yang dijalankan atau data kosong!"
+
+        # Tulis langsung ke file sementara di disk (anti memory-spike)
+        fd, file_path = tempfile.mkstemp(prefix="full_so_", suffix=".xlsx")
+        os.close(fd)
+
+        try:
+            with pd.ExcelWriter(file_path, engine="xlsxwriter") as writer:
+                for s_title, s_df in valid_sheets:
+                    s_df.to_excel(writer, sheet_name=s_title, index=False)
+        except Exception:
+            with pd.ExcelWriter(file_path, engine="openpyxl") as writer:
+                for s_title, s_df in valid_sheets:
+                    s_df.to_excel(writer, sheet_name=s_title, index=False)
+
+        self.so_report_path = file_path
+        self.so_saved_sheets_count.set(len(valid_sheets))
         self.so_report_ready.set(True)
-        self.so_report_status.set(f"✅ Data {step_name} siap ({sheet_count} Sheet siap dirangkum).")
+        self.so_report_status.set(f"✅ Full Report siap diunduh ({len(valid_sheets)} Sheet telah dikompilasi).")
+        return True, f"Kompilasi {len(valid_sheets)} Sheet Selesai!"
+
+    def compile_cca_full_report(self):
+        """Merender seluruh sheet Cycle Count ke file sementara sebelum diunduh"""
+        import os
+        import re
+        import tempfile
+        import pandas as pd
+
+        sheets_list = [
+            ('1_DATA SCAN', getattr(self, "_raw_df_cca_scan", pd.DataFrame())),
+            ('2_STOCK SYSTEM', getattr(self, "_raw_df_cca_stock", pd.DataFrame())),
+            ('3_REAL PLUS', getattr(self, "_raw_df_cca_real_plus", pd.DataFrame())),
+            ('4_SYSTEM PLUS', getattr(self, "_raw_df_cca_sys_plus", pd.DataFrame())),
+            ('5_ALLOCATION DETAIL', getattr(self, "_raw_df_cca_alloc", pd.DataFrame())),
+            ('6_SET UP REAL PLUS', getattr(self, "_raw_df_cca_setup_real", pd.DataFrame())),
+            ('7_REAL PLUS RECON', getattr(self, "_raw_df_cca_rec_real", pd.DataFrame())),
+            ('8_SYSTEM OUTSTANDING', getattr(self, "_raw_df_cca_rec_sys", pd.DataFrame())),
+            ('9_REAL PLUS NEED ADJ', getattr(self, "_raw_df_cca_adj4", pd.DataFrame())),
+            ('10_KARANTINA', getattr(self, "_raw_df_cca_karantina", pd.DataFrame())),
+            ('11_CHECK AUDIT', getattr(self, "_raw_df_cca_check5", pd.DataFrame())),
+            ('12_MISS LOCATION', getattr(self, "_raw_df_cca_miss_loc", pd.DataFrame())),
+            ('13_SUMMARY MISS LOC', getattr(self, "_raw_df_cca_sum_miss", pd.DataFrame())),
+        ]
+
+        valid_sheets = []
+        seen = set()
+
+        for raw_title, df in sheets_list:
+            if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+                continue
+
+            title = re.sub(r'[\\/*?:\[\]]', '', str(raw_title))[:31].strip() or "Sheet"
+            base, n = title[:28], 1
+            while title.upper() in seen:
+                title = f"{base}_{n}"
+                n += 1
+            seen.add(title.upper())
+
+            d_clean = df.copy()
+            cols = pd.Series([str(c).strip() for c in d_clean.columns])
+            if cols.duplicated().any():
+                for dup in cols[cols.duplicated()].unique():
+                    cols[cols == dup] = [f"{dup}_{i}" if i != 0 else dup for i in range((cols == dup).sum())]
+                d_clean.columns = cols.values
+
+            for col in d_clean.columns:
+                if pd.api.types.is_datetime64_any_dtype(d_clean[col]):
+                    try:
+                        if hasattr(d_clean[col].dt, 'tz') and d_clean[col].dt.tz is not None:
+                            d_clean[col] = d_clean[col].dt.tz_localize(None)
+                    except Exception:
+                        d_clean[col] = d_clean[col].astype(str)
+
+            valid_sheets.append((title, d_clean))
+
+        if not valid_sheets:
+            return False, "Belum ada step yang dijalankan atau data kosong!"
+
+        fd, file_path = tempfile.mkstemp(prefix="full_cca_", suffix=".xlsx")
+        os.close(fd)
+
+        try:
+            with pd.ExcelWriter(file_path, engine="xlsxwriter") as writer:
+                for s_title, s_df in valid_sheets:
+                    s_df.to_excel(writer, sheet_name=s_title, index=False)
+        except Exception:
+            with pd.ExcelWriter(file_path, engine="openpyxl") as writer:
+                for s_title, s_df in valid_sheets:
+                    s_df.to_excel(writer, sheet_name=s_title, index=False)
+
+        self.cca_report_path = file_path
+        self.cca_saved_sheets_count.set(len(valid_sheets))
+        self.cca_report_ready.set(True)
+        self.cca_report_status.set(f"✅ Full Report siap diunduh ({len(valid_sheets)} Sheet telah dikompilasi).")
+        return True, f"Kompilasi {len(valid_sheets)} Sheet Selesai!"
