@@ -18,216 +18,6 @@ REPORT_URL = "https://report.jezpro.id/powerbi/?id=f8f93cc4-2ec6-4535-a708-94fd3
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-PAYLOAD_QUERY = {
-    "version": "1.0.0",
-    "queries": [{
-        "Query": {
-            "Commands": [{
-                "SemanticQueryDataShapeCommand": {
-                    "Query": {
-                        "Version": 2,
-                        "From": [
-                            {"Name": "f", "Entity": "FDR", "Type": 0},
-                            {
-                                "Name": "d",
-                                "Entity": "Date Filter",
-                                "Type": 0,
-                            },
-                        ],
-                        "Select": [
-                            {
-                                "Column": {
-                                    "Expression": {
-                                        "SourceRef": {"Source": "f"}
-                                    },
-                                    "Property": "Order Number",
-                                },
-                                "Name": "FDR.Order Number",
-                            },
-                            {
-                                "Column": {
-                                    "Expression": {
-                                        "SourceRef": {"Source": "f"}
-                                    },
-                                    "Property": "warehouse",
-                                },
-                                "Name": "FDR.warehouse",
-                            },
-                            {
-                                "Column": {
-                                    "Expression": {
-                                        "SourceRef": {"Source": "f"}
-                                    },
-                                    "Property": "order_date_created",
-                                },
-                                "Name": "FDR.order_date_created",
-                            },
-                            {
-                                "Column": {
-                                    "Expression": {
-                                        "SourceRef": {"Source": "f"}
-                                    },
-                                    "Property": "Resi",
-                                },
-                                "Name": "FDR.Resi",
-                            },
-                            {
-                                "Column": {
-                                    "Expression": {
-                                        "SourceRef": {"Source": "f"}
-                                    },
-                                    "Property": "platform_name",
-                                },
-                                "Name": "FDR.platform_name",
-                            },
-                            {
-                                "Column": {
-                                    "Expression": {
-                                        "SourceRef": {"Source": "f"}
-                                    },
-                                    "Property": "Store",
-                                },
-                                "Name": "FDR.Store",
-                            },
-                            {
-                                "Column": {
-                                    "Expression": {
-                                        "SourceRef": {"Source": "f"}
-                                    },
-                                    "Property": "order_status",
-                                },
-                                "Name": "FDR.order_status",
-                            },
-                            {
-                                "Column": {
-                                    "Expression": {
-                                        "SourceRef": {"Source": "f"}
-                                    },
-                                    "Property": "FDRstatus",
-                                },
-                                "Name": "FDR.FDRstatus",
-                            },
-                            {
-                                "Column": {
-                                    "Expression": {
-                                        "SourceRef": {"Source": "f"}
-                                    },
-                                    "Property": "internal_order_status",
-                                },
-                                "Name": "FDR.internal_order_status",
-                            },
-                            {
-                                "Column": {
-                                    "Expression": {
-                                        "SourceRef": {"Source": "f"}
-                                    },
-                                    "Property": "tgl_manifest",
-                                },
-                                "Name": "FDR.tgl_manifest",
-                            },
-                            {
-                                "Column": {
-                                    "Expression": {
-                                        "SourceRef": {"Source": "f"}
-                                    },
-                                    "Property": "payment_method",
-                                },
-                                "Name": "FDR.payment_method",
-                            },
-                            {
-                                "Column": {
-                                    "Expression": {
-                                        "SourceRef": {"Source": "f"}
-                                    },
-                                    "Property": "packed_time",
-                                },
-                                "Name": "FDR.packed_time",
-                            },
-                            {
-                                "Column": {
-                                    "Expression": {
-                                        "SourceRef": {"Source": "f"}
-                                    },
-                                    "Property": "FDRtime",
-                                },
-                                "Name": "FDR.FDRtime",
-                            },
-                            {
-                                "Column": {
-                                    "Expression": {
-                                        "SourceRef": {"Source": "f"}
-                                    },
-                                    "Property": "shipping_method",
-                                },
-                                "Name": "FDR.shipping_method",
-                            },
-                            {
-                                "Column": {
-                                    "Expression": {
-                                        "SourceRef": {"Source": "f"}
-                                    },
-                                    "Property": "created_at",
-                                },
-                                "Name": "FDR.created_at",
-                            },
-                        ],
-                        "Where": [{
-                            "Condition": {
-                                "In": {
-                                    "Expressions": [{
-                                        "Column": {
-                                            "Expression": {
-                                                "SourceRef": {"Source": "d"}
-                                            },
-                                            "Property": "Filter",
-                                        }
-                                    }],
-                                    "Values": [[{
-                                        "Literal": {
-                                            "Value": "'Current Month'"
-                                        }
-                                    }]],
-                                }
-                            }
-                        }],
-                        "OrderBy": [{
-                            "Direction": 2,
-                            "Expression": {
-                                "Column": {
-                                    "Expression": {
-                                        "SourceRef": {"Source": "f"}
-                                    },
-                                    "Property": "order_date_created",
-                                }
-                            },
-                          }],
-                        "Binding": {
-                            "Primary": {
-                                "Groupings": [{
-                                    "Projections": list(range(15)),
-                                    "Subtotal": 1,
-                                }]
-                            },
-                            "DataReduction": {
-                                "DataVolume": 3,
-                                "Primary": {"Window": {"Count": 2000}},
-                            },
-                            "Version": 1,
-                        },
-                    }
-                }
-            }]
-        },
-        "QueryId": "",
-        "ApplicationContext": {
-            "Sources": [{"VisualId": "f7300ca4d0cbc490c149"}]
-        },
-    }],
-    "cancelQueries": [],
-    "modelId": "256734217",
-    "userPreferredLocale": "en-US",
-}
-
 COLS = [
     "order_number",
     "warehouse",
@@ -255,91 +45,112 @@ def run_scraper():
       " Scraping FDR via Playwright..."
   )
 
-  with sync_playwright() as p:
-    # Buka browser chromium di background (headless=True)
-    # Ubah headless=False jika Anda ingin melihat browsernya terbuka di layar
-    browser = p.chromium.launch(headless=True)
+  target_data = []
 
-    # Otomatis tangani popup login Windows NTLM
+  with sync_playwright() as p:
+    # headless=False agar jendela browser muncul di layar Anda
+    browser = p.chromium.launch(headless=False)
     context = browser.new_context(
         http_credentials={"username": PBI_USER, "password": PBI_PASS}
     )
     page = context.new_page()
 
-    try:
-      print("🌐 Membuka halaman Power BI report...")
-      page.goto(REPORT_URL, wait_until="networkidle", timeout=60000)
+    # Mencegat (intercept) request data tabel saat Power BI memuat visual
+    def handle_response(response):
+      if "/querydata" in response.url and response.request.method == "POST":
+        try:
+          body = response.json()
+          results = body.get("results", [])
+          if results:
+            dm0 = (
+                results[0]
+                .get("result", {})
+                .get("data", {})
+                .get("dsr", {})
+                .get("DS", [{}])[0]
+                .get("PH", [{}])[0]
+                .get("DM0", [])
+            )
+            # Cek jika ini adalah request tabel utama (memiliki lebih dari 5 kolom/cell)
+            if dm0 and len(dm0) > 0 and "C" in dm0[0] and len(dm0[0]["C"]) >= 10:
+              target_data.append(dm0)
+              print(
+                  f"🎯 Berhasil mencegat paket data tabel utama FDR! ({len(dm0)}"
+                  " baris mentah)"
+              )
+        except Exception:
+          pass
 
-      # Cek jika ada form isian login di halaman web
+    page.on("response", handle_response)
+
+    try:
+      print("🌐 Membuka Power BI report...")
+      page.goto(REPORT_URL, timeout=60000)
+
+      # Periksa apakah ada form login HTML di web
       time.sleep(2)
-      user_input = page.locator(
-          "input[type='text'], input[name*='user'], input[id*='user']"
-      ).first
+      user_input = page.locator("input[type='text'], input[name*='user']").first
       if user_input.is_visible(timeout=3000):
-        print("🔑 Mengisi form login web...")
+        print("🔑 Terdeteksi form login web, mengisi username & password...")
         user_input.fill(PBI_USER)
         page.locator("input[type='password']").first.fill(PBI_PASS)
         page.keyboard.press("Enter")
-        page.wait_for_load_state("networkidle", timeout=30000)
 
-      print("⏳ Mengambil data kueri dari sesi browser...")
+      # Tunggu hingga tabel termuat dan data tertangkap
+      print("⏳ Menunggu visual tabel selesai memuat data...")
+      for _ in range(30):
+        if len(target_data) > 0:
+          break
+        page.wait_for_timeout(1000)
 
-      # Eksekusi kueri langsung di dalam sesi browser yang sudah berhasil login
-      js_code = """
-            async (payload) => {
-                const res = await fetch("https://report.jezpro.id/powerbi/api/explore/reports/f8f93cc4-2ec6-4535-a708-94fd3cf99f22/querydata", {
-                    method: "POST",
-                    credentials: "include",
-                    headers: {
-                        "Content-Type": "application/json;charset=UTF-8",
-                        "Accept": "application/json, text/plain, */*",
-                        "X-PowerBI-ResourceKey": "any"
-                    },
-                    body: JSON.stringify(payload)
-                });
-                return await res.json();
-            }
-            """
-      raw_json = page.evaluate(js_code, PAYLOAD_QUERY)
-
-      # Tutup browser
+      # Beri jeda 2 detik sebelum browser ditutup
+      page.wait_for_timeout(2000)
       browser.close()
 
-      # Parsing format DSR Power BI
-      dm0 = raw_json["results"][0]["result"]["data"]["dsr"]["DS"][0]["PH"][0][
-          "DM0"
-      ]
-      rows = []
-      last_row = [None] * len(COLS)
-      for item in dm0:
-        if "C" in item:
-          cells = item["C"]
-          row = [
-              cells[i] if (i < len(cells) and cells[i] is not None) else None
-              for i in range(len(COLS))
-          ]
-          for i in range(len(row)):
-            if row[i] is None and last_row[i] is not None:
-              row[i] = last_row[i]
-          rows.append(row)
-          last_row = row
-
-      df = pd.DataFrame(rows, columns=COLS)
-
     except Exception as e:
-      print(f"❌ Terjadi kesalahan saat scraping: {e}")
+      print(f"❌ Terjadi kesalahan pada browser: {e}")
       browser.close()
       return
 
+  if not target_data:
+    print(
+        "⚠️ Gagal menangkap data tabel. Pastikan dashboard berhasil terbuka dan"
+        " tidak stuck di login."
+    )
+    return
+
+  # Parsing data
+  try:
+    dm0 = target_data[0]
+    rows = []
+    last_row = [None] * len(COLS)
+    for item in dm0:
+      if "C" in item:
+        cells = item["C"]
+        row = [
+            cells[i] if (i < len(cells) and cells[i] is not None) else None
+            for i in range(len(COLS))
+        ]
+        for i in range(len(row)):
+          if row[i] is None and last_row[i] is not None:
+            row[i] = last_row[i]
+        rows.append(row)
+        last_row = row
+
+    df = pd.DataFrame(rows, columns=COLS)
+  except Exception as e:
+    print(f"❌ Error parsing data: {e}")
+    return
+
   if df.empty:
-    print("⚠️ Data kosong.")
+    print("⚠️ DataFrame kosong.")
     return
 
   # ==================== FILTER DATA ==================== #
-  # 1. Warehouse: HANYA SURABAYA
+  # 1. Warehouse Surabaya
   df = df[df["warehouse"].fillna("").str.strip().str.upper() == "SURABAYA"]
 
-  # 2. Status: SELAIN DONE & CANCEL
+  # 2. Selain status DONE dan CANCEL
   excluded = [
       "DONE",
       "DONE ONLINE",
@@ -355,7 +166,7 @@ def run_scraper():
   mask_order = ~df["order_status"].fillna("").str.upper().isin(excluded)
   df = df[mask_internal & mask_order]
 
-  # 3. Tanggal: Mulai awal bulan ini ke depan
+  # 3. Tanggal bulan ini ke depan
   first_day_of_month = now_wib.replace(
       day=1, hour=0, minute=0, second=0, microsecond=0
   )
@@ -365,7 +176,7 @@ def run_scraper():
   df = df[df["dt_temp"].isna() | (df["dt_temp"] >= first_day_of_month)]
   df = df.drop(columns=["dt_temp"])
 
-  print(f"📊 Berhasil memfilter {len(df)} pesanan Surabaya aktif.")
+  print(f"📊 Ditemukan {len(df)} pesanan Surabaya aktif.")
 
   # ==================== SIMPAN KE SUPABASE ==================== #
   if not df.empty:
@@ -384,15 +195,13 @@ def run_scraper():
           " (fdr_orders)!"
       )
     except Exception as e:
-      print(f"❌ Gagal menyimpan ke Supabase: {e}")
+      print(f"❌ Gagal simpan ke Supabase: {e}")
 
 
-# ==================== RUNNER & SCHEDULER ==================== #
+# ==================== SCHEDULER ==================== #
 if __name__ == "__main__":
-  # Jalankan 1x saat pertama kali script dijalankan
   run_scraper()
 
-  # Atur jadwal otomatis setiap 14:00 & 21:00 WIB
   schedule.every().day.at("14:00", "Asia/Jakarta").do(run_scraper)
   schedule.every().day.at("21:00", "Asia/Jakarta").do(run_scraper)
 
