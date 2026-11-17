@@ -671,6 +671,17 @@ class AppState:
         self.df_iv_setup_rows = reactive.Value([])
         self._raw_df_iv_setup = pd.DataFrame()
 
+    # --- FDR CONTROLLER STATE ---
+        self.fdr_processed = reactive.Value(False)
+        self.fdr_total_order = reactive.Value(0)
+        self.fdr_overdue = reactive.Value(0)
+        self.fdr_critical = reactive.Value(0)
+        self.fdr_warning = reactive.Value(0)
+        self.fdr_normal = reactive.Value(0)
+        self.df_fdr_headers = reactive.Value([])
+        self.df_fdr_rows = reactive.Value([])
+        self._raw_df_fdr = pd.DataFrame()
+
         # --- INSTOCK VALIDATION 2-LIST STATE ---
         self.iv_tab1_pending = reactive.Value([])  # Item yang masih di Tab 1
         self.iv_tab3_scanned = reactive.Value([])  # Item yang sudah dipindah ke Tab 3
@@ -796,7 +807,7 @@ class AppState:
             return ["Warehouse Activity Monitor"]
         elif uname == "toko":
             return ["Warehouse Activity Monitor"]
-        return ["Warehouse Activity Monitor", "Memo Pengajuan", "Balancing Stock", "Database Ongkir In/Out", "Precentage Display"]
+        return ["Warehouse Activity Monitor","FDR Controller", "Memo Pengajuan", "Balancing Stock", "Database Ongkir In/Out", "Precentage Display"]
 
     def get_menu_target(self) -> list[str]:
         uname = self.username().lower()
@@ -878,6 +889,7 @@ class AppState:
         elif cur_menu in ["Instock Validation", "instock_validation", "instock-validation"]: return "instock_validation"
         elif cur_menu in ["Refill Shelving", "refill_shelving"]: return "refill_shelving"
         elif cur_menu in ["Reloc Koli to Koli", "reloc-koli-to-koli"]: return "reloc_koli_to_koli"
+        elif cur_menu in ["FDR Controller", "fdr_controller", "fdr-controller"]: return "fdr_controller"
         return "under_development"
 
     # --- Ongkir Methods ---
@@ -8218,3 +8230,145 @@ class AppState:
         self.so_saved_sheets_count.set(sheet_count)
         self.so_report_ready.set(True)
         self.so_report_status.set(f"✅ Data {step_name} siap ({sheet_count} Sheet siap dirangkum).")
+
+
+        # ==========================================================================
+    # LOGIKA FDR CONTROLLER (URGENSI MANIFEST SURABAYA)
+    # ==========================================================================
+    def process_fdr_controller(self, file_info):
+        try:
+            if not file_info:
+                return False, "File manifest/order wajib diupload!"
+
+            df_raw = load_data_from_info(file_info)
+            if df_raw.empty:
+                return False, "File yang diupload kosong!"
+
+            # Minimal 14 kolom (A s/d N)
+            if df_raw.shape[1] < 14:
+                return False, f"File hanya memiliki {df_raw.shape[1]} kolom! Minimal membutuhkan 14 kolom (hingga Kolom N)."
+
+            df = df_raw.copy()
+
+            # Mapping Kolom sesuai instruksi:
+            # Kolom C (Index 2) = Order Number
+            # Kolom D (Index 3) = Resi
+            # Kolom E (Index 4) = Warehouse
+            # Kolom G (Index 6) = Order Date Create
+            # Kolom L (Index 11) = Status
+            # Kolom N (Index 13) = Target Time FDR
+            col_order = df.columns[2]
+            col_resi = df.columns[3]
+            col_wh = df.columns[4]
+            col_create = df.columns[6]
+            col_status = df.columns[11]
+            col_target_fdr = df.columns[13]
+
+            # 1. Bersihkan Data Dasar
+            df['ORDER_NO'] = df[col_order].fillna('-').astype(str).str.strip().str.replace(r'\.0$', '', regex=True)
+            df['RESI'] = df[col_resi].fillna('-').astype(str).str.strip().str.replace(r'\.0$', '', regex=True)
+            df['WAREHOUSE'] = df[col_wh].fillna('').astype(str).str.strip().str.upper()
+            df['STATUS'] = df[col_status].fillna('').astype(str).str.strip().str.upper()
+
+            # 2. FILTER: Warehouse Surabaya & Status selain DONE dan CANCEL
+            mask_wh = df['WAREHOUSE'].str.contains('SURABAYA', na=False)
+            mask_status = ~df['STATUS'].isin(['DONE', 'CANCEL']) & (df['STATUS'] != '')
+
+            df_filtered = df[mask_wh & mask_status].copy()
+
+            if df_filtered.empty:
+                return False, "Tidak ditemukan order untuk cabang SURABAYA dengan status selain DONE dan CANCEL."
+
+            # 3. Parsing Datetime Waktu Sekarang (WIB Jakarta)
+            now_wib = pd.Timestamp.now(tz='Asia/Jakarta').tz_localize(None)
+
+            # 4. Parsing Target Time FDR (Kolom N) dan Order Date Create (Kolom G)
+            df_filtered['DT_CREATE'] = pd.to_datetime(df_filtered[col_create], errors='coerce')
+            df_filtered['DT_TARGET'] = pd.to_datetime(df_filtered[col_target_fdr], errors='coerce')
+
+            records = []
+            c_overdue = 0
+            c_critical = 0
+            c_warning = 0
+            c_normal = 0
+
+            for _, row in df_filtered.iterrows():
+                target_dt = row['DT_TARGET']
+                create_dt = row['DT_CREATE']
+
+                create_str = create_dt.strftime('%d/%m/%Y %H:%M') if pd.notna(create_dt) else str(row[col_create])
+                target_str = target_dt.strftime('%d/%m/%Y %H:%M') if pd.notna(target_dt) else str(row[col_target_fdr])
+
+                if pd.notna(target_dt):
+                    # Selisih waktu dalam menit (target - sekarang)
+                    diff_mins = (target_dt - now_wib).total_seconds() / 60.0
+
+                    if diff_mins < 0:
+                        mins_passed = int(abs(diff_mins))
+                        hrs_passed = mins_passed // 60
+                        m_rem = mins_passed % 60
+                        time_display = f"Lewat {hrs_passed}j {m_rem}m" if hrs_passed > 0 else f"Lewat {m_rem}m"
+                        urgency_rank = 1
+                        urgency_label = "🚨 OVERDUE / EXPIRED"
+                        c_overdue += 1
+                    elif diff_mins <= 60:
+                        time_display = f"Sisa {int(diff_mins)} menit"
+                        urgency_rank = 2
+                        urgency_label = "🔥 KRITIS (< 1 JAM)"
+                        c_critical += 1
+                    elif diff_mins <= 180:
+                        hrs = int(diff_mins // 60)
+                        m_rem = int(diff_mins % 60)
+                        time_display = f"Sisa {hrs}j {m_rem}m"
+                        urgency_rank = 3
+                        urgency_label = "⚠️ MENENGAH (1-3 JAM)"
+                        c_warning += 1
+                    else:
+                        hrs = int(diff_mins // 60)
+                        m_rem = int(diff_mins % 60)
+                        time_display = f"Sisa {hrs}j {m_rem}m"
+                        urgency_rank = 4
+                        urgency_label = "🟢 NORMAL (> 3 JAM)"
+                        c_normal += 1
+                else:
+                    diff_mins = 999999.0
+                    time_display = "-"
+                    urgency_rank = 5
+                    urgency_label = "❓ TARGET TIDAK VALID"
+
+                records.append({
+                    "URGENSI RANK": urgency_rank,
+                    "TINGKAT URGENSI": urgency_label,
+                    "SISA WAKTU DEADLINE": time_display,
+                    "ORDER NUMBER": row['ORDER_NO'],
+                    "NOMOR RESI": row['RESI'],
+                    "WAREHOUSE": row['WAREHOUSE'],
+                    "ORDER DATE CREATE": create_str,
+                    "TARGET TIME FDR": target_str,
+                    "STATUS": row['STATUS'],
+                    "_diff_mins": diff_mins
+                })
+
+            df_result = pd.DataFrame(records)
+
+            # Sort agar yang paling mendesak / paling mendekati deadline berada di paling atas
+            df_result = df_result.sort_values(by=['_diff_mins', 'URGENSI RANK'], ascending=[True, True]).reset_index(drop=True)
+            df_display = df_result.drop(columns=['URGENSI RANK', '_diff_mins'])
+
+            # Set Reactive State
+            self.fdr_total_order.set(len(df_display))
+            self.fdr_overdue.set(c_overdue)
+            self.fdr_critical.set(c_critical)
+            self.fdr_warning.set(c_warning)
+            self.fdr_normal.set(c_normal)
+
+            self._raw_df_fdr = df_display.copy()
+            self.df_fdr_headers.set(df_display.columns.tolist())
+            self.df_fdr_rows.set(df_display.fillna("").astype(str).values.tolist())
+            self.fdr_processed.set(True)
+
+            return True, f"Berhasil memproses {len(df_display):,} order FDR untuk Surabaya!"
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return False, f"Terjadi kesalahan saat memproses FDR: {str(e)}"

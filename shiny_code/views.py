@@ -3312,6 +3312,35 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
         ),
         style="padding: 0.5rem 0; width: 100%;"
     )
+
+
+
+    # ==============================================================================
+# VIEW: FDR CONTROLLER (URGENSI MANIFEST TIME SURABAYA)
+# ==============================================================================
+def fdr_controller_view(state: AppState):
+    upload_section = ui.div(
+        ui.div(
+            ui.h4("📥 Upload File Manifest FDR", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
+            ui.p(
+                "Sistem otomatis memfilter Warehouse SURABAYA (Kolom E) dengan Status selain DONE & CANCEL (Kolom L), "
+                "serta memetakan tingkat urgensi waktu nyata berdasarkan selisih Target Time FDR (Kolom N) dengan jam saat ini.",
+                style="color: #718096; font-size: 12.5px; margin: 0;"
+            ),
+            style="margin-bottom: 0.75rem;"
+        ),
+        custom_uploader_box("uploader_fdr_file", "Upload File Excel / CSV Manifest FDR"),
+        ui.output_ui("fdr_action_btn_ui"),
+        style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+    )
+
+    results_section = ui.output_ui("fdr_results_container")
+
+    return ui.div(
+        upload_section,
+        results_section,
+        style="width: 100%; padding: 1rem;"
+    )
 def menu_item(label: str, target_menu: str, current_menu: str):
     import re
     is_active = (current_menu == target_menu)
