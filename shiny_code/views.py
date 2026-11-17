@@ -3341,6 +3341,42 @@ def fdr_controller_view(state: AppState):
         results_section,
         style="width: 100%; padding: 1rem;"
     )
+
+
+def dark_metric_box_with_delta(title: str, val_str: str, delta_val: float, unit_suffix: str, border_color: str, invert_color: bool = False):
+    """
+    Kotak metrik modern dilengkapi indikator panah naik / turun.
+    invert_color=True digunakan untuk metrik seperti 'Defisit' (jika turun = bagus/hijau, naik = merah).
+    """
+    if delta_val > 0:
+        arrow_icon = "fa-solid fa-arrow-trend-up"
+        delta_text = f"+{delta_val:.1f}{unit_suffix}" if isinstance(delta_val, float) else f"+{delta_val}{unit_suffix}"
+        badge_color = "#E53E3E" if invert_color else "#10B981"
+        badge_bg = "rgba(229, 62, 62, 0.15)" if invert_color else "rgba(16, 185, 129, 0.15)"
+    elif delta_val < 0:
+        arrow_icon = "fa-solid fa-arrow-trend-down"
+        delta_text = f"{delta_val:.1f}{unit_suffix}" if isinstance(delta_val, float) else f"{delta_val}{unit_suffix}"
+        badge_color = "#10B981" if invert_color else "#E53E3E"
+        badge_bg = "rgba(16, 185, 129, 0.15)" if invert_color else "rgba(229, 62, 62, 0.15)"
+    else:
+        arrow_icon = "fa-solid fa-minus"
+        delta_text = f"0{unit_suffix}"
+        badge_color = "#A0AEC0"
+        badge_bg = "rgba(160, 174, 192, 0.15)"
+
+    delta_badge = ui.div(
+        ui.tags.i(class_=arrow_icon, style=f"margin-right: 4px; font-size: 11px; color: {badge_color};"),
+        ui.span(delta_text, style=f"font-size: 11px; font-weight: 800; color: {badge_color};"),
+        ui.span(" vs sync lalu", style="font-size: 10px; color: #718096; margin-left: 4px;"),
+        style=f"display: inline-flex; align-items: center; background: {badge_bg}; padding: 2px 8px; border-radius: 6px; margin-top: 6px;"
+    )
+
+    return ui.div(
+        ui.div(title, style="color: #A0AEC0; font-size: 11px; font-weight: bold; margin-bottom: 4px;"),
+        ui.div(val_str, style=f"color: {border_color}; font-size: 22px; font-weight: bold; line-height: 1.1;"),
+        delta_badge,
+        style=f"background: #1A1A1A; padding: 1rem; border-radius: 8px; border-left: 4px solid {border_color}; width: 100%; text-align: center;"
+    )
 def menu_item(label: str, target_menu: str, current_menu: str):
     import re
     is_active = (current_menu == target_menu)

@@ -690,6 +690,17 @@ class AppState:
         self.df_iv_done_headers = reactive.Value([])
         self.df_iv_done_rows = reactive.Value([])
         self._raw_df_iv_done = pd.DataFrame()
+        # Delta Tracking Balancing Stock (Dibanding Sync Sebelumnya)
+        self.bs_delta_logistik = reactive.Value(0.0)
+        self.bs_delta_offline = reactive.Value(0.0)
+        self.bs_delta_online = reactive.Value(0.0)
+        self.bs_delta_need_off = reactive.Value(0)
+        self.bs_delta_need_on = reactive.Value(0)
+        self.bs_delta_need_log = reactive.Value(0)
+        self.bs_delta_total_refill = reactive.Value(0)
+
+        # Cache snapshot metrik sebelumnya di memory
+        self._prev_bs_metrics = {}
 
         # --- REFILL SHELVING STATE ---
         self.rs_processed = reactive.Value(False)
@@ -4378,7 +4389,7 @@ class AppState:
         selected_cats = self.bs_selected_categories()
         selected_area = self.bs_selected_area()
 
-        # 1. Filter Sub Kategori (Jika ada pilihan, saring; jika tidak, SEMUANYA)
+        # 1. Filter Sub Kategori
         if selected_cats and len(selected_cats) > 0:
             selected_clean = [str(x).strip().upper() for x in selected_cats]
             df_alloc = df_alloc[df_alloc["SUB KATEGORI"].isin(selected_clean)].copy()
@@ -4400,52 +4411,71 @@ class AppState:
             df_refill = df_refill[mask_log].copy()
 
         # ----------------------------------------------------------------------
-        # 🌟 PERHITUNGAN BARU SESUAI INSTRUKSI:
-        # A = TOTAL SKU UNIK YANG ADA DI ALL BIN (SESUAI FILTER)
-        # B = TOTAL SKU YANG ADA DI MASING-MASING BIN AREA (QTY > 0)
+        # HITUNG NILAI METRIK SAAT INI (CURRENT)
         # ----------------------------------------------------------------------
-        tot_sku = len(df_alloc) # Total SKU Unik (All BIN)
+        tot_sku = len(df_alloc)
         tot_stk = int(df_alloc["TOTAL STOK"].sum()) if not df_alloc.empty else 0
 
-        # Hitung berapa SKU yang BENAR-BENAR MEMILIKI STOK di area tersebut (Qty > 0)
         sku_ada_off = sum(1 for _, r in df_alloc.iterrows() if r["QTY OFF"] > 0)
         sku_ada_onl = sum(1 for _, r in df_alloc.iterrows() if r["QTY ONL"] > 0)
         sku_ada_log = sum(1 for _, r in df_alloc.iterrows() if r["QTY LOG"] > 0)
 
-        # DEFISIT = TOTAL SKU ALL BIN - TOTAL SKU YANG ADA DI AREA TERSEBUT
         defisit_off = max(0, tot_sku - sku_ada_off)
         defisit_onl = max(0, tot_sku - sku_ada_onl)
         defisit_log = max(0, tot_sku - sku_ada_log)
 
-        # PERSENTASE KETERSEDIAAN / KESEIMBANGAN (%)
-        # Rumus: (Total SKU yang Ada di BIN / Total SKU All BIN) * 100%
-        # Atau: ((Total SKU - Defisit) / Total SKU) * 100%
         perc_off = (sku_ada_off / tot_sku * 100.0) if tot_sku > 0 else 0.0
         perc_on  = (sku_ada_onl / tot_sku * 100.0) if tot_sku > 0 else 0.0
         perc_log = (sku_ada_log / tot_sku * 100.0) if tot_sku > 0 else 0.0
 
-        # Simpan ke reactive state
+        # Simpan nilai metrik ke reactive state
         self.bs_total_sku.set(tot_sku)
         self.bs_total_stock.set(tot_stk)
-
-        # Baris Bawah: Menampilkan Total SKU yang Masih Kurang/Kosong di area tersebut
         self.bs_sku_need_off.set(defisit_off)
         self.bs_sku_need_on.set(defisit_onl)
         self.bs_sku_need_log.set(defisit_log)
-
-        # Baris Atas: Menampilkan Persentase Keseimbangan Keterisian Area
         self.bs_perc_offline.set(perc_off)
         self.bs_perc_online.set(perc_on)
         self.bs_perc_logistik.set(perc_log)
-
         self.bs_qty_refill_total.set(len(df_refill))
+
+        # ----------------------------------------------------------------------
+        # 🌟 KALKULASI DELTA ANAK PANAH (DITARUH DI SINI AGAR TIDAK ERROR)
+        # ----------------------------------------------------------------------
+        prev = getattr(self, "_prev_bs_metrics", {})
+        if prev:
+            self.bs_delta_offline.set(round(perc_off - prev.get("perc_off", perc_off), 1))
+            self.bs_delta_online.set(round(perc_on - prev.get("perc_on", perc_on), 1))
+            self.bs_delta_logistik.set(round(perc_log - prev.get("perc_log", perc_log), 1))
+            self.bs_delta_need_off.set(int(defisit_off - prev.get("defisit_off", defisit_off)))
+            self.bs_delta_need_on.set(int(defisit_onl - prev.get("defisit_onl", defisit_onl)))
+            self.bs_delta_need_log.set(int(defisit_log - prev.get("defisit_log", defisit_log)))
+            self.bs_delta_total_refill.set(int(len(df_refill) - prev.get("total_refill", len(df_refill))))
+        else:
+            self.bs_delta_offline.set(0.0)
+            self.bs_delta_online.set(0.0)
+            self.bs_delta_logistik.set(0.0)
+            self.bs_delta_need_off.set(0)
+            self.bs_delta_need_on.set(0)
+            self.bs_delta_need_log.set(0)
+            self.bs_delta_total_refill.set(0)
+
+        # Simpan snapshot saat ini sebagai acuan perbandingan sync berikutnya
+        self._prev_bs_metrics = {
+            "perc_off": perc_off,
+            "perc_on": perc_on,
+            "perc_log": perc_log,
+            "defisit_off": defisit_off,
+            "defisit_onl": defisit_onl,
+            "defisit_log": defisit_log,
+            "total_refill": len(df_refill)
+        }
 
         self._raw_df_bs_alloc = df_alloc.copy()
         self._raw_df_bs_refill = df_refill.copy()
 
         self.df_bs_alloc_headers.set(df_alloc.columns.tolist() if not df_alloc.empty else [])
         self.df_bs_alloc_rows.set(df_alloc.fillna("").astype(str).values.tolist() if not df_alloc.empty else [])
-
         self.df_bs_refill_headers.set(df_refill.columns.tolist() if not df_refill.empty else [])
         self.df_bs_refill_rows.set(df_refill.fillna("").astype(str).values.tolist() if not df_refill.empty else [])
     # ==========================================================================

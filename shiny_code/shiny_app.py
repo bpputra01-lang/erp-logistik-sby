@@ -3264,6 +3264,8 @@ def server(input: Inputs, output: Outputs, session: Session):
         if not state.bs_processed():
             return ui.div()
 
+        from views import dark_metric_box_with_delta
+
         def get_balance_color(pct):
             if pct >= 90.0: return "#10B981"
             elif pct >= 70.0: return "#DD6B20"
@@ -3274,20 +3276,20 @@ def server(input: Inputs, output: Outputs, session: Session):
         c_on = get_balance_color(state.bs_perc_online())
 
         return ui.div(
-            # BARIS 1: PERSENTASE KESEIMBANGAN (% BALANCE RATE)
+            # BARIS 1: PERSENTASE KESEIMBANGAN DENGAN ANAK PANAH
             ui.div(
-                dark_metric_box("📦 BALANCE AREA LOGISTIK", f"{state.bs_perc_logistik():.1f}%", c_log),
-                dark_metric_box("🏪 BALANCE AREA OFFLINE", f"{state.bs_perc_offline():.1f}%", c_off),
-                dark_metric_box("🌐 BALANCE AREA ONLINE", f"{state.bs_perc_online():.1f}%", c_on),
+                dark_metric_box_with_delta("📦 BALANCE AREA LOGISTIK", f"{state.bs_perc_logistik():.1f}%", state.bs_delta_logistik(), "%", c_log),
+                dark_metric_box_with_delta("🏪 BALANCE AREA OFFLINE", f"{state.bs_perc_offline():.1f}%", state.bs_delta_offline(), "%", c_off),
+                dark_metric_box_with_delta("🌐 BALANCE AREA ONLINE", f"{state.bs_perc_online():.1f}%", state.bs_delta_online(), "%", c_on),
                 style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
             ),
-            # BARIS 2: VOLUME TOTAL & DEFISIT SKU YANG PERLU REFILL
+            # BARIS 2: DEFISIT SKU & VOLUME DENGAN ANAK PANAH (Invert color: Turun = Hijau)
             ui.div(
                 dark_metric_box("📦 TOTAL UNIQUE SKU", f"{state.bs_total_sku():,} SKU", "#3182CE"),
                 dark_metric_box("🔢 TOTAL QTY STOCK", f"{state.bs_total_stock():,} PCS", "#C5A059"),
-                dark_metric_box("🏪 DEFISIT OFFLINE", f"{state.bs_sku_need_off():,} SKU", "#DD6B20"),
-                dark_metric_box("💻 DEFISIT ONLINE", f"{state.bs_sku_need_on():,} SKU", "#3182CE"),
-                dark_metric_box("🚚 DEFISIT LOGISTIK", f"{state.bs_sku_need_log():,} SKU", "#805AD5"),
+                dark_metric_box_with_delta("🏪 DEFISIT OFFLINE", f"{state.bs_sku_need_off():,} SKU", state.bs_delta_need_off(), " SKU", "#DD6B20", invert_color=True),
+                dark_metric_box_with_delta("💻 DEFISIT ONLINE", f"{state.bs_sku_need_on():,} SKU", state.bs_delta_need_on(), " SKU", "#3182CE", invert_color=True),
+                dark_metric_box_with_delta("🚚 DEFISIT LOGISTIK", f"{state.bs_sku_need_log():,} SKU", state.bs_delta_need_log(), " SKU", "#805AD5", invert_color=True),
                 style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
             )
         )
