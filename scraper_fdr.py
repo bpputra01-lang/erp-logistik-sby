@@ -4,7 +4,7 @@ import time
 import pandas as pd
 from pytz import timezone
 import requests
-from requests.auth import HTTPBasicAuth
+from requests_ntlm import HttpNtlmAuth
 import schedule
 from supabase import Client, create_client
 
@@ -275,7 +275,7 @@ def fetch_and_sync_fdr():
         url,
         headers=headers,
         json=payload,
-        auth=HTTPBasicAuth(PBI_USER, PBI_PASS),
+        auth=HttpNtlmAuth(PBI_USER, PBI_PASS),
         timeout=60,
     )
   except Exception as e:
