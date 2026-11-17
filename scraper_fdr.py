@@ -41,21 +41,25 @@ def run_scraper():
   wib = timezone("Asia/Jakarta")
   now_wib = datetime.now(wib)
   print(
-      f"\n{'='*55}\n[{now_wib.strftime('%Y-%m-%d %H:%M:%S')} WIB] Memulai"
-      " Scraping FDR via Playwright..."
+      f"\n{'='*55}\n[{now_wib.strftime('%Y-%m-%d %H:%M:%S')} WIB] Menjalankan"
+      " Scraping FDR..."
   )
 
   target_data = []
 
-  with sync_playwright() as p:
-    # headless=False agar jendela browser muncul di layar Anda
-    browser = p.chromium.launch(headless=False)
-    context = browser.new_context(
-        http_credentials={"username": PBI_USER, "password": PBI_PASS}
-    )
-    page = context.new_page()
+  # Folder lokal untuk menyimpan login & cookies selamanya
+  session_dir = os.path.join(os.getcwd(), "pbi_browser_session")
 
-    # Mencegat (intercept) request data tabel saat Power BI memuat visual
+  with sync_playwright() as p:
+    # Menggunakan Persistent Context agar sesi tersimpan di laptop Anda
+    context = p.chromium.launch_persistent_context(
+        user_data_dir=session_dir,
+        headless=False,  # Browser akan tampil agar Anda bisa login jika belum login
+        args=["--disable-blink-features=AutomationControlled"],
+    )
+    page = context.pages[0] if context.pages else context.new_page()
+
+    # Mencegat (intercept) paket data tabel dari aliran jaringan browser
     def handle_response(response):
       if "/querydata" in response.url and response.request.method == "POST":
         try:
@@ -71,12 +75,12 @@ def run_scraper():
                 .get("PH", [{}])[0]
                 .get("DM0", [])
             )
-            # Cek jika ini adalah request tabel utama (memiliki lebih dari 5 kolom/cell)
+            # Cek jika data memiliki banyak kolom (tabel utama)
             if dm0 and len(dm0) > 0 and "C" in dm0[0] and len(dm0[0]["C"]) >= 10:
               target_data.append(dm0)
               print(
-                  f"🎯 Berhasil mencegat paket data tabel utama FDR! ({len(dm0)}"
-                  " baris mentah)"
+                  f"🎯 Paket data tabel FDR tertangkap! ({len(dm0)} baris"
+                  " mentah)"
               )
         except Exception:
           pass
@@ -84,38 +88,40 @@ def run_scraper():
     page.on("response", handle_response)
 
     try:
-      print("🌐 Membuka Power BI report...")
-      page.goto(REPORT_URL, timeout=60000)
+      print("🌐 Membuka Power BI di browser...")
+      page.goto(REPORT_URL, timeout=90000)
 
-      # Periksa apakah ada form login HTML di web
+      # Jika muncul form input login di halaman, otomatis diisi
       time.sleep(2)
       user_input = page.locator("input[type='text'], input[name*='user']").first
-      if user_input.is_visible(timeout=3000):
-        print("🔑 Terdeteksi form login web, mengisi username & password...")
+      if user_input.is_visible(timeout=2000):
+        print("🔑 Mengisi username & password otomatis...")
         user_input.fill(PBI_USER)
         page.locator("input[type='password']").first.fill(PBI_PASS)
         page.keyboard.press("Enter")
 
-      # Tunggu hingga tabel termuat dan data tertangkap
-      print("⏳ Menunggu visual tabel selesai memuat data...")
-      for _ in range(30):
+      # Menunggu hingga data tabel Power BI muncul dan tertangkap
+      print(
+          "⏳ Menunggu visual tabel selesai memuat data (maksimal 45"
+          " detik)..."
+      )
+      for _ in range(45):
         if len(target_data) > 0:
           break
         page.wait_for_timeout(1000)
 
-      # Beri jeda 2 detik sebelum browser ditutup
       page.wait_for_timeout(2000)
-      browser.close()
+      context.close()
 
     except Exception as e:
       print(f"❌ Terjadi kesalahan pada browser: {e}")
-      browser.close()
+      context.close()
       return
 
   if not target_data:
     print(
-        "⚠️ Gagal menangkap data tabel. Pastikan dashboard berhasil terbuka dan"
-        " tidak stuck di login."
+        "⚠️ Data belum tertangkap. Jika browser tadi meminta login, silakan"
+        " login sekali lalu jalankan ulang scriptnya."
     )
     return
 
@@ -147,10 +153,10 @@ def run_scraper():
     return
 
   # ==================== FILTER DATA ==================== #
-  # 1. Warehouse Surabaya
+  # 1. Warehouse Surabaya Saja
   df = df[df["warehouse"].fillna("").str.strip().str.upper() == "SURABAYA"]
 
-  # 2. Selain status DONE dan CANCEL
+  # 2. Selain Status DONE dan CANCEL
   excluded = [
       "DONE",
       "DONE ONLINE",
@@ -166,7 +172,7 @@ def run_scraper():
   mask_order = ~df["order_status"].fillna("").str.upper().isin(excluded)
   df = df[mask_internal & mask_order]
 
-  # 3. Tanggal bulan ini ke depan
+  # 3. Tanggal Bulan Ini ke Depan
   first_day_of_month = now_wib.replace(
       day=1, hour=0, minute=0, second=0, microsecond=0
   )
@@ -191,14 +197,14 @@ def run_scraper():
           records, on_conflict="order_number"
       ).execute()
       print(
-          f"✅ SUKSES! {len(records)} data pesanan masuk ke Supabase"
+          f"✅ SUKSES! {len(records)} data pesanan berhasil masuk ke Supabase"
           " (fdr_orders)!"
       )
     except Exception as e:
       print(f"❌ Gagal simpan ke Supabase: {e}")
 
 
-# ==================== SCHEDULER ==================== #
+# ==================== SCHEDULER (14:00 & 21:00 WIB) ==================== #
 if __name__ == "__main__":
   run_scraper()
 
