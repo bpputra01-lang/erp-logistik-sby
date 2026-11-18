@@ -1462,11 +1462,17 @@ def server(input: Inputs, output: Outputs, session: Session):
     def cca_step1_card_ui():
         br = state.cca_branch_selected()
         tujuan = state.cca_tujuan()
-        
-        # 🛑 JIKA CABANG ATAU TUJUAN MASIH KOSONG, STEP 1 TIDAK AKAN MUNCUL SAMA SEKALI
-        if not br or br == "" or not tujuan or tujuan == "":
+
+        # 🛑 Jika cabang belum dipilih: sembunyikan Step 1
+        if not br or br == "":
             return ui.div()
 
+        # 🛑 Jika cabang luar (selain Surabaya & Malang), WAJIB pilih tujuan dulu
+        if br.upper() not in ["SURABAYA", "MALANG"]:
+            if not tujuan or tujuan == "":
+                return ui.div()
+
+        # 🌟 Jika lolos (Surabaya/Malang langsung lolos, cabang luar lolos setelah pilih tujuan):
         return ui.div(
             ui.h4("1️⃣ Upload Data Scan & All Data Stock", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
             ui.div(
@@ -6831,7 +6837,7 @@ def server(input: Inputs, output: Outputs, session: Session):
     def cca_dynamic_branch_options_ui():
         br = state.cca_branch_selected()
         
-        # 🌟 1. DAFTAR LENGKAP SUB KATEGORI & BRAND
+        # 🌟 DAFTAR LENGKAP 24 SUB KATEGORI & 43 BRAND
         list_sub_kat = [
             "BAG", "BALL", "BASELAYER", "BOTTLE", "CLEANNING & CARE", "EXTRA SHOES", 
             "HARDWARE", "JACKET", "JERSEY", "LOWER BODY", "NUTRITION", "OTHER", 
@@ -6851,13 +6857,24 @@ def server(input: Inputs, output: Outputs, session: Session):
         # 🛑 Jika cabang belum dipilih sama sekali
         if not br or br == "":
             return ui.div(
-                ui.p("⚠️ Silakan pilih Cabang di atas terlebih dahulu untuk memunculkan pilihan tujuan.", 
+                ui.p("⚠️ Silakan pilih Cabang di atas terlebih dahulu.", 
                      style="color: #DD6B20; font-weight: bold; font-style: italic; background: #FFFFF0; border: 1px solid #F6E05E; padding: 1rem; border-radius: 8px; text-align: center;")
             )
 
-        tujuan_cur = state.cca_tujuan()
+        # 🏢 KHUSUS SURABAYA & MALANG: LANGSUNG KELUAR FILTER TANPA DROPDOWN TUJUAN
+        if br.upper() in ["SURABAYA", "MALANG"]:
+            return ui.div(
+                ui.div(
+                    ui.div(ui.input_selectize("cca_sub_kat", "📁 Sub Kategori:", choices=list_sub_kat, multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
+                    ui.div(ui.input_selectize("cca_brand", "🏷️ Brand:", choices=list_brand, multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
+                    ui.div(ui.output_ui("cca_bin_sys_ui"), style="flex: 1; min-width: 180px;"),
+                    style="display: flex; gap: 1rem; width: 100%; flex-wrap: wrap;"
+                )
+            )
 
-        # 🎯 2. DROPDOWN TUJUAN (Default wajib ada placeholder kosong)
+        # 🏢 KHUSUS CABANG SELAIN SURABAYA & MALANG (SEMARANG, SIDOARJO, KEDIRI, JEMBER, JKT):
+        tujuan_cur = state.cca_tujuan()
+        
         tujuan_box = ui.div(
             ui.div(
                 ui.span("🎯 Tujuan Cycle Count (Wajib):", style="font-weight: 800; color: #E50914; font-size: 13px; margin-bottom: 4px; display: block;"),
@@ -6873,7 +6890,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             )
         )
 
-        # 🛑 JIKA TUJUAN BELUM DIPILIH: TAMPILKAN HANYA PILIHAN TUJUAN (FILTER BELUM MUNCUL)
+        # 🛑 Cabang luar tapi TUJUAN BELUM DIPILIH: STOP di dropdown tujuan saja!
         if not tujuan_cur or tujuan_cur == "":
             return ui.div(
                 tujuan_box,
@@ -6881,7 +6898,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                      style="color: #DD6B20; font-weight: 600; font-size: 12px; margin-top: 6px; font-style: italic;")
             )
 
-        # 🌟 3. JIKA CABANG & TUJUAN SUDAH DIPILIH: BARULAH FILTER MUNCUL LENGKAP
+        # 🌟 Cabang luar & TUJUAN SUDAH DIPILIH: BARU MUNCULKAN FILTER LENGKAP
         schedule_bin_selector = ui.div()
         if tujuan_cur == "ON SCHEDULE CC":
             bins_from_db = state.cca_available_bins_from_db()
@@ -6897,7 +6914,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                 style="background: #F0FDF4; border: 1.5px dashed #86EFAC; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;"
             )
 
-        filter_sub_brand = ui.div(
+        filter_sub_brand_bin = ui.div(
             ui.div(ui.input_selectize("cca_sub_kat", "📁 Sub Kategori:", choices=list_sub_kat, multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
             ui.div(ui.input_selectize("cca_brand", "🏷️ Brand:", choices=list_brand, multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
             ui.div(ui.output_ui("cca_bin_sys_ui"), style="flex: 1; min-width: 180px;"),
@@ -6907,7 +6924,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         return ui.div(
             tujuan_box,
             schedule_bin_selector,
-            filter_sub_brand
+            filter_sub_brand_bin
         )
 
     # Sinkronisasi BIN Terpilih
