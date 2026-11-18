@@ -1454,6 +1454,29 @@ def server(input: Inputs, output: Outputs, session: Session):
         choices = BRANCH_BIN_MAPPING.get(b, [])
         return ui.input_selectize("cca_bin_sys", "🏭 BIN System:", choices=choices, multiple=True, width="100%")
 
+    # ==========================================================================
+    # KARTU STEP 1: HANYA MUNCUL JIKA CABANG SUDAH DIPILIH
+    # ==========================================================================
+    @render.ui
+    def cca_step1_card_ui():
+        br = state.cca_branch_selected()
+        # 🛑 Jika cabang belum dipilih (masih blank), Step 1 disembunyikan total
+        if not br or br == "":
+            return ui.div()
+
+        return ui.div(
+            ui.h4("1️⃣ Upload Data Scan & All Data Stock", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+            ui.div(
+                custom_uploader_box("cca_up_scan", "📥 DATA SCAN"),
+                custom_uploader_box("cca_up_stock", "📥 STOCK SYSTEM"),
+                style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%; margin-bottom: 0.5rem;"
+            ),
+            ui.output_ui("cca_step1_btn_ui"),
+            ui.output_ui("cca_step1_results_ui"),
+            class_="step-card-box",
+            style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+        )
+        
     # --- STEP 1 ---
     @render.ui
     def cca_step1_btn_ui():

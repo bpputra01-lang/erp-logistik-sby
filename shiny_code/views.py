@@ -981,12 +981,12 @@ def ppa_audit_view(state: AppState):
     return ui.div(upload_section, ui.output_ui("ppa_results_container"), style="width: 100%; padding: 1rem;")
 
 # ==============================================================================
-# VIEW 7: CYCLE COUNT ANALYZER (MENU: "Cycle Count")
+# VIEW: CYCLE COUNT ANALYZER (STEP 1 TERKUNCI MENUNGGU PILIH CABANG)
 # ==============================================================================
 def cycle_count_analyzer_view(state: AppState):
     branch_choices = ["", "SURABAYA", "MALANG", "HUB JAKARTA", "SEMARANG", "SIDOARJO", "KEDIRI", "JEMBER"]
     
-    # 🌟 1. SELECTOR CABANG WAJIB DIISI & DEFAULT BLANK
+    # 🌟 1. SELECTOR CABANG (DEFAULT BLANK)
     branch_select_box = ui.div(
         ui.span("🏢 Pilih Cabang / Branch (Wajib):", style="font-weight: 800; color: #E50914; font-size: 13px; margin-bottom: 4px; display: block;"),
         ui.tags.select(
@@ -996,25 +996,11 @@ def cycle_count_analyzer_view(state: AppState):
             onchange="Shiny.setInputValue('change_cca_branch', this.value, {priority: 'event'})",
             style="width: 100%; padding: 10px 14px; background: white; border: 2px solid #CBD5E0; border-radius: 8px; font-weight: 800; font-size: 13px; cursor: pointer;"
         ),
-        style="width: 100%; margin-bottom: 1rem;"
+        style="width: 100%; margin-bottom: 0.5rem;"
     )
 
     # 🌟 2. WADAH TUJUAN & FILTER DINAMIS
     dynamic_branch_options = ui.output_ui("cca_dynamic_branch_options_ui")
-
-    # Step 1 Uploader
-    step1_ui = ui.div(
-        ui.h4("1️⃣ Upload Data Scan & All Data Stock", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
-        ui.div(
-            custom_uploader_box("cca_up_scan", "📥 DATA SCAN"),
-            custom_uploader_box("cca_up_stock", "📥 STOCK SYSTEM"),
-            style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%; margin-bottom: 0.5rem;"
-        ),
-        ui.output_ui("cca_step1_btn_ui"),
-        ui.output_ui("cca_step1_results_ui"),
-        class_="step-card-box",
-        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
-    )
 
     return ui.div(
         ui.div(
@@ -1022,7 +1008,8 @@ def cycle_count_analyzer_view(state: AppState):
             dynamic_branch_options,
             style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
         ),
-        step1_ui,
+        # 🌟 STEP 1 SEKARANG REAKTIF: Tidak akan muncul jika cabang masih blank
+        ui.output_ui("cca_step1_card_ui"),
         ui.output_ui("cca_step2_card_ui"),
         ui.output_ui("cca_step4_card_ui"),
         ui.output_ui("cca_step5_card_ui"),
@@ -3487,7 +3474,7 @@ def cycle_count_monitoring_view(state: AppState):
         ),
         style="width: 100%; padding: 1rem;"
     )
-    
+
 def menu_item(label: str, target_menu: str, current_menu: str):
     import re
     is_active = (current_menu == target_menu)
