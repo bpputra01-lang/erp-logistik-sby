@@ -156,112 +156,77 @@ def parse_sales_payload(raw_json, channel="ALL"):
     unique_records = {}
     now_iso = datetime.now(WIB).isoformat()
 
-    if not raw_json:
+    if not raw_json or not isinstance(raw_json, dict):
         return []
 
-    # 🔍 CETAK DIAGNOSTIK RESPON KE TERMINAL
-    print("=" * 60)
-    print("📦 [DIAGNOSTIK RESPON DARI JEZPRO]:")
-    if isinstance(raw_json, dict):
-        print(f"   -> Top Keys: {list(raw_json.keys())}")
-    print(f"   -> Cuplikan Response: {json.dumps(raw_json, default=str)[:500]}...")
-    print("=" * 60)
+    # 1. AMBIL DARI DETAIL TABLE (Data tabel harian per cabang)
+    detail_table = raw_json.get("detail_table")
+    if isinstance(detail_table, dict):
+        detail_table = detail_table.get("data") or detail_table.get("rows") or []
 
-    # 1. Jika data ada di dalam root atau sub-key 'data' / 'table'
-    container = raw_json
-    if isinstance(raw_json, dict) and "data" in raw_json and isinstance(raw_json["data"], (list, dict)):
-        container = raw_json["data"]
-    elif isinstance(raw_json, dict) and "table" in raw_json and isinstance(raw_json["table"], (list, dict)):
-        container = raw_json["table"]
-
-    # --- KASUS A: Format List of Objects ---
-    if isinstance(container, list):
-        for row in container:
+    if isinstance(detail_table, list) and len(detail_table) > 0:
+        for row in detail_table:
             if not isinstance(row, dict): continue
             
-            # Cari kolom tanggal di dalam row
+            # Cari tanggal di kolom DATE / date / tgl
             date_val = None
-            for d_k in ["date", "DATE", "tgl", "tanggal", "created_at", "dt"]:
+            for d_k in ["DATE", "date", "tgl", "tanggal", "dt"]:
                 if d_k in row:
                     date_val = extract_valid_date(row[d_k])
                     if date_val: break
-            
+
             if not date_val:
-                # Coba scan semua value di row untuk mencari tanggal
                 for k, v in row.items():
                     date_val = extract_valid_date(v)
                     if date_val: break
-            
+
             if not date_val: continue
 
-            # Sub-kasus A1: Row memiliki kolom spesifik seperti 'store_name' dan 'net_sales'
-            if any(k in row for k in ["store", "store_name", "st_name", "branch"]):
-                st_name = row.get("store_name") or row.get("store") or row.get("st_name") or row.get("branch")
-                sales_val = row.get("net_sales") or row.get("sales") or row.get("total") or row.get("nominal") or 0
-                clean_id = f"{date_val}_{str(st_name).replace(' ', '_').upper()}"
-                unique_records[clean_id] = {
-                    "id": clean_id, "date": date_val, "store_name": str(st_name).strip(),
-                    "net_sales": safe_int(sales_val), "channel": channel,
-                    "metric_key": "net_sales", "updated_at": now_iso
-                }
-            else:
-                # Sub-kasus A2: Format Pivot (kolom-kolom adalah nama toko)
-                for col_name, col_val in row.items():
-                    if extract_valid_date(col_val): continue
-                    if col_name.upper() in ["DATE", "TANGGAL", "TGL", "TOTAL", "DT_ROWINDEX", "ID"]: continue
-                    
-                    st_name = col_name.strip()
-                    clean_id = f"{date_val}_{st_name.replace(' ', '_').upper()}"
-                    unique_records[clean_id] = {
-                        "id": clean_id, "date": date_val, "store_name": st_name,
-                        "net_sales": safe_int(col_val), "channel": channel,
-                        "metric_key": "net_sales", "updated_at": now_iso
-                    }
+            # Ambil nominal penjualan untuk tiap toko di baris tersebut
+            for store_col, sales_val in row.items():
+                if store_col.upper() in ["DATE", "TANGGAL", "TGL", "TOTAL", "DT_ROWINDEX", "ID"]:
+                    continue
+                if extract_valid_date(sales_val):
+                    continue
 
-    # --- KASUS B: Format Chart.js (categories / labels & series / datasets) ---
-    chart_obj = raw_json.get("chart") or raw_json
-    labels = chart_obj.get("labels") or chart_obj.get("categories") or []
-    datasets = chart_obj.get("datasets") or chart_obj.get("series") or []
-
-    if labels and datasets and isinstance(labels, list) and isinstance(datasets, list):
-        for ds in datasets:
-            st_name = ds.get("label") or ds.get("name") or "UNKNOWN"
-            d_points = ds.get("data") or []
-            for idx, d_lbl in enumerate(labels):
-                date_val = extract_valid_date(d_lbl)
-                if not date_val: continue
-                val = d_points[idx] if idx < len(d_points) else 0
-                clean_id = f"{date_val}_{st_name.replace(' ', '_').upper()}"
+                store_name = store_col.strip()
+                clean_id = f"{date_val}_{store_name.replace(' ', '_').upper()}"
                 unique_records[clean_id] = {
-                    "id": clean_id, "date": date_val, "store_name": st_name,
-                    "net_sales": safe_int(val), "channel": channel,
-                    "metric_key": "net_sales", "updated_at": now_iso
+                    "id": clean_id,
+                    "date": date_val,
+                    "store_name": store_name,
+                    "net_sales": safe_int(sales_val, 0),
+                    "channel": channel,
+                    "metric_key": "net_sales",
+                    "updated_at": now_iso
                 }
 
-    # --- KASUS C: Format Nested Dictionary ---
-    if isinstance(container, dict):
-        for k_outer, v_outer in container.items():
-            if isinstance(v_outer, dict):
-                for k_inner, v_inner in v_outer.items():
-                    # Apakah k_inner adalah tanggal?
-                    date_val = extract_valid_date(k_inner)
-                    if date_val:
-                        st_name = str(k_outer).strip()
-                        val = v_inner
-                    else:
-                        # Apakah k_outer adalah tanggal?
-                        date_val = extract_valid_date(k_outer)
-                        if date_val:
-                            st_name = str(k_inner).strip()
-                            val = v_inner
-                        else:
-                            continue
-                    
-                    clean_id = f"{date_val}_{st_name.replace(' ', '_').upper()}"
+    # 2. JIKA DETAIL TABLE KOSONG, CADANGAN AMBIL DARI DETAIL CHART
+    if not unique_records:
+        detail_chart = raw_json.get("detail_chart") or {}
+        labels = detail_chart.get("labels") or detail_chart.get("categories") or []
+        if isinstance(labels, dict) and "categories" in labels:
+            labels = labels["categories"]
+
+        series = detail_chart.get("series") or detail_chart.get("datasets") or []
+
+        if labels and series and isinstance(labels, list) and isinstance(series, list):
+            for s in series:
+                store_name = s.get("name") or s.get("label") or "UNKNOWN"
+                data_points = s.get("data") or []
+                for idx, lbl in enumerate(labels):
+                    date_val = extract_valid_date(lbl)
+                    if not date_val: continue
+                    val = data_points[idx] if idx < len(data_points) else 0
+                    clean_id = f"{date_val}_{store_name.replace(' ', '_').upper()}"
                     unique_records[clean_id] = {
-                        "id": clean_id, "date": date_val, "store_name": st_name,
-                        "net_sales": safe_int(val), "channel": channel,
-                        "metric_key": "net_sales", "updated_at": now_iso
+                        "id": clean_id,
+                        "date": date_val,
+                        "store_name": store_name,
+                        "net_sales": safe_int(val, 0),
+                        "channel": channel,
+                        "metric_key": "net_sales",
+                        "updated_at": now_iso
                     }
 
     return list(unique_records.values())
