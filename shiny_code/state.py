@@ -8995,8 +8995,61 @@ class AppState:
     # ==============================================================================
     # REFRESH CEPAT KHUSUS NET SALES & BTSB (INSTAN < 0.2 DETIK)
     # ==============================================================================
+    # ==============================================================================
+    # HELPER TERPUSAT: PENJUMLAHAN HARIAN NET SALES (MENDUKUNG RENTANG TANGGAL)
+    # ==============================================================================
+    def _calculate_net_sales(self, client, branch_keyword, tgl_s, tgl_e, year, mo_num):
+        """Menjumlahkan seluruh data harian net_sales berdasarkan rentang tanggal atau bulan"""
+        try:
+            res = client.table("jezpro_daily_net_sales").select("*").execute()
+            if not res or not hasattr(res, 'data') or not res.data:
+                return 0
+
+            d_start = pd.to_datetime(tgl_s).date() if tgl_s and tgl_s != "None" else None
+            d_end = pd.to_datetime(tgl_e).date() if tgl_e and tgl_e != "None" else None
+
+            net_sales = 0
+            for r in res.data:
+                if not isinstance(r, dict):
+                    continue
+                
+                st_name = str(r.get("store_name", "")).strip().upper()
+                if branch_keyword not in st_name:
+                    continue
+
+                raw_dt = r.get("date") or r.get("created_at")
+                if not raw_dt:
+                    continue
+
+                try:
+                    rec_date = pd.to_datetime(raw_dt).date()
+                except Exception:
+                    continue
+
+                val_ns = safe_int(r.get("net_sales") if r.get("net_sales") is not None else r.get("NET_SALES", 0))
+
+                # Akumulasi (SUM) Presisi Berdasarkan Rentang Tanggal
+                if d_start and d_end:
+                    if d_start <= rec_date <= d_end:
+                        net_sales += val_ns
+                elif d_start:
+                    if rec_date >= d_start:
+                        net_sales += val_ns
+                elif d_end:
+                    if rec_date <= d_end:
+                        net_sales += val_ns
+                else:
+                    # Jika filter tanggal kosong, ikuti Bulan & Tahun di atas
+                    if rec_date.year == year and rec_date.month == int(mo_num):
+                        net_sales += val_ns
+
+            return net_sales
+        except Exception as e:
+            print("Error _calculate_net_sales:", e)
+            return 0
+
     def refresh_ccm_net_sales_only(self):
-        """Menjumlahkan seluruh data harian net_sales sesuai rentang tanggal yang dipilih"""
+        """Memperbarui Net Sales & BTSB secara instan saat tanggal diubah"""
         try:
             client = get_supabase()
             if not client:
@@ -9005,7 +9058,6 @@ class AppState:
             branch = self.ccm_branch().upper()
             month = self.ccm_month()
             year = safe_int(self.ccm_year(), 2026)
-
             tgl_s = str(self.ccm_filter_tgl_start()).strip()
             tgl_e = str(self.ccm_filter_tgl_end()).strip()
 
@@ -9017,51 +9069,8 @@ class AppState:
             mo_num = MONTH_EN_MAP.get(month.upper(), "11")
             branch_keyword = branch.replace("JEZ ", "").strip().upper()
 
-            # 1. Ambil data dengan aman tanpa filter PostgREST yang rentan gagal
-            res = client.table("jezpro_daily_net_sales").select("*").execute()
-
-            # 2. Parse rentang tanggal filter menjadi objek date
-            d_start = pd.to_datetime(tgl_s).date() if tgl_s and tgl_s != "None" else None
-            d_end = pd.to_datetime(tgl_e).date() if tgl_e and tgl_e != "None" else None
-
-            net_sales = 0
-            if res and hasattr(res, 'data') and res.data:
-                for r in res.data:
-                    if not isinstance(r, dict):
-                        continue
-                    
-                    st_name = str(r.get("store_name", "")).strip().upper()
-                    # Cocokkan nama cabang (misal 'SIDOARJO' dalam 'JEZ SIDOARJO')
-                    if branch_keyword not in st_name:
-                        continue
-
-                    # Ambil tanggal record harian dari kolom 'date' atau 'created_at'
-                    raw_dt = r.get("date") or r.get("created_at")
-                    if not raw_dt:
-                        continue
-
-                    try:
-                        rec_date = pd.to_datetime(raw_dt).date()
-                    except Exception:
-                        continue
-
-                    # Ambil nilai net_sales (toleransi berbagai variasi key)
-                    val_ns = safe_int(r.get("net_sales") if r.get("net_sales") is not None else r.get("NET_SALES", 0))
-
-                    # 3. AKUMULASI (SUM) SELURUH RECORD HARIAN SESUAI RENTANG TANGGAL
-                    if d_start and d_end:
-                        if d_start <= rec_date <= d_end:
-                            net_sales += val_ns
-                    elif d_start:
-                        if rec_date >= d_start:
-                            net_sales += val_ns
-                    elif d_end:
-                        if rec_date <= d_end:
-                            net_sales += val_ns
-                    else:
-                        # Default: Berdasarkan Bulan & Tahun yang dipilih di dropdown atas
-                        if rec_date.year == year and rec_date.month == int(mo_num):
-                            net_sales += val_ns
+            # Panggil helper terpusat
+            net_sales = self._calculate_net_sales(client, branch_keyword, tgl_s, tgl_e, year, mo_num)
 
             sales_label = f"{tgl_s} s/d {tgl_e}" if (tgl_s and tgl_e) else f"Bulan {month} {year}"
             self.ccm_sales_period_label.set(sales_label)
@@ -9073,7 +9082,6 @@ class AppState:
             btsb_abs_pct = (val_adj_abs / net_sales * 100.0) if net_sales > 0 else 0.0
             btsb_sub_pct = (val_adj_sub / net_sales * 100.0) if net_sales > 0 else 0.0
 
-            # Update State Reaktif
             self.ccm_m_net_sales.set(net_sales)
             self.ccm_m_btsb.set(round(btsb_val, 2))
             self.ccm_m_btsb_abs_pct.set(round(btsb_abs_pct, 2))
@@ -9081,6 +9089,4 @@ class AppState:
 
             return True, f"Net Sales terkalkulasi: Rp {net_sales:,}"
         except Exception as e:
-            import traceback
-            traceback.print_exc()
             return False, str(e)
