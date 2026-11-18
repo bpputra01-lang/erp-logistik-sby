@@ -1451,10 +1451,21 @@ def server(input: Inputs, output: Outputs, session: Session):
     # ==========================================================================
     @render.ui
     def cca_bin_sys_ui():
-        b = input.cca_branch() if "cca_branch" in input else "SURABAYA"
-        choices = BRANCH_BIN_MAPPING.get(b, [])
-        return ui.input_selectize("cca_bin_sys", "🏭 BIN System:", choices=choices, multiple=True, width="100%")
+        # 🌟 BACA CABANG YANG BENAR-BENAR DIPILIH OLEH USER
+        b = state.cca_branch_selected()
+        if not b or b == "":
+            b = "SURABAYA"
 
+        # Tarik BIN sesuai nama cabang terpilih dari BRANCH_BIN_MAPPING
+        choices = BRANCH_BIN_MAPPING.get(str(b).upper().strip(), [])
+        
+        return ui.input_selectize(
+            "cca_bin_sys", 
+            f"🏭 BIN System ({b.upper()}):", 
+            choices=choices, 
+            multiple=True, 
+            width="100%"
+        )
     # ==========================================================================
     # KARTU STEP 1: HANYA MUNCUL JIKA CABANG SUDAH DIPILIH
     # ==========================================================================
