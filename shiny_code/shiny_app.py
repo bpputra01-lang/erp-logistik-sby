@@ -1461,8 +1461,10 @@ def server(input: Inputs, output: Outputs, session: Session):
     @render.ui
     def cca_step1_card_ui():
         br = state.cca_branch_selected()
-        # 🛑 Jika cabang belum dipilih (masih blank), Step 1 disembunyikan total
-        if not br or br == "":
+        tujuan = state.cca_tujuan()
+        
+        # 🛑 JIKA CABANG ATAU TUJUAN MASIH KOSONG, STEP 1 TIDAK AKAN MUNCUL SAMA SEKALI
+        if not br or br == "" or not tujuan or tujuan == "":
             return ui.div()
 
         return ui.div(
@@ -6829,48 +6831,62 @@ def server(input: Inputs, output: Outputs, session: Session):
     def cca_dynamic_branch_options_ui():
         br = state.cca_branch_selected()
         
-        # 🌟 DAFTAR LENGKAP SUB KATEGORI & BRAND SEMULA
-        list_sub_kat = ["BAG", "BALL", "BASELAYER", "BOTTLE", "CLEANNING & CARE", "EXTRA SHOES", "HARDWARE", "JACKET", "JERSEY", "LOWER BODY", "NUTRITION", "OTHER", "OTHERS", "PANTS", "RACKET", "SANDALS", "SET APPAREL", "SHIRT", "SHOES", "SHORT", "SWLM", "UKNOWN SC", "UNDERLAYER", "UPPER BODY"]
-        list_brand = ["MILLS", "ORTUSEIGHT", "SPECS", "ARDILES", "NINETEN", "LYCAN", "PATROBAS", "PIERO", "PORTO", "BRODO", "JACK IDN", "JOHNSON", "NOIJ", "VENTELA", "DESLE", "LEAGUE", "UNERD", "CALCI", "HUNDRED", "FIXCH", "YONEX", "NIKE", "AZA", "ASICS", "EAGLE", "PUMA", "KARGE", "GUMI", "ZUMA", "MILESTONE", "WEIDENMANN", "DIADORA", "HEIDEN HERITAGE", "LOTTO", "KRONIKEL", "ADIDAS", "VOOLA", "RECOIR", "MIZUNO", "UNKNOWN", "WARRIOR", "AVO", "KANKY"]
+        # 🌟 1. DAFTAR LENGKAP SUB KATEGORI & BRAND
+        list_sub_kat = [
+            "BAG", "BALL", "BASELAYER", "BOTTLE", "CLEANNING & CARE", "EXTRA SHOES", 
+            "HARDWARE", "JACKET", "JERSEY", "LOWER BODY", "NUTRITION", "OTHER", 
+            "OTHERS", "PANTS", "RACKET", "SANDALS", "SET APPAREL", "SHIRT", 
+            "SHOES", "SHORT", "SWLM", "UKNOWN SC", "UNDERLAYER", "UPPER BODY"
+        ]
+        list_brand = [
+            "MILLS", "ORTUSEIGHT", "SPECS", "ARDILES", "NINETEN", "LYCAN", 
+            "PATROBAS", "PIERO", "PORTO", "BRODO", "JACK IDN", "JOHNSON", 
+            "NOIJ", "VENTELA", "DESLE", "LEAGUE", "UNERD", "CALCI", 
+            "HUNDRED", "FIXCH", "YONEX", "NIKE", "AZA", "ASICS", 
+            "EAGLE", "PUMA", "KARGE", "GUMI", "ZUMA", "MILESTONE", 
+            "WEIDENMANN", "DIADORA", "HEIDEN HERITAGE", "LOTTO", "KRONIKEL", 
+            "ADIDAS", "VOOLA", "RECOIR", "MIZUNO", "UNKNOWN", "WARRIOR", "AVO", "KANKY"
+        ]
 
-        if not br:
+        # 🛑 Jika cabang belum dipilih sama sekali
+        if not br or br == "":
             return ui.div(
-                ui.p("⚠️ Silakan pilih Cabang di atas terlebih dahulu untuk memunculkan parameter analisis.", 
+                ui.p("⚠️ Silakan pilih Cabang di atas terlebih dahulu untuk memunculkan pilihan tujuan.", 
                      style="color: #DD6B20; font-weight: bold; font-style: italic; background: #FFFFF0; border: 1px solid #F6E05E; padding: 1rem; border-radius: 8px; text-align: center;")
             )
 
-        # Jika Surabaya atau Malang -> alur standar tanpa pilihan schedule khusus
-        if br in ["SURABAYA", "MALANG"]:
-            return ui.div(
-                ui.div(
-                    ui.div(ui.input_selectize("cca_sub_kat", "📁 Sub Kategori:", choices=list_sub_kat, multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
-                    ui.div(ui.input_selectize("cca_brand", "🏷️ Brand:", choices=list_brand, multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
-                    ui.div(ui.output_ui("cca_bin_sys_ui"), style="flex: 1; min-width: 180px;"),
-                    style="display: flex; gap: 1rem; width: 100%; flex-wrap: wrap;"
-                )
-            )
-
-        # Jika cabang selain Surabaya dan Malang -> Munculkan Tujuan (Trial vs On Schedule CC)
         tujuan_cur = state.cca_tujuan()
+
+        # 🎯 2. DROPDOWN TUJUAN (Default wajib ada placeholder kosong)
         tujuan_box = ui.div(
             ui.div(
-                ui.span("🎯 Tujuan Cycle Count:", style="font-weight: 800; color: #2B6CB0; font-size: 12px; margin-bottom: 2px; display: block;"),
+                ui.span("🎯 Tujuan Cycle Count (Wajib):", style="font-weight: 800; color: #E50914; font-size: 13px; margin-bottom: 4px; display: block;"),
                 ui.tags.select(
+                    ui.tags.option("-- Silakan Pilih Tujuan Cycle Count --", value="", selected=(not tujuan_cur or tujuan_cur == "")),
                     ui.tags.option("TRIAL / LATIHAN", value="TRIAL / LATIHAN", selected=(tujuan_cur == "TRIAL / LATIHAN")),
                     ui.tags.option("ON SCHEDULE CC", value="ON SCHEDULE CC", selected=(tujuan_cur == "ON SCHEDULE CC")),
                     id="cca_tujuan_select_input",
                     onchange="Shiny.setInputValue('change_cca_tujuan', this.value, {priority: 'event'})",
-                    style="padding: 8px 12px; border-radius: 6px; border: 2px solid #3182CE; font-weight: 800; font-size: 13px; background: white; cursor: pointer; width: 100%;"
+                    style="padding: 10px 14px; border-radius: 8px; border: 2px solid #CBD5E0; font-weight: 800; font-size: 13px; background: white; cursor: pointer; width: 100%;"
                 ),
-                style="margin-bottom: 1rem;"
+                style="margin-bottom: 0.5rem;"
             )
         )
 
+        # 🛑 JIKA TUJUAN BELUM DIPILIH: TAMPILKAN HANYA PILIHAN TUJUAN (FILTER BELUM MUNCUL)
+        if not tujuan_cur or tujuan_cur == "":
+            return ui.div(
+                tujuan_box,
+                ui.p("⚠️ Silakan tentukan Tujuan Cycle Count di atas untuk membuka filter dan uploader.", 
+                     style="color: #DD6B20; font-weight: 600; font-size: 12px; margin-top: 6px; font-style: italic;")
+            )
+
+        # 🌟 3. JIKA CABANG & TUJUAN SUDAH DIPILIH: BARULAH FILTER MUNCUL LENGKAP
         schedule_bin_selector = ui.div()
         if tujuan_cur == "ON SCHEDULE CC":
             bins_from_db = state.cca_available_bins_from_db()
             schedule_bin_selector = ui.div(
-                ui.span(f"🏭 Pilih BIN Yang Akan Di-Cycle Count (Ditarik dari stock_live_cache Kolom B - {len(bins_from_db)} BIN ditemukan):", 
+                ui.span(f"🏭 Pilih BIN Yang Akan Di-Cycle Count (Ditarik dari database - {len(bins_from_db)} BIN ditemukan):", 
                         style="font-weight: 800; color: #10B981; font-size: 12px; margin-bottom: 4px; display: block;"),
                 ui.input_selectize(
                     "cca_target_bins_select", None, 
@@ -6884,7 +6900,8 @@ def server(input: Inputs, output: Outputs, session: Session):
         filter_sub_brand = ui.div(
             ui.div(ui.input_selectize("cca_sub_kat", "📁 Sub Kategori:", choices=list_sub_kat, multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
             ui.div(ui.input_selectize("cca_brand", "🏷️ Brand:", choices=list_brand, multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
-            style="display: flex; gap: 1rem; width: 100%; flex-wrap: wrap;"
+            ui.div(ui.output_ui("cca_bin_sys_ui"), style="flex: 1; min-width: 180px;"),
+            style="display: flex; gap: 1rem; width: 100%; flex-wrap: wrap; margin-top: 0.5rem;"
         )
 
         return ui.div(

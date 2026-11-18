@@ -377,7 +377,7 @@ class AppState:
 
         # --- CYCLE COUNT CONDITIONAL & SCHEDULE STATE ---
         self.cca_branch_selected = reactive.Value("")         # Default blank
-        self.cca_tujuan = reactive.Value("TRIAL / LATIHAN")   # "TRIAL / LATIHAN" atau "ON SCHEDULE CC"
+        self.cca_tujuan = reactive.Value("")   # "TRIAL / LATIHAN" atau "ON SCHEDULE CC"
         self.cca_available_bins_from_db = reactive.Value([])   # Dari stock_live_cache Kolom B
         self.cca_target_bins_schedule = reactive.Value([])     # BIN yang dipilih untuk schedule
 
