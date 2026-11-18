@@ -9017,27 +9017,21 @@ class AppState:
             mo_num = MONTH_EN_MAP.get(month.upper(), "11")
             branch_keyword = branch.replace("JEZ ", "").strip().upper()
 
-            # 1. Ambil data dari Supabase dengan filter cabang agar ringan
-            try:
-                res = client.table("jezpro_daily_net_sales") \
-                            .select("store_name, date, created_at, net_sales") \
-                            .ilike("store_name", f"%{branch_keyword}%") \
-                            .execute()
-            except Exception:
-                res = client.table("jezpro_daily_net_sales") \
-                            .select("store_name, date, created_at, net_sales") \
-                            .execute()
+            # 1. Ambil data dengan aman tanpa filter PostgREST yang rentan gagal
+            res = client.table("jezpro_daily_net_sales").select("*").execute()
 
             # 2. Parse rentang tanggal filter menjadi objek date
-            d_start = pd.to_datetime(tgl_s).date() if tgl_s else None
-            d_end = pd.to_datetime(tgl_e).date() if tgl_e else None
+            d_start = pd.to_datetime(tgl_s).date() if tgl_s and tgl_s != "None" else None
+            d_end = pd.to_datetime(tgl_e).date() if tgl_e and tgl_e != "None" else None
 
             net_sales = 0
-            if res and res.data:
+            if res and hasattr(res, 'data') and res.data:
                 for r in res.data:
                     if not isinstance(r, dict):
                         continue
+                    
                     st_name = str(r.get("store_name", "")).strip().upper()
+                    # Cocokkan nama cabang (misal 'SIDOARJO' dalam 'JEZ SIDOARJO')
                     if branch_keyword not in st_name:
                         continue
 
@@ -9045,26 +9039,29 @@ class AppState:
                     raw_dt = r.get("date") or r.get("created_at")
                     if not raw_dt:
                         continue
-                    
+
                     try:
                         rec_date = pd.to_datetime(raw_dt).date()
                     except Exception:
                         continue
 
+                    # Ambil nilai net_sales (toleransi berbagai variasi key)
+                    val_ns = safe_int(r.get("net_sales") if r.get("net_sales") is not None else r.get("NET_SALES", 0))
+
                     # 3. AKUMULASI (SUM) SELURUH RECORD HARIAN SESUAI RENTANG TANGGAL
                     if d_start and d_end:
                         if d_start <= rec_date <= d_end:
-                            net_sales += safe_int(r.get("net_sales", 0))
+                            net_sales += val_ns
                     elif d_start:
                         if rec_date >= d_start:
-                            net_sales += safe_int(r.get("net_sales", 0))
+                            net_sales += val_ns
                     elif d_end:
                         if rec_date <= d_end:
-                            net_sales += safe_int(r.get("net_sales", 0))
+                            net_sales += val_ns
                     else:
-                        # Default: Berdasarkan Bulan & Tahun di dropdown atas
+                        # Default: Berdasarkan Bulan & Tahun yang dipilih di dropdown atas
                         if rec_date.year == year and rec_date.month == int(mo_num):
-                            net_sales += safe_int(r.get("net_sales", 0))
+                            net_sales += val_ns
 
             sales_label = f"{tgl_s} s/d {tgl_e}" if (tgl_s and tgl_e) else f"Bulan {month} {year}"
             self.ccm_sales_period_label.set(sales_label)
@@ -9084,5 +9081,6 @@ class AppState:
 
             return True, f"Net Sales terkalkulasi: Rp {net_sales:,}"
         except Exception as e:
-            print("Gagal refresh net sales:", e)
+            import traceback
+            traceback.print_exc()
             return False, str(e)
