@@ -3506,6 +3506,17 @@ def cycle_count_monitoring_view(state: AppState):
         style="padding: 0.5rem 0;"
     )
 
+    # 👇👇 TAMBAHKAN BLOK RETURN INI SEBELUM def menu_item 👇👇
+    return ui.div(
+        filter_bar,
+        ui.navset_card_tab(
+            ui.nav_panel("📅 1. UPLOAD & VERIFIKASI JADWAL", tab1_upload),
+            ui.nav_panel("📊 2. MONITORING & KPI METRICS", tab2_dashboard),
+            id="ccm_navset_tab"
+        ),
+        style="width: 100%; padding: 1rem;"
+    )
+
 def menu_item(label: str, target_menu: str, current_menu: str):
     import re
     is_active = (current_menu == target_menu)
