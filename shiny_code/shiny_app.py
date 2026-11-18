@@ -6945,8 +6945,10 @@ def server(input: Inputs, output: Outputs, session: Session):
             state.cca_target_bins_schedule.set(list(input.cca_target_bins_select()))
 
     # ==========================================================================
-    # CYCLE COUNT MONITORING: EVENT LISTENERS
+    # CYCLE COUNT MONITORING: CONTROLLER & EVENT LISTENERS
     # ==========================================================================
+    
+    # 🌟 1. Menangani Tombol "SINKRONISASI MONITORING" di pojok kanan atas
     @reactive.Effect
     @reactive.event(input.btn_refresh_ccm_data)
     def _on_ccm_refresh_btn():
@@ -6976,6 +6978,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         state.ccm_year.set(input.change_ccm_year())
         state.load_cycle_count_monitoring_data()
 
+    # 🌟 2. Menangani Filter Rentang Tanggal Net Sales (Cepat & Menjumlahkan Harian)
     @reactive.Effect
     @reactive.event(input.change_ccm_dates_range)
     def _on_ccm_dates_range():
@@ -6984,12 +6987,11 @@ def server(input: Inputs, output: Outputs, session: Session):
         state.ccm_filter_tgl_end.set(data.get("end", ""))
         
         try:
-            # 🌟 EKSEKUSI METHOD RINGAN (< 0.2 DETIK)
             succ, msg = state.refresh_ccm_net_sales_only()
         except Exception as e:
             succ, msg = False, str(e)
         finally:
-            # 🌟 JAMINAN SPINNER SELALU TERTUTUP (ANTI-HANG)
+            # Jaminan spinner tertutup instan
             ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
         
         ui.update_navs("ccm_navset_tab", selected="TAB_CCM_DASHBOARD")
