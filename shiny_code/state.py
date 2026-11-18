@@ -8706,8 +8706,9 @@ class AppState:
             return False, f"Gagal upload jadwal: {str(e)}"
 
     def load_cycle_count_monitoring_data(self):
-        """Kalkulasi 16 Metrik Lengkap dari Supabase untuk Dashboard Tab 2 dengan Filter Tanggal"""
+        """Kalkulasi 16 Metrik Lengkap dari Supabase untuk Dashboard Tab 2 dengan Filter Tanggal (Anti-Crash JSON String)"""
         try:
+            import json
             client = get_supabase()
             if not client:
                 return False, "Koneksi database gagal!"
@@ -8720,13 +8721,39 @@ class AppState:
             tgl_s = str(self.ccm_filter_tgl_start()).strip()
             tgl_e = str(self.ccm_filter_tgl_end()).strip()
 
+            # ------------------------------------------------------------------
             # 1. Tarik Jadwal Cabang
-            sched_res = client.table("cycle_count_schedules").select("*").eq("id", f"{branch}_{month.upper()}_{year}").execute()
-            raw_schedule_items = sched_res.data[0].get("schedule_items", []) if sched_res.data else []
+            # ------------------------------------------------------------------
+            doc_id = f"{branch}_{month.upper()}_{year}"
+            sched_res = client.table("cycle_count_schedules").select("*").eq("id", doc_id).execute()
+            
+            raw_schedule_items = []
+            if sched_res and sched_res.data:
+                first_sched = sched_res.data[0]
+                if isinstance(first_sched, dict):
+                    raw_schedule_items = first_sched.get("schedule_items", [])
+                    # JIKA TERSIMPAN SEBAGAI STRING, PARSE JADI LIST
+                    if isinstance(raw_schedule_items, str):
+                        try:
+                            raw_schedule_items = json.loads(raw_schedule_items)
+                        except Exception:
+                            raw_schedule_items = []
+
+            if not isinstance(raw_schedule_items, list):
+                raw_schedule_items = []
 
             # Filter jadwal jika ada rentang tanggal
             schedule_items = []
             for it in raw_schedule_items:
+                # Sanitasi jika item di dalam list masih berupa string JSON
+                if isinstance(it, str):
+                    try:
+                        it = json.loads(it)
+                    except Exception:
+                        continue
+                if not isinstance(it, dict):
+                    continue
+
                 t_val = str(it.get("tanggal", ""))[:10]
                 if tgl_s and t_val < tgl_s: continue
                 if tgl_e and t_val > tgl_e: continue
@@ -8734,15 +8761,21 @@ class AppState:
 
             self.ccm_schedule_data.set(schedule_items)
 
-            # 2. Status Cabang
+            # ------------------------------------------------------------------
+            # 2. Status Cabang (Sudah / Belum Upload Jadwal)
+            # ------------------------------------------------------------------
             all_branches = ["HUB JAKARTA", "SEMARANG", "SIDOARJO", "KEDIRI", "JEMBER"]
             stat_res = client.table("cycle_count_schedules").select("branch").eq("month", month).eq("year", year).execute()
-            uploaded_branches = set([r.get("branch") for r in (stat_res.data or [])])
+            uploaded_branches = set([
+                r.get("branch") for r in (stat_res.data or []) if isinstance(r, dict) and r.get("branch")
+            ])
             self.ccm_branches_status.set({b: (b in uploaded_branches) for b in all_branches})
 
             planned_bins_set = set()
             bins_per_date = {}
             for item in schedule_items:
+                if not isinstance(item, dict):
+                    continue
                 tgl = str(item.get("tanggal", ""))
                 bins_str = str(item.get("target_bin", ""))
                 b_list = [b.strip() for b in bins_str.split(",") if b.strip()]
@@ -8752,7 +8785,9 @@ class AppState:
 
             total_planned_bins = len(planned_bins_set)
 
-            # 3. Tarik Eksekusi CC
+            # ------------------------------------------------------------------
+            # 3. Tarik Eksekusi CC dari Supabase
+            # ------------------------------------------------------------------
             exec_res = client.table("cycle_count_executions").select("*").eq("branch", branch).execute()
             executed_records = exec_res.data or []
 
@@ -8761,11 +8796,23 @@ class AppState:
             total_miss_location_qty = 0
 
             for ex in executed_records:
+                if not isinstance(ex, dict):
+                    continue
+
                 dt_created = str(ex.get("created_at", ""))[:10]
                 if tgl_s and dt_created < tgl_s: continue
                 if tgl_e and dt_created > tgl_e: continue
 
+                # Parsing Target Bins aman dari string JSON
                 tbins = ex.get("target_bins", [])
+                if isinstance(tbins, str):
+                    try:
+                        tbins = json.loads(tbins)
+                    except Exception:
+                        tbins = [tbins]
+                if not isinstance(tbins, list):
+                    tbins = []
+
                 for b in tbins:
                     executed_bins_set.add(str(b).strip().upper())
 
@@ -8774,14 +8821,25 @@ class AppState:
                 for b in tbins:
                     executed_per_date[dt_created].add(str(b).strip().upper())
 
+                # Parsing Summary aman dari string JSON
                 summary = ex.get("summary", {})
+                if isinstance(summary, str):
+                    try:
+                        summary = json.loads(summary)
+                    except Exception:
+                        summary = {}
+                if not isinstance(summary, dict):
+                    summary = {}
+
                 total_miss_location_qty += safe_int(summary.get("qty_miss_loc", 0))
 
             bin_done_count = len(executed_bins_set)
             bin_not_yet_count = max(0, total_planned_bins - bin_done_count)
             progress_pct = (bin_done_count / total_planned_bins * 100.0) if total_planned_bins > 0 else 0.0
 
+            # ------------------------------------------------------------------
             # 4. Match, Unmatch, Blank
+            # ------------------------------------------------------------------
             match_days = 0
             unmatch_days = 0
             blank_days = 0
@@ -8808,26 +8866,51 @@ class AppState:
             else:
                 pct_match, pct_unmatch, pct_blank = 0.0, 0.0, 0.0
 
-            # 5. Stock Accuracy
-            stock_res = client.table("stock_live_cache").select("stock_data").eq("branch", branch).execute()
+            # ------------------------------------------------------------------
+            # 5. Stock Accuracy to Total Stock
+            # ------------------------------------------------------------------
+            BRANCH_KEY_MAP = {
+                "HUB JAKARTA": "HUB_JAKARTA_LATEST",
+                "SEMARANG": "SEMARANG_LATEST",
+                "SIDOARJO": "SIDOARJO_LATEST",
+                "KEDIRI": "KEDIRI_LATEST",
+                "JEMBER": "JEMBER_LATEST",
+                "SURABAYA": "SURABAYA_LATEST",
+                "MALANG": "MALANG_LATEST"
+            }
+            cache_id = BRANCH_KEY_MAP.get(branch, f"{branch.replace(' ', '_')}_LATEST")
+
+            stock_res = client.table("stock_live_cache").select("stock_data").eq("id", cache_id).execute()
+            if not stock_res or not stock_res.data:
+                stock_res = client.table("stock_live_cache").select("stock_data").eq("branch", branch).execute()
+
             total_stock_branch = 0
-            if stock_res.data:
-                s_data = stock_res.data[0].get("stock_data", [])
-                if isinstance(s_data, str):
-                    s_data = json.loads(s_data)
-                for item in s_data:
-                    if isinstance(item, dict):
-                        total_stock_branch += safe_int(item.get("QTY SYSTEM", item.get("qty", 0)))
-                    elif isinstance(item, list) and len(item) > 9:
-                        total_stock_branch += safe_int(item[9])
+            if stock_res and stock_res.data:
+                first_row = stock_res.data[0]
+                if isinstance(first_row, dict):
+                    s_data = first_row.get("stock_data", [])
+                    if isinstance(s_data, str):
+                        try:
+                            s_data = json.loads(s_data)
+                        except Exception:
+                            s_data = []
+                    if isinstance(s_data, list):
+                        for item in s_data:
+                            if isinstance(item, dict):
+                                total_stock_branch += safe_int(item.get("QTY SYSTEM", item.get("qty", 0)))
+                            elif isinstance(item, list) and len(item) > 9:
+                                total_stock_branch += safe_int(item[9])
 
             pct_accuracy_stock = (total_miss_location_qty / total_stock_branch * 100.0) if total_stock_branch > 0 else 0.0
 
-            # 6. Adjustment Items
+            # ------------------------------------------------------------------
+            # 6. Adjustment Items (jezpro_adjustment_headers)
+            # ------------------------------------------------------------------
             adj_res = client.table("jezpro_adjustment_headers").select("*").eq("store_name", branch).execute()
             valid_ma_ids = []
-            if adj_res.data:
+            if adj_res and adj_res.data:
                 for ah in adj_res.data:
+                    if not isinstance(ah, dict): continue
                     dt_adj = str(ah.get("created_at", ""))[:10]
                     if tgl_s and dt_adj < tgl_s: continue
                     if tgl_e and dt_adj > tgl_e: continue
@@ -8842,6 +8925,7 @@ class AppState:
             if valid_ma_ids:
                 items_res = client.table("jezpro_adjustment_items").select("*").in_("ma_id", valid_ma_ids).execute()
                 for it in (items_res.data or []):
+                    if not isinstance(it, dict): continue
                     q_so = safe_int(it.get("qty_so", 0))
                     q_sys = safe_int(it.get("qty_system", 0))
                     diff_q = q_so - q_sys
@@ -8857,11 +8941,14 @@ class AppState:
             val_adj_abs = val_adj_p + val_adj_m
             val_adj_sub = val_adj_p - val_adj_m
 
-            # 7. Net Sales
+            # ------------------------------------------------------------------
+            # 7. Net Sales (jezpro_daily_net_sales)
+            # ------------------------------------------------------------------
             sales_res = client.table("jezpro_daily_net_sales").select("*").eq("branch", branch).execute()
             net_sales = 0
-            if sales_res.data:
+            if sales_res and sales_res.data:
                 for r in sales_res.data:
+                    if not isinstance(r, dict): continue
                     dt_s = str(r.get("created_at", r.get("date", "")))[:10]
                     if tgl_s and dt_s < tgl_s: continue
                     if tgl_e and dt_s > tgl_e: continue
@@ -8871,7 +8958,9 @@ class AppState:
             btsb_abs_pct = (val_adj_abs / net_sales * 100.0) if net_sales > 0 else 0.0
             btsb_sub_pct = (val_adj_sub / net_sales * 100.0) if net_sales > 0 else 0.0
 
-            # Set Reactive Values
+            # ------------------------------------------------------------------
+            # Set Reactive Values ke Dashboard
+            # ------------------------------------------------------------------
             self.ccm_m_bin_done.set(bin_done_count)
             self.ccm_m_bin_not_yet.set(bin_not_yet_count)
             self.ccm_m_prog_cc.set(round(progress_pct, 1))
@@ -8894,4 +8983,6 @@ class AppState:
             self.ccm_processed.set(True)
             return True, "Data Monitoring Cycle Count berhasil dihitung!"
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             return False, f"Gagal menghitung metrik: {e}"
