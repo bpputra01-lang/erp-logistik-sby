@@ -22,10 +22,10 @@ HEADERS_SB = {
     "apikey": SUPABASE_KEY,
     "Authorization": f"Bearer {SUPABASE_KEY}",
     "Content-Type": "application/json",
-    "Prefer": "resolution=merge-duplicates"  # UPSERT otomatis
+    "Prefer": "resolution=merge-duplicates"
 }
 
-# Daftar default seluruh cabang/store (Offline & Online)
+# Daftar default cabang/store Jezpro
 ALL_KNOWN_STORES = [
     "JEZ SURABAYA",
     "ONLINE HUB SURABAYA",
@@ -40,7 +40,7 @@ ALL_KNOWN_STORES = [
 ]
 
 # ==============================================================================
-# HELPER & CLEANER
+# HELPER & VALIDATOR
 # ==============================================================================
 def strip_html(val):
     if not val: return ""
@@ -55,6 +55,19 @@ def safe_int(val, default=0):
     except Exception:
         digits = re.findall(r'-?\d+', str(val))
         return int(digits[0]) if digits else default
+
+def extract_valid_date(val):
+    """Memastikan hanya string tanggal YYYY-MM-DD yang lolos validasi"""
+    if not val: return None
+    s = strip_html(str(val)).strip()
+    m = re.search(r'\b(20\d{2}[-/]\d{1,2}[-/]\d{1,2})\b', s)
+    if m:
+        try:
+            d_str = m.group(1).replace('/', '-')
+            return datetime.strptime(d_str, "%Y-%m-%d").strftime("%Y-%m-%d")
+        except Exception:
+            pass
+    return None
 
 # ==============================================================================
 # AUTENTIKASI KE JEZPRO
@@ -72,24 +85,21 @@ def create_jezpro_session():
     if not token_tag:
         raise Exception("Gagal mendapatkan CSRF Token Jezpro!")
 
-    res_login = session.post("https://jezpro.id/user_login", data={
+    session.post("https://jezpro.id/user_login", data={
         "_token": token_tag["value"],
         "u_email": JEZPRO_EMAIL,
         "password": JEZPRO_PASSWORD
     }, timeout=20)
     
-    # Inisialisasi route dashboard
     session.get("https://jezpro.id/dashboards", timeout=20)
     print("✅ Berhasil login ke Jezpro!")
     return session
 
 def get_store_list_from_page(session):
-    """Mendeteksi seluruh opsi cabang yang tersedia di dropdown dashboard"""
     try:
         res = session.get("https://jezpro.id/dashboards", timeout=20)
         soup = BeautifulSoup(res.text, "html.parser")
         stores = []
-        # Cari elemen select store
         select_tag = soup.find("select", {"id": re.compile(r'store', re.I)}) or soup.find("select", {"name": re.compile(r'store', re.I)})
         if select_tag:
             for opt in select_tag.find_all("option"):
@@ -98,20 +108,15 @@ def get_store_list_from_page(session):
                     stores.append(txt)
         if stores:
             return list(dict.fromkeys(stores))
-    except Exception as e:
-        print(f"⚠️ Gagal deteksi opsi store otomatis ({e}), menggunakan default store list.")
+    except Exception:
+        pass
     return ALL_KNOWN_STORES
 
 # ==============================================================================
-# CORE SCRAPER: NET SALES DASHBOARD
+# CORE SCRAPER: NET SALES
 # ==============================================================================
 def fetch_dashboard_metrics(session, start_date: str, end_date: str, stores: list, metric="net_sales", channel="ALL"):
-    """
-    Menembak API https://jezpro.id/dashboards/metrics
-    """
     url = "https://jezpro.id/dashboards/metrics"
-    
-    # Format parameter array stores[]=...
     params = [
         ("start_date", start_date),
         ("end_date", end_date),
@@ -131,7 +136,7 @@ def fetch_dashboard_metrics(session, start_date: str, end_date: str, stores: lis
     res = session.get(url, params=params, headers=headers, timeout=30)
     
     if res.status_code != 200:
-        print(f"❌ Respon gagal dari Jezpro (HTTP {res.status_code}): {res.text[:200]}")
+        print(f"❌ Respon gagal dari Jezpro (HTTP {res.status_code})")
         return None
 
     try:
@@ -141,89 +146,117 @@ def fetch_dashboard_metrics(session, start_date: str, end_date: str, stores: lis
         return None
 
 def parse_sales_payload(raw_json, channel="ALL"):
-    """
-    Memetakan response JSON ke bentuk list data harian yang siap di-upsert ke Supabase
-    """
-    records = []
+    unique_records = {}
     now_iso = datetime.now(WIB).isoformat()
 
-    if not raw_json:
-        return records
+    if not raw_json or not isinstance(raw_json, dict):
+        return []
 
-    # Skenario 1: Respons format Tabel (array object berisi tanggal dan kolom toko)
-    # Contoh: [{"DATE": "2026-11-01", "ONLINE HUB SURABAYA": 35000000, ...}]
+    # Daftar kata kunci yang bukan merupakan nama store
+    META_KEYS = {
+        "FILTERS", "FILTER", "PARAMS", "REQUEST", "SUMMARY", 
+        "META", "TOTAL", "STATUS", "CODE", "STORES", "LABELS", 
+        "DATASETS", "START_DATE", "END_DATE", "METRIC_KEY", "CHANNEL"
+    }
+
+    # Format 1: Format Datatable [{"DATE": "2026-11-01", "STORE": 1000}]
     table_data = raw_json.get("table") or raw_json.get("data")
     if isinstance(table_data, list) and len(table_data) > 0 and isinstance(table_data[0], dict):
         for row in table_data:
-            date_val = row.get("DATE") or row.get("date") or row.get("tgl")
-            if not date_val: continue
+            date_raw = row.get("DATE") or row.get("date") or row.get("tgl")
+            valid_date = extract_valid_date(date_raw)
+            if not valid_date: continue
             
-            for key, val in row.items():
-                if key.upper() in ["DATE", "TOTAL", "TGL", "DT_ROWINDEX", "ID"]:
+            for k, v in row.items():
+                if k.upper() in ["DATE", "TOTAL", "TGL", "DT_ROWINDEX", "ID"] or k.upper() in META_KEYS:
                     continue
-                store_name = key.strip()
-                sales_nominal = safe_int(val, 0)
-                clean_id = f"{date_val}_{store_name.replace(' ', '_').upper()}"
-                
-                records.append({
+                store_name = k.strip()
+                clean_id = f"{valid_date}_{store_name.replace(' ', '_').upper()}"
+                unique_records[clean_id] = {
                     "id": clean_id,
-                    "date": date_val,
+                    "date": valid_date,
                     "store_name": store_name,
-                    "net_sales": sales_nominal,
+                    "net_sales": safe_int(v, 0),
                     "channel": channel,
                     "metric_key": "net_sales",
                     "updated_at": now_iso
-                })
-        return records
+                }
+        return list(unique_records.values())
 
-    # Skenario 2: Respons format Chart (labels = tanggal, datasets = [ {label: 'Store A', data: [...]} ])
+    # Format 2: Format Chart.js (labels & datasets)
     chart_data = raw_json.get("chart") or raw_json
     labels = chart_data.get("labels") or []
     datasets = chart_data.get("datasets") or []
-
-    if labels and datasets:
+    if labels and datasets and isinstance(labels, list) and isinstance(datasets, list):
         for ds in datasets:
             store_name = ds.get("label", "UNKNOWN").strip()
             data_points = ds.get("data", [])
             for idx, date_label in enumerate(labels):
+                valid_date = extract_valid_date(date_label)
+                if not valid_date: continue
                 val = data_points[idx] if idx < len(data_points) else 0
-                clean_id = f"{date_label}_{store_name.replace(' ', '_').upper()}"
-                records.append({
+                clean_id = f"{valid_date}_{store_name.replace(' ', '_').upper()}"
+                unique_records[clean_id] = {
                     "id": clean_id,
-                    "date": date_label,
+                    "date": valid_date,
                     "store_name": store_name,
                     "net_sales": safe_int(val, 0),
                     "channel": channel,
                     "metric_key": "net_sales",
                     "updated_at": now_iso
-                })
-        return records
+                }
+        if unique_records:
+            return list(unique_records.values())
 
-    # Skenario 3: Respons format Dictionary langsung {"ONLINE HUB SURABAYA": {"2026-11-01": 10000}}
-    if isinstance(raw_json, dict):
-        for store_key, date_dict in raw_json.items():
-            if isinstance(date_dict, dict):
-                for d_key, v in date_dict.items():
-                    clean_id = f"{d_key}_{store_key.replace(' ', '_').upper()}"
-                    records.append({
-                        "id": clean_id,
-                        "date": d_key,
-                        "store_name": store_key,
-                        "net_sales": safe_int(v, 0),
-                        "channel": channel,
-                        "metric_key": "net_sales",
-                        "updated_at": now_iso
-                    })
+    # Format 3: Nested Dictionary (Store -> Date -> Sales ATAU Date -> Store -> Sales)
+    for k_outer, v_outer in raw_json.items():
+        if str(k_outer).upper() in META_KEYS:
+            continue
+        
+        if isinstance(v_outer, dict):
+            for k_inner, v_inner in v_outer.items():
+                # Cek apakah inner key adalah tanggal
+                d_val = extract_valid_date(k_inner)
+                if d_val:
+                    store_name = str(k_outer).strip()
+                    val = v_inner
+                else:
+                    # Cek apakah outer key adalah tanggal
+                    d_val = extract_valid_date(k_outer)
+                    if d_val:
+                        store_name = str(k_inner).strip()
+                        val = v_inner
+                    else:
+                        continue  # Bukan pasangan tanggal dan sales
 
-    return records
+                if store_name.upper() in META_KEYS:
+                    continue
+
+                clean_id = f"{d_val}_{store_name.replace(' ', '_').upper()}"
+                unique_records[clean_id] = {
+                    "id": clean_id,
+                    "date": d_val,
+                    "store_name": store_name,
+                    "net_sales": safe_int(val, 0),
+                    "channel": channel,
+                    "metric_key": "net_sales",
+                    "updated_at": now_iso
+                }
+
+    return list(unique_records.values())
 
 # ==============================================================================
 # UPSERT SUPABASE
 # ==============================================================================
 def upsert_to_supabase(records: list):
     if not records:
-        print("⚠️ Tidak ada data records yang akan disimpan.")
+        print("⚠️ Tidak ada data records yang valid untuk disimpan.")
         return
+
+    # Tampilkan preview 2 data teratas untuk memastikan format tanggal sudah benar
+    print(f"🔍 [PREVIEW DATA]")
+    for sample in records[:2]:
+        print(f"   -> ID: {sample['id']} | Date: {sample['date']} | Store: {sample['store_name']} | Net Sales: Rp{sample['net_sales']:,}")
 
     print(f"🚀 [SUPABASE] Mengirim {len(records)} baris data Net Sales...")
     batch_size = 100
@@ -242,24 +275,19 @@ def upsert_to_supabase(records: list):
     print(f"✅ [SUPABASE] Berhasil menyimpan/mengupdate total {total_saved} baris data!")
 
 # ==============================================================================
-# MAIN FUNCTION
+# MAIN
 # ==============================================================================
 def run_sync_sales():
     jez = create_jezpro_session()
 
-    # Hitung tanggal dari hari ke-1 bulan ini hingga akhir bulan
     now_wib = datetime.now(WIB)
     start_date = now_wib.strftime("%Y-%m-01")
-    
-    # Ambil hari terakhir di bulan ini (misal 30 atau 31)
     last_day = calendar.monthrange(now_wib.year, now_wib.month)[1]
     end_date = f"{now_wib.year}-{now_wib.month:02d}-{last_day:02d}"
 
-    # Dapatkan seluruh store
     store_list = get_store_list_from_page(jez)
     print(f"🏢 Cabang terdaftar ({len(store_list)}): {', '.join(store_list)}")
 
-    # Tarik API Net Sales
     raw_response = fetch_dashboard_metrics(
         session=jez,
         start_date=start_date,
@@ -271,7 +299,7 @@ def run_sync_sales():
 
     if raw_response:
         clean_records = parse_sales_payload(raw_response, channel="ALL")
-        print(f"📊 Berhasil mengekstrak {len(clean_records)} rincian baris data harian.")
+        print(f"📊 Berhasil mengekstrak {len(clean_records)} rincian baris data harian yang valid.")
         if clean_records:
             upsert_to_supabase(clean_records)
     else:
@@ -281,15 +309,4 @@ if __name__ == "__main__":
     print("=" * 70)
     print("🚀 JEZPRO DASHBOARD NET SALES SCRAPER & SUPABASE SYNC")
     print("=" * 70)
-    
-    # Bisa langsung dijalankan sekali (One-off)
     run_sync_sales()
-
-    # OPSI JIKA INGIN DIJALANKAN OTOMATIS TIAP 1 JAM (Uncomment jika perlu):
-    # while True:
-    #     print("\n⏳ Menunggu 1 jam untuk sinkronisasi berikutnya...")
-    #     time.sleep(3600)
-    #     try:
-    #         run_sync_sales()
-    #     except Exception as e:
-    #         print(f"⚠️ Error: {e}")
