@@ -3460,19 +3460,50 @@ def cycle_count_monitoring_view(state: AppState):
             style="background: #FFFFFF; border: 2px solid #000000; border-radius: 4px; padding: 1.25rem 1rem; width: 100%; min-height: 115px; display: flex; flex-direction: column; justify-content: center; box-shadow: 2px 2px 0px rgba(0,0,0,0.15);"
         )
 
+    # --- TAB 2: MONITORING DASHBOARD (DENGAN FILTER TANGGAL & 16 KPI MODERN) ---
     tab2_dashboard = ui.div(
+        # 🌟 BARIS FILTER TANGGAL KHUSUS TAB 2
+        ui.div(
+            ui.div(
+                ui.div(
+                    ui.tags.i(class_="fa-solid fa-calendar-days", style="color: #3182CE; font-size: 15px; margin-right: 8px;"),
+                    ui.span("Filter Periode Tanggal Khusus Tab 2:", style="font-weight: 800; font-size: 12.5px; color: #1A202C;"),
+                    style="display: flex; align-items: center;"
+                ),
+                ui.div(
+                    ui.div(
+                        ui.span("Tanggal Awal:", style="font-size: 11px; font-weight: 700; color: #4A5568; margin-right: 6px;"),
+                        ui.tags.input(
+                            type="date", id="ccm_tab2_tgl_start", value=state.ccm_filter_tgl_start(),
+                            onchange="Shiny.setInputValue('change_ccm_tgl_start', this.value, {priority: 'event'})",
+                            style="padding: 5px 10px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; background: white;"
+                        ),
+                        style="display: flex; align-items: center;"
+                    ),
+                    ui.div(
+                        ui.span("Tanggal Akhir:", style="font-size: 11px; font-weight: 700; color: #4A5568; margin-left: 10px; margin-right: 6px;"),
+                        ui.tags.input(
+                            type="date", id="ccm_tab2_tgl_end", value=state.ccm_filter_tgl_end(),
+                            onchange="Shiny.setInputValue('change_ccm_tgl_end', this.value, {priority: 'event'})",
+                            style="padding: 5px 10px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; background: white;"
+                        ),
+                        style="display: flex; align-items: center;"
+                    ),
+                    ui.tags.button(
+                        "🔄 Reset Tanggal",
+                        onclick="Shiny.setInputValue('btn_reset_ccm_dates', Math.random(), {priority: 'event'})",
+                        style="background: #EDF2F7; color: #4A5568; border: 1.5px solid #CBD5E0; border-radius: 6px; font-weight: 700; font-size: 12px; padding: 5px 12px; cursor: pointer; margin-left: 8px;"
+                    ),
+                    style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px;"
+                ),
+                style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 10px;"
+            ),
+            style="background: #F8FAFC; border: 1.5px solid #CBD5E0; padding: 12px 18px; border-radius: 10px; margin-bottom: 1.25rem;"
+        ),
+        
+        # Output Reaktif 16 Kotak Metrik
         ui.output_ui("ccm_16_metrics_grid_ui"),
         style="padding: 0.5rem 0;"
-    )
-
-    return ui.div(
-        filter_bar,
-        ui.navset_card_tab(
-            ui.nav_panel("📅 1. UPLOAD JADWAL CYCLE COUNT", tab1_upload),
-            ui.nav_panel("📊 2. MONITORING DASHBOARD (16 KPI)", tab2_dashboard),
-            id="ccm_main_navset"
-        ),
-        style="width: 100%; padding: 1rem;"
     )
 
 def menu_item(label: str, target_menu: str, current_menu: str):

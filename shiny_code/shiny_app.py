@@ -7079,53 +7079,101 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         yield buf.getvalue()
     # ==========================================================================
-    # RENDER 16 KPI METRICS (PERSIS 4 BARIS x 4 KOTAK SESUAI SCREENSHOT EXCEL)
+    # EVENT HANDLERS FILTER TANGGAL TAB 2
+    # ==========================================================================
+    @reactive.Effect
+    @reactive.event(input.change_ccm_tgl_start)
+    def _on_ccm_tgl_start():
+        state.ccm_filter_tgl_start.set(input.change_ccm_tgl_start())
+        state.load_cycle_count_monitoring_data()
+
+    @reactive.Effect
+    @reactive.event(input.change_ccm_tgl_end)
+    def _on_ccm_tgl_end():
+        state.ccm_filter_tgl_end.set(input.change_ccm_tgl_end())
+        state.load_cycle_count_monitoring_data()
+
+    @reactive.Effect
+    @reactive.event(input.btn_reset_ccm_dates)
+    def _on_ccm_reset_dates():
+        state.ccm_filter_tgl_start.set("")
+        state.ccm_filter_tgl_end.set("")
+        ui.update_text("ccm_tab2_tgl_start", value="")
+        ui.update_text("ccm_tab2_tgl_end", value="")
+        state.load_cycle_count_monitoring_data()
+
+    # ==========================================================================
+    # RENDER 16 KPI METRICS MODERN (DARK THEME, ICON BADGE & ACCENT BORDER)
     # ==========================================================================
     @render.ui
     def ccm_16_metrics_grid_ui():
-        def box(title, val_str, sub_str=""):
+        # Komponen Kartu Modern: Gradien Gelap, Icon Bulat & Glow Border
+        def modern_kpi_box(title: str, val_str: str, sub_str: str, border_color: str, icon_class: str):
+            badge_icon = ui.div(
+                ui.tags.i(class_=icon_class, style=f"color: {border_color}; font-size: 13px;"),
+                style=f"width: 28px; height: 28px; border-radius: 6px; background: {border_color}22; display: flex; align-items: center; justify-content: center;"
+            )
             return ui.div(
-                ui.div(title, style="font-size: 11.5px; font-weight: 800; color: #1A202C; text-align: center; text-transform: uppercase; margin-bottom: 6px; min-height: 28px; display: flex; align-items: center; justify-content: center;"),
-                ui.div(val_str, style="font-size: 21px; font-weight: 900; color: #1A202C; text-align: center;"),
-                ui.div(sub_str, style="font-size: 11.5px; font-weight: 700; color: #718096; text-align: center; margin-top: 2px;") if sub_str else ui.div(),
-                style="background: #FFFFFF; border: 2px solid #000000; border-radius: 4px; padding: 1rem 0.75rem; width: 100%; min-height: 110px; display: flex; flex-direction: column; justify-content: center; box-shadow: 2px 2px 0px rgba(0,0,0,0.12);"
+                ui.div(
+                    ui.span(title, style="font-size: 10.5px; font-weight: 800; color: #A0AEC0; text-transform: uppercase; letter-spacing: 0.5px; line-height: 1.2;"),
+                    badge_icon,
+                    style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;"
+                ),
+                ui.div(val_str, style=f"font-size: 21px; font-weight: 900; color: #FFFFFF; line-height: 1.1; margin-bottom: 4px;"),
+                ui.div(
+                    ui.span(sub_str, style=f"font-size: 11.5px; font-weight: 700; color: {border_color};"),
+                    style="min-height: 18px;"
+                ) if sub_str else ui.div(style="height: 18px;"),
+                style=f"""
+                    background: linear-gradient(145deg, #1A1D24 0%, #111318 100%);
+                    border-radius: 10px;
+                    border: 1px solid #2D3748;
+                    border-left: 4px solid {border_color};
+                    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+                    padding: 1rem 1.15rem;
+                    width: 100%;
+                    min-height: 105px;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: space-between;
+                """
             )
 
-        # Baris 1: Progress & Match Plan
+        # Baris 1: Progress & Match Plan (Tema: Blue / Emerald / Cyan)
         row1 = ui.div(
-            box("TOTAL BIN DONE CYCLE COUNT", f"{state.ccm_m_bin_done():,} BIN"),
-            box("TOTAL BIN NOT CYCLE COUNT YET", f"{state.ccm_m_bin_not_yet():,} BIN"),
-            box("%PROGRESS CYCLE COUNT", f"{state.ccm_m_prog_cc():.1f}%"),
-            box("%MATCH PLAN Vs ACTION", f"{state.ccm_m_match_plan():.1f}%"),
-            style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; width: 100%; margin-bottom: 1rem;"
+            modern_kpi_box("TOTAL BIN DONE CYCLE COUNT", f"{state.ccm_m_bin_done():,} BIN", "Selesai Terverifikasi", "#38BDF8", "fa-solid fa-boxes-stacked"),
+            modern_kpi_box("TOTAL BIN NOT CYCLE COUNT YET", f"{state.ccm_m_bin_not_yet():,} BIN", "Menunggu Pelaksanaan", "#FB923C", "fa-solid fa-hourglass-half"),
+            modern_kpi_box("%PROGRESS CYCLE COUNT", f"{state.ccm_m_prog_cc():.1f}%", "Pencapaian Jadwal", "#10B981", "fa-solid fa-chart-line"),
+            modern_kpi_box("%MATCH PLAN Vs ACTION", f"{state.ccm_m_match_plan():.1f}%", "Sesuai Jadwal Harian", "#06B6D4", "fa-solid fa-circle-check"),
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
         )
 
-        # Baris 2: Unmatch, Blank, Miss Location & Accuracy
+        # Baris 2: Unmatch, Blank, Miss Location & Accuracy (Tema: Rose / Purple / Amber)
         row2 = ui.div(
-            box("%UNMATCH PLAN Vs ACTION", f"{state.ccm_m_unmatch_plan():.1f}%"),
-            box("%BLANK", f"{state.ccm_m_blank():.1f}%"),
-            box("TOTAL MISS LOCATION", f"{state.ccm_m_total_miss_loc():,} PCS"),
-            box("%ACCURACY to TOTAL STOCK", f"{state.ccm_m_accuracy_stock():.2f}%"),
-            style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; width: 100%; margin-bottom: 1rem;"
+            modern_kpi_box("%UNMATCH PLAN Vs ACTION", f"{state.ccm_m_unmatch_plan():.1f}%", "Tidak Sesuai Rencana", "#F43F5E", "fa-solid fa-triangle-exclamation"),
+            modern_kpi_box("%BLANK", f"{state.ccm_m_blank():.1f}%", "Jadwal Tanpa Realisasi", "#A855F7", "fa-solid fa-calendar-xmark"),
+            modern_kpi_box("TOTAL MISS LOCATION", f"{state.ccm_m_total_miss_loc():,} PCS", "Salah Letak Rak", "#EF4444", "fa-solid fa-people-carry-box"),
+            modern_kpi_box("%ACCURACY to TOTAL STOCK", f"{state.ccm_m_accuracy_stock():.2f}%", "Rasio Miss vs Total Stok", "#F59E0B", "fa-solid fa-bullseye"),
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
         )
 
-        # Baris 3: Adjustment Values (+, -, ABS, SUB)
+        # Baris 3: Adjustment Values (+, -, ABS, SUB) (Tema: Green / Red / Indigo)
         sub_sign = "+" if state.ccm_m_adj_sub_val() > 0 else ""
         row3 = ui.div(
-            box("TOTAL QTY & VALUE ADJ. +", f"{state.ccm_m_adj_plus_qty():,} PCS", f"Rp {state.ccm_m_adj_plus_val():,}"),
-            box("TOTAL QTY & VALUE ADJ. -", f"-{state.ccm_m_adj_minus_qty():,} PCS", f"-Rp {state.ccm_m_adj_minus_val():,}"),
-            box("TOTAL QTY & VALUE ADJ. (ABS)", f"Rp {state.ccm_m_adj_abs_val():,}"),
-            box("TOTAL QTY & VALUE ADJ. (SUB)", f"{sub_sign}Rp {state.ccm_m_adj_sub_val():,}"),
-            style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; width: 100%; margin-bottom: 1rem;"
+            modern_kpi_box("TOTAL QTY & VALUE ADJ. +", f"{state.ccm_m_adj_plus_qty():,} PCS", f"Rp {state.ccm_m_adj_plus_val():,}", "#10B981", "fa-solid fa-circle-plus"),
+            modern_kpi_box("TOTAL QTY & VALUE ADJ. -", f"-{state.ccm_m_adj_minus_qty():,} PCS", f"-Rp {state.ccm_m_adj_minus_val():,}", "#EF4444", "fa-solid fa-circle-minus"),
+            modern_kpi_box("TOTAL QTY & VALUE ADJ. (ABS)", f"Rp {state.ccm_m_adj_abs_val():,}", "Total Nilai Kotor (Abs)", "#38BDF8", "fa-solid fa-scale-balanced"),
+            modern_kpi_box("TOTAL QTY & VALUE ADJ. (SUB)", f"{sub_sign}Rp {state.ccm_m_adj_sub_val():,}", "Net Nilai Bersih", "#818CF8", "fa-solid fa-calculator"),
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
         )
 
-        # Baris 4: Net Sales & BTSB
+        # Baris 4: Net Sales & BTSB (Tema: Teal / Gold / Rose)
         row4 = ui.div(
-            box("NET SALES", f"Rp {state.ccm_m_net_sales():,}"),
-            box("BTSB", f"Rp {state.ccm_m_btsb():,.2f}"),
-            box("%BTSB (ABS)", f"{state.ccm_m_btsb_abs_pct():.2f}%"),
-            box("%BTSB (SUB)", f"{state.ccm_m_btsb_sub_pct():.2f}%"),
-            style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; width: 100%; margin-bottom: 1rem;"
+            modern_kpi_box("NET SALES", f"Rp {state.ccm_m_net_sales():,}", "Omzet Penjualan Cabang", "#10B981", "fa-solid fa-money-bill-wave"),
+            modern_kpi_box("BTSB (0.015% SALES)", f"Rp {state.ccm_m_btsb():,.2f}", "Budget Toleransi Selisih", "#F59E0B", "fa-solid fa-shield-halved"),
+            modern_kpi_box("%BTSB (ABS)", f"{state.ccm_m_btsb_abs_pct():.2f}%", "Rasio Absolut vs Sales", "#F43F5E", "fa-solid fa-percent"),
+            modern_kpi_box("%BTSB (SUB)", f"{state.ccm_m_btsb_sub_pct():.2f}%", "Rasio Net vs Sales", "#0EA5E9", "fa-solid fa-chart-pie"),
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
         )
 
         return ui.div(row1, row2, row3, row4, style="width: 100%;")
