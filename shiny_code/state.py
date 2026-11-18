@@ -9078,7 +9078,7 @@ class AppState:
             val_adj_abs = self.ccm_m_adj_abs_val()
             val_adj_sub = self.ccm_m_adj_sub_val()
 
-            btsb_val = net_sales * 0.00015
+            btsb_val = net_sales * 0.0015
             btsb_abs_pct = (val_adj_abs / net_sales * 100.0) if net_sales > 0 else 0.0
             btsb_sub_pct = (val_adj_sub / net_sales * 100.0) if net_sales > 0 else 0.0
 
