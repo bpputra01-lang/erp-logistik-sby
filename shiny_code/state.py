@@ -857,7 +857,7 @@ class AppState:
             return ["Warehouse Activity Monitor"]
         elif uname == "toko":
             return ["Warehouse Activity Monitor"]
-        return ["Warehouse Activity Monitor","FDR Controller", "Memo Pengajuan", "Balancing Stock", "Database Ongkir In/Out", "Precentage Display"]
+        return ["Warehouse Activity Monitor","Cycle Count Monitoring", "FDR Controller", "Memo Pengajuan", "Balancing Stock", "Database Ongkir In/Out", "Precentage Display"]
 
     def get_menu_target(self) -> list[str]:
         uname = self.username().lower()
@@ -906,6 +906,10 @@ class AppState:
         # 🌟 1. 'IF' TETAP WAREHOUSE ACTIVITY MONITORING
         if cur_menu in ["Warehouse Activity Monitor", "Warehouse Monitoring", "warehouse_activity_monitor", "ll01-monitor"]:
             return "warehouse_activity_monitor"
+
+        # 🌟 TAMBAHKAN BARIS INI AGAR SISTEM MENAMPILKAN VIEW MONITORING:
+        elif cur_menu in ["Cycle Count Monitoring", "cycle_count_monitoring", "cycle-count-monitoring"]:
+            return "cycle_count_monitoring"
 
         # 🌟 2. 'ELIF' TARGET PROGRESS (HANYA AKSES ADMIN / DC)
         elif cur_menu in ["Target Progress", "target_progress", "target-progress"]:
@@ -8514,50 +8518,141 @@ class AppState:
     # LOGIKA BARU: CYCLE COUNT MONITORING (UPLOAD JADWAL & 16 METRICS CALCULATION)
     # ==============================================================================
     def upload_cycle_count_schedule(self, file_info, branch: str, month: str, year: str):
-        """Upload dan simpan jadwal CC bulanan ke Supabase"""
+        """Membaca file jadwal format Kalender Matrix (Persis foto) maupun Flat Table"""
         try:
             if not file_info:
                 return False, "File jadwal wajib diupload!"
 
-            df_raw = load_data_from_info(file_info)
-            if df_raw.empty:
-                return False, "File jadwal kosong!"
+            import openpyxl
+            import re
 
-            # Normalisasi kolom jadwal (Flexible Column & Date Parser)
-            # Standar template: Kolom A = TANGGAL (1-31), Kolom B = TARGET BIN (Bisa koma), Kolom C = PIC / NOTE
+            path = file_info[0]["datapath"]
+            wb = openpyxl.load_workbook(path, data_only=True)
+            ws = wb.active
+
             records = []
-            for _, row in df_raw.iterrows():
-                tgl_val = str(row.iloc[0]).strip()
-                bin_val = str(row.iloc[1]).strip().upper() if df_raw.shape[1] > 1 else ""
-                note_val = str(row.iloc[2]).strip() if df_raw.shape[1] > 2 else ""
+            title_text = f"JADWAL CYCLE COUNT {branch.upper()} {month.upper()} {year}"
 
-                if not tgl_val or tgl_val in ["NAN", "NONE", ""]:
-                    continue
+            # Helper bersihkan nama BIN
+            def clean_bin_text(b_str):
+                s = str(b_str).strip()
+                # Buang kurung buka dan tutup (GL3-SDA-A2-1) -> GL3-SDA-A2-1
+                s = re.sub(r'^[(\[]|[)\]]$', '', s).strip()
+                # Jika tertulis DISPLAY -> Ubah ke TOKO
+                if s.upper() == "DISPLAY":
+                    return "TOKO"
+                return s
 
-                # Konversi jika store leader menulis 'DISPLAY' -> jadikan 'TOKO'
-                bin_clean = "TOKO" if bin_val == "DISPLAY" else bin_val
+            MONTH_EN_MAP = {
+                "JANUARI": "01", "FEBRUARI": "02", "MARET": "03", "APRIL": "04",
+                "MEI": "05", "JUNI": "06", "JULI": "07", "AGUSTUS": "08",
+                "SEPTEMBER": "09", "OKTOBER": "10", "NOVEMBER": "11", "DESEMBER": "12"
+            }
+            mo_num = MONTH_EN_MAP.get(month.upper(), "10")
+
+            # SCAN MATRIX CELL KALENDER PERSIS FOTO
+            max_r = ws.max_row
+            max_c = min(ws.max_column, 15)
+
+            # Cari baris yang berisi hari (Senin, Selasa, ...)
+            day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
+            
+            r = 1
+            while r <= max_r:
+                row_vals = [str(ws.cell(row=r, column=c).value or "").strip().upper() for c in range(1, max_c + 1)]
                 
-                records.append({
-                    "tanggal": tgl_val,
-                    "target_bin": bin_clean,
-                    "note": note_val
-                })
+                # Cek baris header kalender (Senin, Selasa, dll)
+                matched_days = [c_idx for c_idx, val in enumerate(row_vals, 1) if any(d in val for d in day_names)]
+                
+                if len(matched_days) >= 4:
+                    # Baris berikutnya adalah tanggal (contoh: 5 Oct 2026 / 5)
+                    r_date = r + 1
+                    
+                    # Kolom-kolom tanggal
+                    col_date_map = {}
+                    for col_idx in range(1, max_c + 1):
+                        cell_d_val = str(ws.cell(row=r_date, column=col_idx).value or "").strip()
+                        # Tangkap angka tanggal 1 s/d 31
+                        d_match = re.search(r'\b([1-9]|[12]\d|3[01])\b', cell_d_val)
+                        if d_match:
+                            day_int = int(d_match.group(1))
+                            iso_date = f"{year}-{mo_num}-{day_int:02d}"
+                            col_date_map[col_idx] = {
+                                "date_str": cell_d_val,
+                                "iso_date": iso_date,
+                                "day_num": day_int
+                            }
 
+                    # Baca baris-baris BIN di bawah tanggal ini sampai ketemu baris WEEK berikutnya
+                    r_bin = r_date + 1
+                    while r_bin <= max_r:
+                        check_week = str(ws.cell(row=r_bin, column=1).value or "").strip().upper()
+                        # Jika ketemu blok week berikutnya, hentikan loop sub-baris
+                        if "WEEK" in check_week and r_bin > r_date + 1:
+                            break
+
+                        for c_idx, d_info in col_date_map.items():
+                            cell_content = str(ws.cell(row=r_bin, column=c_idx).value or "").strip()
+                            if not cell_content or cell_content.upper() in ["NONE", "NAN", "-"]:
+                                continue
+
+                            # Pisahkan jika ada banyak baris dalam 1 sel (Alt+Enter)
+                            lines = cell_content.split("\n")
+                            for line in lines:
+                                bin_cleaned = clean_bin_text(line)
+                                if bin_cleaned:
+                                    records.append({
+                                        "tanggal": d_info["iso_date"],
+                                        "day_num": d_info["day_num"],
+                                        "date_display": d_info["date_str"],
+                                        "target_bin": bin_cleaned,
+                                        "note": f"Cycle Count Week {d_info['day_num']}"
+                                    })
+                        r_bin += 1
+                    r = r_bin - 1
+                r += 1
+
+            # Fallback jika user upload format Flat (Kolom A=Tgl, B=BIN, C=Note)
+            if not records:
+                for r_idx in range(2, max_r + 1):
+                    tgl = str(ws.cell(row=r_idx, column=1).value or "").strip()
+                    bn = str(ws.cell(row=r_idx, column=2).value or "").strip()
+                    nt = str(ws.cell(row=r_idx, column=3).value or "").strip()
+                    if tgl and bn and tgl.upper() not in ["NONE", "NAN"]:
+                        for single_b in bn.split(","):
+                            clean_b = clean_bin_text(single_b)
+                            if clean_b:
+                                records.append({
+                                    "tanggal": tgl,
+                                    "day_num": safe_int(re.sub(r'\D', '', tgl), 1),
+                                    "date_display": tgl,
+                                    "target_bin": clean_b,
+                                    "note": nt or "-"
+                                })
+
+            if not records:
+                return False, "Tidak dapat membaca tanggal dan BIN dari file! Pastikan file sesuai template."
+
+            # Simpan ke Supabase
             client = get_supabase()
             if client:
+                doc_id = f"{branch.upper()}_{month.upper()}_{year}"
                 client.table("cycle_count_schedules").upsert({
-                    "id": f"{branch.upper()}_{month.upper()}_{year}",
+                    "id": doc_id,
                     "branch": branch.upper(),
                     "month": month,
                     "year": safe_int(year, 2026),
+                    "title": title_text,
                     "schedule_items": records,
                     "updated_at": datetime.now(WIB).isoformat()
                 }).execute()
 
             self.load_cycle_count_monitoring_data()
-            return True, f"Jadwal {branch} bulan {month} {year} ({len(records)} baris) berhasil disimpan!"
+            return True, f"✅ Berhasil memproses {len(records)} slot BIN jadwal untuk {branch} ({month} {year})!"
         except Exception as e:
-            return False, f"Gagal upload jadwal: {e}"
+            import traceback
+            traceback.print_exc()
+            return False, f"Gagal upload jadwal: {str(e)}"
 
     def load_cycle_count_monitoring_data(self):
         """Kalkulasi 16 Metrik Lengkap dari Supabase untuk Dashboard Tab 2"""

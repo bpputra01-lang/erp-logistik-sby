@@ -17,7 +17,8 @@ from views import (
     justification_so_view, cycle_count_view, login_page, ppa_audit_view, 
     cycle_count_analyzer_view, global_header, cross_check_real_system_view,
     balancing_stock_view, physical_inventory_list_view, validation_barcode_sku_view, percentage_display_view,excel_practice_view,
-    auditor_view, memo_pengajuan_view, warehouse_activity_monitor_view, compliance_audit_view, instock_validation_view, target_progress_view, fdr_controller_view
+    auditor_view, memo_pengajuan_view, warehouse_activity_monitor_view, compliance_audit_view, instock_validation_view, target_progress_view, fdr_controller_view,
+    cycle_count_monitoring_view
 )
 
 app_ui = ui.page_fluid(
@@ -1476,7 +1477,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             class_="step-card-box",
             style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
         )
-        
+
     # --- STEP 1 ---
     @render.ui
     def cca_step1_btn_ui():
@@ -6964,19 +6965,119 @@ def server(input: Inputs, output: Outputs, session: Session):
         return render_clean_table(["TANGGAL", "TARGET BIN", "NOTE / KETERANGAN"], rows, "tbl_ccm_sched")
 
     # Template Download Jadwal
-    @render.download(filename="TEMPLATE_JADWAL_CYCLE_COUNT.xlsx")
+    @render.download(filename="TEMPLATE_JADWAL_CYCLE_COUNT_MATRIX.xlsx")
     def btn_dl_ccm_schedule_template():
+        import io
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Jadwal_CC"
+        ws.sheet_view.showGridLines = True
+
+        # Styles Persis Foto
+        gray_fill = PatternFill(start_color="A6A6A6", end_color="A6A6A6", fill_type="solid")
+        peach_fill = PatternFill(start_color="F8CBAD", end_color="F8CBAD", fill_type="solid")
+        font_title = Font(name="Calibri", size=13, bold=True, color="000000")
+        font_header = Font(name="Calibri", size=10, bold=True, color="000000")
+        font_body = Font(name="Calibri", size=10, color="000000")
+        thin_border = Border(
+            left=Side(style='thin', color='000000'), right=Side(style='thin', color='000000'),
+            top=Side(style='thin', color='000000'), bottom=Side(style='thin', color='000000')
+        )
+
+        # 1. Judul Header Atas Abu-abu
+        ws.merge_cells("A1:H1")
+        cell_t = ws["A1"]
+        cell_t.value = f"JADWAL CYCLE COUNT {state.ccm_branch().upper()} {state.ccm_month().upper()} {state.ccm_year()}"
+        cell_t.font = font_title
+        cell_t.fill = gray_fill
+        cell_t.alignment = Alignment(horizontal="center", vertical="center")
+        ws.row_dimensions[1].height = 28
+
+        days_header = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
+
+        sample_weeks = [
+            ("WEEK 2", ["5 Oct 2026", "6 Oct 2026", "7 Oct 2026", "8 Oct 2026", "9 Oct 2026", "10 Oct 2026", "11 Oct 2026"],
+             ["(GL3-SDA-A2-1)\n(GL3-SDA-A2-2)\n(GL3-SDA-A2-3)",
+              "(GL3-SDA-A3-1)\n(GL3-SDA-A3-2)\n(GL3-SDA-A3-3)",
+              "(GL3-SDA-B1-1)\n(GL3-SDA-B1-2)\n(GL3-SDA-B1-3)",
+              "(GL3-SDA-B2-1)\n(GL3-SDA-B2-2)\n(GL3-SDA-B2-3)",
+              "(GL3-SDA-B3-1)\n(GL3-SDA-B3-2)\n(GL3-SDA-B3-3)",
+              "(GL3-SDA-B4-1)\n(GL3-SDA-B4-2)\n(GL3-SDA-B4-3)",
+              "DISPLAY"]),
+
+            ("WEEK 3", ["12 Oct 2026", "13 Oct 2026", "14 Oct 2026", "15 Oct 2026", "16 Oct 2026", "17 Oct 2026", "18 Oct 2026"],
+             ["(GL3-SDA-B6-1)\n(GL3-SDA-B6-2)\n(GL3-SDA-B6-3)",
+              "(GL3-SDA-C1-1)\n(GL3-SDA-C1-2)\n(GL3-SDA-C1-3)",
+              "(GL3-SDA-C2-1)\n(GL3-SDA-C2-2)\n(GL3-SDA-C2-3)",
+              "(GL3-SDA-C3-1)\n(GL3-SDA-C3-2)\n(GL3-SDA-C3-3)",
+              "(GL3-SDA-C4-1)\n(GL3-SDA-C4-2)\n(GL3-SDA-C4-3)",
+              "(GL3-SDA-C5-1)\n(GL3-SDA-C5-2)\n(GL3-SDA-C5-3)",
+              "(GL3-SDA-C6-1)\n(GL3-SDA-C6-2)\n(GL3-SDA-C6-3)"]),
+
+            ("WEEK 4", ["19 Oct 2026", "20 Oct 2026", "21 Oct 2026", "22 Oct 2026", "23 Oct 2026", "24 Oct 2026", "25 Oct 2026"],
+             ["(GL3-SDA-D1-1)\n(GL3-SDA-D1-2)\n(GL3-SDA-D1-3)",
+              "(GL3-SDA-D2-1)\n(GL3-SDA-D2-2)\n(GL3-SDA-D2-3)",
+              "(GL3-SDA-D3-1)\n(GL3-SDA-D3-2)\n(GL3-SDA-D3-3)",
+              "(GL3-SDA-D4-1)\n(GL3-SDA-D4-2)\n(GL3-SDA-D4-3)",
+              "(GL3-SDA-D5-1)\n(GL3-SDA-D5-2)\n(GL3-SDA-D5-3)",
+              "(GL3-SDA-D6-1)\n(GL3-SDA-D6-2)\n(GL3-SDA-D6-3)",
+              "(BIN OFFLINE-1)\n(BIN OFFLINE-2)\n(BIN OFFLINE-3)"]),
+
+            ("WEEK 5", ["26 Oct 2026", "27 Oct 2026", "28 Oct 2026", "29 Oct 2026", "30 Oct 2026", "31 Oct 2026", "1 Nov 2026"],
+             ["GUDANG LT.2",
+              "GUDANG LT.2",
+              "GUDANG LT.2",
+              "(GL2-SDA-RAK-1)\n(GL2-SDA-RAK-2)\n(GL2-SDA-RAK-3)",
+              "(GL2-SDA-RAK-7)\n(GL2-SDA-RAK-8)\n(GL2-SDA-RAK-9)",
+              "(GL2-SDA-RAK-13)\n(GL2-SDA-RAK-14)\n(GL2-SDA-RAK-15)",
+              "(GL2-SDA-RAK-19)\n(GL2-SDA-RAK-20)\n(GL2-SDA-RAK-21)"])
+        ]
+
+        curr_r = 2
+        for w_name, dates, bin_samples in sample_weeks:
+            # Baris Nama Hari
+            c_w = ws.cell(row=curr_r, column=1, value=w_name)
+            c_w.font = font_header; c_w.fill = peach_fill; c_w.alignment = Alignment(horizontal="center", vertical="center")
+            c_w.border = thin_border
+
+            for c_i, d_name in enumerate(days_header, start=2):
+                c = ws.cell(row=curr_r, column=c_i, value=d_name)
+                c.font = font_header; c.fill = peach_fill; c.alignment = Alignment(horizontal="center", vertical="center")
+                c.border = thin_border
+            curr_r += 1
+
+            # Baris Tanggal
+            ws.cell(row=curr_r, column=1, value="").border = thin_border
+            for c_i, d_str in enumerate(dates, start=2):
+                c = ws.cell(row=curr_r, column=c_i, value=d_str)
+                c.font = font_header; c.fill = peach_fill; c.alignment = Alignment(horizontal="center", vertical="center")
+                c.border = thin_border
+            curr_r += 1
+
+            # Baris BIN
+            c_bin_lbl = ws.cell(row=curr_r, column=1, value="BIN")
+            c_bin_lbl.font = font_header; c_bin_lbl.alignment = Alignment(horizontal="center", vertical="center")
+            c_bin_lbl.border = thin_border
+
+            ws.row_dimensions[curr_r].height = 55
+            for c_i, b_val in enumerate(bin_samples, start=2):
+                c = ws.cell(row=curr_r, column=c_i, value=b_val)
+                c.font = font_body
+                c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                c.border = thin_border
+            curr_r += 1
+
+        ws.column_dimensions['A'].width = 12
+        for c_letter in ['B', 'C', 'D', 'E', 'F', 'G', 'H']:
+            ws.column_dimensions[c_letter].width = 19
+
         buf = io.BytesIO()
-        df_tpl = pd.DataFrame({
-            "TANGGAL": [str(d) for d in range(1, 32)],
-            "TARGET_BIN": ["GL1-A, GL1-B" if d % 2 == 0 else "DISPLAY" for d in range(1, 32)],
-            "NOTE": ["Cycle Count Reguler" for _ in range(31)]
-        })
-        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-            df_tpl.to_excel(writer, sheet_name='TEMPLATE_JADWAL', index=False)
+        wb.save(buf)
         buf.seek(0)
         yield buf.getvalue()
-
     # ==========================================================================
     # RENDER 16 KPI METRICS (PERSIS 4 BARIS x 4 KOTAK SESUAI SCREENSHOT EXCEL)
     # ==========================================================================
