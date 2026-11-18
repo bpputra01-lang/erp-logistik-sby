@@ -6828,6 +6828,11 @@ def server(input: Inputs, output: Outputs, session: Session):
     @render.ui
     def cca_dynamic_branch_options_ui():
         br = state.cca_branch_selected()
+        
+        # 🌟 DAFTAR LENGKAP SUB KATEGORI & BRAND SEMULA
+        list_sub_kat = ["BAG", "BALL", "BASELAYER", "BOTTLE", "CLEANNING & CARE", "EXTRA SHOES", "HARDWARE", "JACKET", "JERSEY", "LOWER BODY", "NUTRITION", "OTHER", "OTHERS", "PANTS", "RACKET", "SANDALS", "SET APPAREL", "SHIRT", "SHOES", "SHORT", "SWLM", "UKNOWN SC", "UNDERLAYER", "UPPER BODY"]
+        list_brand = ["MILLS", "ORTUSEIGHT", "SPECS", "ARDILES", "NINETEN", "LYCAN", "PATROBAS", "PIERO", "PORTO", "BRODO", "JACK IDN", "JOHNSON", "NOIJ", "VENTELA", "DESLE", "LEAGUE", "UNERD", "CALCI", "HUNDRED", "FIXCH", "YONEX", "NIKE", "AZA", "ASICS", "EAGLE", "PUMA", "KARGE", "GUMI", "ZUMA", "MILESTONE", "WEIDENMANN", "DIADORA", "HEIDEN HERITAGE", "LOTTO", "KRONIKEL", "ADIDAS", "VOOLA", "RECOIR", "MIZUNO", "UNKNOWN", "WARRIOR", "AVO", "KANKY"]
+
         if not br:
             return ui.div(
                 ui.p("⚠️ Silakan pilih Cabang di atas terlebih dahulu untuk memunculkan parameter analisis.", 
@@ -6838,8 +6843,8 @@ def server(input: Inputs, output: Outputs, session: Session):
         if br in ["SURABAYA", "MALANG"]:
             return ui.div(
                 ui.div(
-                    ui.div(ui.input_selectize("cca_sub_kat", "📁 Sub Kategori:", choices=["BAG", "BALL", "SHOES", "PANTS", "JERSEY", "UPPER BODY", "LOWER BODY"], multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
-                    ui.div(ui.input_selectize("cca_brand", "🏷️ Brand:", choices=["MILLS", "ORTUSEIGHT", "SPECS", "PIERO", "VENTELA"], multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
+                    ui.div(ui.input_selectize("cca_sub_kat", "📁 Sub Kategori:", choices=list_sub_kat, multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
+                    ui.div(ui.input_selectize("cca_brand", "🏷️ Brand:", choices=list_brand, multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
                     ui.div(ui.output_ui("cca_bin_sys_ui"), style="flex: 1; min-width: 180px;"),
                     style="display: flex; gap: 1rem; width: 100%; flex-wrap: wrap;"
                 )
@@ -6877,8 +6882,8 @@ def server(input: Inputs, output: Outputs, session: Session):
             )
 
         filter_sub_brand = ui.div(
-            ui.div(ui.input_selectize("cca_sub_kat", "📁 Sub Kategori:", choices=["BAG", "BALL", "SHOES", "PANTS", "JERSEY", "UPPER BODY", "LOWER BODY"], multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
-            ui.div(ui.input_selectize("cca_brand", "🏷️ Brand:", choices=["MILLS", "ORTUSEIGHT", "SPECS", "PIERO", "VENTELA"], multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
+            ui.div(ui.input_selectize("cca_sub_kat", "📁 Sub Kategori:", choices=list_sub_kat, multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
+            ui.div(ui.input_selectize("cca_brand", "🏷️ Brand:", choices=list_brand, multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
             style="display: flex; gap: 1rem; width: 100%; flex-wrap: wrap;"
         )
 
