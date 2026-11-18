@@ -8548,9 +8548,18 @@ class AppState:
                 return s
 
             MONTH_EN_MAP = {
-                "JANUARI": "01", "FEBRUARI": "02", "MARET": "03", "APRIL": "04",
-                "MEI": "05", "JUNI": "06", "JULI": "07", "AGUSTUS": "08",
-                "SEPTEMBER": "09", "OKTOBER": "10", "NOVEMBER": "11", "DESEMBER": "12"
+                "JANUARI": "01", "JANUARY": "01", "JAN": "01",
+                "FEBRUARI": "02", "FEBRUARY": "02", "FEB": "02",
+                "MARET": "03", "MARCH": "03", "MAR": "03",
+                "APRIL": "04", "APR": "04",
+                "MEI": "05", "MAY": "05",
+                "JUNI": "06", "JUNE": "06", "JUN": "06",
+                "JULI": "07", "JULY": "07", "JUL": "07",
+                "AGUSTUS": "08", "AUGUST": "08", "AUG": "08",
+                "SEPTEMBER": "09", "SEP": "09",
+                "OKTOBER": "10", "OCTOBER": "10", "OCT": "10",
+                "NOVEMBER": "11", "NOV": "11",
+                "DESEMBER": "12", "DECEMBER": "12", "DEC": "12"
             }
             mo_num = MONTH_EN_MAP.get(month.upper(), "10")
 
@@ -8638,10 +8647,11 @@ class AppState:
                 return False, "Tidak dapat membaca tanggal dan BIN dari file! Pastikan file sesuai template."
 
             # Simpan ke Supabase
+            # Simpan ke Supabase (Kompatibel dengan SimpleSupabaseTable)
             client = get_supabase()
             if client:
                 doc_id = f"{branch.upper()}_{month.upper()}_{year}"
-                client.table("cycle_count_schedules").upsert({
+                payload = {
                     "id": doc_id,
                     "branch": branch.upper(),
                     "month": month,
@@ -8649,7 +8659,24 @@ class AppState:
                     "title": title_text,
                     "schedule_items": records,
                     "updated_at": datetime.now(WIB).isoformat()
-                }).execute()
+                }
+
+                # Cek apakah jadwal untuk cabang & periode ini sudah ada
+                check_res = None
+                try:
+                    check_res = client.table("cycle_count_schedules").select("id").eq("id", doc_id).execute()
+                except Exception:
+                    check_res = client.table("cycle_count_schedules").select("id").in_("id", [doc_id]).execute()
+
+                if check_res and getattr(check_res, 'data', None):
+                    # Jika sudah ada, UPDATE data lama
+                    try:
+                        client.table("cycle_count_schedules").update(payload).eq("id", doc_id).execute()
+                    except Exception:
+                        client.table("cycle_count_schedules").update(payload).in_("id", [doc_id]).execute()
+                else:
+                    # Jika belum ada, INSERT baris baru
+                    client.table("cycle_count_schedules").insert(payload).execute()
 
             self.load_cycle_count_monitoring_data()
             return True, f"✅ Berhasil memproses {len(records)} slot BIN jadwal untuk {branch} ({month} {year})!"
