@@ -7249,7 +7249,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         # Baris 4: Net Sales & BTSB (Tema: Teal / Gold / Rose)
         row4 = ui.div(
             modern_kpi_box("NET SALES", f"Rp {state.ccm_m_net_sales():,}", "Omzet Penjualan Cabang", "#10B981", "fa-solid fa-money-bill-wave"),
-            modern_kpi_box("BTSB (0.015% SALES)", f"Rp {state.ccm_m_btsb():,.2f}", "Budget Toleransi Selisih", "#F59E0B", "fa-solid fa-shield-halved"),
+            modern_kpi_box("BTSB (0.15% SALES)", f"Rp {state.ccm_m_btsb():,.2f}", "Budget Toleransi Selisih", "#F59E0B", "fa-solid fa-shield-halved"),
             modern_kpi_box("%BTSB (ABS)", f"{state.ccm_m_btsb_abs_pct():.2f}%", "Rasio Absolut vs Sales", "#F43F5E", "fa-solid fa-percent"),
             modern_kpi_box("%BTSB (SUB)", f"{state.ccm_m_btsb_sub_pct():.2f}%", "Rasio Net vs Sales", "#0EA5E9", "fa-solid fa-chart-pie"),
             style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
@@ -7400,7 +7400,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                 style="display: flex; align-items: center; margin-bottom: 4px;"
             ),
             ui.p(
-                f"Net Sales: Rp {state.ccm_m_net_sales():,} • Toleransi (0.015%): Rp {state.ccm_m_btsb():,.2f}",
+                f"Net Sales: Rp {state.ccm_m_net_sales():,} • Toleransi (0.15%): Rp {state.ccm_m_btsb():,.2f}",
                 style="font-family: monospace; font-weight: 800; font-size: 13px; color: #047857; margin: 0 0 2px 0;"
             ),
             ui.span("Batas budget toleransi selisih barang terhadap total penjualan cabang.", style="font-size: 11px; color: #64748B;"),
