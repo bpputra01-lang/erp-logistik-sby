@@ -6951,7 +6951,6 @@ def server(input: Inputs, output: Outputs, session: Session):
     @reactive.event(input.change_ccm_branch)
     def _on_ccm_br_chg():
         state.ccm_branch.set(input.change_ccm_branch())
-        state.ccm_total_stock_val.set(0)  # 👈 Reset cache stok agar cabang baru dihitung ulang
         state.load_cycle_count_monitoring_data()
 
     @reactive.Effect
