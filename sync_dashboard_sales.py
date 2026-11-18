@@ -25,7 +25,6 @@ HEADERS_SB = {
     "Prefer": "resolution=merge-duplicates"
 }
 
-# Daftar default cabang/store Jezpro
 ALL_KNOWN_STORES = [
     "JEZ SURABAYA",
     "ONLINE HUB SURABAYA",
@@ -40,7 +39,7 @@ ALL_KNOWN_STORES = [
 ]
 
 # ==============================================================================
-# HELPER & VALIDATOR
+# HELPER & UNIVERSAL DATE PARSER
 # ==============================================================================
 def strip_html(val):
     if not val: return ""
@@ -57,16 +56,24 @@ def safe_int(val, default=0):
         return int(digits[0]) if digits else default
 
 def extract_valid_date(val):
-    """Memastikan hanya string tanggal YYYY-MM-DD yang lolos validasi"""
+    """Mendeteksi tanggal baik YYYY-MM-DD maupun DD-MM-YYYY / DD/MM/YYYY"""
     if not val: return None
     s = strip_html(str(val)).strip()
-    m = re.search(r'\b(20\d{2}[-/]\d{1,2}[-/]\d{1,2})\b', s)
-    if m:
+    
+    # Format YYYY-MM-DD
+    m1 = re.search(r'\b(20\d{2}[-/]\d{1,2}[-/]\d{1,2})\b', s)
+    if m1:
         try:
-            d_str = m.group(1).replace('/', '-')
-            return datetime.strptime(d_str, "%Y-%m-%d").strftime("%Y-%m-%d")
-        except Exception:
-            pass
+            return datetime.strptime(m1.group(1).replace('/', '-'), "%Y-%m-%d").strftime("%Y-%m-%d")
+        except Exception: pass
+
+    # Format DD-MM-YYYY atau DD/MM/YYYY
+    m2 = re.search(r'\b(\d{1,2}[-/]\d{1,2}[-/]20\d{2})\b', s)
+    if m2:
+        for fmt in ("%d-%m-%Y", "%d/%m/%Y"):
+            try:
+                return datetime.strptime(m2.group(1), fmt).strftime("%Y-%m-%d")
+            except Exception: pass
     return None
 
 # ==============================================================================
@@ -113,7 +120,7 @@ def get_store_list_from_page(session):
     return ALL_KNOWN_STORES
 
 # ==============================================================================
-# CORE SCRAPER: NET SALES
+# FETCH & PARSE METRICS
 # ==============================================================================
 def fetch_dashboard_metrics(session, start_date: str, end_date: str, stores: list, metric="net_sales", channel="ALL"):
     url = "https://jezpro.id/dashboards/metrics"
@@ -142,106 +149,120 @@ def fetch_dashboard_metrics(session, start_date: str, end_date: str, stores: lis
     try:
         return res.json()
     except Exception as e:
-        print(f"❌ Gagal parse JSON respon: {e}")
+        print(f"❌ Gagal parse JSON: {e}")
         return None
 
 def parse_sales_payload(raw_json, channel="ALL"):
     unique_records = {}
     now_iso = datetime.now(WIB).isoformat()
 
-    if not raw_json or not isinstance(raw_json, dict):
+    if not raw_json:
         return []
 
-    # Daftar kata kunci yang bukan merupakan nama store
-    META_KEYS = {
-        "FILTERS", "FILTER", "PARAMS", "REQUEST", "SUMMARY", 
-        "META", "TOTAL", "STATUS", "CODE", "STORES", "LABELS", 
-        "DATASETS", "START_DATE", "END_DATE", "METRIC_KEY", "CHANNEL"
-    }
+    # 🔍 CETAK DIAGNOSTIK RESPON KE TERMINAL
+    print("=" * 60)
+    print("📦 [DIAGNOSTIK RESPON DARI JEZPRO]:")
+    if isinstance(raw_json, dict):
+        print(f"   -> Top Keys: {list(raw_json.keys())}")
+    print(f"   -> Cuplikan Response: {json.dumps(raw_json, default=str)[:500]}...")
+    print("=" * 60)
 
-    # Format 1: Format Datatable [{"DATE": "2026-11-01", "STORE": 1000}]
-    table_data = raw_json.get("table") or raw_json.get("data")
-    if isinstance(table_data, list) and len(table_data) > 0 and isinstance(table_data[0], dict):
-        for row in table_data:
-            date_raw = row.get("DATE") or row.get("date") or row.get("tgl")
-            valid_date = extract_valid_date(date_raw)
-            if not valid_date: continue
+    # 1. Jika data ada di dalam root atau sub-key 'data' / 'table'
+    container = raw_json
+    if isinstance(raw_json, dict) and "data" in raw_json and isinstance(raw_json["data"], (list, dict)):
+        container = raw_json["data"]
+    elif isinstance(raw_json, dict) and "table" in raw_json and isinstance(raw_json["table"], (list, dict)):
+        container = raw_json["table"]
+
+    # --- KASUS A: Format List of Objects ---
+    if isinstance(container, list):
+        for row in container:
+            if not isinstance(row, dict): continue
             
-            for k, v in row.items():
-                if k.upper() in ["DATE", "TOTAL", "TGL", "DT_ROWINDEX", "ID"] or k.upper() in META_KEYS:
-                    continue
-                store_name = k.strip()
-                clean_id = f"{valid_date}_{store_name.replace(' ', '_').upper()}"
-                unique_records[clean_id] = {
-                    "id": clean_id,
-                    "date": valid_date,
-                    "store_name": store_name,
-                    "net_sales": safe_int(v, 0),
-                    "channel": channel,
-                    "metric_key": "net_sales",
-                    "updated_at": now_iso
-                }
-        return list(unique_records.values())
+            # Cari kolom tanggal di dalam row
+            date_val = None
+            for d_k in ["date", "DATE", "tgl", "tanggal", "created_at", "dt"]:
+                if d_k in row:
+                    date_val = extract_valid_date(row[d_k])
+                    if date_val: break
+            
+            if not date_val:
+                # Coba scan semua value di row untuk mencari tanggal
+                for k, v in row.items():
+                    date_val = extract_valid_date(v)
+                    if date_val: break
+            
+            if not date_val: continue
 
-    # Format 2: Format Chart.js (labels & datasets)
-    chart_data = raw_json.get("chart") or raw_json
-    labels = chart_data.get("labels") or []
-    datasets = chart_data.get("datasets") or []
+            # Sub-kasus A1: Row memiliki kolom spesifik seperti 'store_name' dan 'net_sales'
+            if any(k in row for k in ["store", "store_name", "st_name", "branch"]):
+                st_name = row.get("store_name") or row.get("store") or row.get("st_name") or row.get("branch")
+                sales_val = row.get("net_sales") or row.get("sales") or row.get("total") or row.get("nominal") or 0
+                clean_id = f"{date_val}_{str(st_name).replace(' ', '_').upper()}"
+                unique_records[clean_id] = {
+                    "id": clean_id, "date": date_val, "store_name": str(st_name).strip(),
+                    "net_sales": safe_int(sales_val), "channel": channel,
+                    "metric_key": "net_sales", "updated_at": now_iso
+                }
+            else:
+                # Sub-kasus A2: Format Pivot (kolom-kolom adalah nama toko)
+                for col_name, col_val in row.items():
+                    if extract_valid_date(col_val): continue
+                    if col_name.upper() in ["DATE", "TANGGAL", "TGL", "TOTAL", "DT_ROWINDEX", "ID"]: continue
+                    
+                    st_name = col_name.strip()
+                    clean_id = f"{date_val}_{st_name.replace(' ', '_').upper()}"
+                    unique_records[clean_id] = {
+                        "id": clean_id, "date": date_val, "store_name": st_name,
+                        "net_sales": safe_int(col_val), "channel": channel,
+                        "metric_key": "net_sales", "updated_at": now_iso
+                    }
+
+    # --- KASUS B: Format Chart.js (categories / labels & series / datasets) ---
+    chart_obj = raw_json.get("chart") or raw_json
+    labels = chart_obj.get("labels") or chart_obj.get("categories") or []
+    datasets = chart_obj.get("datasets") or chart_obj.get("series") or []
+
     if labels and datasets and isinstance(labels, list) and isinstance(datasets, list):
         for ds in datasets:
-            store_name = ds.get("label", "UNKNOWN").strip()
-            data_points = ds.get("data", [])
-            for idx, date_label in enumerate(labels):
-                valid_date = extract_valid_date(date_label)
-                if not valid_date: continue
-                val = data_points[idx] if idx < len(data_points) else 0
-                clean_id = f"{valid_date}_{store_name.replace(' ', '_').upper()}"
+            st_name = ds.get("label") or ds.get("name") or "UNKNOWN"
+            d_points = ds.get("data") or []
+            for idx, d_lbl in enumerate(labels):
+                date_val = extract_valid_date(d_lbl)
+                if not date_val: continue
+                val = d_points[idx] if idx < len(d_points) else 0
+                clean_id = f"{date_val}_{st_name.replace(' ', '_').upper()}"
                 unique_records[clean_id] = {
-                    "id": clean_id,
-                    "date": valid_date,
-                    "store_name": store_name,
-                    "net_sales": safe_int(val, 0),
-                    "channel": channel,
-                    "metric_key": "net_sales",
-                    "updated_at": now_iso
+                    "id": clean_id, "date": date_val, "store_name": st_name,
+                    "net_sales": safe_int(val), "channel": channel,
+                    "metric_key": "net_sales", "updated_at": now_iso
                 }
-        if unique_records:
-            return list(unique_records.values())
 
-    # Format 3: Nested Dictionary (Store -> Date -> Sales ATAU Date -> Store -> Sales)
-    for k_outer, v_outer in raw_json.items():
-        if str(k_outer).upper() in META_KEYS:
-            continue
-        
-        if isinstance(v_outer, dict):
-            for k_inner, v_inner in v_outer.items():
-                # Cek apakah inner key adalah tanggal
-                d_val = extract_valid_date(k_inner)
-                if d_val:
-                    store_name = str(k_outer).strip()
-                    val = v_inner
-                else:
-                    # Cek apakah outer key adalah tanggal
-                    d_val = extract_valid_date(k_outer)
-                    if d_val:
-                        store_name = str(k_inner).strip()
+    # --- KASUS C: Format Nested Dictionary ---
+    if isinstance(container, dict):
+        for k_outer, v_outer in container.items():
+            if isinstance(v_outer, dict):
+                for k_inner, v_inner in v_outer.items():
+                    # Apakah k_inner adalah tanggal?
+                    date_val = extract_valid_date(k_inner)
+                    if date_val:
+                        st_name = str(k_outer).strip()
                         val = v_inner
                     else:
-                        continue  # Bukan pasangan tanggal dan sales
-
-                if store_name.upper() in META_KEYS:
-                    continue
-
-                clean_id = f"{d_val}_{store_name.replace(' ', '_').upper()}"
-                unique_records[clean_id] = {
-                    "id": clean_id,
-                    "date": d_val,
-                    "store_name": store_name,
-                    "net_sales": safe_int(val, 0),
-                    "channel": channel,
-                    "metric_key": "net_sales",
-                    "updated_at": now_iso
-                }
+                        # Apakah k_outer adalah tanggal?
+                        date_val = extract_valid_date(k_outer)
+                        if date_val:
+                            st_name = str(k_inner).strip()
+                            val = v_inner
+                        else:
+                            continue
+                    
+                    clean_id = f"{date_val}_{st_name.replace(' ', '_').upper()}"
+                    unique_records[clean_id] = {
+                        "id": clean_id, "date": date_val, "store_name": st_name,
+                        "net_sales": safe_int(val), "channel": channel,
+                        "metric_key": "net_sales", "updated_at": now_iso
+                    }
 
     return list(unique_records.values())
 
@@ -253,10 +274,9 @@ def upsert_to_supabase(records: list):
         print("⚠️ Tidak ada data records yang valid untuk disimpan.")
         return
 
-    # Tampilkan preview 2 data teratas untuk memastikan format tanggal sudah benar
-    print(f"🔍 [PREVIEW DATA]")
-    for sample in records[:2]:
-        print(f"   -> ID: {sample['id']} | Date: {sample['date']} | Store: {sample['store_name']} | Net Sales: Rp{sample['net_sales']:,}")
+    print(f"🔍 [CONTOH HASIL EKSTRAKSI]")
+    for sample in records[:3]:
+        print(f"   -> ID: {sample['id']} | Tanggal: {sample['date']} | Store: {sample['store_name']} | Net Sales: Rp{sample['net_sales']:,}")
 
     print(f"🚀 [SUPABASE] Mengirim {len(records)} baris data Net Sales...")
     batch_size = 100
