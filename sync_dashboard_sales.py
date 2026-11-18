@@ -39,7 +39,7 @@ ALL_KNOWN_STORES = [
 ]
 
 # ==============================================================================
-# HELPER & UNIVERSAL DATE PARSER
+# HELPER & VALIDATOR
 # ==============================================================================
 def strip_html(val):
     if not val: return ""
@@ -56,18 +56,14 @@ def safe_int(val, default=0):
         return int(digits[0]) if digits else default
 
 def extract_valid_date(val):
-    """Mendeteksi tanggal baik YYYY-MM-DD maupun DD-MM-YYYY / DD/MM/YYYY"""
     if not val: return None
     s = strip_html(str(val)).strip()
-    
-    # Format YYYY-MM-DD
     m1 = re.search(r'\b(20\d{2}[-/]\d{1,2}[-/]\d{1,2})\b', s)
     if m1:
         try:
             return datetime.strptime(m1.group(1).replace('/', '-'), "%Y-%m-%d").strftime("%Y-%m-%d")
         except Exception: pass
 
-    # Format DD-MM-YYYY atau DD/MM/YYYY
     m2 = re.search(r'\b(\d{1,2}[-/]\d{1,2}[-/]20\d{2})\b', s)
     if m2:
         for fmt in ("%d-%m-%Y", "%d/%m/%Y"):
@@ -77,7 +73,7 @@ def extract_valid_date(val):
     return None
 
 # ==============================================================================
-# AUTENTIKASI KE JEZPRO
+# LOGIN JEZPRO
 # ==============================================================================
 def create_jezpro_session():
     session = requests.Session()
@@ -120,18 +116,17 @@ def get_store_list_from_page(session):
     return ALL_KNOWN_STORES
 
 # ==============================================================================
-# FETCH & PARSE METRICS
+# FETCH SINGLE STORE & PARSER
 # ==============================================================================
-def fetch_dashboard_metrics(session, start_date: str, end_date: str, stores: list, metric="net_sales", channel="ALL"):
+def fetch_metrics_single_store(session, start_date: str, end_date: str, store_name: str, channel="ALL"):
     url = "https://jezpro.id/dashboards/metrics"
     params = [
         ("start_date", start_date),
         ("end_date", end_date),
         ("channel", channel),
-        ("metric_key", metric),
+        ("metric_key", "net_sales"),
+        ("stores[]", store_name)
     ]
-    for s in stores:
-        params.append(("stores[]", s))
 
     headers = {
         "Accept": "application/json, text/javascript, */*; q=0.01",
@@ -139,125 +134,105 @@ def fetch_dashboard_metrics(session, start_date: str, end_date: str, stores: lis
         "Referer": "https://jezpro.id/dashboards"
     }
 
-    print(f"📡 Mengambil data Jezpro: {start_date} s/d {end_date} ({len(stores)} Toko)...")
-    res = session.get(url, params=params, headers=headers, timeout=30)
-    
-    if res.status_code != 200:
-        print(f"❌ Respon gagal dari Jezpro (HTTP {res.status_code})")
-        return None
-
     try:
-        return res.json()
+        res = session.get(url, params=params, headers=headers, timeout=25)
+        if res.status_code == 200:
+            return res.json()
     except Exception as e:
-        print(f"❌ Gagal parse JSON: {e}")
-        return None
+        print(f"      ⚠️ Gagal fetch {store_name}: {e}")
+    return None
 
-def parse_sales_payload(raw_json, channel="ALL"):
-    unique_records = {}
+def parse_single_store_data(raw_json, store_name: str, channel="ALL"):
+    records = []
     now_iso = datetime.now(WIB).isoformat()
-
     if not raw_json or not isinstance(raw_json, dict):
-        return []
+        return records
 
-    # 1. AMBIL DARI DETAIL TABLE (Data tabel harian per cabang)
     detail_table = raw_json.get("detail_table")
     if isinstance(detail_table, dict):
         detail_table = detail_table.get("data") or detail_table.get("rows") or []
 
+    # 1. Parsing dari Detail Table
     if isinstance(detail_table, list) and len(detail_table) > 0:
         for row in detail_table:
             if not isinstance(row, dict): continue
             
-            # Cari tanggal di kolom DATE / date / tgl
             date_val = None
-            for d_k in ["DATE", "date", "tgl", "tanggal", "dt"]:
+            for d_k in ["DATE", "date", "tgl", "tanggal"]:
                 if d_k in row:
                     date_val = extract_valid_date(row[d_k])
                     if date_val: break
-
-            if not date_val:
-                for k, v in row.items():
-                    date_val = extract_valid_date(v)
-                    if date_val: break
-
             if not date_val: continue
 
-            # Ambil nominal penjualan untuk tiap toko di baris tersebut
-            for store_col, sales_val in row.items():
-                if store_col.upper() in ["DATE", "TANGGAL", "TGL", "TOTAL", "DT_ROWINDEX", "ID"]:
-                    continue
-                if extract_valid_date(sales_val):
-                    continue
+            # Karena hanya request 1 cabang, sales diambil dari kolom nama cabang atau kolom net_sales_total
+            sales_val = 0
+            if store_name in row:
+                sales_val = safe_int(row[store_name])
+            elif "net_sales_total" in row:
+                sales_val = safe_int(row["net_sales_total"])
+            else:
+                for k, v in row.items():
+                    if k.upper() not in ["DATE", "TANGGAL", "STOREADJ", "TOTAL", "ID"]:
+                        sales_val = safe_int(v)
+                        break
 
-                store_name = store_col.strip()
-                clean_id = f"{date_val}_{store_name.replace(' ', '_').upper()}"
-                unique_records[clean_id] = {
-                    "id": clean_id,
-                    "date": date_val,
-                    "store_name": store_name,
-                    "net_sales": safe_int(sales_val, 0),
-                    "channel": channel,
-                    "metric_key": "net_sales",
-                    "updated_at": now_iso
-                }
+            clean_id = f"{date_val}_{store_name.replace(' ', '_').upper()}"
+            records.append({
+                "id": clean_id,
+                "date": date_val,
+                "store_name": store_name,
+                "net_sales": sales_val,
+                "channel": channel,
+                "metric_key": "net_sales",
+                "updated_at": now_iso
+            })
+        return records
 
-    # 2. JIKA DETAIL TABLE KOSONG, CADANGAN AMBIL DARI DETAIL CHART
-    if not unique_records:
-        detail_chart = raw_json.get("detail_chart") or {}
-        labels = detail_chart.get("labels") or detail_chart.get("categories") or []
-        if isinstance(labels, dict) and "categories" in labels:
-            labels = labels["categories"]
+    # 2. Cadangan: Parsing dari Detail Chart jika Table kosong
+    detail_chart = raw_json.get("detail_chart") or {}
+    labels = detail_chart.get("labels") or detail_chart.get("categories") or []
+    series = detail_chart.get("series") or detail_chart.get("datasets") or []
+    if labels and series:
+        data_points = series[0].get("data") if len(series) > 0 else []
+        for idx, lbl in enumerate(labels):
+            date_val = extract_valid_date(lbl)
+            if not date_val: continue
+            val = data_points[idx] if idx < len(data_points) else 0
+            clean_id = f"{date_val}_{store_name.replace(' ', '_').upper()}"
+            records.append({
+                "id": clean_id,
+                "date": date_val,
+                "store_name": store_name,
+                "net_sales": safe_int(val),
+                "channel": channel,
+                "metric_key": "net_sales",
+                "updated_at": now_iso
+            })
 
-        series = detail_chart.get("series") or detail_chart.get("datasets") or []
-
-        if labels and series and isinstance(labels, list) and isinstance(series, list):
-            for s in series:
-                store_name = s.get("name") or s.get("label") or "UNKNOWN"
-                data_points = s.get("data") or []
-                for idx, lbl in enumerate(labels):
-                    date_val = extract_valid_date(lbl)
-                    if not date_val: continue
-                    val = data_points[idx] if idx < len(data_points) else 0
-                    clean_id = f"{date_val}_{store_name.replace(' ', '_').upper()}"
-                    unique_records[clean_id] = {
-                        "id": clean_id,
-                        "date": date_val,
-                        "store_name": store_name,
-                        "net_sales": safe_int(val, 0),
-                        "channel": channel,
-                        "metric_key": "net_sales",
-                        "updated_at": now_iso
-                    }
-
-    return list(unique_records.values())
+    return records
 
 # ==============================================================================
 # UPSERT SUPABASE
 # ==============================================================================
 def upsert_to_supabase(records: list):
     if not records:
-        print("⚠️ Tidak ada data records yang valid untuk disimpan.")
+        print("⚠️ Tidak ada data untuk disimpan.")
         return
 
-    print(f"🔍 [CONTOH HASIL EKSTRAKSI]")
-    for sample in records[:3]:
-        print(f"   -> ID: {sample['id']} | Tanggal: {sample['date']} | Store: {sample['store_name']} | Net Sales: Rp{sample['net_sales']:,}")
-
-    print(f"🚀 [SUPABASE] Mengirim {len(records)} baris data Net Sales...")
-    batch_size = 100
+    print(f"\n🚀 [SUPABASE] Menyimpan total {len(records)} baris data per cabang...")
+    batch_size = 150
     total_saved = 0
 
     for i in range(0, len(records), batch_size):
         chunk = records[i:i + batch_size]
         url = f"{SUPABASE_URL}/rest/v1/jezpro_daily_net_sales"
-        res = requests.post(url, headers=HEADERS_SB, json=chunk, timeout=20)
-        
+        res = requests.post(url, headers=HEADERS_SB, json=chunk, timeout=25)
         if res.status_code in [200, 201]:
             total_saved += len(chunk)
         else:
             print(f"❌ Gagal batch {i}: {res.status_code} - {res.text}")
 
-    print(f"✅ [SUPABASE] Berhasil menyimpan/mengupdate total {total_saved} baris data!")
+    print(f"✅ [SUPABASE] Sukses! Berhasil menyimpan {total_saved} baris data per cabang!")
 
 # ==============================================================================
 # MAIN
@@ -271,27 +246,27 @@ def run_sync_sales():
     end_date = f"{now_wib.year}-{now_wib.month:02d}-{last_day:02d}"
 
     store_list = get_store_list_from_page(jez)
-    print(f"🏢 Cabang terdaftar ({len(store_list)}): {', '.join(store_list)}")
+    print(f"\n🏢 Mengambil data detail untuk {len(store_list)} cabang:")
+    print(f"   Periode: {start_date} s/d {end_date}\n")
 
-    raw_response = fetch_dashboard_metrics(
-        session=jez,
-        start_date=start_date,
-        end_date=end_date,
-        stores=store_list,
-        metric="net_sales",
-        channel="ALL"
-    )
+    all_records = []
 
-    if raw_response:
-        clean_records = parse_sales_payload(raw_response, channel="ALL")
-        print(f"📊 Berhasil mengekstrak {len(clean_records)} rincian baris data harian yang valid.")
-        if clean_records:
-            upsert_to_supabase(clean_records)
+    for idx, store in enumerate(store_list, 1):
+        print(f"   [{idx}/{len(store_list)}] 📡 Mengambil data: {store}...")
+        raw_data = fetch_metrics_single_store(jez, start_date, end_date, store)
+        if raw_data:
+            store_rows = parse_single_store_data(raw_data, store, channel="ALL")
+            all_records.extend(store_rows)
+            print(f"         -> Ditemukan {len(store_rows)} data tanggal.")
+        time.sleep(0.15)  # Jeda halus
+
+    if all_records:
+        upsert_to_supabase(all_records)
     else:
-        print("❌ Gagal mendapatkan respon data dari Jezpro.")
+        print("❌ Tidak ada data yang berhasil diekstrak.")
 
 if __name__ == "__main__":
     print("=" * 70)
-    print("🚀 JEZPRO DASHBOARD NET SALES SCRAPER & SUPABASE SYNC")
+    print("🚀 JEZPRO DASHBOARD NET SALES SCRAPER (PER BRANCH) -> SUPABASE")
     print("=" * 70)
     run_sync_sales()
