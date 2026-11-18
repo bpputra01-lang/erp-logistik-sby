@@ -4,7 +4,7 @@ import random
 import base64
 from datetime import datetime
 import pandas as pd 
-from shiny import ui
+from shiny import ui, reactive
 from state import AppState
 from config import safe_int
 
