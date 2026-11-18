@@ -3375,13 +3375,19 @@ def cycle_count_monitoring_view(state: AppState):
     YEARS = [str(y) for y in range(2026, 2031)]
     BRANCHES = ["HUB JAKARTA", "SEMARANG", "SIDOARJO", "KEDIRI", "JEMBER"]
 
+    # 🌟 KUNCI ANTI-LONCAT: Baca nilai reaktif secara terisolasi agar navset tab tidak ter-recreate
+    with reactive.isolate():
+        cur_branch = state.ccm_branch()
+        cur_month = state.ccm_month()
+        cur_year = state.ccm_year()
+
     # Filter Global Baris Atas
     filter_bar = ui.div(
         ui.div(
             ui.div(
                 ui.span("🏢 Cabang / Branch:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
                 ui.tags.select(
-                    *[ui.tags.option(b, value=b, selected=(b == state.ccm_branch())) for b in BRANCHES],
+                    *[ui.tags.option(b, value=b, selected=(b == cur_branch)) for b in BRANCHES],
                     id="ccm_filter_branch",
                     onchange="Shiny.setInputValue('change_ccm_branch', this.value, {priority: 'event'})",
                     style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; background: white; cursor: pointer; min-width: 170px;"
@@ -3391,7 +3397,7 @@ def cycle_count_monitoring_view(state: AppState):
             ui.div(
                 ui.span("📆 Bulan:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
                 ui.tags.select(
-                    *[ui.tags.option(m, value=m, selected=(m == state.ccm_month())) for m in MONTHS],
+                    *[ui.tags.option(m, value=m, selected=(m == cur_month)) for m in MONTHS],
                     id="ccm_filter_month",
                     onchange="Shiny.setInputValue('change_ccm_month', this.value, {priority: 'event'})",
                     style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; background: white; cursor: pointer; min-width: 140px;"
@@ -3401,12 +3407,12 @@ def cycle_count_monitoring_view(state: AppState):
             ui.div(
                 ui.span("🗓️ Tahun:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
                 ui.tags.select(
-                    *[ui.tags.option(y, value=y, selected=(y == state.ccm_year())) for y in YEARS],
+                    *[ui.tags.option(y, value=y, selected=(y == cur_year)) for y in YEARS],
                     id="ccm_filter_year",
                     onchange="Shiny.setInputValue('change_ccm_year', this.value, {priority: 'event'})",
                     style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; background: white; cursor: pointer; min-width: 120px;"
                 ),
-                style="display: flex; flex-direction: column;"
+                style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;"
             ),
             style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;"
         ),
@@ -3418,12 +3424,12 @@ def cycle_count_monitoring_view(state: AppState):
         style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 1.25rem 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 10px;"
     )
 
-    # --- TAB 1: UPLOAD & VERIFIKASI JADWAL ---
+    # TAB 1: UPLOAD & VERIFIKASI JADWAL
     tab1_upload = ui.div(
         ui.div(
             ui.div(
                 ui.h4("📥 Upload Jadwal Cycle Count Bulanan", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
-                ui.p("Format: Kolom A = Tanggal (1-31), Kolom B = Target BIN (bisa pisah koma), Kolom C = PIC / Note.", style="color: #718096; font-size: 12px; margin: 0;"),
+                ui.p("Format file jadwal matriks kalender atau tabel tanggal target BIN.", style="color: #718096; font-size: 12px; margin: 0;"),
             ),
             ui.download_button(
                 "btn_dl_ccm_schedule_template",
@@ -3450,32 +3456,21 @@ def cycle_count_monitoring_view(state: AppState):
         style="padding: 0.5rem 0;"
     )
 
-    # --- TAB 2: 16 METRIC CARDS SESUAI GAMBAR ---
-    # Helper Card Persegi Putih Border Hitam Persis Screenshot
-    def excel_style_kpi_box(title: str, val_text: str, sub_val_text: str = ""):
-        return ui.div(
-            ui.div(title, style="font-size: 11px; font-weight: 800; color: #1A202C; text-align: center; text-transform: uppercase; margin-bottom: 6px; min-height: 28px; display: flex; align-items: center; justify-content: center;"),
-            ui.div(val_text, style="font-size: 20px; font-weight: 900; color: #1A202C; text-align: center; margin-bottom: 2px;"),
-            ui.div(sub_val_text, style="font-size: 12px; font-weight: 700; color: #718096; text-align: center;") if sub_val_text else ui.div(),
-            style="background: #FFFFFF; border: 2px solid #000000; border-radius: 4px; padding: 1.25rem 1rem; width: 100%; min-height: 115px; display: flex; flex-direction: column; justify-content: center; box-shadow: 2px 2px 0px rgba(0,0,0,0.15);"
-        )
-
-    # --- TAB 2: MONITORING DASHBOARD (DENGAN FILTER TANGGAL & 16 KPI MODERN) ---
+    # TAB 2: MONITORING DASHBOARD
     tab2_dashboard = ui.div(
-        # 🌟 BARIS FILTER TANGGAL KHUSUS TAB 2
+        # 🌟 FILTER TANGGAL KHUSUS NET SALES (TRIGGER HANYA SAAT END DATE DIPILIH - Poin 6)
         ui.div(
             ui.div(
                 ui.div(
                     ui.tags.i(class_="fa-solid fa-calendar-days", style="color: #3182CE; font-size: 15px; margin-right: 8px;"),
-                    ui.span("Filter Periode Tanggal Khusus Tab 2:", style="font-weight: 800; font-size: 12.5px; color: #1A202C;"),
+                    ui.span("Filter Periode Khusus Net Sales (Opsional):", style="font-weight: 800; font-size: 12.5px; color: #1A202C;"),
                     style="display: flex; align-items: center;"
                 ),
                 ui.div(
                     ui.div(
                         ui.span("Tanggal Awal:", style="font-size: 11px; font-weight: 700; color: #4A5568; margin-right: 6px;"),
                         ui.tags.input(
-                            type="date", id="ccm_tab2_tgl_start", value=state.ccm_filter_tgl_start(),
-                            onchange="Shiny.setInputValue('change_ccm_tgl_start', this.value, {priority: 'event'})",
+                            type="date", id="ccm_tab2_tgl_start",
                             style="padding: 5px 10px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; background: white;"
                         ),
                         style="display: flex; align-items: center;"
@@ -3483,15 +3478,28 @@ def cycle_count_monitoring_view(state: AppState):
                     ui.div(
                         ui.span("Tanggal Akhir:", style="font-size: 11px; font-weight: 700; color: #4A5568; margin-left: 10px; margin-right: 6px;"),
                         ui.tags.input(
-                            type="date", id="ccm_tab2_tgl_end", value=state.ccm_filter_tgl_end(),
-                            onchange="Shiny.setInputValue('change_ccm_tgl_end', this.value, {priority: 'event'})",
+                            type="date", id="ccm_tab2_tgl_end",
+                            onchange="""
+                                let s = document.getElementById('ccm_tab2_tgl_start').value;
+                                let e = this.value;
+                                if (s && e) {
+                                    window.showGlobalSpinner();
+                                    Shiny.setInputValue('change_ccm_dates_range', {start: s, end: e}, {priority: 'event'});
+                                }
+                            """,
                             style="padding: 5px 10px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; background: white;"
                         ),
                         style="display: flex; align-items: center;"
                     ),
                     ui.tags.button(
                         "🔄 Reset Tanggal",
-                        onclick="Shiny.setInputValue('btn_reset_ccm_dates', Math.random(), {priority: 'event'})",
+                        type="button",
+                        onclick="""
+                            document.getElementById('ccm_tab2_tgl_start').value = '';
+                            document.getElementById('ccm_tab2_tgl_end').value = '';
+                            window.showGlobalSpinner();
+                            Shiny.setInputValue('change_ccm_dates_range', {start: '', end: ''}, {priority: 'event'});
+                        """,
                         style="background: #EDF2F7; color: #4A5568; border: 1.5px solid #CBD5E0; border-radius: 6px; font-weight: 700; font-size: 12px; padding: 5px 12px; cursor: pointer; margin-left: 8px;"
                     ),
                     style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px;"
@@ -3501,17 +3509,20 @@ def cycle_count_monitoring_view(state: AppState):
             style="background: #F8FAFC; border: 1.5px solid #CBD5E0; padding: 12px 18px; border-radius: 10px; margin-bottom: 1.25rem;"
         ),
         
-        # Output Reaktif 16 Kotak Metrik
+        # 16 Metrics Grid
         ui.output_ui("ccm_16_metrics_grid_ui"),
+        
+        # 🌟 PANEL KETERANGAN DETAIL PENJELASAN (Poin 4)
+        ui.output_ui("ccm_explanation_panel_ui"),
+        
         style="padding: 0.5rem 0;"
     )
 
-    # 👇👇 TAMBAHKAN BLOK RETURN INI SEBELUM def menu_item 👇👇
     return ui.div(
         filter_bar,
         ui.navset_card_tab(
-            ui.nav_panel("📅 1. UPLOAD & VERIFIKASI JADWAL", tab1_upload),
-            ui.nav_panel("📊 2. MONITORING & KPI METRICS", tab2_dashboard),
+            ui.nav_panel("📅 1. UPLOAD & VERIFIKASI JADWAL", tab1_upload, value="TAB_CCM_UPLOAD"),
+            ui.nav_panel("📊 2. MONITORING & KPI METRICS", tab2_dashboard, value="TAB_CCM_DASHBOARD"),
             id="ccm_navset_tab"
         ),
         style="width: 100%; padding: 1rem;"

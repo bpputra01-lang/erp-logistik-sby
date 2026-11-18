@@ -7228,6 +7228,88 @@ def server(input: Inputs, output: Outputs, session: Session):
 
         return ui.div(row1, row2, row3, row4, style="width: 100%;")
 
+    # ==========================================================================
+    # PANEL KETERANGAN DETAIL PENJELASAN DI TAB 2 (Poin 4)
+    # ==========================================================================
+    @render.ui
+    def ccm_explanation_panel_ui():
+        if not state.ccm_processed():
+            return ui.div()
+
+        match_bins = state.ccm_match_bins_list()
+        unmatch_bins = state.ccm_unmatch_bins_list()
+        blank_bins = state.ccm_blank_bins_list()
+        total_stk = state.ccm_total_stock_val()
+        sales_period = state.ccm_sales_period_label()
+
+        # Helper pembuat badge BIN kecil
+        def render_bin_badges(bin_list, badge_bg, badge_color):
+            if not bin_list:
+                return ui.span("(Tidak ada)", style="color: #A0AEC0; font-size: 12px; font-style: italic;")
+            badges = [
+                ui.span(
+                    b, 
+                    style=f"background: {badge_bg}; color: {badge_color}; font-weight: 700; font-size: 11px; padding: 2px 7px; border-radius: 4px; display: inline-block; margin: 2px;"
+                ) for b in bin_list
+            ]
+            return ui.div(*badges, style="display: flex; flex-wrap: wrap; gap: 4px; max-height: 120px; overflow-y: auto; padding-top: 4px;")
+
+        return ui.div(
+            ui.h4("💡 Keterangan & Penjelasan Detail Hasil Monitoring", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+            
+            # KARTU 1: MATCH, UNMATCH, & BLANK
+            ui.div(
+                ui.div(
+                    ui.strong("🎯 Analisis Kepatuhan Rencana vs Eksekusi (Plan vs Action):", style="font-size: 13px; color: #2D3748; display: block; margin-bottom: 8px;"),
+                    ui.div(
+                        ui.div(
+                            ui.span(f"✅ Match Plan ({state.ccm_m_match_plan():.1f}%): ", style="font-weight: 800; color: #10B981; font-size: 12px;"),
+                            ui.span(f"{len(match_bins)} BIN dikerjakan tepat pada tanggal jadwal.", style="font-size: 12px; color: #4A5568;"),
+                            render_bin_badges(match_bins, "#C6F6D5", "#22543D"),
+                            style="flex: 1; min-width: 260px; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 10px; border-radius: 8px;"
+                        ),
+                        ui.div(
+                            ui.span(f"⚠️ Unmatch Plan ({state.ccm_m_unmatch_plan():.1f}%): ", style="font-weight: 800; color: #F43F5E; font-size: 12px;"),
+                            ui.span(f"{len(unmatch_bins)} BIN dikerjakan tetapi bergeser hari dari jadwal.", style="font-size: 12px; color: #4A5568;"),
+                            render_bin_badges(unmatch_bins, "#FED7D7", "#9B2C2C"),
+                            style="flex: 1; min-width: 260px; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 10px; border-radius: 8px;"
+                        ),
+                        ui.div(
+                            ui.span(f"⏳ Blank ({state.ccm_m_blank():.1f}%): ", style="font-weight: 800; color: #805AD5; font-size: 12px;"),
+                            ui.span(f"{len(blank_bins)} BIN belum pernah di-cycle count sama sekali.", style="font-size: 12px; color: #4A5568;"),
+                            render_bin_badges(blank_bins, "#E9D8FD", "#553C9A"),
+                            style="flex: 1; min-width: 260px; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 10px; border-radius: 8px;"
+                        ),
+                        style="display: flex; gap: 12px; flex-wrap: wrap;"
+                    ),
+                    style="margin-bottom: 1rem;"
+                ),
+
+                # KARTU 2: AKURASI STOK & NET SALES
+                ui.div(
+                    ui.div(
+                        ui.strong("📦 Akurasi Stok Terhadap Total Stok:", style="font-size: 12.5px; color: #2D3748; display: block; margin-bottom: 4px;"),
+                        ui.p(
+                            f"Rumus: 100% - ({state.ccm_m_total_miss_loc():,} PCS Miss Loc / {total_stk:,} PCS Total Stok) = {state.ccm_m_accuracy_stock():.2f}%",
+                            style="margin: 0; font-size: 12px; color: #4A5568; font-family: monospace; font-weight: bold;"
+                        ),
+                        style="flex: 1; min-width: 260px; background: #EBF8FF; border-left: 4px solid #3182CE; padding: 10px 14px; border-radius: 6px;"
+                    ),
+                    ui.div(
+                        ui.strong(f"💰 Penjualan Cabang ({sales_period}):", style="font-size: 12.5px; color: #2D3748; display: block; margin-bottom: 4px;"),
+                        ui.p(
+                            f"Net Sales: Rp {state.ccm_m_net_sales():,} • BTSB (0.015%): Rp {state.ccm_m_btsb():,.2f}",
+                            style="margin: 0; font-size: 12px; color: #4A5568; font-weight: bold;"
+                        ),
+                        style="flex: 1; min-width: 260px; background: #F0FDF4; border-left: 4px solid #10B981; padding: 10px 14px; border-radius: 6px;"
+                    ),
+                    style="display: flex; gap: 12px; flex-wrap: wrap;"
+                ),
+                style="background: #FFFFFF; border: 1px solid #CBD5E0; border-radius: 10px; padding: 1.25rem; margin-top: 1rem;"
+            ),
+            style="width: 100%; margin-top: 0.5rem;"
+        )
+
 from pathlib import Path
 
 app = App(app_ui, server)
