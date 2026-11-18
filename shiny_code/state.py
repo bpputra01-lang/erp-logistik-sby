@@ -8562,41 +8562,42 @@ class AppState:
             }
             mo_num = MONTH_EN_MAP.get(month.upper(), "01")
 
-            # Helper ekstraksi tanggal yang akurat dari cell Excel
-            def extract_day_number(cell_val):
+            # Helper ekstraksi tanggal presisi per cell
+            def parse_cell_date(cell_val, def_year, def_mo):
                 if cell_val is None:
-                    return None
-                # Jika tipe data cell sudah berupa datetime/date bawaan Excel
+                    return None, None
+                # Jika cell bertipe datetime/date asli Excel
                 if isinstance(cell_val, (datetime, date)):
-                    return cell_val.day
-                
+                    return cell_val.day, cell_val.strftime("%Y-%m-%d")
+
                 s = str(cell_val).strip()
-                if not s or s.upper() in ["NONE", "NAN", "-"]:
-                    return None
-                
-                # Coba parse string tanggal seperti "5-Nov-26", "05/11/2026", dll.
+                if not s or s.upper() in ["NONE", "NAN", "-", ""]:
+                    return None, None
+
+                # Coba parse teks tanggal lengkap seperti "5-Nov-26", "05/11/2026"
                 try:
                     dt = pd.to_datetime(s, dayfirst=True)
                     if pd.notna(dt):
-                        return dt.day
+                        return dt.day, dt.strftime("%Y-%m-%d")
                 except Exception:
                     pass
 
                 # Jika cell hanya berisi angka hari seperti "5" atau "05"
                 m = re.match(r'^\s*0*([1-9]|[12]\d|3[01])\s*$', s)
                 if m:
-                    return int(m.group(1))
+                    d = int(m.group(1))
+                    return d, f"{def_year}-{def_mo}-{d:02d}"
 
-                # Jika teks format seperti "5-Nov" ambil angka paling depan
+                # Jika format teks seperti "5-Nov"
                 m_lead = re.match(r'^\s*0*([1-9]|[12]\d|3[01])\b', s)
                 if m_lead:
-                    return int(m_lead.group(1))
+                    d = int(m_lead.group(1))
+                    return d, f"{def_year}-{def_mo}-{d:02d}"
 
-                return None
+                return None, None
 
             max_r = ws.max_row
             max_c = min(ws.max_column, 15)
-
             day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
             
             r = 1
@@ -8608,33 +8609,27 @@ class AppState:
                     # Ambil label Minggu dari Kolom A (misal: "WEEK 1")
                     week_label = str(ws.cell(row=r, column=1).value or "").strip()
                     if not week_label or "WEEK" not in week_label.upper():
-                        # Coba cari di baris tanggal jika baris header dimerge
                         c_below = str(ws.cell(row=r + 1, column=1).value or "").strip()
-                        if "WEEK" in c_below.upper():
-                            week_label = c_below
-                        else:
-                            week_label = "WEEK 1"
+                        week_label = c_below if "WEEK" in c_below.upper() else "WEEK 1"
                     
                     r_date = r + 1
                     
-                    # Pemetaan kolom ke tanggal yang benar
+                    # Pemetaan kolom tanggal masing-masing hari (Senin s/d Minggu)
                     col_date_map = {}
                     for col_idx in range(1, max_c + 1):
                         cell_obj = ws.cell(row=r_date, column=col_idx).value
-                        day_int = extract_day_number(cell_obj)
-                        if day_int is not None:
-                            iso_date = f"{year}-{mo_num}-{day_int:02d}"
+                        d_num, iso_dt = parse_cell_date(cell_obj, year, mo_num)
+                        if d_num is not None:
                             col_date_map[col_idx] = {
                                 "date_str": str(cell_obj),
-                                "iso_date": iso_date,
-                                "day_num": day_int
+                                "iso_date": iso_dt,
+                                "day_num": d_num
                             }
 
-                    # Baca baris-baris BIN di bawah tanggal ini
+                    # Baca BIN di bawah baris tanggal
                     r_bin = r_date + 1
                     while r_bin <= max_r:
                         check_week = str(ws.cell(row=r_bin, column=1).value or "").strip().upper()
-                        # Jika sudah menyentuh blok WEEK berikutnya, stop sub-loop
                         if "WEEK" in check_week and r_bin > r_date + 1:
                             break
 
@@ -8643,7 +8638,6 @@ class AppState:
                             if not cell_content or cell_content.upper() in ["NONE", "NAN", "-"]:
                                 continue
 
-                            # Pecah baris jika dalam satu cell ada beberapa BIN (Alt+Enter)
                             lines = cell_content.split("\n")
                             for line in lines:
                                 bin_cleaned = clean_bin_text(line)
@@ -8653,36 +8647,35 @@ class AppState:
                                         "day_num": d_info["day_num"],
                                         "date_display": d_info["date_str"],
                                         "target_bin": bin_cleaned,
-                                        "note": f"Cycle Count {week_label}"  # 🌟 HASIL: "Cycle Count WEEK 1"
+                                        "note": f"Cycle Count {week_label}"
                                     })
                         r_bin += 1
                     r = r_bin - 1
                 r += 1
 
-            # Fallback jika user upload format Flat Table (Kolom A=Tgl, B=BIN, C=Note)
+            # Fallback jika format Flat Table
             if not records:
                 for r_idx in range(2, max_r + 1):
                     tgl_raw = ws.cell(row=r_idx, column=1).value
                     bn = str(ws.cell(row=r_idx, column=2).value or "").strip()
                     nt = str(ws.cell(row=r_idx, column=3).value or "").strip()
-                    day_int = extract_day_number(tgl_raw)
-                    if day_int is not None and bn and str(tgl_raw).upper() not in ["NONE", "NAN"]:
-                        iso_date = f"{year}-{mo_num}-{day_int:02d}"
+                    d_num, iso_dt = parse_cell_date(tgl_raw, year, mo_num)
+                    if d_num is not None and bn and str(tgl_raw).upper() not in ["NONE", "NAN"]:
                         for single_b in bn.split(","):
                             clean_b = clean_bin_text(single_b)
                             if clean_b:
                                 records.append({
-                                    "tanggal": iso_date,
-                                    "day_num": day_int,
+                                    "tanggal": iso_dt,
+                                    "day_num": d_num,
                                     "date_display": str(tgl_raw),
                                     "target_bin": clean_b,
-                                    "note": nt or "Cycle Count"
+                                    "note": nt or "Cycle Count WEEK 1"
                                 })
 
             if not records:
-                return False, "Tidak dapat membaca tanggal dan BIN dari file! Pastikan file sesuai template."
+                return False, "Tidak dapat membaca tanggal dan BIN dari file! Periksa format file."
 
-            # Simpan ke Supabase (Kompatibel dengan SimpleSupabaseTable)
+            # Simpan ke Supabase: Hapus data lama dulu agar bersih, lalu insert baru
             client = get_supabase()
             if client:
                 doc_id = f"{branch.upper()}_{month.upper()}_{year}"
@@ -8696,19 +8689,14 @@ class AppState:
                     "updated_at": datetime.now(WIB).isoformat()
                 }
 
-                check_res = None
+                # 1. Hapus cache jadwal lama untuk cabang & periode ini
                 try:
-                    check_res = client.table("cycle_count_schedules").select("id").eq("id", doc_id).execute()
+                    client.table("cycle_count_schedules").delete().in_("id", [doc_id]).execute()
                 except Exception:
-                    check_res = client.table("cycle_count_schedules").select("id").in_("id", [doc_id]).execute()
+                    pass
 
-                if check_res and getattr(check_res, 'data', None):
-                    try:
-                        client.table("cycle_count_schedules").update(payload).eq("id", doc_id).execute()
-                    except Exception:
-                        client.table("cycle_count_schedules").update(payload).in_("id", [doc_id]).execute()
-                else:
-                    client.table("cycle_count_schedules").insert(payload).execute()
+                # 2. Masukkan data jadwal yang sudah diperbaiki
+                client.table("cycle_count_schedules").insert(payload).execute()
 
             self.load_cycle_count_monitoring_data()
             return True, f"✅ Berhasil memproses {len(records)} slot BIN jadwal untuk {branch} ({month} {year})!"
