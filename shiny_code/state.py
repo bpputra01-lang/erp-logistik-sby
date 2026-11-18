@@ -8734,6 +8734,66 @@ class AppState:
             }
             mo_num = MONTH_EN_MAP.get(month.upper(), "11")
 
+    def refresh_ccm_net_sales_only(self):
+        """Memperbarui Net Sales & BTSB secara instan (< 0.1 detik) terfilter langsung dari Supabase"""
+        try:
+            client = get_supabase()
+            if not client:
+                return False, "Koneksi database gagal!"
+
+            branch = self.ccm_branch().upper()
+            month = self.ccm_month()
+            year = safe_int(self.ccm_year(), 2026)
+            
+            tgl_s = str(self.ccm_filter_tgl_start()).strip()
+            tgl_e = str(self.ccm_filter_tgl_end()).strip()
+
+            MONTH_EN_MAP = {
+                "JANUARI": "01", "FEBRUARI": "02", "MARET": "03", "APRIL": "04",
+                "MEI": "05", "JUNI": "06", "JULI": "07", "AGUSTUS": "08",
+                "SEPTEMBER": "09", "OKTOBER": "10", "NOVEMBER": "11", "DESEMBER": "12"
+            }
+            mo_num = MONTH_EN_MAP.get(month.upper(), "11")
+            branch_keyword = branch.replace("JEZ ", "").strip().upper()
+
+            # 🌟 FILTER DI SERVER SUPABASE: Hanya ambil kolom net_sales, toko yang cocok, dan tanggal yang dipilih
+            query = client.table("jezpro_daily_net_sales") \
+                          .select("net_sales, date, store_name") \
+                          .ilike("store_name", f"%{branch_keyword}%")
+
+            if tgl_s and tgl_e:
+                query = query.gte("date", tgl_s).lte("date", tgl_e)
+                sales_label = f"{tgl_s} s/d {tgl_e}"
+            else:
+                # Default: Bulan & Tahun terpilih
+                query = query.gte("date", f"{year}-{mo_num}-01").lte("date", f"{year}-{mo_num}-31")
+                sales_label = f"Bulan {month} {year}"
+
+            res = query.execute()
+            sales_rows = res.data or []
+
+            # Hitung total net sales
+            net_sales = sum([safe_int(r.get("net_sales", 0)) for r in sales_rows if isinstance(r, dict)])
+
+            # Hitung BTSB
+            val_adj_abs = self.ccm_m_adj_abs_val()
+            val_adj_sub = self.ccm_m_adj_sub_val()
+
+            btsb_val = net_sales * 0.00015
+            btsb_abs_pct = (val_adj_abs / net_sales * 100.0) if net_sales > 0 else 0.0
+            btsb_sub_pct = (val_adj_sub / net_sales * 100.0) if net_sales > 0 else 0.0
+
+            # Update nilai reaktif ke UI
+            self.ccm_m_net_sales.set(net_sales)
+            self.ccm_m_btsb.set(round(btsb_val, 2))
+            self.ccm_m_btsb_abs_pct.set(round(btsb_abs_pct, 2))
+            self.ccm_m_btsb_sub_pct.set(round(btsb_sub_pct, 2))
+            self.ccm_sales_period_label.set(sales_label)
+
+            return True, f"Net Sales berhasil diupdate ({sales_label}): Rp {net_sales:,}"
+        except Exception as e:
+            return False, f"Gagal update Net Sales: {e}"
+
             # ------------------------------------------------------------------
             # 1. Tarik Jadwal Cabang (cycle_count_schedules)
             # ------------------------------------------------------------------

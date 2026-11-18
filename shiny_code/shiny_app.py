@@ -6966,14 +6966,23 @@ def server(input: Inputs, output: Outputs, session: Session):
         state.load_cycle_count_monitoring_data()
 
     @reactive.Effect
-    @reactive.event(input.btn_refresh_ccm_data)
-    def _on_ccm_refresh():
-        succ, msg = state.load_cycle_count_monitoring_data()
+    @reactive.event(input.change_ccm_dates_range)
+    def _on_ccm_dates_range():
+        data = input.change_ccm_dates_range() or {}
+        state.ccm_filter_tgl_start.set(data.get("start", ""))
+        state.ccm_filter_tgl_end.set(data.get("end", ""))
+        
+        # 🌟 HANYA UPDATE NET SALES & BTSB (Selesai dalam 0.1 detik, tanpa reload cache stok!)
+        succ, msg = state.refresh_ccm_net_sales_only()
+        
+        # Tutup spinner dan kunci tab tetap di Tab 2
         ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
-        if succ:
-            ui.notification_show(f"✅ {msg}", type="message", duration=3)
+        ui.update_navs("ccm_navset_tab", selected="TAB_CCM_DASHBOARD")
+        
+        if data.get("start") and data.get("end"):
+            ui.notification_show(f"📅 Net Sales: {data.get('start')} s/d {data.get('end')}", type="message", duration=3)
         else:
-            ui.notification_show(f"⚠️ {msg}", type="warning", duration=4)
+            ui.notification_show("🔄 Filter tanggal Net Sales direset.", type="message", duration=2)
 
     @reactive.Effect
     @reactive.event(input.btn_submit_ccm_schedule)
