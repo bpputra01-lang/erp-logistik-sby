@@ -164,7 +164,6 @@ def parse_single_store_data(raw_json, store_name: str, channel="ALL"):
                     if date_val: break
             if not date_val: continue
 
-            # Karena hanya request 1 cabang, sales diambil dari kolom nama cabang atau kolom net_sales_total
             sales_val = 0
             if store_name in row:
                 sales_val = safe_int(row[store_name])
@@ -219,7 +218,7 @@ def upsert_to_supabase(records: list):
         print("⚠️ Tidak ada data untuk disimpan.")
         return
 
-    print(f"\n🚀 [SUPABASE] Menyimpan total {len(records)} baris data per cabang...")
+    print(f"🚀 [SUPABASE] Menyimpan batch {len(records)} baris data...")
     batch_size = 150
     total_saved = 0
 
@@ -232,41 +231,66 @@ def upsert_to_supabase(records: list):
         else:
             print(f"❌ Gagal batch {i}: {res.status_code} - {res.text}")
 
-    print(f"✅ [SUPABASE] Sukses! Berhasil menyimpan {total_saved} baris data per cabang!")
+    print(f"✅ [SUPABASE] Sukses! Berhasil menyimpan {total_saved} baris data.")
 
 # ==============================================================================
-# MAIN
+# MAIN (LOOPING DARI SEPTEMBER 2026 SAMPAI SEKARANG)
 # ==============================================================================
 def run_sync_sales():
     jez = create_jezpro_session()
-
-    now_wib = datetime.now(WIB)
-    start_date = now_wib.strftime("%Y-%m-01")
-    last_day = calendar.monthrange(now_wib.year, now_wib.month)[1]
-    end_date = f"{now_wib.year}-{now_wib.month:02d}-{last_day:02d}"
-
     store_list = get_store_list_from_page(jez)
+
+    # Mulai dari September 2026 (2026-09-01) hingga bulan/tahun saat ini
+    start_year, start_month = 2026, 9
+    now_wib = datetime.now(WIB)
+    end_year, end_month = now_wib.year, now_wib.month
+
     print(f"\n🏢 Mengambil data detail untuk {len(store_list)} cabang:")
-    print(f"   Periode: {start_date} s/d {end_date}\n")
+    print(f"   Periode: September 2026 s/d {now_wib.strftime('%Y-%m-%d')}\n")
 
-    all_records = []
+    current_year, current_month = start_year, start_month
 
-    for idx, store in enumerate(store_list, 1):
-        print(f"   [{idx}/{len(store_list)}] 📡 Mengambil data: {store}...")
-        raw_data = fetch_metrics_single_store(jez, start_date, end_date, store)
-        if raw_data:
-            store_rows = parse_single_store_data(raw_data, store, channel="ALL")
-            all_records.extend(store_rows)
-            print(f"         -> Ditemukan {len(store_rows)} data tanggal.")
-        time.sleep(0.15)  # Jeda halus
+    # Loop bulan demi bulan agar aman dari batasan payload/timeout web dashboard
+    while (current_year < end_year) or (current_year == end_year and current_month <= end_month):
+        start_date = f"{current_year}-{current_month:02d}-01"
+        
+        # Jika bulan berjalan saat ini, end_date dibatasi sampai hari ini
+        if current_year == end_year and current_month == end_month:
+            end_date = now_wib.strftime("%Y-%m-%d")
+        else:
+            last_day = calendar.monthrange(current_year, current_month)[1]
+            end_date = f"{current_year}-{current_month:02d}-{last_day:02d}"
 
-    if all_records:
-        upsert_to_supabase(all_records)
-    else:
-        print("❌ Tidak ada data yang berhasil diekstrak.")
+        print(f"📅 ----------------------------------------")
+        print(f"📅 Memproses Bulan: {current_year}-{current_month:02d} ({start_date} s/d {end_date})")
+        print(f"📅 ----------------------------------------")
+
+        month_records = []
+        for idx, store in enumerate(store_list, 1):
+            print(f"   [{idx}/{len(store_list)}] 📡 {store}...")
+            raw_data = fetch_metrics_single_store(jez, start_date, end_date, store)
+            if raw_data:
+                store_rows = parse_single_store_data(raw_data, store, channel="ALL")
+                month_records.extend(store_rows)
+                print(f"         -> Ditemukan {len(store_rows)} data harian.")
+            time.sleep(0.15)  # Jeda halus
+
+        if month_records:
+            upsert_to_supabase(month_records)
+        else:
+            print(f"⚠️ Tidak ada data untuk bulan {current_year}-{current_month:02d}.")
+
+        # Pindah ke bulan berikutnya
+        if current_month == 12:
+            current_month = 1
+            current_year += 1
+        else:
+            current_month += 1
+
+    print("\n🎉 SEMUA PROSES SCRAPING DARI SEPTEMBER 2026 SELESAI!")
 
 if __name__ == "__main__":
     print("=" * 70)
-    print("🚀 JEZPRO DASHBOARD NET SALES SCRAPER (PER BRANCH) -> SUPABASE")
+    print("🚀 JEZPRO DASHBOARD NET SALES SCRAPER (SEPT 2026 ONWARDS) -> SUPABASE")
     print("=" * 70)
     run_sync_sales()
