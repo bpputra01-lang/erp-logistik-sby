@@ -8991,3 +8991,78 @@ class AppState:
             import traceback
             traceback.print_exc()
             return False, f"Gagal menghitung metrik: {e}"
+
+    # ==============================================================================
+    # REFRESH CEPAT KHUSUS NET SALES & BTSB (INSTAN < 0.2 DETIK)
+    # ==============================================================================
+    def refresh_ccm_net_sales_only(self):
+        """Memperbarui Net Sales & BTSB secara instan tanpa memuat ulang jadwal/stok"""
+        try:
+            client = get_supabase()
+            if not client:
+                return False, "Koneksi database Supabase gagal!"
+
+            branch = self.ccm_branch().upper()
+            month = self.ccm_month()
+            year = safe_int(self.ccm_year(), 2026)
+
+            tgl_s = str(self.ccm_filter_tgl_start()).strip()
+            tgl_e = str(self.ccm_filter_tgl_end()).strip()
+
+            MONTH_EN_MAP = {
+                "JANUARI": "01", "FEBRUARI": "02", "MARET": "03", "APRIL": "04",
+                "MEI": "05", "JUNI": "06", "JULI": "07", "AGUSTUS": "08",
+                "SEPTEMBER": "09", "OKTOBER": "10", "NOVEMBER": "11", "DESEMBER": "12"
+            }
+            mo_num = MONTH_EN_MAP.get(month.upper(), "11")
+            branch_keyword = branch.replace("JEZ ", "").strip().upper()
+
+            # 🌟 Query HANYA kolom yang dibutuhkan & difilter langsung di database Supabase
+            try:
+                res = client.table("jezpro_daily_net_sales") \
+                            .select("store_name, date, created_at, net_sales") \
+                            .ilike("store_name", f"%{branch_keyword}%") \
+                            .execute()
+            except Exception:
+                res = client.table("jezpro_daily_net_sales") \
+                            .select("store_name, date, created_at, net_sales") \
+                            .execute()
+
+            net_sales = 0
+            if res and res.data:
+                for r in res.data:
+                    if not isinstance(r, dict):
+                        continue
+                    st_name = str(r.get("store_name", "")).strip().upper()
+                    if branch_keyword not in st_name:
+                        continue
+
+                    dt_s = str(r.get("date", r.get("created_at", "")))[:10]
+
+                    if tgl_s and tgl_e:
+                        if tgl_s <= dt_s <= tgl_e:
+                            net_sales += safe_int(r.get("net_sales", 0))
+                    else:
+                        if dt_s.startswith(f"{year}-{mo_num}"):
+                            net_sales += safe_int(r.get("net_sales", 0))
+
+            sales_label = f"{tgl_s} s/d {tgl_e}" if (tgl_s and tgl_e) else f"Bulan {month} {year}"
+            self.ccm_sales_period_label.set(sales_label)
+
+            val_adj_abs = self.ccm_m_adj_abs_val()
+            val_adj_sub = self.ccm_m_adj_sub_val()
+
+            btsb_val = net_sales * 0.00015
+            btsb_abs_pct = (val_adj_abs / net_sales * 100.0) if net_sales > 0 else 0.0
+            btsb_sub_pct = (val_adj_sub / net_sales * 100.0) if net_sales > 0 else 0.0
+
+            # Update reactive state
+            self.ccm_m_net_sales.set(net_sales)
+            self.ccm_m_btsb.set(round(btsb_val, 2))
+            self.ccm_m_btsb_abs_pct.set(round(btsb_abs_pct, 2))
+            self.ccm_m_btsb_sub_pct.set(round(btsb_sub_pct, 2))
+
+            return True, "Net Sales berhasil diperbarui!"
+        except Exception as e:
+            print("Gagal refresh net sales:", e)
+            return False, str(e)

@@ -6945,8 +6945,19 @@ def server(input: Inputs, output: Outputs, session: Session):
             state.cca_target_bins_schedule.set(list(input.cca_target_bins_select()))
 
     # ==========================================================================
-    # CYCLE COUNT MONITORING: CONTROLLER & EVENT LISTENERS
+    # CYCLE COUNT MONITORING: EVENT LISTENERS
     # ==========================================================================
+    @reactive.Effect
+    @reactive.event(input.btn_refresh_ccm_data)
+    def _on_ccm_refresh_btn():
+        succ, msg = state.load_cycle_count_monitoring_data()
+        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+        if succ:
+            state.show_success_modal.set(True)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+
     @reactive.Effect
     @reactive.event(input.change_ccm_branch)
     def _on_ccm_br_chg():
@@ -6972,18 +6983,25 @@ def server(input: Inputs, output: Outputs, session: Session):
         state.ccm_filter_tgl_start.set(data.get("start", ""))
         state.ccm_filter_tgl_end.set(data.get("end", ""))
         
-        # 🌟 HANYA UPDATE NET SALES & BTSB (Selesai dalam 0.1 detik, tanpa reload cache stok!)
-        succ, msg = state.refresh_ccm_net_sales_only()
+        try:
+            # 🌟 EKSEKUSI METHOD RINGAN (< 0.2 DETIK)
+            succ, msg = state.refresh_ccm_net_sales_only()
+        except Exception as e:
+            succ, msg = False, str(e)
+        finally:
+            # 🌟 JAMINAN SPINNER SELALU TERTUTUP (ANTI-HANG)
+            ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
         
-        # Tutup spinner dan kunci tab tetap di Tab 2
-        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
         ui.update_navs("ccm_navset_tab", selected="TAB_CCM_DASHBOARD")
         
-        if data.get("start") and data.get("end"):
-            ui.notification_show(f"📅 Net Sales: {data.get('start')} s/d {data.get('end')}", type="message", duration=3)
+        if succ:
+            if data.get("start") and data.get("end"):
+                ui.notification_show(f"📅 Net Sales: {data.get('start')} s/d {data.get('end')}", type="message", duration=3)
+            else:
+                ui.notification_show("🔄 Filter tanggal Net Sales direset.", type="message", duration=2)
         else:
-            ui.notification_show("🔄 Filter tanggal Net Sales direset.", type="message", duration=2)
-
+            ui.notification_show(f"⚠️ {msg}", type="warning", duration=4)
+    
     @reactive.Effect
     @reactive.event(input.btn_submit_ccm_schedule)
     def _on_ccm_upload_schedule():
