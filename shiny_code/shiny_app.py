@@ -7231,6 +7231,9 @@ def server(input: Inputs, output: Outputs, session: Session):
     # ==========================================================================
     # PANEL KETERANGAN DETAIL PENJELASAN DI TAB 2 (Poin 4)
     # ==========================================================================
+    # ==========================================================================
+    # PANEL KETERANGAN DETAIL PENJELASAN DI TAB 2 (SUPER CLEAN & RAPI)
+    # ==========================================================================
     @render.ui
     def ccm_explanation_panel_ui():
         if not state.ccm_processed():
@@ -7242,72 +7245,158 @@ def server(input: Inputs, output: Outputs, session: Session):
         total_stk = state.ccm_total_stock_val()
         sales_period = state.ccm_sales_period_label()
 
-        # Helper pembuat badge BIN kecil
-        def render_bin_badges(bin_list, badge_bg, badge_color):
+        pct_match = state.ccm_m_match_plan()
+        pct_unmatch = state.ccm_m_unmatch_plan()
+        pct_blank = state.ccm_m_blank()
+        total_miss = state.ccm_m_total_miss_loc()
+        acc_stock = state.ccm_m_accuracy_stock()
+
+        # Helper Chip BIN yang rapi dan konsisten
+        def render_clean_chip_list(bin_list, bg_color, border_color, text_color, empty_text):
             if not bin_list:
-                return ui.span("(Tidak ada)", style="color: #A0AEC0; font-size: 12px; font-style: italic;")
-            badges = [
+                return ui.div(
+                    ui.tags.i(class_="fa-regular fa-circle-check", style=f"color: {text_color}; font-size: 16px; margin-bottom: 4px;"),
+                    ui.span(empty_text, style="color: #A0AEC0; font-size: 11.5px; font-weight: 600;"),
+                    style="height: 115px; display: flex; flex-direction: column; align-items: center; justify-content: center;"
+                )
+            chips = [
                 ui.span(
-                    b, 
-                    style=f"background: {badge_bg}; color: {badge_color}; font-weight: 700; font-size: 11px; padding: 2px 7px; border-radius: 4px; display: inline-block; margin: 2px;"
+                    str(b),
+                    style=f"""
+                        background: {bg_color};
+                        color: {text_color};
+                        border: 1px solid {border_color};
+                        font-weight: 700;
+                        font-size: 11px;
+                        font-family: monospace;
+                        padding: 3px 8px;
+                        border-radius: 5px;
+                        display: inline-block;
+                        white-space: nowrap;
+                    """
                 ) for b in bin_list
             ]
-            return ui.div(*badges, style="display: flex; flex-wrap: wrap; gap: 4px; max-height: 120px; overflow-y: auto; padding-top: 4px;")
+            return ui.div(
+                *chips,
+                style="display: flex; flex-wrap: wrap; gap: 6px; max-height: 115px; overflow-y: auto; padding: 4px 2px;"
+            )
 
-        return ui.div(
-            ui.h4("💡 Keterangan & Penjelasan Detail Hasil Monitoring", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
-            
-            # KARTU 1: MATCH, UNMATCH, & BLANK
+        # 1. Visual Ratio Progress Bar
+        ratio_bar = ui.div(
+            ui.div(
+                style=f"width: {max(2.0, pct_match):.1f}%; background: #10B981; height: 10px; border-radius: 6px 0 0 6px;" if pct_match > 0 else "display: none;",
+                title=f"Match: {pct_match:.1f}%"
+            ),
+            ui.div(
+                style=f"width: {max(2.0, pct_unmatch):.1f}%; background: #F43F5E; height: 10px;" if pct_unmatch > 0 else "display: none;",
+                title=f"Unmatch: {pct_unmatch:.1f}%"
+            ),
+            ui.div(
+                style=f"width: {max(2.0, pct_blank):.1f}%; background: #8B5CF6; height: 10px; border-radius: {'0 6px 6px 0' if pct_match > 0 else '6px'};",
+                title=f"Blank: {pct_blank:.1f}%"
+            ),
+            style="display: flex; width: 100%; background: #E2E8F0; border-radius: 6px; overflow: hidden; height: 10px; margin-bottom: 1rem;"
+        )
+
+        # 2. Kotak Analisis Status Jadwal (3 Kolom Sejajar & Simetris)
+        card_match = ui.div(
             ui.div(
                 ui.div(
-                    ui.strong("🎯 Analisis Kepatuhan Rencana vs Eksekusi (Plan vs Action):", style="font-size: 13px; color: #2D3748; display: block; margin-bottom: 8px;"),
-                    ui.div(
-                        ui.div(
-                            ui.span(f"✅ Match Plan ({state.ccm_m_match_plan():.1f}%): ", style="font-weight: 800; color: #10B981; font-size: 12px;"),
-                            ui.span(f"{len(match_bins)} BIN dikerjakan tepat pada tanggal jadwal.", style="font-size: 12px; color: #4A5568;"),
-                            render_bin_badges(match_bins, "#C6F6D5", "#22543D"),
-                            style="flex: 1; min-width: 260px; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 10px; border-radius: 8px;"
-                        ),
-                        ui.div(
-                            ui.span(f"⚠️ Unmatch Plan ({state.ccm_m_unmatch_plan():.1f}%): ", style="font-weight: 800; color: #F43F5E; font-size: 12px;"),
-                            ui.span(f"{len(unmatch_bins)} BIN dikerjakan tetapi bergeser hari dari jadwal.", style="font-size: 12px; color: #4A5568;"),
-                            render_bin_badges(unmatch_bins, "#FED7D7", "#9B2C2C"),
-                            style="flex: 1; min-width: 260px; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 10px; border-radius: 8px;"
-                        ),
-                        ui.div(
-                            ui.span(f"⏳ Blank ({state.ccm_m_blank():.1f}%): ", style="font-weight: 800; color: #805AD5; font-size: 12px;"),
-                            ui.span(f"{len(blank_bins)} BIN belum pernah di-cycle count sama sekali.", style="font-size: 12px; color: #4A5568;"),
-                            render_bin_badges(blank_bins, "#E9D8FD", "#553C9A"),
-                            style="flex: 1; min-width: 260px; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 10px; border-radius: 8px;"
-                        ),
-                        style="display: flex; gap: 12px; flex-wrap: wrap;"
-                    ),
-                    style="margin-bottom: 1rem;"
+                    ui.tags.i(class_="fa-solid fa-circle-check", style="color: #10B981; font-size: 14px; margin-right: 6px;"),
+                    ui.span("MATCH PLAN", style="font-weight: 800; font-size: 12px; color: #065F46;"),
+                    style="display: flex; align-items: center;"
                 ),
-
-                # KARTU 2: AKURASI STOK & NET SALES
-                ui.div(
-                    ui.div(
-                        ui.strong("📦 Akurasi Stok Terhadap Total Stok:", style="font-size: 12.5px; color: #2D3748; display: block; margin-bottom: 4px;"),
-                        ui.p(
-                            f"Rumus: 100% - ({state.ccm_m_total_miss_loc():,} PCS Miss Loc / {total_stk:,} PCS Total Stok) = {state.ccm_m_accuracy_stock():.2f}%",
-                            style="margin: 0; font-size: 12px; color: #4A5568; font-family: monospace; font-weight: bold;"
-                        ),
-                        style="flex: 1; min-width: 260px; background: #EBF8FF; border-left: 4px solid #3182CE; padding: 10px 14px; border-radius: 6px;"
-                    ),
-                    ui.div(
-                        ui.strong(f"💰 Penjualan Cabang ({sales_period}):", style="font-size: 12.5px; color: #2D3748; display: block; margin-bottom: 4px;"),
-                        ui.p(
-                            f"Net Sales: Rp {state.ccm_m_net_sales():,} • BTSB (0.015%): Rp {state.ccm_m_btsb():,.2f}",
-                            style="margin: 0; font-size: 12px; color: #4A5568; font-weight: bold;"
-                        ),
-                        style="flex: 1; min-width: 260px; background: #F0FDF4; border-left: 4px solid #10B981; padding: 10px 14px; border-radius: 6px;"
-                    ),
-                    style="display: flex; gap: 12px; flex-wrap: wrap;"
-                ),
-                style="background: #FFFFFF; border: 1px solid #CBD5E0; border-radius: 10px; padding: 1.25rem; margin-top: 1rem;"
+                ui.span(f"{pct_match:.1f}%", style="font-weight: 900; font-size: 13px; color: #10B981; background: #D1FAE5; padding: 2px 7px; border-radius: 4px;"),
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;"
             ),
-            style="width: 100%; margin-top: 0.5rem;"
+            ui.p(f"{len(match_bins)} BIN selesai tepat tanggal jadwal.", style="font-size: 11.5px; color: #718096; margin: 0 0 8px 0;"),
+            render_clean_chip_list(match_bins, "#ECFDF5", "#A7F3D0", "#065F46", "Tidak ada BIN match"),
+            style="flex: 1; min-width: 260px; background: #FFFFFF; border: 1.5px solid #E2E8F0; border-top: 3.5px solid #10B981; border-radius: 8px; padding: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);"
+        )
+
+        card_unmatch = ui.div(
+            ui.div(
+                ui.div(
+                    ui.tags.i(class_="fa-solid fa-clock-rotate-left", style="color: #F43F5E; font-size: 14px; margin-right: 6px;"),
+                    ui.span("UNMATCH PLAN", style="font-weight: 800; font-size: 12px; color: #9F1239;"),
+                    style="display: flex; align-items: center;"
+                ),
+                ui.span(f"{pct_unmatch:.1f}%", style="font-weight: 900; font-size: 13px; color: #F43F5E; background: #FFE4E6; padding: 2px 7px; border-radius: 4px;"),
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;"
+            ),
+            ui.p(f"{len(unmatch_bins)} BIN bergeser hari dari rencana.", style="font-size: 11.5px; color: #718096; margin: 0 0 8px 0;"),
+            render_clean_chip_list(unmatch_bins, "#FFF1F2", "#FECDD3", "#9F1239", "Nihil (Semua sesuai tanggal)"),
+            style="flex: 1; min-width: 260px; background: #FFFFFF; border: 1.5px solid #E2E8F0; border-top: 3.5px solid #F43F5E; border-radius: 8px; padding: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);"
+        )
+
+        card_blank = ui.div(
+            ui.div(
+                ui.div(
+                    ui.tags.i(class_="fa-solid fa-hourglass-start", style="color: #8B5CF6; font-size: 14px; margin-right: 6px;"),
+                    ui.span("BLANK (BELUM TER-CC)", style="font-weight: 800; font-size: 12px; color: #5B21B6;"),
+                    style="display: flex; align-items: center;"
+                ),
+                ui.span(f"{pct_blank:.1f}%", style="font-weight: 900; font-size: 13px; color: #8B5CF6; background: #EDE9FE; padding: 2px 7px; border-radius: 4px;"),
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;"
+            ),
+            ui.p(f"{len(blank_bins)} BIN belum pernah di-cycle count.", style="font-size: 11.5px; color: #718096; margin: 0 0 8px 0;"),
+            render_clean_chip_list(blank_bins, "#F5F3FF", "#DDD6FE", "#5B21B6", "Nihil (Semua sudah di-CC)"),
+            style="flex: 1; min-width: 260px; background: #FFFFFF; border: 1.5px solid #E2E8F0; border-top: 3.5px solid #8B5CF6; border-radius: 8px; padding: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);"
+        )
+
+        grid_cards = ui.div(
+            card_match, card_unmatch, card_blank,
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+        )
+
+        # 3. Strip Bawah: Rincian Akurasi & Net Sales (Rapi & Sejajar)
+        strip_akurasi = ui.div(
+            ui.div(
+                ui.tags.i(class_="fa-solid fa-bullseye", style="color: #3182CE; font-size: 15px; margin-right: 8px;"),
+                ui.strong("Kalkulasi Akurasi Stok:", style="font-size: 12.5px; color: #1E3A8A;"),
+                style="display: flex; align-items: center; margin-bottom: 4px;"
+            ),
+            ui.p(
+                f"100% - ({total_miss:,} PCS Miss Location / {total_stk:,} PCS Total Stok) = {acc_stock:.2f}%",
+                style="font-family: monospace; font-weight: 800; font-size: 13px; color: #1D4ED8; margin: 0 0 2px 0;"
+            ),
+            ui.span("Tingkat kesesuaian fisik terhadap master data sistem cabang.", style="font-size: 11px; color: #64748B;"),
+            style="flex: 1; min-width: 300px; background: #EFF6FF; border: 1px solid #BFDBFE; border-left: 4px solid #3B82F6; padding: 12px 16px; border-radius: 8px;"
+        )
+
+        strip_sales = ui.div(
+            ui.div(
+                ui.tags.i(class_="fa-solid fa-wallet", style="color: #059669; font-size: 15px; margin-right: 8px;"),
+                ui.strong(f"Omzet & BTSB ({sales_period}):", style="font-size: 12.5px; color: #064E3B;"),
+                style="display: flex; align-items: center; margin-bottom: 4px;"
+            ),
+            ui.p(
+                f"Net Sales: Rp {state.ccm_m_net_sales():,} • Toleransi (0.015%): Rp {state.ccm_m_btsb():,.2f}",
+                style="font-family: monospace; font-weight: 800; font-size: 13px; color: #047857; margin: 0 0 2px 0;"
+            ),
+            ui.span("Batas budget toleransi selisih barang terhadap total penjualan cabang.", style="font-size: 11px; color: #64748B;"),
+            style="flex: 1; min-width: 300px; background: #ECFDF5; border: 1px solid #A7F3D0; border-left: 4px solid #10B981; padding: 12px 16px; border-radius: 8px;"
+        )
+
+        strip_bawah = ui.div(
+            strip_akurasi, strip_sales,
+            style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%;"
+        )
+
+        return ui.div(
+            ui.div(
+                ui.div(
+                    ui.tags.i(class_="fa-solid fa-chart-pie", style="color: #3182CE; font-size: 16px; margin-right: 8px;"),
+                    ui.h4("Evaluasi & Rincian Kepatuhan Jadwal Cycle Count", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0;"),
+                    style="display: flex; align-items: center;"
+                ),
+                ui.span("Pembaruan Terverifikasi Database", style="background: #F1F5F9; color: #475569; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 4px;"),
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;"
+            ),
+            ratio_bar,
+            grid_cards,
+            strip_bawah,
+            style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 1.25rem 1.5rem; margin-top: 1rem; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);"
         )
 
 from pathlib import Path
