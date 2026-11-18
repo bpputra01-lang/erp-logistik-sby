@@ -370,6 +370,45 @@ class AppState:
         self.so_report_status = reactive.Value("Belum ada step yang dijalankan.")
         self.so_report_ready = reactive.Value(False)
         self.so_saved_sheets_count = reactive.Value(0)
+
+        # ==============================================================================
+# TAMBAHAN DI STATE.PY -> DI DALAM def __init__(self):
+# ==============================================================================
+
+        # --- CYCLE COUNT CONDITIONAL & SCHEDULE STATE ---
+        self.cca_branch_selected = reactive.Value("")         # Default blank
+        self.cca_tujuan = reactive.Value("TRIAL / LATIHAN")   # "TRIAL / LATIHAN" atau "ON SCHEDULE CC"
+        self.cca_available_bins_from_db = reactive.Value([])   # Dari stock_live_cache Kolom B
+        self.cca_target_bins_schedule = reactive.Value([])     # BIN yang dipilih untuk schedule
+
+        # --- CYCLE COUNT MONITORING STATE ---
+        self.ccm_branch = reactive.Value("HUB JAKARTA")
+        self.ccm_month = reactive.Value("Januari")
+        self.ccm_year = reactive.Value("2026")
+        self.ccm_schedule_data = reactive.Value([])            # Data jadwal dari Supabase
+        self.ccm_branches_status = reactive.Value({})          # Status upload tiap cabang
+
+        # 16 Metrics State untuk Tab 2
+        self.ccm_m_bin_done = reactive.Value(0)
+        self.ccm_m_bin_not_yet = reactive.Value(0)
+        self.ccm_m_prog_cc = reactive.Value(0.0)
+        self.ccm_m_match_plan = reactive.Value(0.0)
+        self.ccm_m_unmatch_plan = reactive.Value(0.0)
+        self.ccm_m_blank = reactive.Value(0.0)
+        self.ccm_m_total_miss_loc = reactive.Value(0)
+        self.ccm_m_accuracy_stock = reactive.Value(0.0)
+        self.ccm_m_adj_plus_qty = reactive.Value(0)
+        self.ccm_m_adj_plus_val = reactive.Value(0)
+        self.ccm_m_adj_minus_qty = reactive.Value(0)
+        self.ccm_m_adj_minus_val = reactive.Value(0)
+        self.ccm_m_adj_abs_val = reactive.Value(0)
+        self.ccm_m_adj_sub_val = reactive.Value(0)
+        self.ccm_m_net_sales = reactive.Value(0)
+        self.ccm_m_btsb = reactive.Value(0.0)
+        self.ccm_m_btsb_abs_pct = reactive.Value(0.0)
+        self.ccm_m_btsb_sub_pct = reactive.Value(0.0)
+        self.ccm_processed = reactive.Value(False)
+
        # --- JUSTIFICATION SO STATE ---
         self.jso_mode = reactive.Value("")  # "JUSTIFIKASI REVERSAL" atau "JUSTIFIKASI NON REVERSAL"
         self.jso_rev_start_date = reactive.Value(datetime.now().strftime("%Y-%m-01"))
@@ -8402,3 +8441,294 @@ class AppState:
             import traceback
             traceback.print_exc()
             return False, f"Terjadi kesalahan saat memproses FDR: {str(e)}"
+
+    # ==============================================================================
+    # LOGIKA BARU: LOAD UNIQUE BIN DARI SUPABASE (stock_live_cache)
+    # ==============================================================================
+    def load_bins_from_stock_cache(self, branch_name: str):
+        """Mengambil unique BIN dari kolom B (index 1) di stock_live_cache"""
+        try:
+            client = get_supabase()
+            if not client:
+                return []
+
+            BRANCH_KEY_MAP = {
+                "HUB JAKARTA": "HUB_JAKARTA_LATEST",
+                "SEMARANG": "SEMARANG_LATEST",
+                "SIDOARJO": "SIDOARJO_LATEST",
+                "KEDIRI": "KEDIRI_LATEST",
+                "JEMBER": "JEMBER_LATEST",
+                "SURABAYA": "SURABAYA_LATEST",
+                "MALANG": "MALANG_LATEST"
+            }
+            cache_id = BRANCH_KEY_MAP.get(branch_name.upper(), f"{branch_name.upper()}_LATEST")
+            res = client.table("stock_live_cache").select("stock_data").eq("id", cache_id).execute()
+            
+            unique_bins = set()
+            if res and res.data:
+                raw_stock = res.data[0].get("stock_data", [])
+                if isinstance(raw_stock, str):
+                    raw_stock = json.loads(raw_stock)
+                
+                for item in raw_stock:
+                    if isinstance(item, dict):
+                        # Ambil dari Kolom B / Key 'BIN' / 'LOKASI'
+                        b_val = str(item.get("BIN", item.get("bin", item.get("lokasi", "")))).strip().upper()
+                        if b_val and b_val not in ["NAN", "NONE", "-"]:
+                            unique_bins.add(b_val)
+                    elif isinstance(item, list) and len(item) > 1:
+                        b_val = str(item[1]).strip().upper()
+                        if b_val:
+                            unique_bins.add(b_val)
+
+            sorted_bins = sorted(list(unique_bins))
+            self.cca_available_bins_from_db.set(sorted_bins)
+            return sorted_bins
+        except Exception as e:
+            print("Gagal load BIN dari Supabase:", e)
+            return []
+
+    def auto_save_cc_step_to_supabase(self, step_no: int, step_title: str, summary_data: dict):
+        """Menyimpan progress eksekusi Cycle Count On-Schedule ke Supabase"""
+        if self.cca_tujuan() != "ON SCHEDULE CC":
+            return  # Jika Trial / Latihan, skip penyimpanan database
+
+        try:
+            client = get_supabase()
+            if not client:
+                return
+            
+            payload = {
+                "branch": self.cca_branch_selected(),
+                "step_no": step_no,
+                "step_title": step_title,
+                "target_bins": list(self.cca_target_bins_schedule()),
+                "summary": summary_data,
+                "created_at": datetime.now(WIB).isoformat()
+            }
+            client.table("cycle_count_executions").insert(payload).execute()
+        except Exception as e:
+            print(f"Auto-save step {step_no} error (non-fatal):", e)
+
+    # ==============================================================================
+    # LOGIKA BARU: CYCLE COUNT MONITORING (UPLOAD JADWAL & 16 METRICS CALCULATION)
+    # ==============================================================================
+    def upload_cycle_count_schedule(self, file_info, branch: str, month: str, year: str):
+        """Upload dan simpan jadwal CC bulanan ke Supabase"""
+        try:
+            if not file_info:
+                return False, "File jadwal wajib diupload!"
+
+            df_raw = load_data_from_info(file_info)
+            if df_raw.empty:
+                return False, "File jadwal kosong!"
+
+            # Normalisasi kolom jadwal (Flexible Column & Date Parser)
+            # Standar template: Kolom A = TANGGAL (1-31), Kolom B = TARGET BIN (Bisa koma), Kolom C = PIC / NOTE
+            records = []
+            for _, row in df_raw.iterrows():
+                tgl_val = str(row.iloc[0]).strip()
+                bin_val = str(row.iloc[1]).strip().upper() if df_raw.shape[1] > 1 else ""
+                note_val = str(row.iloc[2]).strip() if df_raw.shape[1] > 2 else ""
+
+                if not tgl_val or tgl_val in ["NAN", "NONE", ""]:
+                    continue
+
+                # Konversi jika store leader menulis 'DISPLAY' -> jadikan 'TOKO'
+                bin_clean = "TOKO" if bin_val == "DISPLAY" else bin_val
+                
+                records.append({
+                    "tanggal": tgl_val,
+                    "target_bin": bin_clean,
+                    "note": note_val
+                })
+
+            client = get_supabase()
+            if client:
+                client.table("cycle_count_schedules").upsert({
+                    "id": f"{branch.upper()}_{month.upper()}_{year}",
+                    "branch": branch.upper(),
+                    "month": month,
+                    "year": safe_int(year, 2026),
+                    "schedule_items": records,
+                    "updated_at": datetime.now(WIB).isoformat()
+                }).execute()
+
+            self.load_cycle_count_monitoring_data()
+            return True, f"Jadwal {branch} bulan {month} {year} ({len(records)} baris) berhasil disimpan!"
+        except Exception as e:
+            return False, f"Gagal upload jadwal: {e}"
+
+    def load_cycle_count_monitoring_data(self):
+        """Kalkulasi 16 Metrik Lengkap dari Supabase untuk Dashboard Tab 2"""
+        try:
+            client = get_supabase()
+            if not client:
+                return False, "Koneksi database gagal!"
+
+            branch = self.ccm_branch().upper()
+            month = self.ccm_month()
+            year = safe_int(self.ccm_year(), 2026)
+
+            # 1. Tarik Jadwal Cabang
+            sched_res = client.table("cycle_count_schedules").select("*").eq("id", f"{branch}_{month.upper()}_{year}").execute()
+            schedule_items = sched_res.data[0].get("schedule_items", []) if sched_res.data else []
+            self.ccm_schedule_data.set(schedule_items)
+
+            # 2. Cek Status Cabang Mana Saja yang Sudah Upload Jadwal
+            all_branches = ["HUB JAKARTA", "SEMARANG", "SIDOARJO", "KEDIRI", "JEMBER"]
+            stat_res = client.table("cycle_count_schedules").select("branch").eq("month", month).eq("year", year).execute()
+            uploaded_branches = set([r.get("branch") for r in (stat_res.data or [])])
+            self.ccm_branches_status.set({b: (b in uploaded_branches) for b in all_branches})
+
+            # Ekstraksi total BIN terencana di jadwal
+            planned_bins_set = set()
+            bins_per_date = {}
+            for item in schedule_items:
+                tgl = str(item.get("tanggal", ""))
+                bins_str = str(item.get("target_bin", ""))
+                # Support multi bin pisah koma
+                b_list = [b.strip() for b in bins_str.split(",") if b.strip()]
+                bins_per_date[tgl] = b_list
+                for b in b_list:
+                    planned_bins_set.add(b)
+
+            total_planned_bins = len(planned_bins_set)
+
+            # 3. Tarik Riwayat Eksekusi CC Bulan Tersebut dari cycle_count_executions
+            exec_res = client.table("cycle_count_executions").select("*").eq("branch", branch).execute()
+            executed_records = exec_res.data or []
+
+            executed_bins_set = set()
+            executed_per_date = {}
+            total_miss_location_qty = 0
+
+            for ex in executed_records:
+                tbins = ex.get("target_bins", [])
+                for b in tbins:
+                    executed_bins_set.add(str(b).strip().upper())
+
+                dt_created = str(ex.get("created_at", ""))[:10]
+                if dt_created not in executed_per_date:
+                    executed_per_date[dt_created] = set()
+                for b in tbins:
+                    executed_per_date[dt_created].add(str(b).strip().upper())
+
+                # Akumulasi Miss Location dari summary Step 2 (Setup Real + Kolom D)
+                summary = ex.get("summary", {})
+                total_miss_location_qty += safe_int(summary.get("qty_miss_loc", 0))
+
+            bin_done_count = len(executed_bins_set)
+            bin_not_yet_count = max(0, total_planned_bins - bin_done_count)
+            progress_pct = (bin_done_count / total_planned_bins * 100.0) if total_planned_bins > 0 else 0.0
+
+            # 4. Kalkulasi %MATCH, %UNMATCH, dan %BLANK
+            match_days = 0
+            unmatch_days = 0
+            blank_days = 0
+            total_days_eval = len(bins_per_date)
+
+            for tgl, plan_list in bins_per_date.items():
+                # Cari eksekusi di tanggal yang cocok
+                actual_done_bins = set()
+                for d_key, b_done_set in executed_per_date.items():
+                    if tgl in d_key or d_key.endswith(tgl.zfill(2)):
+                        actual_done_bins.update(b_done_set)
+
+                if not actual_done_bins:
+                    blank_days += 1
+                else:
+                    # Cek apakah seluruh BIN terencana ada di aktual
+                    if all(b in actual_done_bins for b in plan_list):
+                        match_days += 1
+                    else:
+                        unmatch_days += 1
+
+            if total_days_eval > 0:
+                pct_match = round((match_days / total_days_eval) * 100.0, 1)
+                pct_unmatch = round((unmatch_days / total_days_eval) * 100.0, 1)
+                pct_blank = round(max(0.0, 100.0 - pct_match - pct_unmatch), 1)
+            else:
+                pct_match, pct_unmatch, pct_blank = 0.0, 0.0, 0.0
+
+            # 5. % Accuracy to Total Stock
+            stock_res = client.table("stock_live_cache").select("stock_data").eq("branch", branch).execute()
+            total_stock_branch = 0
+            if stock_res.data:
+                s_data = stock_res.data[0].get("stock_data", [])
+                if isinstance(s_data, str):
+                    s_data = json.loads(s_data)
+                for item in s_data:
+                    # Kolom J (index 9)
+                    if isinstance(item, dict):
+                        total_stock_branch += safe_int(item.get("QTY SYSTEM", item.get("qty", 0)))
+                    elif isinstance(item, list) and len(item) > 9:
+                        total_stock_branch += safe_int(item[9])
+
+            pct_accuracy_stock = (total_miss_location_qty / total_stock_branch * 100.0) if total_stock_branch > 0 else 0.0
+
+            # 6. Adjustment + & - via jezpro_adjustment_headers & jezpro_adjustment_items
+            adj_res = client.table("jezpro_adjustment_headers").select("*").eq("store_name", branch).execute()
+            valid_ma_ids = []
+            if adj_res.data:
+                for ah in adj_res.data:
+                    note = str(ah.get("note", "")).upper()
+                    if any(k in note for k in ["PARTIAL", "KESALAHAN SYSTEM", "CYCLE COUNT"]):
+                        valid_ma_ids.append(ah.get("ma_id"))
+
+            qty_adj_p, val_adj_p = 0, 0
+            qty_adj_m, val_adj_m = 0, 0
+
+            if valid_ma_ids:
+                items_res = client.table("jezpro_adjustment_items").select("*").in_("ma_id", valid_ma_ids).execute()
+                for it in (items_res.data or []):
+                    q_so = safe_int(it.get("qty_so", 0))
+                    q_sys = safe_int(it.get("qty_system", 0))
+                    diff_q = q_so - q_sys
+                    cogs = safe_int(it.get("cogs", it.get("harga_beli", 0)))
+
+                    if diff_q > 0:
+                        qty_adj_p += diff_q
+                        val_adj_p += diff_q * cogs
+                    elif diff_q < 0:
+                        qty_adj_m += abs(diff_q)
+                        val_adj_m += abs(diff_q) * cogs
+
+            val_adj_abs = val_adj_p + val_adj_m
+            val_adj_sub = val_adj_p - val_adj_m
+
+            # 7. Net Sales & BTSB
+            sales_res = client.table("jezpro_daily_net_sales").select("net_sales").eq("branch", branch).execute()
+            net_sales = sum([safe_int(r.get("net_sales", 0)) for r in (sales_res.data or [])])
+
+            # BTSB = 0.015% dari Net Sales (Net Sales * 0.00015)
+            btsb_val = net_sales * 0.00015
+            btsb_abs_pct = (val_adj_abs / net_sales * 100.0) if net_sales > 0 else 0.0
+            btsb_sub_pct = (val_adj_sub / net_sales * 100.0) if net_sales > 0 else 0.0
+
+            # Simpan seluruh 16 metrik ke state
+            self.ccm_m_bin_done.set(bin_done_count)
+            self.ccm_m_bin_not_yet.set(bin_not_yet_count)
+            self.ccm_m_prog_cc.set(round(progress_pct, 1))
+            self.ccm_m_match_plan.set(pct_match)
+            self.ccm_m_unmatch_plan.set(pct_unmatch)
+            self.ccm_m_blank.set(pct_blank)
+            self.ccm_m_total_miss_loc.set(total_miss_location_qty)
+            self.ccm_m_accuracy_stock.set(round(pct_accuracy_stock, 2))
+            self.ccm_m_adj_plus_qty.set(qty_adj_p)
+            self.ccm_m_adj_plus_val.set(val_adj_p)
+            self.ccm_m_adj_minus_qty.set(qty_adj_m)
+            self.ccm_m_adj_minus_val.set(val_adj_m)
+            self.ccm_m_adj_abs_val.set(val_adj_abs)
+            self.ccm_m_adj_sub_val.set(val_adj_sub)
+            self.ccm_m_net_sales.set(net_sales)
+            self.ccm_m_btsb.set(round(btsb_val, 2))
+            self.ccm_m_btsb_abs_pct.set(round(btsb_abs_pct, 2))
+            self.ccm_m_btsb_sub_pct.set(round(btsb_sub_pct, 2))
+
+            self.ccm_processed.set(True)
+            return True, "Data Monitoring Cycle Count berhasil dihitung!"
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return False, f"Gagal menghitung metrik: {e}"

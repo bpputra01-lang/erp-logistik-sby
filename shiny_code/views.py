@@ -984,27 +984,25 @@ def ppa_audit_view(state: AppState):
 # VIEW 7: CYCLE COUNT ANALYZER (MENU: "Cycle Count")
 # ==============================================================================
 def cycle_count_analyzer_view(state: AppState):
-    list_sub_kat = ["BAG", "BALL", "BASELAYER", "BOTTLE", "CLEANNING & CARE", "EXTRA SHOES", "HARDWARE", "JACKET", "JERSEY", "LOWER BODY", "NUTRITION", "OTHER", "OTHERS", "PANTS", "RACKET", "SANDALS", "SET APPAREL", "SHIRT", "SHOES", "SHORT", "SWLM", "UKNOWN SC", "UNDERLAYER", "UPPER BODY"]
-    list_brand = ["MILLS", "ORTUSEIGHT", "SPECS", "ARDILES", "NINETEN", "LYCAN", "PATROBAS", "PIERO", "PORTO", "BRODO", "JACK IDN", "JOHNSON", "NOIJ", "VENTELA", "DESLE", "LEAGUE", "UNERD", "CALCI", "HUNDRED", "FIXCH", "YONEX", "NIKE", "AZA", "ASICS", "EAGLE", "PUMA", "KARGE", "GUMI", "ZUMA", "MILESTONE", "WEIDENMANN", "DIADORA", "HEIDEN HERITAGE", "LOTTO", "KRONIKEL", "ADIDAS", "VOOLA", "RECOIR", "MIZUNO", "UNKNOWN", "WARRIOR", "AVO", "KANKY"]
-    list_bin_cov = ["KARANTINA", "STAGGING", "STAGING", "GUDANG LT.2", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL1", "GL4-DC-KL2", "GL3-DC-RAK", "GL4-DC-RAK", "LIVE", "MARKOM", "AMP", "GL2-STORE", "PUTAWAY", "OUT", "INB"]
-
-    # Filter Section
-    filter_section = ui.div(
-        ui.div(
-            ui.input_select("cca_branch", "🏢 Pilih Cabang / Branch:", choices=list(BRANCH_BIN_MAPPING.keys()), selected="SURABAYA", width="100%"),
-            style="width: 100%; margin-bottom: 1rem;"
+    branch_choices = ["", "SURABAYA", "MALANG", "HUB JAKARTA", "SEMARANG", "SIDOARJO", "KEDIRI", "JEMBER"]
+    
+    # 🌟 1. SELECTOR CABANG WAJIB DIISI & DEFAULT BLANK
+    branch_select_box = ui.div(
+        ui.span("🏢 Pilih Cabang / Branch (Wajib):", style="font-weight: 800; color: #E50914; font-size: 13px; margin-bottom: 4px; display: block;"),
+        ui.tags.select(
+            ui.tags.option("-- Silakan Pilih Cabang Terlebih Dahulu --", value="", selected=(state.cca_branch_selected() == "")),
+            *[ui.tags.option(b, value=b, selected=(b == state.cca_branch_selected())) for b in branch_choices if b != ""],
+            id="cca_branch_select_input",
+            onchange="Shiny.setInputValue('change_cca_branch', this.value, {priority: 'event'})",
+            style="width: 100%; padding: 10px 14px; background: white; border: 2px solid #CBD5E0; border-radius: 8px; font-weight: 800; font-size: 13px; cursor: pointer;"
         ),
-        ui.div(
-            ui.div(ui.input_selectize("cca_sub_kat", "📁 Sub Kategori:", choices=list_sub_kat, multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
-            ui.div(ui.input_selectize("cca_brand", "🏷️ Brand:", choices=list_brand, multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
-            ui.div(ui.output_ui("cca_bin_sys_ui"), style="flex: 1; min-width: 180px;"),
-            ui.div(ui.input_selectize("cca_bin_cov", "📡 BIN Coverage:", choices=list_bin_cov, multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
-            style="display: flex; gap: 1rem; width: 100%; flex-wrap: wrap;"
-        ),
-        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+        style="width: 100%; margin-bottom: 1rem;"
     )
 
-    # Step 1 Cycle Count (Kembalikan ke id cca_*)
+    # 🌟 2. WADAH TUJUAN & FILTER DINAMIS
+    dynamic_branch_options = ui.output_ui("cca_dynamic_branch_options_ui")
+
+    # Step 1 Uploader
     step1_ui = ui.div(
         ui.h4("1️⃣ Upload Data Scan & All Data Stock", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
         ui.div(
@@ -1019,7 +1017,11 @@ def cycle_count_analyzer_view(state: AppState):
     )
 
     return ui.div(
-        filter_section,
+        ui.div(
+            branch_select_box,
+            dynamic_branch_options,
+            style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+        ),
         step1_ui,
         ui.output_ui("cca_step2_card_ui"),
         ui.output_ui("cca_step4_card_ui"),
@@ -3377,6 +3379,115 @@ def dark_metric_box_with_delta(title: str, val_str: str, delta_val: float, unit_
         delta_badge,
         style=f"background: #1A1A1A; padding: 1rem; border-radius: 8px; border-left: 4px solid {border_color}; width: 100%; text-align: center;"
     )
+
+# ==============================================================================
+# VIEW BARU: CYCLE COUNT MONITORING (TAB 1 UPLOAD JADWAL + TAB 2 16 METRICS)
+# ==============================================================================
+def cycle_count_monitoring_view(state: AppState):
+    MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
+    YEARS = [str(y) for y in range(2026, 2031)]
+    BRANCHES = ["HUB JAKARTA", "SEMARANG", "SIDOARJO", "KEDIRI", "JEMBER"]
+
+    # Filter Global Baris Atas
+    filter_bar = ui.div(
+        ui.div(
+            ui.div(
+                ui.span("🏢 Cabang / Branch:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
+                ui.tags.select(
+                    *[ui.tags.option(b, value=b, selected=(b == state.ccm_branch())) for b in BRANCHES],
+                    id="ccm_filter_branch",
+                    onchange="Shiny.setInputValue('change_ccm_branch', this.value, {priority: 'event'})",
+                    style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; background: white; cursor: pointer; min-width: 170px;"
+                ),
+                style="display: flex; flex-direction: column;"
+            ),
+            ui.div(
+                ui.span("📆 Bulan:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
+                ui.tags.select(
+                    *[ui.tags.option(m, value=m, selected=(m == state.ccm_month())) for m in MONTHS],
+                    id="ccm_filter_month",
+                    onchange="Shiny.setInputValue('change_ccm_month', this.value, {priority: 'event'})",
+                    style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; background: white; cursor: pointer; min-width: 140px;"
+                ),
+                style="display: flex; flex-direction: column;"
+            ),
+            ui.div(
+                ui.span("🗓️ Tahun:", style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
+                ui.tags.select(
+                    *[ui.tags.option(y, value=y, selected=(y == state.ccm_year())) for y in YEARS],
+                    id="ccm_filter_year",
+                    onchange="Shiny.setInputValue('change_ccm_year', this.value, {priority: 'event'})",
+                    style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; background: white; cursor: pointer; min-width: 120px;"
+                ),
+                style="display: flex; flex-direction: column;"
+            ),
+            style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;"
+        ),
+        ui.tags.button(
+            ui.tags.i(class_="fa-solid fa-arrows-rotate", style="margin-right: 6px;"), "SINKRONISASI MONITORING",
+            onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_refresh_ccm_data', Math.random(), {priority: 'event'})",
+            style="background: linear-gradient(135deg, #3182CE 0%, #2B6CB0 100%); color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer;"
+        ),
+        style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 1.25rem 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 10px;"
+    )
+
+    # --- TAB 1: UPLOAD & VERIFIKASI JADWAL ---
+    tab1_upload = ui.div(
+        ui.div(
+            ui.div(
+                ui.h4("📥 Upload Jadwal Cycle Count Bulanan", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
+                ui.p("Format: Kolom A = Tanggal (1-31), Kolom B = Target BIN (bisa pisah koma), Kolom C = PIC / Note.", style="color: #718096; font-size: 12px; margin: 0;"),
+            ),
+            ui.download_button(
+                "btn_dl_ccm_schedule_template",
+                ui.tags.span(ui.tags.i(class_="fa-solid fa-file-excel", style="margin-right: 6px;"), "DOWNLOAD TEMPLATE JADWAL"),
+                style="background: #10B981; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer;"
+            ),
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 8px;"
+        ),
+        custom_uploader_box("uploader_ccm_schedule", "Pilih File Jadwal (.xlsx / .csv)"),
+        ui.div(
+            ui.tags.button(
+                ui.tags.span(ui.tags.i(class_="fa-solid fa-cloud-arrow-up", style="margin-right: 6px;"), "SIMPAN JADWAL KE SUPABASE"),
+                onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_submit_ccm_schedule', Math.random(), {priority: 'event'})",
+                class_="btn-red-gradient"
+            ),
+            style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+        ),
+        ui.hr(style="margin: 1.5rem 0; border-color: #E2E8F0;"),
+        ui.h4("📊 Status Kelengkapan Upload Jadwal Seluruh Cabang", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 1rem;"),
+        ui.output_ui("ccm_status_cabang_cards_ui"),
+        ui.hr(style="margin: 1.5rem 0; border-color: #E2E8F0;"),
+        ui.h4("📋 Preview Jadwal Cabang Terpilih", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+        ui.output_ui("ccm_schedule_table_ui"),
+        style="padding: 0.5rem 0;"
+    )
+
+    # --- TAB 2: 16 METRIC CARDS SESUAI GAMBAR ---
+    # Helper Card Persegi Putih Border Hitam Persis Screenshot
+    def excel_style_kpi_box(title: str, val_text: str, sub_val_text: str = ""):
+        return ui.div(
+            ui.div(title, style="font-size: 11px; font-weight: 800; color: #1A202C; text-align: center; text-transform: uppercase; margin-bottom: 6px; min-height: 28px; display: flex; align-items: center; justify-content: center;"),
+            ui.div(val_text, style="font-size: 20px; font-weight: 900; color: #1A202C; text-align: center; margin-bottom: 2px;"),
+            ui.div(sub_val_text, style="font-size: 12px; font-weight: 700; color: #718096; text-align: center;") if sub_val_text else ui.div(),
+            style="background: #FFFFFF; border: 2px solid #000000; border-radius: 4px; padding: 1.25rem 1rem; width: 100%; min-height: 115px; display: flex; flex-direction: column; justify-content: center; box-shadow: 2px 2px 0px rgba(0,0,0,0.15);"
+        )
+
+    tab2_dashboard = ui.div(
+        ui.output_ui("ccm_16_metrics_grid_ui"),
+        style="padding: 0.5rem 0;"
+    )
+
+    return ui.div(
+        filter_bar,
+        ui.navset_card_tab(
+            ui.nav_panel("📅 1. UPLOAD JADWAL CYCLE COUNT", tab1_upload),
+            ui.nav_panel("📊 2. MONITORING DASHBOARD (16 KPI)", tab2_dashboard),
+            id="ccm_main_navset"
+        ),
+        style="width: 100%; padding: 1rem;"
+    )
+    
 def menu_item(label: str, target_menu: str, current_menu: str):
     import re
     is_active = (current_menu == target_menu)

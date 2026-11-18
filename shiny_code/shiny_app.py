@@ -199,7 +199,9 @@ def server(input: Inputs, output: Outputs, session: Session):
         "target-progress": "Target Progress",
         "target_progress": "Target Progress",
         "fdr-controller": "FDR Controller",
-        "fdr_controller": "FDR Controller"
+        "fdr_controller": "FDR Controller",
+        "cycle-count-monitoring": "Cycle Count Monitoring",
+        "cycle_count_monitoring": "Cycle Count Monitoring"
     }
 
     # 1. Saat menu diklik di sidebar -> URL di browser otomatis berubah
@@ -1212,6 +1214,9 @@ def server(input: Inputs, output: Outputs, session: Session):
         elif content_type == "refill_shelving": 
             from views import refill_shelving_view
             return refill_shelving_view(state)
+        elif content_type in ["cycle_count_monitoring", "cycle-count-monitoring"]:
+            from views import cycle_count_monitoring_view
+            return cycle_count_monitoring_view(state)
             
         # 🌟 TARGET MENGGUNAKAN 'ELIF' DENGAN PROTEKSI ROLE ADMIN / DC
         elif content_type in ["target_progress", "target-progress"]:
@@ -1486,6 +1491,9 @@ def server(input: Inputs, output: Outputs, session: Session):
             ), style="width: 100%;"
         )
 
+    # ==========================================================================
+    # CYCLE COUNT ANALYZER - STEP 1 EVENT HANDLER
+    # ==========================================================================
     @reactive.Effect
     @reactive.event(input.btn_run_cca_step1)
     def _proc_cca_step1():
@@ -1494,14 +1502,17 @@ def server(input: Inputs, output: Outputs, session: Session):
         brand = input.cca_brand() if "cca_brand" in input else []
         bin_sys = input.cca_bin_sys() if "cca_bin_sys" in input else []
         succ, msg = state.run_cca_step1(f_scan, f_stock, sub, brand, bin_sys)
-        # Menutup tirai loading seketika proses selesai
         ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
-        if succ: 
+        if succ:
+            # ✅ AUTO SAVE STEP 1
+            state.auto_save_cc_step_to_supabase(1, "Compare Scan vs System", {
+                "qty_real_plus": state.cca_qty_real_plus(),
+                "qty_sys_plus": state.cca_qty_sys_plus()
+            })
             state.show_success_modal.set(True)
         else:
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
-
 
     # --- KARTU MANDIRI STEP 2 & 3 (CYCLE COUNT) ---
     @render.ui
@@ -1583,6 +1594,9 @@ def server(input: Inputs, output: Outputs, session: Session):
             )
         return ui.div(ui.tags.button("UPLOAD FILE BIN COVERAGE UNTUK ALOKASI", disabled=True, class_="btn-locked"), style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;")
 
+    # ==========================================================================
+    # CYCLE COUNT ANALYZER - STEP 2 EVENT HANDLER
+    # ==========================================================================
     @reactive.Effect
     @reactive.event(input.btn_run_cca_step2)
     def _proc_cca_step2():
@@ -1590,7 +1604,15 @@ def server(input: Inputs, output: Outputs, session: Session):
         bin_cov = input.cca_bin_cov() if "cca_bin_cov" in input else []
         succ, msg = state.run_cca_step2(f, bin_cov)
         ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
-        if succ: 
+        if succ:
+            # ✅ AUTO SAVE STEP 2 (Menyimpan Qty Miss Location untuk Monitoring Tab 2)
+            qty_miss_step2 = int(state._raw_df_cca_setup_real['QUANTITY'].sum()) if hasattr(state, '_raw_df_cca_setup_real') and not state._raw_df_cca_setup_real.empty and 'QUANTITY' in state._raw_df_cca_setup_real.columns else 0
+            state.auto_save_cc_step_to_supabase(2, "Alokasi BIN Coverage & Recon", {
+                "qty_miss_loc": qty_miss_step2,
+                "total_allocated_rows": len(state.df_cca_alloc_rows()),
+                "rec_real_count": len(state.df_cca_rec_real_rows()),
+                "rec_sys_count": len(state.df_cca_rec_sys_rows())
+            })
             state.show_success_modal.set(True)
         else:
             state.error_modal_message.set(msg)
@@ -1636,7 +1658,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         yield buf.getvalue()
 
 # ==========================================================================
-    # CYCLE COUNT ANALYZER - STEP 4 EVENT HANDLER
+    # CYCLE COUNT ANALYZER - STEP 4 EVENT HANDLER & DOWNLOAD TAB 1 (FIXED)
     # ==========================================================================
     @reactive.Effect
     @reactive.event(input.btn_run_cca_step4)
@@ -1646,11 +1668,25 @@ def server(input: Inputs, output: Outputs, session: Session):
         succ, msg = state.run_cca_step4(f_recon, f_adj)
         ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
         if succ:
+            # ✅ AUTO SAVE STEP 4
+            state.auto_save_cc_step_to_supabase(4, "Recon Real + & Cek Stock Adj", {
+                "qty_need_adj": state.cca_qty_need_adj(),
+                "sku_need_adj": state.cca_sku_need_adj(),
+                "miss_lookup_count": len(state.df_cca_miss4_rows())
+            })
             state.show_success_modal.set(True)
         else:
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
-
+    # 🌟 INI HANDLER DOWNLOAD TAB 1 YANG SEBELUMNYA HILANG:
+    @render.download(filename="Real_Plus_Need_Adj_CCA.xlsx")
+    def btn_dl_cca_step4():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            df = state._raw_df_cca_adj4 if hasattr(state, "_raw_df_cca_adj4") and not state._raw_df_cca_adj4.empty else pd.DataFrame(columns=['BIN', 'SKU', 'ITEM NAME', 'QTY_SCAN', 'QTY_SYSTEM', 'DIFF', 'NEED_ADJ'])
+            df.to_excel(writer, sheet_name='REAL_PLUS_NEED_ADJ', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
     @render.download(filename="Hasil_Cek_Stock_Adj_CCA.xlsx")
     def btn_dl_cca_res4():
         buf = io.BytesIO()
@@ -1666,6 +1702,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             state._raw_df_cca_miss4.to_excel(writer, sheet_name='MISS_LOOKUP_SKU', index=False)
         buf.seek(0)
         yield buf.getvalue()
+
     # ==========================================================================
     # CYCLE COUNT ANALYZER CONTROLLER (STEP 4: RECON REAL + & CEK STOCK ADJ)
     # ==========================================================================
@@ -1811,6 +1848,9 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
         )
 
+    # ==========================================================================
+    # CYCLE COUNT ANALYZER - STEP 5 EVENT HANDLER
+    # ==========================================================================
     @reactive.Effect
     @reactive.event(input.btn_run_cca_step5)
     def _proc_cca_step5():
@@ -1828,7 +1868,13 @@ def server(input: Inputs, output: Outputs, session: Session):
             succ, msg = state.run_cca_step5(f1, f2)
 
         ui.insert_ui(ui.tags.script("window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
-        if succ: state.show_success_modal.set(True)
+        if succ:
+            # ✅ AUTO SAVE STEP 5
+            state.auto_save_cc_step_to_supabase(5, "Recon System + & Karantina", {
+                "qty_karantina": state.cca_qty_karantina(),
+                "sku_karantina": state.cca_sku_karantina()
+            })
+            state.show_success_modal.set(True)
         else:
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
@@ -1885,12 +1931,22 @@ def server(input: Inputs, output: Outputs, session: Session):
             ui.output_ui("cca_master_report_banner_ui")
         )
         
+    # ==========================================================================
+    # CYCLE COUNT ANALYZER - STEP 6 EVENT HANDLER
+    # ==========================================================================
     @reactive.Effect
     @reactive.event(input.btn_run_cca_step6)
     def _proc_cca_step6():
         succ, msg = state.run_cca_step6()
         ui.insert_ui(ui.tags.script("window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
-        if succ: state.show_success_modal.set(True)
+        if succ:
+            # ✅ AUTO SAVE STEP 6 (Full Summary)
+            state.auto_save_cc_step_to_supabase(6, "Miss Location Report", {
+                "sku_miss_loc": state.cca_sku_miss_loc(),
+                "qty_miss_loc": state.cca_qty_miss_loc(),
+                "qty_karantina": state.cca_qty_karantina()
+            })
+            state.show_success_modal.set(True)
         else:
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
@@ -6726,6 +6782,229 @@ def server(input: Inputs, output: Outputs, session: Session):
             state._raw_df_fdr.to_excel(writer, sheet_name='FDR_URGENSI_SBY', index=False)
         buf.seek(0)
         yield buf.getvalue()
+
+    # ==========================================================================
+    # CYCLE COUNT ANALYZER: EVENT DROPDOWN CABANG & TUJUAN BERTINGKAT
+    # ==========================================================================
+    @reactive.Effect
+    @reactive.event(input.change_cca_branch)
+    def _on_change_cca_branch():
+        br = input.change_cca_branch()
+        state.cca_branch_selected.set(br)
+        if br not in ["SURABAYA", "MALANG", ""]:
+            # Tarik unique BIN dari stock_live_cache Supabase
+            state.load_bins_from_stock_cache(br)
+
+    @reactive.Effect
+    @reactive.event(input.change_cca_tujuan)
+    def _on_change_cca_tujuan():
+        val = input.change_cca_tujuan()
+        state.cca_tujuan.set(val)
+
+    @render.ui
+    def cca_dynamic_branch_options_ui():
+        br = state.cca_branch_selected()
+        if not br:
+            return ui.div(
+                ui.p("⚠️ Silakan pilih Cabang di atas terlebih dahulu untuk memunculkan parameter analisis.", 
+                     style="color: #DD6B20; font-weight: bold; font-style: italic; background: #FFFFF0; border: 1px solid #F6E05E; padding: 1rem; border-radius: 8px; text-align: center;")
+            )
+
+        # Jika Surabaya atau Malang -> alur standar tanpa pilihan schedule khusus
+        if br in ["SURABAYA", "MALANG"]:
+            return ui.div(
+                ui.div(
+                    ui.div(ui.input_selectize("cca_sub_kat", "📁 Sub Kategori:", choices=["BAG", "BALL", "SHOES", "PANTS", "JERSEY", "UPPER BODY", "LOWER BODY"], multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
+                    ui.div(ui.input_selectize("cca_brand", "🏷️ Brand:", choices=["MILLS", "ORTUSEIGHT", "SPECS", "PIERO", "VENTELA"], multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
+                    ui.div(ui.output_ui("cca_bin_sys_ui"), style="flex: 1; min-width: 180px;"),
+                    style="display: flex; gap: 1rem; width: 100%; flex-wrap: wrap;"
+                )
+            )
+
+        # Jika cabang selain Surabaya dan Malang -> Munculkan Tujuan (Trial vs On Schedule CC)
+        tujuan_cur = state.cca_tujuan()
+        tujuan_box = ui.div(
+            ui.div(
+                ui.span("🎯 Tujuan Cycle Count:", style="font-weight: 800; color: #2B6CB0; font-size: 12px; margin-bottom: 2px; display: block;"),
+                ui.tags.select(
+                    ui.tags.option("TRIAL / LATIHAN", value="TRIAL / LATIHAN", selected=(tujuan_cur == "TRIAL / LATIHAN")),
+                    ui.tags.option("ON SCHEDULE CC", value="ON SCHEDULE CC", selected=(tujuan_cur == "ON SCHEDULE CC")),
+                    id="cca_tujuan_select_input",
+                    onchange="Shiny.setInputValue('change_cca_tujuan', this.value, {priority: 'event'})",
+                    style="padding: 8px 12px; border-radius: 6px; border: 2px solid #3182CE; font-weight: 800; font-size: 13px; background: white; cursor: pointer; width: 100%;"
+                ),
+                style="margin-bottom: 1rem;"
+            )
+        )
+
+        schedule_bin_selector = ui.div()
+        if tujuan_cur == "ON SCHEDULE CC":
+            bins_from_db = state.cca_available_bins_from_db()
+            schedule_bin_selector = ui.div(
+                ui.span(f"🏭 Pilih BIN Yang Akan Di-Cycle Count (Ditarik dari stock_live_cache Kolom B - {len(bins_from_db)} BIN ditemukan):", 
+                        style="font-weight: 800; color: #10B981; font-size: 12px; margin-bottom: 4px; display: block;"),
+                ui.input_selectize(
+                    "cca_target_bins_select", None, 
+                    choices=bins_from_db, 
+                    multiple=True, 
+                    width="100%"
+                ),
+                style="background: #F0FDF4; border: 1.5px dashed #86EFAC; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;"
+            )
+
+        filter_sub_brand = ui.div(
+            ui.div(ui.input_selectize("cca_sub_kat", "📁 Sub Kategori:", choices=["BAG", "BALL", "SHOES", "PANTS", "JERSEY", "UPPER BODY", "LOWER BODY"], multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
+            ui.div(ui.input_selectize("cca_brand", "🏷️ Brand:", choices=["MILLS", "ORTUSEIGHT", "SPECS", "PIERO", "VENTELA"], multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
+            style="display: flex; gap: 1rem; width: 100%; flex-wrap: wrap;"
+        )
+
+        return ui.div(
+            tujuan_box,
+            schedule_bin_selector,
+            filter_sub_brand
+        )
+
+    # Sinkronisasi BIN Terpilih
+    @reactive.Effect
+    def _on_cca_target_bins_change():
+        if "cca_target_bins_select" in input and input.cca_target_bins_select() is not None:
+            state.cca_target_bins_schedule.set(list(input.cca_target_bins_select()))
+
+    # ==========================================================================
+    # CYCLE COUNT MONITORING: CONTROLLER & EVENT LISTENERS
+    # ==========================================================================
+    @reactive.Effect
+    @reactive.event(input.change_ccm_branch)
+    def _on_ccm_br_chg():
+        state.ccm_branch.set(input.change_ccm_branch())
+        state.load_cycle_count_monitoring_data()
+
+    @reactive.Effect
+    @reactive.event(input.change_ccm_month)
+    def _on_ccm_mo_chg():
+        state.ccm_month.set(input.change_ccm_month())
+        state.load_cycle_count_monitoring_data()
+
+    @reactive.Effect
+    @reactive.event(input.change_ccm_year)
+    def _on_ccm_yr_chg():
+        state.ccm_year.set(input.change_ccm_year())
+        state.load_cycle_count_monitoring_data()
+
+    @reactive.Effect
+    @reactive.event(input.btn_refresh_ccm_data)
+    def _on_ccm_refresh():
+        succ, msg = state.load_cycle_count_monitoring_data()
+        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+        if succ:
+            ui.notification_show(f"✅ {msg}", type="message", duration=3)
+        else:
+            ui.notification_show(f"⚠️ {msg}", type="warning", duration=4)
+
+    @reactive.Effect
+    @reactive.event(input.btn_submit_ccm_schedule)
+    def _on_ccm_upload_schedule():
+        f = input.uploader_ccm_schedule() if "uploader_ccm_schedule" in input else None
+        succ, msg = state.upload_cycle_count_schedule(f, state.ccm_branch(), state.ccm_month(), state.ccm_year())
+        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+        if succ:
+            state.show_success_modal.set(True)
+            ui.notification_show(msg, type="message", duration=4)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+
+    # Status Cabang Upload Jadwal
+    @render.ui
+    def ccm_status_cabang_cards_ui():
+        stat_map = state.ccm_branches_status()
+        cards = []
+        for br, is_up in stat_map.items():
+            badge = ui.span("✅ SUDAH UPLOAD", style="background: #C6F6D5; color: #22543D; font-weight: 800; font-size: 11px; padding: 4px 8px; border-radius: 4px;") if is_up else ui.span("❌ BELUM UPLOAD", style="background: #FED7D7; color: #9B2C2C; font-weight: 800; font-size: 11px; padding: 4px 8px; border-radius: 4px;")
+            cards.append(
+                ui.div(
+                    ui.strong(br, style="font-size: 13px; color: #1A202C; display: block; margin-bottom: 4px;"),
+                    badge,
+                    style="flex: 1; min-width: 170px; background: #F8FAFC; border: 1.5px solid #CBD5E0; border-radius: 8px; padding: 12px; text-align: center;"
+                )
+            )
+        return ui.div(*cards, style="display: flex; gap: 10px; flex-wrap: wrap;")
+
+    # Preview Tabel Jadwal
+    @render.ui
+    def ccm_schedule_table_ui():
+        items = state.ccm_schedule_data()
+        if not items:
+            return ui.p("Belum ada jadwal yang diunggah untuk cabang dan periode ini.", style="color: #718096; font-style: italic; text-align: center; padding: 1.5rem;")
+
+        rows = [[str(it.get("tanggal", "-")), str(it.get("target_bin", "-")), str(it.get("note", "-"))] for it in items]
+        return render_clean_table(["TANGGAL", "TARGET BIN", "NOTE / KETERANGAN"], rows, "tbl_ccm_sched")
+
+    # Template Download Jadwal
+    @render.download(filename="TEMPLATE_JADWAL_CYCLE_COUNT.xlsx")
+    def btn_dl_ccm_schedule_template():
+        buf = io.BytesIO()
+        df_tpl = pd.DataFrame({
+            "TANGGAL": [str(d) for d in range(1, 32)],
+            "TARGET_BIN": ["GL1-A, GL1-B" if d % 2 == 0 else "DISPLAY" for d in range(1, 32)],
+            "NOTE": ["Cycle Count Reguler" for _ in range(31)]
+        })
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            df_tpl.to_excel(writer, sheet_name='TEMPLATE_JADWAL', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    # ==========================================================================
+    # RENDER 16 KPI METRICS (PERSIS 4 BARIS x 4 KOTAK SESUAI SCREENSHOT EXCEL)
+    # ==========================================================================
+    @render.ui
+    def ccm_16_metrics_grid_ui():
+        def box(title, val_str, sub_str=""):
+            return ui.div(
+                ui.div(title, style="font-size: 11.5px; font-weight: 800; color: #1A202C; text-align: center; text-transform: uppercase; margin-bottom: 6px; min-height: 28px; display: flex; align-items: center; justify-content: center;"),
+                ui.div(val_str, style="font-size: 21px; font-weight: 900; color: #1A202C; text-align: center;"),
+                ui.div(sub_str, style="font-size: 11.5px; font-weight: 700; color: #718096; text-align: center; margin-top: 2px;") if sub_str else ui.div(),
+                style="background: #FFFFFF; border: 2px solid #000000; border-radius: 4px; padding: 1rem 0.75rem; width: 100%; min-height: 110px; display: flex; flex-direction: column; justify-content: center; box-shadow: 2px 2px 0px rgba(0,0,0,0.12);"
+            )
+
+        # Baris 1: Progress & Match Plan
+        row1 = ui.div(
+            box("TOTAL BIN DONE CYCLE COUNT", f"{state.ccm_m_bin_done():,} BIN"),
+            box("TOTAL BIN NOT CYCLE COUNT YET", f"{state.ccm_m_bin_not_yet():,} BIN"),
+            box("%PROGRESS CYCLE COUNT", f"{state.ccm_m_prog_cc():.1f}%"),
+            box("%MATCH PLAN Vs ACTION", f"{state.ccm_m_match_plan():.1f}%"),
+            style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; width: 100%; margin-bottom: 1rem;"
+        )
+
+        # Baris 2: Unmatch, Blank, Miss Location & Accuracy
+        row2 = ui.div(
+            box("%UNMATCH PLAN Vs ACTION", f"{state.ccm_m_unmatch_plan():.1f}%"),
+            box("%BLANK", f"{state.ccm_m_blank():.1f}%"),
+            box("TOTAL MISS LOCATION", f"{state.ccm_m_total_miss_loc():,} PCS"),
+            box("%ACCURACY to TOTAL STOCK", f"{state.ccm_m_accuracy_stock():.2f}%"),
+            style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; width: 100%; margin-bottom: 1rem;"
+        )
+
+        # Baris 3: Adjustment Values (+, -, ABS, SUB)
+        sub_sign = "+" if state.ccm_m_adj_sub_val() > 0 else ""
+        row3 = ui.div(
+            box("TOTAL QTY & VALUE ADJ. +", f"{state.ccm_m_adj_plus_qty():,} PCS", f"Rp {state.ccm_m_adj_plus_val():,}"),
+            box("TOTAL QTY & VALUE ADJ. -", f"-{state.ccm_m_adj_minus_qty():,} PCS", f"-Rp {state.ccm_m_adj_minus_val():,}"),
+            box("TOTAL QTY & VALUE ADJ. (ABS)", f"Rp {state.ccm_m_adj_abs_val():,}"),
+            box("TOTAL QTY & VALUE ADJ. (SUB)", f"{sub_sign}Rp {state.ccm_m_adj_sub_val():,}"),
+            style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; width: 100%; margin-bottom: 1rem;"
+        )
+
+        # Baris 4: Net Sales & BTSB
+        row4 = ui.div(
+            box("NET SALES", f"Rp {state.ccm_m_net_sales():,}"),
+            box("BTSB", f"Rp {state.ccm_m_btsb():,.2f}"),
+            box("%BTSB (ABS)", f"{state.ccm_m_btsb_abs_pct():.2f}%"),
+            box("%BTSB (SUB)", f"{state.ccm_m_btsb_sub_pct():.2f}%"),
+            style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; width: 100%; margin-bottom: 1rem;"
+        )
+
+        return ui.div(row1, row2, row3, row4, style="width: 100%;")
 
 from pathlib import Path
 
