@@ -6688,17 +6688,26 @@ def server(input: Inputs, output: Outputs, session: Session):
     @reactive.event(input.btn_open_cca_overview_modal)
     def _open_cca_overview():
         from views import render_executive_overview_modal
+        
+        # ✅ Ambil Qty Miss Location Murni dari Setup Real+ (Rak ke Rak)
+        if hasattr(state, '_raw_df_cca_setup_real') and not state._raw_df_cca_setup_real.empty and 'QUANTITY' in state._raw_df_cca_setup_real.columns:
+            q_miss = int(state._raw_df_cca_setup_real['QUANTITY'].sum())
+            sku_miss = state._raw_df_cca_setup_real['SKU'].nunique()
+        else:
+            q_miss = state.cca_qty_miss_loc()
+            sku_miss = state.cca_sku_miss_loc()
+
         data_m = {
             "q_real_init": state.cca_qty_real_plus(),
             "q_sys_init": state.cca_qty_sys_plus(),
-            "q_miss_loc": state.cca_qty_miss_loc(),
-            "sku_miss_loc": state.cca_sku_miss_loc(),
+            "q_miss_loc": q_miss,                   # <-- Murni Rak ke Rak
+            "sku_miss_loc": sku_miss,               # <-- Murni SKU Rak ke Rak
             "q_need_adj": state.cca_qty_need_adj(),
             "sku_need_adj": state.cca_sku_need_adj(),
             "q_karantina": state.cca_qty_karantina(),
             "sku_karantina": state.cca_sku_karantina(),
         }
-        modal_content = render_executive_overview_modal("Cycle Count", "SURABAYA", data_m)
+        modal_content = render_executive_overview_modal("Cycle Count", state.cca_branch_selected() or "SURABAYA", data_m)
         ui.modal_show(ui.modal(
             modal_content,
             title=ui.div(ui.tags.i(class_="fa-solid fa-chart-line", style="color: #C5A059; margin-right: 8px;"), "Executive Summary: Cycle Count Analyzer"),
@@ -6706,7 +6715,6 @@ def server(input: Inputs, output: Outputs, session: Session):
             easy_close=True,
             footer=ui.modal_button("Tutup", class_="btn-red-gradient")
         ))
-
     @reactive.Effect
     @reactive.event(input.btn_open_so_overview_modal)
     def _open_so_overview():

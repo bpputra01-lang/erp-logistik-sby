@@ -2410,7 +2410,7 @@ class AppState:
         try:
             columns_ref = ["BIN SYSTEM (AWAL)", "BIN REAL (TUJUAN)", "SKU", "ITEM NAME", "QTY MISS LOC.", "NOTES"]
 
-            # 1. Miss Location dari Alokasi Rak ke Rak (Step 2 Setup Real +)
+            # 1. Miss Location MURNI dari Alokasi Rak ke Rak (Step 2 Setup Real +)
             if self._raw_df_cca_setup_real.empty or len(self._raw_df_cca_setup_real) == 0:
                 df_out = pd.DataFrame(columns=columns_ref)
                 count_sku_rak = 0
@@ -2432,31 +2432,31 @@ class AppState:
                 count_sku_rak = df_out["SKU"].nunique()
                 count_qty_rak = int(df_out["QTY MISS LOC."].sum())
 
-            # 2. Miss Location ke Karantina (Step 5)
+            # 2. Mutasi ke Karantina (Step 5 - Notes: NOT FOUND)
             df_karan = self._raw_df_cca_karantina.copy() if not self._raw_df_cca_karantina.empty else pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'ITEM NAME', 'QUANTITY', 'NOTES'])
             count_qty_karan = int(df_karan["QUANTITY"].sum()) if not df_karan.empty and 'QUANTITY' in df_karan.columns else 0
 
-            # 3. Summary Gabungan
-            total_unique_skus = len(set(df_out['SKU'].dropna().unique()) | set(df_karan['SKU'].dropna().unique()))
-            total_qty_miss_all = count_qty_rak + count_qty_karan
+            # 3. Summary Rekapitulasi
+            total_qty_all = count_qty_rak + count_qty_karan
 
             df_sum = pd.DataFrame({
                 "METRIC": [
-                    "Total SKU Miss Location (Semua)",
+                    "Total SKU Miss Location (Rak ke Rak)",
                     "Total QTY Miss Location (Rak ke Rak)",
-                    "Total QTY Miss Location (ke Karantina)",
-                    "Grand Total QTY Miss Location"
+                    "Total QTY Mutasi Karantina",
+                    "Grand Total QTY Case"
                 ],
                 "VALUE": [
-                    total_unique_skus,
+                    count_sku_rak,
                     count_qty_rak,
                     count_qty_karan,
-                    total_qty_miss_all
+                    total_qty_all
                 ]
             })
 
-            self.cca_sku_miss_loc.set(total_unique_skus)
-            self.cca_qty_miss_loc.set(total_qty_miss_all)
+            # ✅ PERBAIKAN: Set variabel Miss Location MURNI HANYA dari data Rak ke Rak!
+            self.cca_sku_miss_loc.set(count_sku_rak)
+            self.cca_qty_miss_loc.set(count_qty_rak)
 
             self._raw_df_cca_miss_loc = df_out.copy()
             self._raw_df_cca_sum_miss = df_sum.copy()
@@ -2467,9 +2467,7 @@ class AppState:
             self.df_cca_sum_miss_rows.set(df_sum.fillna("").astype(str).values.tolist())
 
             self.cca_step6_done.set(True)
-            # Tambahkan baris ini:
             self.update_cca_master_file("Step 6 (Miss Location Full)")
-            self.cca_step6_done.set(True)
             return True, "Miss Location Report Berhasil Dibuat!"
         except Exception as e:
             return False, f"Gagal Step 6: {e}"
