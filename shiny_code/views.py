@@ -3222,7 +3222,7 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
                 style="background: #161920; padding: 1rem 1.25rem; border-radius: 10px; border-left: 4px solid #10B981; border-top: 1px solid #2D3748; border-right: 1px solid #2D3748; border-bottom: 1px solid #2D3748;"
             ),
 
-            # Card 3: Real + Need Adjustment
+            # Card 3: Real + Need Adjustment (SUDAH DIPERBAIKI TANDA PETIKNYA)
             ui.div(
                 ui.div(
                     ui.span("3. REAL + NEED ADJUSTMENT", style="font-size: 11px; font-weight: 800; color: #A0AEC0; letter-spacing: 0.5px;"),
@@ -3230,7 +3230,7 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
                     style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;"
                 ),
                 ui.span(f"{q_need_adj:,} PCS", style="color: #F59E0B; font-size: 24px; font-weight: 900; display: block; line-height: 1.1;"),
-                ui.span(f"🏷️ Sebanyak {sku_need_adj:,} SKU • Perlu Adjustment, style="color: #718096; font-size: 11.5px; margin-top: 4px; display: block;"),
+                ui.span(f"🏷️ Sebanyak {sku_need_adj:,} SKU • Perlu Adjustment", style="color: #718096; font-size: 11.5px; margin-top: 4px; display: block;"),
                 style="background: #161920; padding: 1rem 1.25rem; border-radius: 10px; border-left: 4px solid #F59E0B; border-top: 1px solid #2D3748; border-right: 1px solid #2D3748; border-bottom: 1px solid #2D3748;"
             ),
 
@@ -3252,7 +3252,7 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
         ui.div(
             ui.div(
                 ui.h4("📊 Distribusi Chart Bar Case to Case", style="font-size: 14px; font-weight: 800; color: #FFFFFF; margin: 0 0 6px 0;"),
-                ui.p("Proprosi Case to Case Dalam Proses Cycle Count.", style="color: #A0AEC0; font-size: 12px; margin: 0;"),
+                ui.p("Proporsi Case to Case Dalam Proses Cycle Count.", style="color: #A0AEC0; font-size: 12px; margin: 0;"),
             ),
             # Visual Multi-Color Stacked Bar
             ui.div(
@@ -3293,16 +3293,16 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
                 ui.strong("Insight Cycle Count Result:", style="color: #C5A059; font-size: 13px;"),
                 style="display: flex; align-items: center; margin-bottom: 6px;"
             ),
+            # Teks di bawah sudah diganti menjadi hitam (#000000)
             ui.p(
                 f"Dari total case selisih sebanyak {tot_resolusi:,} pcs, sebesar {pct_miss:.1f}% merupakan kesalahan penempatan barang (Miss Location) yang dapat diselesaikan melalui mutasi antar BIN tanpa proses adjustment. Total barang dimutasi ke karantina sebesar {pct_karan:.1f}%, dan Item Real + sebesar {pct_adj:.1f}%.",
-                style="color: #CBD5E0; font-size: 12.5px; line-height: 1.5; margin: 0;"
+                style="color: #000000; font-size: 12.5px; line-height: 1.5; margin: 0;"
             ),
             style="background: rgba(197, 160, 89, 0.08); border-left: 4px solid #C5A059; border-top: 1px solid rgba(197, 160, 89, 0.2); border-right: 1px solid rgba(197, 160, 89, 0.2); border-bottom: 1px solid rgba(197, 160, 89, 0.2); padding: 1rem 1.25rem; border-radius: 8px;"
         ),
         style="padding: 0.5rem 0; width: 100%;"
     )
-
-
+    
 
     # ==============================================================================
 # VIEW: FDR CONTROLLER (URGENSI MANIFEST TIME SURABAYA)
