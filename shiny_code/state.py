@@ -154,6 +154,8 @@ class AppState:
         self.cca_qty_real_plus = reactive.Value(0)
         self.cca_qty_sys_plus = reactive.Value(0)
 
+        self._cca_scanned_bins = []
+
         self.df_cca_scan_headers = reactive.Value([])
         self.df_cca_scan_rows = reactive.Value([])
         self.df_cca_stock_headers = reactive.Value([])
@@ -1847,6 +1849,8 @@ class AppState:
             ds = pd.DataFrame({'BIN': b_scan, 'SKU': s_scan, 'QTY_SCAN': q_scan})
             ds = ds[(ds['SKU'] != '') & (ds['SKU'] != 'NAN') & (ds['BIN'] != '')]
             ds_grouped = ds.groupby(['BIN', 'SKU'], as_index=False)['QTY_SCAN'].sum()
+
+            self._cca_scanned_bins = sorted(list(ds['BIN'].dropna().unique()))
 
             # 2. Bersihkan Kolom Overlap (JANGAN HAPUS 'ITEM NAME' LAGI!)
             dt = df_t_raw.copy()
@@ -8501,20 +8505,29 @@ class AppState:
             return []
 
     def auto_save_cc_step_to_supabase(self, step_no: int, step_title: str, summary_data: dict):
-        """Menyimpan progress eksekusi Cycle Count On-Schedule ke Supabase"""
-        if self.cca_tujuan() != "ON SCHEDULE CC":
+        """Menyimpan progress eksekusi Cycle Count ke Supabase secara otomatis"""
+        br = self.cca_branch_selected().upper()
+        if br not in ["SURABAYA", "MALANG"] and self.cca_tujuan() != "ON SCHEDULE CC":
             return  # Jika Trial / Latihan, skip penyimpanan database
 
         try:
             client = get_supabase()
             if not client:
                 return
-            
+
+            # 🌟 OTOMATIS GABUNGKAN: Ambil BIN fisik dari Data Scan + BIN dari Dropdown
+            # Walaupun dropdown kurang (cuma A & B), BIN C di file data scan tetap otomatis masuk!
+            scanned_bins = getattr(self, "_cca_scanned_bins", [])
+            dropdown_bins = list(self.cca_target_bins_schedule())
+
+            # Union semua BIN yang ada
+            all_completed_bins = sorted(list(set(scanned_bins) | set(dropdown_bins)))
+
             payload = {
                 "branch": self.cca_branch_selected(),
                 "step_no": step_no,
                 "step_title": step_title,
-                "target_bins": list(self.cca_target_bins_schedule()),
+                "target_bins": all_completed_bins,  # <-- Otomatis memuat A, B, dan C
                 "summary": summary_data,
                 "created_at": datetime.now(WIB).isoformat()
             }
@@ -8817,7 +8830,7 @@ class AppState:
                     total_miss_location_qty += safe_int(summary.get("qty_miss_loc", 0))
 
             # ------------------------------------------------------------------
-            # 4. Evaluasi Per-Slot BIN: MATCH, UNMATCH, & BLANK (Poin 1)
+            # Evaluasi Per-Slot BIN: MATCH (Tepat Waktu & Lebih Awal), UNMATCH, & BLANK
             # ------------------------------------------------------------------
             match_list = []
             unmatch_list = []
@@ -8825,24 +8838,34 @@ class AppState:
 
             for p in planned_items:
                 b = p["bin"]
-                p_date = p["tanggal"]
+                p_date = p["tanggal"]  # Tanggal jadwal / deadline
 
-                # A. Match: Dikerjakan tepat pada tanggal jadwal
-                if (b, p_date) in executed_bin_date_pairs:
-                    match_list.append(b)
-                # B. Unmatch: Sudah dikerjakan, tetapi tanggal eksekusinya bergeser dari jadwal
-                elif b in all_executed_bins:
-                    act_dates = ", ".join(bin_to_exec_dates.get(b, []))
-                    unmatch_list.append(f"{b} (Jadwal: {p_date}, Realisasi: {act_dates})")
-                # C. Blank: Belum pernah dikerjakan sama sekali
-                else:
+                exec_dates = bin_to_exec_dates.get(b, [])
+
+                if not exec_dates:
+                    # Belum pernah dikerjakan sama sekali -> BLANK
                     blank_list.append(b)
+                else:
+                    earliest_exec = min(exec_dates)
+
+                    # 🌟 KONDISI 1: Dikerjakan tepat waktu ATAU LEBIH AWAL dari jadwal (Early Finish)
+                    # Misal jadwal tgl 11 Nov tapi sudah dikerjakan tgl 10 Nov (earliest_exec <= p_date)
+                    # Di tanggal 11 Nov tetap MATCH, TIDAK AKAN masuk Unmatch ataupun Blank!
+                    if any(d <= p_date for d in exec_dates):
+                        if earliest_exec < p_date:
+                            match_list.append(f"{b} (Jadwal: {p_date}, Selesai Lebih Awal: {earliest_exec})")
+                        else:
+                            match_list.append(b)
+                    
+                    # 🌟 KONDISI 2: Dikerjakan TERLAMBAT (Lewat dari tanggal jadwal)
+                    else:
+                        act_dates_str = ", ".join(exec_dates)
+                        unmatch_list.append(f"{b} (Jadwal: {p_date}, Terlambat Realisasi: {act_dates_str})")
 
             count_match = len(match_list)
             count_unmatch = len(unmatch_list)
             count_blank = len(blank_list)
 
-            # Total BIN selesai = Match + Unmatch
             bin_done_count = count_match + count_unmatch
             bin_not_yet_count = count_blank
 
@@ -8854,7 +8877,6 @@ class AppState:
             else:
                 pct_prog, pct_match, pct_unmatch, pct_blank = 0.0, 0.0, 0.0, 100.0
 
-            # Simpan rincian untuk panel penjelasan di Tab 2
             self.ccm_match_bins_list.set(match_list)
             self.ccm_unmatch_bins_list.set(unmatch_list)
             self.ccm_blank_bins_list.set(blank_list)
