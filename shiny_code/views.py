@@ -3189,20 +3189,20 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
             # Card 1: Selisih Awal
             ui.div(
                 ui.div(
-                    ui.span("1. SELISIH AWAL (STEP 1)", style="font-size: 11px; font-weight: 800; color: #A0AEC0; letter-spacing: 0.5px;"),
+                    ui.span("1. SELISIH AWAL", style="font-size: 11px; font-weight: 800; color: #A0AEC0; letter-spacing: 0.5px;"),
                     ui.tags.i(class_="fa-solid fa-arrows-split-up-and-left", style="color: #38BDF8; font-size: 16px;"),
                     style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;"
                 ),
                 ui.div(
                     ui.div(
                         ui.span(f"{q_real_init:,}", style="color: #C5A059; font-size: 22px; font-weight: 900; display: block; line-height: 1.1;"),
-                        ui.span("Real + (Fisik Lebih)", style="color: #718096; font-size: 11px; font-weight: 600;"),
+                        ui.span("Total Real +", style="color: #718096; font-size: 11px; font-weight: 600;"),
                         style="flex: 1;"
                     ),
                     ui.div(style="width: 1px; height: 32px; background: #2D3748; margin: 0 10px;"),
                     ui.div(
                         ui.span(f"{q_sys_init:,}", style="color: #E53E3E; font-size: 22px; font-weight: 900; display: block; line-height: 1.1;"),
-                        ui.span("System + (Sistem Lebih)", style="color: #718096; font-size: 11px; font-weight: 600;"),
+                        ui.span("Total System +", style="color: #718096; font-size: 11px; font-weight: 600;"),
                         style="flex: 1;"
                     ),
                     style="display: flex; align-items: center;"
@@ -3213,24 +3213,24 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
             # Card 2: Miss Lokasi Antar BIN
             ui.div(
                 ui.div(
-                    ui.span("2. MISS LOKASI RAK KE RAK", style="font-size: 11px; font-weight: 800; color: #A0AEC0; letter-spacing: 0.5px;"),
+                    ui.span("2. MISS LOCATION", style="font-size: 11px; font-weight: 800; color: #A0AEC0; letter-spacing: 0.5px;"),
                     ui.tags.i(class_="fa-solid fa-people-carry-box", style="color: #10B981; font-size: 16px;"),
                     style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;"
                 ),
                 ui.span(f"{q_miss_loc:,} PCS", style="color: #10B981; font-size: 24px; font-weight: 900; display: block; line-height: 1.1;"),
-                ui.span(f"📦 Tersebar di {sku_miss_loc:,} SKU • Terselesaikan tanpa adjustment", style="color: #718096; font-size: 11.5px; margin-top: 4px; display: block;"),
+                ui.span(f"📦 Total {sku_miss_loc:,} SKU • Terselesaikan tanpa adjustment", style="color: #718096; font-size: 11.5px; margin-top: 4px; display: block;"),
                 style="background: #161920; padding: 1rem 1.25rem; border-radius: 10px; border-left: 4px solid #10B981; border-top: 1px solid #2D3748; border-right: 1px solid #2D3748; border-bottom: 1px solid #2D3748;"
             ),
 
             # Card 3: Real + Need Adjustment
             ui.div(
                 ui.div(
-                    ui.span("3. REAL + NEED ADJ (+)", style="font-size: 11px; font-weight: 800; color: #A0AEC0; letter-spacing: 0.5px;"),
+                    ui.span("3. REAL + NEED ADJUSTMENT", style="font-size: 11px; font-weight: 800; color: #A0AEC0; letter-spacing: 0.5px;"),
                     ui.tags.i(class_="fa-solid fa-circle-plus", style="color: #F59E0B; font-size: 16px;"),
                     style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;"
                 ),
                 ui.span(f"{q_need_adj:,} PCS", style="color: #F59E0B; font-size: 24px; font-weight: 900; display: block; line-height: 1.1;"),
-                ui.span(f"🏷️ Sebanyak {sku_need_adj:,} SKU • Fisik lebih murni wajib di-adj (+)", style="color: #718096; font-size: 11.5px; margin-top: 4px; display: block;"),
+                ui.span(f"🏷️ Sebanyak {sku_need_adj:,} SKU • Perlu Adjustment, style="color: #718096; font-size: 11.5px; margin-top: 4px; display: block;"),
                 style="background: #161920; padding: 1rem 1.25rem; border-radius: 10px; border-left: 4px solid #F59E0B; border-top: 1px solid #2D3748; border-right: 1px solid #2D3748; border-bottom: 1px solid #2D3748;"
             ),
 
@@ -3242,7 +3242,7 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
                     style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;"
                 ),
                 ui.span(f"{q_karantina:,} PCS", style="color: #EF4444; font-size: 24px; font-weight: 900; display: block; line-height: 1.1;"),
-                ui.span(f"☣️ Sebanyak {sku_karantina:,} SKU • Sistem tidak ada fisik (Not Found)", style="color: #718096; font-size: 11.5px; margin-top: 4px; display: block;"),
+                ui.span(f"☣️ Sebanyak {sku_karantina:,} SKU • Real (Not Found)", style="color: #718096; font-size: 11.5px; margin-top: 4px; display: block;"),
                 style="background: #161920; padding: 1rem 1.25rem; border-radius: 10px; border-left: 4px solid #EF4444; border-top: 1px solid #2D3748; border-right: 1px solid #2D3748; border-bottom: 1px solid #2D3748;"
             ),
             style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.5rem;"
@@ -3251,8 +3251,8 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
         # --- VISUAL BREAKDOWN & PROPORTION BAR ---
         ui.div(
             ui.div(
-                ui.h4("📊 Distribusi Resolusi Selisih Audit Fisik", style="font-size: 14px; font-weight: 800; color: #FFFFFF; margin: 0 0 6px 0;"),
-                ui.p("Proporsi bagaimana selisih fisik diuraikan: Ditata ulang antar rak, diamankan ke karantina, atau diajukan penyesuaian stok baru.", style="color: #A0AEC0; font-size: 12px; margin: 0;"),
+                ui.h4("📊 Distribusi Chart Bar Case to Case", style="font-size: 14px; font-weight: 800; color: #FFFFFF; margin: 0 0 6px 0;"),
+                ui.p("Proprosi Case to Case Dalam Proses Cycle Count.", style="color: #A0AEC0; font-size: 12px; margin: 0;"),
             ),
             # Visual Multi-Color Stacked Bar
             ui.div(
@@ -3290,11 +3290,11 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
         ui.div(
             ui.div(
                 ui.tags.i(class_="fa-solid fa-lightbulb", style="color: #C5A059; font-size: 18px; margin-right: 10px;"),
-                ui.strong("Insight Manajerial Gudang:", style="color: #C5A059; font-size: 13px;"),
+                ui.strong("Insight Cycle Count Result:", style="color: #C5A059; font-size: 13px;"),
                 style="display: flex; align-items: center; margin-bottom: 6px;"
             ),
             ui.p(
-                f"Dari total resolusi selisih sebanyak {tot_resolusi:,} pcs, sebesar {pct_miss:.1f}% merupakan kesalahan penempatan barang (Miss Location) yang dapat diselesaikan murni melalui mutasi rak tanpa perlu koreksi finansial adjustment. Barang hilang ke karantina sebesar {pct_karan:.1f}%, dan temuan fisik lebih sebesar {pct_adj:.1f}%.",
+                f"Dari total case selisih sebanyak {tot_resolusi:,} pcs, sebesar {pct_miss:.1f}% merupakan kesalahan penempatan barang (Miss Location) yang dapat diselesaikan melalui mutasi antar BIN tanpa proses adjustment. Total barang dimutasi ke karantina sebesar {pct_karan:.1f}%, dan Item Real + sebesar {pct_adj:.1f}%.",
                 style="color: #CBD5E0; font-size: 12.5px; line-height: 1.5; margin: 0;"
             ),
             style="background: rgba(197, 160, 89, 0.08); border-left: 4px solid #C5A059; border-top: 1px solid rgba(197, 160, 89, 0.2); border-right: 1px solid rgba(197, 160, 89, 0.2); border-bottom: 1px solid rgba(197, 160, 89, 0.2); padding: 1rem 1.25rem; border-radius: 8px;"
