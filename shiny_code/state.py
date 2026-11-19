@@ -2355,7 +2355,7 @@ class AppState:
                             # HILANGKAN 'ITEM NAME' DI SINI (MURNI 5 KOLOM)
                             karantina_results.append({
                                 "BIN AWAL": bin_val, "BIN TUJUAN": "KARANTINA", "SKU": sku_val,
-                                "QUANTITY": int(diff), "NOTES": "MISS LOCATION"
+                                "QUANTITY": int(diff), "NOTES": "NOT FOUND"
                             })
             else:
                 # 2. Mode Single File
@@ -2380,7 +2380,7 @@ class AppState:
                                 # HILANGKAN 'ITEM NAME' DI SINI (MURNI 5 KOLOM)
                                 karantina_results.append({
                                     "BIN AWAL": bin_val, "BIN TUJUAN": "KARANTINA", "SKU": sku_val,
-                                    "QUANTITY": int(abs(diff)), "NOTES": "MISS LOCATION"
+                                    "QUANTITY": int(abs(diff)), "NOTES": "NOT FOUND"
                                 })
                     except: continue
 
