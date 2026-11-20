@@ -3674,7 +3674,10 @@ def sidebar(state: AppState):
     )
 
 def login_page():
-    bg_img = get_image_base64("login_bg.png")
+    # URL CDN gambar gudang yang Anda lampirkan (High Resolution & Cepat)
+    bg_img = "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070" 
+    # ATAU jika sudah Anda upload ke imgur/postimages/supabase storage, paste URL-nya di atas.
+
     return ui.div(
         ui.div(
             ui.div(
@@ -3698,8 +3701,7 @@ def login_page():
             ),
             style="width: 100%; max-width: 520px; padding: 3rem 2.5rem; background: rgba(12, 12, 15, 0.88); backdrop-filter: blur(20px); border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.12); border-left: 5px solid #E50914; box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85);"
         ),
-        # Menggunakan background gambar yang dilampirkan
-        style=f"background-image: radial-gradient(circle at center, rgba(0, 0, 0, 0.2) 0%, rgba(0, 0, 0, 0.6) 100%), url('{bg_img}'); background-size: cover; background-position: center; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem;"
+        style=f"background-image: radial-gradient(circle at center, rgba(0, 0, 0, 0.25) 0%, rgba(0, 0, 0, 0.65) 100%), url('{bg_img}'); background-size: cover; background-position: center; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem;"
     )
 
 def global_header(state: AppState):
