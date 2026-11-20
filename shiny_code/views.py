@@ -3678,51 +3678,34 @@ def login_page():
 
     return ui.div(
         # ======================================================================
-        # SISI KIRI: SHOWCASE GAMBAR DENGAN DEGRADASI HALUS KE KANAN
+        # SISI KIRI: SHOWCASE GAMBAR (BERSIH DARI TULISAN PT DI ATAS)
         # ======================================================================
         ui.div(
-            # Overlay Konten di Atas Gambar (Teks Branding & Badges)
+            # Overlay Konten di Atas Gambar (Teks Tagline & Badges di Kiri Bawah)
             ui.div(
-                # Header Brand Kiri Atas
                 ui.div(
                     ui.div(
-                        ui.tags.i(class_="fa-solid fa-boxes-stacked", style="color: #FFFFFF; font-size: 20px;"),
-                        style="width: 44px; height: 44px; background: linear-gradient(135deg, #E50914 0%, #B20710 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(229, 9, 20, 0.4); margin-right: 12px;"
-                    ),
-                    ui.div(
-                        ui.h4("PT ZONA KARYA NUSANTARA", style="color: #FFFFFF; font-weight: 900; font-size: 15px; margin: 0; letter-spacing: 1px;"),
-                        ui.span("LOGISTIC DISTRIBUTION CENTER", style="color: #E50914; font-weight: 800; font-size: 10.5px; letter-spacing: 2px;"),
-                        style="display: flex; flex-direction: column;"
-                    ),
-                    style="display: flex; align-items: center; margin-bottom: auto;"
-                ),
-
-                # Teks Tagline & Fitur di Sisi Kiri Bawah
-                ui.div(
-                    ui.div(
-                        ui.span("ENTERPRISE WAREHOUSE MANAGEMENT SYSTEM", style="color: #C5A059; font-size: 11px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; display: block;"),
-                        ui.h1("Next-Gen Retail & Supply Chain Intelligence", style="color: #FFFFFF; font-size: 32px; font-weight: 900; line-height: 1.2; margin-bottom: 12px; text-shadow: 0 2px 10px rgba(0,0,0,0.5);"),
-                        ui.p("Platform terpadu untuk monitoring pergerakan stok antar rak, validasi audit kepatuhan, sinkronisasi transfer order, dan kontrol distribusi live multi-cabang.", style="color: #CBD5E0; font-size: 13.5px; line-height: 1.6; max-width: 520px; margin-bottom: 20px;"),
+                        ui.span("WAREHOUSE MANAGEMENT SYSTEM", style="color: #C5A059; font-size: 11px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; display: block;"),
+                        ui.h1("Warehouse Retail Supporting Tools", style="color: #FFFFFF; font-size: 32px; font-weight: 900; line-height: 1.2; margin-bottom: 12px; text-shadow: 0 2px 10px rgba(0,0,0,0.5);"),
                         style="margin-bottom: 1rem;"
                     ),
                     # Badges / Pill Tags
                     ui.div(
-                        ui.span(ui.tags.i(class_="fa-solid fa-bolt", style="color: #10B981; margin-right: 6px;"), "Real-time Live Sync", style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #A7F3D0; font-size: 11.5px; font-weight: 700; padding: 6px 12px; border-radius: 20px;"),
-                        ui.span(ui.tags.i(class_="fa-solid fa-chart-line", style="color: #38BDF8; margin-right: 6px;"), "Cycle Count Analytics", style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); color: #BAE6FD; font-size: 11.5px; font-weight: 700; padding: 6px 12px; border-radius: 20px;"),
-                        ui.span(ui.tags.i(class_="fa-solid fa-shield-halved", style="color: #F59E0B; margin-right: 6px;"), "Audit Verified", style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); color: #FDE68A; font-size: 11.5px; font-weight: 700; padding: 6px 12px; border-radius: 20px;"),
+                        ui.span(ui.tags.i(class_="fa-solid fa-bolt", style="color: #10B981; margin-right: 6px;"), "Control Area", style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #A7F3D0; font-size: 11.5px; font-weight: 700; padding: 6px 12px; border-radius: 20px;"),
+                        ui.span(ui.tags.i(class_="fa-solid fa-chart-line", style="color: #38BDF8; margin-right: 6px;"), "Analytic Process", style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); color: #BAE6FD; font-size: 11.5px; font-weight: 700; padding: 6px 12px; border-radius: 20px;"),
+                        ui.span(ui.tags.i(class_="fa-solid fa-shield-halved", style="color: #F59E0B; margin-right: 6px;"), "Operational Process", style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); color: #FDE68A; font-size: 11.5px; font-weight: 700; padding: 6px 12px; border-radius: 20px;"),
                         style="display: flex; gap: 10px; flex-wrap: wrap;"
-                    ),
-                    style="margin-top: auto;"
+                    )
                 ),
-                style="position: relative; z-index: 2; height: 100%; display: flex; flex-direction: column; padding: 3.5rem 3rem; justify-content: space-between;"
+                style="position: relative; z-index: 2; height: 100%; display: flex; flex-direction: column; padding: 3.5rem 3rem; justify-content: flex-end;"
             ),
-            # Efek Gradasi Berlapis (Kiri Gelap, Kanan Menyatu Mulus ke #0E1015)
+            # Efek Gradasi (Menyatu Mulus ke #0E1015 di Sisi Kanan)
             style=f"""
                 flex: 1.35;
                 height: 100vh;
                 position: relative;
                 background-image: 
-                    linear-gradient(to right, rgba(14, 16, 21, 0.35) 0%, rgba(14, 16, 21, 0.6) 60%, rgba(14, 16, 21, 0.95) 88%, #0E1015 100%),
+                    linear-gradient(to right, rgba(14, 16, 21, 0.25) 0%, rgba(14, 16, 21, 0.55) 60%, rgba(14, 16, 21, 0.95) 88%, #0E1015 100%),
                     linear-gradient(to top, rgba(14, 16, 21, 0.85) 0%, transparent 45%),
                     url('{bg_img}');
                 background-size: cover;
@@ -3734,20 +3717,34 @@ def login_page():
         ),
 
         # ======================================================================
-        # SISI KANAN: DEDICATED AUTH PANEL (FOKUS, BERSIH & PROFESIONAL)
+        # SISI KANAN: DEDICATED AUTH PANEL (MEMUAT TULISAN PT ZONA KARYA NUSANTARA)
         # ======================================================================
         ui.div(
             ui.div(
-                # Header Kartu Login
+                # 🌟 LOGO & BRANDING PT PINDAH KE SINI 🌟
                 ui.div(
                     ui.div(
-                        ui.div(style="width: 8px; height: 32px; background: #E50914; border-radius: 4px; margin-right: 12px;"),
+                        ui.tags.i(class_="fa-solid fa-boxes-stacked", style="color: #FFFFFF; font-size: 18px;"),
+                        style="width: 42px; height: 42px; background: linear-gradient(135deg, #E50914 0%, #B20710 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(229, 9, 20, 0.4); margin-right: 12px; flex-shrink: 0;"
+                    ),
+                    ui.div(
+                        ui.h4("PT ZONA KARYA NUSANTARA", style="color: #FFFFFF; font-weight: 900; font-size: 14px; margin: 0; letter-spacing: 0.8px; line-height: 1.2;"),
+                        ui.span("LOGISTIC DISTRIBUTION CENTER", style="color: #E50914; font-weight: 800; font-size: 10px; letter-spacing: 1.5px; margin-top: 2px;"),
+                        style="display: flex; flex-direction: column;"
+                    ),
+                    style="display: flex; align-items: center; margin-bottom: 1.25rem; padding-bottom: 1rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08);"
+                ),
+
+                # Header Sub-Title Login
+                ui.div(
+                    ui.div(
+                        ui.div(style="width: 6px; height: 26px; background: #E50914; border-radius: 4px; margin-right: 10px;"),
                         ui.div(
-                            ui.h3("Selamat Datang Kembali", style="color: #FFFFFF; font-size: 20px; font-weight: 800; margin: 0; line-height: 1.2;"),
-                            ui.span("Masuk ke akun operasional Anda", style="color: #A0AEC0; font-size: 12px; font-weight: 500;"),
+                            ui.h3("Welcome to This Site", style="color: #FFFFFF; font-size: 18px; font-weight: 800; margin: 0; line-height: 1.2;"),
+                            ui.span("Login with your account", style="color: #A0AEC0; font-size: 12px; font-weight: 500;"),
                             style="display: flex; flex-direction: column;"
                         ),
-                        style="display: flex; align-items: center; margin-bottom: 1.5rem;"
+                        style="display: flex; align-items: center; margin-bottom: 1.25rem;"
                     )
                 ),
 
@@ -3759,7 +3756,7 @@ def login_page():
                         ui.tags.input(
                             id="login_username_field",
                             type="text",
-                            placeholder="Masukkan Username...",
+                            placeholder="Username...",
                             onkeydown="if (event.key === 'Enter') document.getElementById('btn_sign_in').click();",
                             style="background: #1A1D24; border: 1.5px solid #2D3748; color: #FFFFFF; border-radius: 8px; padding: 0.75rem 1rem 0.75rem 2.5rem; width: 100%; outline: none; font-size: 13.5px; transition: border-color 0.2s ease;"
                         ),
@@ -3776,7 +3773,7 @@ def login_page():
                         ui.tags.input(
                             id="login_password_field",
                             type="password",
-                            placeholder="Masukkan Password...",
+                            placeholder="Password...",
                             onkeydown="if (event.key === 'Enter') document.getElementById('btn_sign_in').click();",
                             style="background: #1A1D24; border: 1.5px solid #2D3748; color: #FFFFFF; border-radius: 8px; padding: 0.75rem 1rem 0.75rem 2.5rem; width: 100%; outline: none; font-size: 13.5px; transition: border-color 0.2s ease;"
                         ),
@@ -3799,8 +3796,7 @@ def login_page():
 
                 # Footer Bawah Card
                 ui.div(
-                    ui.span("🟢 Warehouse Mangement System", style="color: #10B981; font-size: 11.5px; font-weight: 700; margin-right: 8px;"),
-                    ui.span("• Warehouse Supporting Tools v2.0", style="color: #718096; font-size: 11.5px;"),
+                    ui.span("• Warehouse Management Tools v2.0", style="color: #718096; font-size: 11px;"),
                     style="display: flex; align-items: center; justify-content: center; margin-top: 1.5rem;"
                 ),
                 style="""
@@ -3809,7 +3805,7 @@ def login_page():
                     background: #14161D;
                     border: 1px solid #282C37;
                     border-radius: 16px;
-                    padding: 2.5rem 2rem;
+                    padding: 2.25rem 2rem;
                     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
                 """
             ),
