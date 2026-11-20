@@ -753,6 +753,16 @@ class AppState:
         # Cache snapshot metrik sebelumnya di memory
         self._prev_bs_metrics = {}
 
+        # --- STORE LEADER RTO DECISION STATE ---
+        self.rto_dec_branch = reactive.Value("")
+        self.rto_dec_processed = reactive.Value(False)
+        self.rto_dec_total_sku = reactive.Value(0)
+        self.rto_dec_total_qty_rto = reactive.Value(0)
+        self.rto_dec_total_qty_sby = reactive.Value(0)
+        self.df_rto_dec_headers = reactive.Value([])
+        self.df_rto_dec_rows = reactive.Value([])
+        self._raw_df_rto_dec = pd.DataFrame()
+
         # --- REFILL SHELVING STATE ---
         self.rs_processed = reactive.Value(False)
         self.rs_total_sku = reactive.Value(0)       # 🌟 Tambahan state SKU perlu refill
@@ -956,6 +966,7 @@ class AppState:
         elif cur_menu in ["Refill Shelving", "refill_shelving"]: return "refill_shelving"
         elif cur_menu in ["Reloc Koli to Koli", "reloc-koli-to-koli"]: return "reloc_koli_to_koli"
         elif cur_menu in ["FDR Controller", "fdr_controller", "fdr-controller"]: return "fdr_controller"
+        elif cur_menu in ["Store Leader RTO Decission", "Store Leader RTO Decision", "store_leader_rto_decision", "store-leader-rto-decision"]: return "store_leader_rto_decision"
         return "under_development"
 
     # --- Ongkir Methods ---
@@ -9106,3 +9117,205 @@ class AppState:
             return True, f"Net Sales terkalkulasi: Rp {net_sales:,}"
         except Exception as e:
             return False, str(e)
+
+    # ==========================================================================
+    # LOGIKA STORE LEADER RTO DECISION (SURABAYA VS SIDOARJO/SEMARANG)
+    # ==========================================================================
+    def process_store_leader_rto_decision(self, f_toc):
+        try:
+            import re
+            import json
+            client = get_supabase()
+            if not client:
+                return False, "Koneksi ke Supabase gagal!"
+
+            if not f_toc:
+                return False, "Upload file ToC terlebih dahulu!"
+
+            target_branch = self.rto_dec_branch().upper().strip()
+            if not target_branch or target_branch not in ["SEMARANG", "SIDOARJO"]:
+                return False, "Silakan pilih Cabang Tujuan (SEMARANG atau SIDOARJO) terlebih dahulu!"
+
+            # ------------------------------------------------------------------
+            # 1. BACA FILE TOC (Kolom B: Last_ToC, Kolom G: Article Name)
+            # ------------------------------------------------------------------
+            df_toc_raw = load_data_from_info(f_toc)
+            if df_toc_raw.empty or df_toc_raw.shape[1] < 7:
+                return False, "File ToC minimal harus memiliki 7 kolom (hingga Kolom G: Article Name)!"
+
+            def norm_text(val):
+                if pd.isna(val) or val is None: return ""
+                return re.sub(r'[^A-Z0-9]', '', str(val).upper())
+
+            # Ambil Kolom B (index 1) dan Kolom G (index 6)
+            col_toc = df_toc_raw.columns[1]
+            col_art = df_toc_raw.columns[6]
+
+            toc_map = {}
+            for _, r in df_toc_raw.iterrows():
+                art_clean = norm_text(r[col_art])
+                toc_val = str(r[col_toc]).strip().upper()
+                if art_clean and art_clean not in toc_map:
+                    toc_map[art_clean] = toc_val
+
+            # ------------------------------------------------------------------
+            # 2. TARIK DATA STOK DARI SUPABASE (stock_live_cache)
+            # ------------------------------------------------------------------
+            BRANCH_DB_MAP = {
+                "SURABAYA": "SURABAYA_LATEST",
+                "SEMARANG": "SEMARANG_LATEST",
+                "SIDOARJO": "SIDOARJO_LATEST"
+            }
+
+            def fetch_cached_stock(db_id):
+                res = client.table("stock_live_cache").select("stock_data").eq("id", db_id).execute()
+                if res and res.data:
+                    raw = res.data[0].get("stock_data", [])
+                    if isinstance(raw, str):
+                        try: raw = json.loads(raw)
+                        except Exception: raw = []
+                    return pd.DataFrame(raw) if raw else pd.DataFrame()
+                return pd.DataFrame()
+
+            df_stk_sby = fetch_cached_stock(BRANCH_DB_MAP["SURABAYA"])
+            df_stk_tgt = fetch_cached_stock(BRANCH_DB_MAP[target_branch])
+
+            if df_stk_sby.empty:
+                return False, "Data stok Surabaya di Supabase masih kosong!"
+
+            # ------------------------------------------------------------------
+            # 3. FILTER BIN NON-OPERASIONAL
+            # ------------------------------------------------------------------
+            EXCL_BIN_REGEX = r"TOKO|STAG|KARANTINA|DEFECT|REJECT|RESELLER|LIVE|AMP|GIFT|EVENT|PERBAIKAN|GARAGE"
+
+            def clean_sku(val):
+                if pd.isna(val) or val is None: return ""
+                s = str(val).strip().upper()
+                if s.endswith('.0'): s = s[:-2]
+                return s
+
+            def aggregate_valid_stock(df_raw):
+                if df_raw.empty or df_raw.shape[1] < 10:
+                    return {}
+                # Kolom B = BIN (idx 1), C = SKU (idx 2), E = ITEM NAME (idx 4), J = QTY (idx 9)
+                col_b = df_raw.columns[1]
+                col_c = df_raw.columns[2]
+                col_e = df_raw.columns[4]
+                col_j = df_raw.columns[9]
+
+                stock_pool = {}
+                for _, r in df_raw.iterrows():
+                    bin_txt = str(r[col_b]).strip().upper()
+                    if re.search(EXCL_BIN_REGEX, bin_txt):
+                        continue
+
+                    sku_txt = clean_sku(r[col_c])
+                    if not sku_txt or sku_txt in ["NAN", "NONE", "-", ""]:
+                        continue
+
+                    qty_val = safe_int(r[col_j], 0)
+                    if qty_val <= 0:
+                        continue
+
+                    item_name = str(r[col_e]).strip()
+                    if sku_txt not in stock_pool:
+                        stock_pool[sku_txt] = {"item_name": item_name, "qty": 0}
+                    stock_pool[sku_txt]["qty"] += qty_val
+
+                return stock_pool
+
+            pool_sby = aggregate_valid_stock(df_stk_sby)
+            pool_tgt = aggregate_valid_stock(df_stk_tgt)
+
+            # ------------------------------------------------------------------
+            # 4. TARIK SALES DARI SUPABASE (balancing_sales_cache)
+            # ------------------------------------------------------------------
+            sales_cache_id = f"{target_branch}_SALES_90D"
+            res_sales = client.table("balancing_sales_cache").select("sales_data").eq("id", sales_cache_id).execute()
+            
+            sales_pool = {}
+            if res_sales and res_sales.data:
+                raw_sls = res_sales.data[0].get("sales_data", [])
+                if isinstance(raw_sls, str):
+                    try: raw_sls = json.loads(raw_sls)
+                    except Exception: raw_sls = []
+                for s_item in raw_sls:
+                    if isinstance(s_item, dict):
+                        s_code = clean_sku(s_item.get("SKU"))
+                        if s_code:
+                            sales_pool[s_code] = safe_int(s_item.get("TOTAL_SALES", 0), 0)
+
+            # ------------------------------------------------------------------
+            # 5. MATCHING & FILTER FAST MOVING (PROP. 1:3)
+            # ------------------------------------------------------------------
+            records = []
+            tot_rto_qty = 0
+            tot_sby_qty = 0
+
+            for sku, sby_data in pool_sby.items():
+                qty_sby = sby_data["qty"]
+                item_name = sby_data["item_name"]
+
+                # Syarat: Ada di Surabaya, tapi TIDAK ADA / 0 di Cabang Target
+                tgt_info = pool_tgt.get(sku, {"qty": 0})
+                qty_tgt = tgt_info["qty"]
+                if qty_tgt > 0:
+                    continue
+
+                # Cek ToC berdasarkan nama artikel
+                art_norm = norm_text(item_name)
+                toc_class = toc_map.get(art_norm, "")
+
+                # Jika tidak exact, coba pencarian sebagian (partial match)
+                if not toc_class:
+                    for k_art, v_toc in toc_map.items():
+                        if k_art and (k_art in art_norm or art_norm in k_art):
+                            toc_class = v_toc
+                            break
+
+                # Lewati jika Non Moving atau Slow Moving
+                if not toc_class or "NON" in toc_class or "SLOW" in toc_class:
+                    continue
+
+                # Wajib Fast Moving
+                if "FAST" not in toc_class:
+                    continue
+
+                # Hitung Sales 60d Cabang Target
+                sales_tgt = sales_pool.get(sku, 0)
+
+                # Rekomendasi RTO: Kelipatan 1:3 dari stok Surabaya
+                rekomendasi_rto = qty_sby // 3
+
+                # Masukkan ke daftar rekomendasi
+                if rekomendasi_rto > 0:
+                    records.append({
+                        "SKU": sku,
+                        "ITEM NAME": item_name,
+                        "QTY SURABAYA": qty_sby,
+                        f"QTY {target_branch}": qty_tgt,
+                        f"SALES 60d {target_branch}": sales_tgt,
+                        "LAST ToC": toc_class,
+                        "REKOMENDASI RTO": rekomendasi_rto
+                    })
+                    tot_rto_qty += rekomendasi_rto
+                    tot_sby_qty += qty_sby
+
+            df_result = pd.DataFrame(records)
+            if not df_result.empty:
+                df_result = df_result.sort_values(by="REKOMENDASI RTO", ascending=False).reset_index(drop=True)
+
+            self.rto_dec_total_sku.set(len(df_result))
+            self.rto_dec_total_qty_rto.set(tot_rto_qty)
+            self.rto_dec_total_qty_sby.set(tot_sby_qty)
+
+            self._raw_df_rto_dec = df_result.copy()
+            self.df_rto_dec_headers.set(df_result.columns.tolist() if not df_result.empty else [])
+            self.df_rto_dec_rows.set(df_result.fillna("").astype(str).values.tolist() if not df_result.empty else [])
+            self.rto_dec_processed.set(True)
+
+            return True, f"Analisis Berhasil! Ditemukan {len(df_result)} SKU Fast Moving untuk RTO ke {target_branch}."
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return False, f"Terjadi kesalahan saat proses analisis: {str(e)}"

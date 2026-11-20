@@ -3528,6 +3528,49 @@ def cycle_count_monitoring_view(state: AppState):
         style="width: 100%; padding: 1rem;"
     )
 
+# ==============================================================================
+# VIEW: STORE LEADER RTO DECISION (AKUN TOKO)
+# ==============================================================================
+def store_leader_rto_decision_view(state: AppState):
+    branch_choices = ["SEMARANG", "SIDOARJO"]
+    cur_branch = state.rto_dec_branch()
+
+    control_section = ui.div(
+        ui.div(
+            ui.div(
+                ui.h4("🎯 Store Leader RTO Decision Maker", style="font-size: 16px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
+                ui.p("Rekomendasi replenishment/RTO otomatis: Membandingkan stok kosong di cabang target dengan stok Surabaya, memvalidasi kelas perputaran barang (Fast Moving), dan menghitung alokasi proporsional 1:3.", style="color: #718096; font-size: 12.5px; margin: 0;"),
+            ),
+            style="margin-bottom: 1.25rem;"
+        ),
+        ui.div(
+            # 1. Filter Cabang (Default KOSONG)
+            ui.div(
+                ui.span("🏢 Pilih Cabang Tujuan RTO:", style="font-size: 12px; font-weight: 800; color: #1A202C; margin-bottom: 4px; display: block;"),
+                ui.tags.select(
+                    # 👇 Opsi default kosong
+                    ui.tags.option("-- Silakan Pilih Cabang Tujuan --", value="", selected=(not cur_branch or cur_branch == "")),
+                    *[ui.tags.option(b, value=b, selected=(b == cur_branch)) for b in branch_choices],
+                    id="rto_dec_branch_select",
+                    onchange="Shiny.setInputValue('change_rto_dec_branch', this.value, {priority: 'event'})",
+                    style="width: 100%; padding: 10px 14px; background: white; border: 2px solid #CBD5E0; border-radius: 8px; font-weight: 800; font-size: 13px; cursor: pointer;"
+                ),
+                style="flex: 1; min-width: 220px;"
+            ),
+            # 2. Uploader File ToC
+            custom_uploader_box("uploader_rto_toc", "📥 Upload File ToC (Kolom B: Last_ToC, Kolom G: Article Name)"),
+            style="display: flex; gap: 1rem; width: 100%; flex-wrap: wrap; margin-bottom: 1rem;"
+        ),
+        ui.output_ui("rto_dec_action_btn_ui"),
+        style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.02);"
+    )
+
+    return ui.div(
+        control_section,
+        ui.output_ui("rto_dec_results_container"),
+        style="width: 100%; padding: 1rem;"
+    )
+
 def menu_item(label: str, target_menu: str, current_menu: str):
     import re
     is_active = (current_menu == target_menu)

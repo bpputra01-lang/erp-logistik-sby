@@ -18,7 +18,7 @@ from views import (
     cycle_count_analyzer_view, global_header, cross_check_real_system_view,
     balancing_stock_view, physical_inventory_list_view, validation_barcode_sku_view, percentage_display_view,excel_practice_view,
     auditor_view, memo_pengajuan_view, warehouse_activity_monitor_view, compliance_audit_view, instock_validation_view, target_progress_view, fdr_controller_view,
-    cycle_count_monitoring_view
+    cycle_count_monitoring_view, store_leader_rto_decision_view
 )
 
 app_ui = ui.page_fluid(
@@ -202,7 +202,9 @@ def server(input: Inputs, output: Outputs, session: Session):
         "fdr-controller": "FDR Controller",
         "fdr_controller": "FDR Controller",
         "cycle-count-monitoring": "Cycle Count Monitoring",
-        "cycle_count_monitoring": "Cycle Count Monitoring"
+        "cycle_count_monitoring": "Cycle Count Monitoring",
+        "store-leader-rto-decission": "Store Leader RTO Decission",
+        "store-leader-rto-decision": "Store Leader RTO Decission"
     }
 
     # 1. Saat menu diklik di sidebar -> URL di browser otomatis berubah
@@ -1218,6 +1220,10 @@ def server(input: Inputs, output: Outputs, session: Session):
         elif content_type in ["cycle_count_monitoring", "cycle-count-monitoring"]:
             from views import cycle_count_monitoring_view
             return cycle_count_monitoring_view(state)
+        
+        elif content_type in ["store_leader_rto_decision", "Store Leader RTO Decission"]:
+            from views import store_leader_rto_decision_view
+            return store_leader_rto_decision_view(state)
             
         # 🌟 TARGET MENGGUNAKAN 'ELIF' DENGAN PROTEKSI ROLE ADMIN / DC
         elif content_type in ["target_progress", "target-progress"]:
@@ -7420,6 +7426,119 @@ def server(input: Inputs, output: Outputs, session: Session):
             strip_bawah,
             style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 1.25rem 1.5rem; margin-top: 1rem; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);"
         )
+
+    # ==========================================================================
+    # STORE LEADER RTO DECISION CONTROLLER
+    # ==========================================================================
+    @reactive.Effect
+    @reactive.event(input.change_rto_dec_branch)
+    def _on_change_rto_dec_branch():
+        state.rto_dec_branch.set(input.change_rto_dec_branch())
+
+    @render.ui
+    def rto_dec_action_btn_ui():
+        f = input.uploader_rto_toc() if "uploader_rto_toc" in input else None
+        cur_br = state.rto_dec_branch()
+        has_file = f and len(f) > 0
+        has_branch = bool(cur_br and cur_br.strip() != "")
+
+        # Tombol hanya menyala merah jika cabang SUDAH DIPILIH dan file SUDAH DIUPLOAD
+        if has_file and has_branch:
+            return ui.div(
+                ui.tags.button(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-calculator", style="margin-right: 6px; font-size: 14px;"), "PROSES REKOMENDASI RTO"),
+                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_process_rto_decision', Math.random(), {priority: 'event'});",
+                    class_="btn-red-gradient"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+            )
+        
+        # Pesan tombol sesuai kondisi yang belum lengkap
+        if not has_branch and not has_file:
+            btn_text = "PILIH CABANG DAN UPLOAD FILE TOC UNTUK MEMULAI"
+        elif not has_branch:
+            btn_text = "PILIH CABANG TUJUAN TERLEBIH DAHULU"
+        else:
+            btn_text = "UPLOAD FILE TOC UNTUK MEMULAI"
+
+        return ui.div(
+            ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"),
+                btn_text,
+                disabled=True,
+                class_="btn-locked"
+            ),
+            style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+        )
+
+    @reactive.Effect
+    @reactive.event(input.btn_process_rto_decision)
+    def _proc_rto_decision():
+        cur_br = state.rto_dec_branch()
+        if not cur_br or cur_br.strip() == "":
+            ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+            state.error_modal_message.set("Silakan pilih cabang tujuan RTO terlebih dahulu!")
+            state.show_error_modal.set(True)
+            return
+
+        f = input.uploader_rto_toc()
+        succ, msg = state.process_store_leader_rto_decision(f)
+        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+        if succ:
+            state.show_success_modal.set(True)
+            ui.notification_show(f"✅ {msg}", type="message", duration=4)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+
+    @render.ui
+    def rto_dec_results_container():
+        if not state.rto_dec_processed():
+            return ui.div()
+
+        target_br = state.rto_dec_branch()
+
+        return ui.div(
+            ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
+            ui.h4(f"📋 HASIL REKOMENDASI RTO UNTUK JEZ {target_br}", style="font-size: 16px; color: #010B13; font-weight: 800; margin-bottom: 1rem;"),
+            
+            # 3 Kotak Metrik Ringkasan
+            ui.div(
+                dark_metric_box("📦 TOTAL SKU FAST MOVING", f"{state.rto_dec_total_sku():,} SKU", "#3182CE"),
+                dark_metric_box("🔢 TOTAL REKOMENDASI RTO", f"{state.rto_dec_total_qty_rto():,} PCS", "#10B981"),
+                dark_metric_box("🏭 TOTAL STOK SURABAYA", f"{state.rto_dec_total_qty_sby():,} PCS", "#C5A059"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+            ),
+
+            # Tabel Detail & Download Excel
+            ui.div(
+                ui.div(
+                    ui.div(
+                        ui.h4(f"📄 Rekomendasi Item Barang ke {target_br} (Proporsi 1:3)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 2px 0;"),
+                        ui.p("Barang yang masuk daftar hanya barang yang stoknya 0 di cabang target, berstatus Fast Moving, dan stok Surabaya minimal 3 pcs.", style="color: #718096; font-size: 12px; margin: 0;")
+                    ),
+                    ui.download_button(
+                        "btn_dl_rto_decision",
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-file-excel", style="margin-right: 6px;"), f"DOWNLOAD REKOMENDASI RTO {target_br} (.XLSX)"),
+                        style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; font-weight: 800; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer; font-size: 12px; box-shadow: 0 2px 6px rgba(16,185,129,0.3);"
+                    ),
+                    style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 8px;"
+                ),
+                render_clean_table(state.df_rto_dec_headers(), state.df_rto_dec_rows(), "tbl_rto_decision"),
+                style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
+            ),
+            style="width: 100%;"
+        )
+
+    @render.download(
+        filename=lambda: f"REKOMENDASI_RTO_{state.rto_dec_branch()}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    )
+    def btn_dl_rto_decision():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_rto_dec.to_excel(writer, sheet_name=f'RTO_{state.rto_dec_branch()}', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
 
 from pathlib import Path
 
