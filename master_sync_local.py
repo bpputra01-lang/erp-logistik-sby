@@ -1056,7 +1056,7 @@ def run_module_warehouse_monitor(session):
     push_monitor_to_supabase(stg, tf_h, tf_i, ma_h, ma_i, sng)
 
 # ==============================================================================
-# MODUL 3: EKSPOR STOK & SALES 90 HARI (SURABAYA, SIDOARJO, SEMARANG)
+# MODUL 3: EKSPOR STOK & SALES 2 BULAN TERAKHIR (SURABAYA, SIDOARJO, SEMARANG)
 # ==============================================================================
 TARGET_SALES_BRANCHES = [
     {"st_id": 3, "branch": "JEZ SURABAYA", "cache_id": "SURABAYA_SALES_90D"},
@@ -1066,82 +1066,172 @@ TARGET_SALES_BRANCHES = [
 
 def fetch_branch_sales_90days(session, st_id, branch_name, cache_id):
     now_dt = datetime.now(WIB)
-    start_date = now_dt - timedelta(days=60)  # Rentang 90 hari terakhir
+    # Rentang 2 bulan terakhir (60 hari)
+    start_date = now_dt - timedelta(days=60)
     p_start = start_date.strftime('%Y-%m-%d')
     p_end = now_dt.strftime('%Y-%m-%d')
     date_param = f"{p_start}|{p_end}"
 
-    print(f"   ⏳ [HEAVY] Menghitung rekap sales 90 hari {branch_name} ({p_start} s/d {p_end})...")
+    print(f"\n   ⏳ [HEAVY] Menghitung rekap sales 2 bulan {branch_name} ({p_start} s/d {p_end})...")
+
+    # 1. Pastikan Sesi Jezpro Masih Aktif Sebelum Scraping Sales
+    try:
+        chk = session.get("https://jezpro.id/stock_tracking", timeout=15)
+        if chk.status_code in [401, 419] or "login" in chk.url:
+            print("      🔄 Sesi login Jezpro kedaluwarsa, melakukan relogin...")
+            relogin_jezpro(session)
+    except Exception:
+        relogin_jezpro(session)
 
     url_dt = "https://jezpro.id/stock_tracking_datatables"
-    headers_dt = {"Accept": "application/json, text/javascript, */*; q=0.01", "X-Requested-With": "XMLHttpRequest"}
+    headers_dt = {
+        "Accept": "application/json, text/javascript, */*; q=0.01",
+        "X-Requested-With": "XMLHttpRequest",
+        "Referer": "https://jezpro.id/stock_tracking"
+    }
+
     sales_by_sku = {}
     total_raw_rows = 0
 
     start_row = 0
-    batch_size = 2000
+    batch_size = 1000  # Diturunkan ke 1000 agar stabil dan tidak 504 Timeout
     total_expected = 999999
     draw_count = 1
 
     while start_row < total_expected:
+        # Parameter resmi yang sesuai dengan Datatables Jezpro
         params = {
             "draw": str(draw_count),
-            "columns[0][data]": "DT_RowIndex", "columns[1][data]": "datetime",
-            "columns[2][data]": "ps_barcode", "columns[3][data]": "article",
-            "columns[4][data]": "invoice", "columns[5][data]": "cust_name",
-            "columns[6][data]": "qty", "columns[7][data]": "product_location",
-            "columns[8][data]": "status", "columns[9][data]": "instock_source",
-            "order[0][column]": "0", "order[0][dir]": "desc",
+            "columns[0][data]": "DT_RowIndex", "columns[0][name]": "plst_id", "columns[0][orderable]": "false",
+            "columns[1][data]": "datetime", "columns[1][name]": "plst_created", "columns[1][orderable]": "true",
+            "columns[2][data]": "ps_barcode", "columns[2][name]": "ps_barcode", "columns[2][orderable]": "true",
+            "columns[3][data]": "article", "columns[3][name]": "p_name", "columns[3][orderable]": "true",
+            "columns[4][data]": "invoice", "columns[4][name]": "p_name", "columns[4][orderable]": "true",
+            "columns[5][data]": "cust_name", "columns[5][name]": "cust_name", "columns[5][orderable]": "true",
+            "columns[6][data]": "qty", "columns[6][name]": "p_name", "columns[6][orderable]": "true",
+            "columns[7][data]": "product_location", "columns[7][name]": "pl_code", "columns[7][orderable]": "true",
+            "columns[8][data]": "status", "columns[8][name]": "plst_status", "columns[8][orderable]": "true",
+            "columns[9][data]": "instock_source", "columns[9][name]": "instock_source_status",
+            "order[0][column]": "1", "order[0][dir]": "desc",  # Urutkan berdasarkan kolom 1 (datetime), bukan kolom 0
             "start": str(start_row), "length": str(batch_size),
             "status": "", "st_id": str(st_id), "date": date_param
         }
+
         try:
-            res_s = session.get(url_dt, params=params, headers=headers_dt, timeout=60)
-            if res_s.status_code != 200: break
+            res_s = session.get(url_dt, params=params, headers=headers_dt, timeout=45)
+
+            # Jika terkena logout di tengah pagination
+            if res_s.status_code in [401, 419] or "login" in res_s.url:
+                print(f"      🔄 Sesi terputus pada batch start={start_row}, relogin...")
+                if relogin_jezpro(session):
+                    res_s = session.get(url_dt, params=params, headers=headers_dt, timeout=45)
+
+            if res_s.status_code != 200:
+                print(f"      ⚠️ Gagal ambil batch start={start_row} (HTTP {res_s.status_code})")
+                break
+
             j_data = res_s.json()
             chunk = j_data.get("data", [])
-            total_expected = j_data.get("recordsFiltered", j_data.get("recordsTotal", 0))
-            if not chunk: break
+            
+            # Parsing aman untuk total data (menghindari error int vs str)
+            total_expected = safe_int(j_data.get("recordsFiltered") or j_data.get("recordsTotal"), 0)
+
+            if not chunk:
+                break
 
             for item in chunk:
-                status_raw = strip_html(item.get("status") or item.get("plst_status") or "").upper()
-                if "DONE" not in status_raw: continue
+                # Kompatibel untuk response item berbentuk Dict maupun List
+                status_raw = ""
+                raw_sku = ""
+                raw_qty = 1
+                inv_val = ""
+                raw_art = ""
 
-                raw_sku = strip_html(item.get("ps_barcode") or "")
+                if isinstance(item, dict):
+                    status_raw = strip_html(item.get("status") or item.get("plst_status") or "").upper()
+                    raw_sku = strip_html(item.get("ps_barcode") or item.get("barcode") or item.get("sku") or "")
+                    raw_qty = item.get("qty")
+                    inv_val = strip_html(item.get("invoice") or "").upper()
+                    raw_art = item.get("article") or item.get("p_name") or ""
+                elif isinstance(item, list) and len(item) > 8:
+                    status_raw = strip_html(item[8]).upper()
+                    raw_sku = strip_html(item[2])
+                    raw_qty = item[6]
+                    inv_val = strip_html(item[4]).upper()
+                    raw_art = item[3]
+
+                if "DONE" not in status_raw:
+                    continue
+
                 sku = raw_sku.split('.')[0].strip().upper()
-                if not sku or sku in ["-", "NAN", "NONE", "NULL"]: continue
+                if not sku or sku in ["-", "NAN", "NONE", "NULL", ""]:
+                    continue
 
-                qty_val = safe_int(item.get("qty"), 1)
-                inv_val = strip_html(item.get("invoice") or "").upper()
+                qty_val = safe_int(raw_qty, 1)
                 is_online = ("INV" not in inv_val)
 
                 if sku not in sales_by_sku:
                     sales_by_sku[sku] = {
-                        "SKU": sku, "ARTICLE": clean_article_name(item.get("article") or item.get("p_name")),
-                        "SALES_OFFLINE": 0, "SALES_ONLINE": 0, "TOTAL_SALES": 0
+                        "SKU": sku,
+                        "ARTICLE": clean_article_name(raw_art),
+                        "SALES_OFFLINE": 0,
+                        "SALES_ONLINE": 0,
+                        "TOTAL_SALES": 0
                     }
 
-                if is_online: sales_by_sku[sku]["SALES_ONLINE"] += qty_val
-                else: sales_by_sku[sku]["SALES_OFFLINE"] += qty_val
+                if is_online:
+                    sales_by_sku[sku]["SALES_ONLINE"] += qty_val
+                else:
+                    sales_by_sku[sku]["SALES_OFFLINE"] += qty_val
                 sales_by_sku[sku]["TOTAL_SALES"] += qty_val
                 total_raw_rows += 1
 
             start_row += len(chunk)
             draw_count += 1
-            time.sleep(0.02)
-        except Exception:
+            time.sleep(0.04)
+
+        except Exception as e_batch:
+            print(f"      ⚠️ Terjadi error saat membaca batch {start_row}: {e_batch}")
             break
 
     summary_sales = list(sales_by_sku.values())
-    if summary_sales:
-        requests.post(f"{SUPABASE_URL}/rest/v1/balancing_sales_cache", headers=HEADERS_SB, json={
-            "id": cache_id, "branch": branch_name,
-            "period_start": p_start, "period_end": p_end,
-            "updated_at": datetime.now(WIB).isoformat(), "total_rows": total_raw_rows,
-            "sales_data": summary_sales
-        }, timeout=120)
-        print(f"   ✅ [HEAVY] Rekap Sales {branch_name} Terkirim! ({len(summary_sales)} SKU terdeteksi)")
 
+    # 2. Simpan ke Supabase (Hapus Baris Lama Terlebih Dahulu agar Tidak Error 409 Conflict)
+    if summary_sales:
+        payload = {
+            "id": cache_id,
+            "branch": branch_name,
+            "period_start": p_start,
+            "period_end": p_end,
+            "updated_at": datetime.now(WIB).isoformat(),
+            "total_rows": total_raw_rows,
+            "sales_data": summary_sales
+        }
+
+        # Bersihkan record lama untuk id cabang ini
+        try:
+            requests.delete(
+                f"{SUPABASE_URL}/rest/v1/balancing_sales_cache?id=eq.{cache_id}",
+                headers=HEADERS_SB,
+                timeout=15
+            )
+        except Exception:
+            pass
+
+        # Insert data baru yang bersih
+        res_sb = requests.post(
+            f"{SUPABASE_URL}/rest/v1/balancing_sales_cache",
+            headers=HEADERS_SB,
+            json=payload,
+            timeout=120
+        )
+
+        if res_sb.status_code in [200, 201, 204]:
+            print(f"   ✅ [HEAVY] Rekap Sales {branch_name} Berhasil Disimpan ke Supabase! ({len(summary_sales):,} SKU terdeteksi, {total_raw_rows:,} baris)")
+        else:
+            print(f"   ❌ [HEAVY] Gagal simpan ke Supabase ({res_sb.status_code}): {res_sb.text}")
+    else:
+        print(f"   ⚠️ [HEAVY] Tidak ada data transaksi sales 'DONE' ditemukan untuk {branch_name} dalam 2 bulan terakhir.")
 def run_module_exports_and_balancing(session):
     print(f"\n📦 [{datetime.now(WIB).strftime('%H:%M:%S')}] [HEAVY] Memulai Ekspor Stok Excel Seluruh Cabang...")
     for branch_name, info in BRANCH_MAP.items():
