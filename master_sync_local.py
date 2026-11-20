@@ -1056,16 +1056,22 @@ def run_module_warehouse_monitor(session):
     push_monitor_to_supabase(stg, tf_h, tf_i, ma_h, ma_i, sng)
 
 # ==============================================================================
-# MODUL 3: EKSPOR STOK & SALES SURABAYA (HEAVY)
+# MODUL 3: EKSPOR STOK & SALES 90 HARI (SURABAYA, SIDOARJO, SEMARANG)
 # ==============================================================================
-def fetch_surabaya_sales_2months(session):
+TARGET_SALES_BRANCHES = [
+    {"st_id": 3, "branch": "JEZ SURABAYA", "cache_id": "SURABAYA_SALES_90D"},
+    {"st_id": 8, "branch": "JEZ SIDOARJO", "cache_id": "SIDOARJO_SALES_90D"},
+    {"st_id": 53, "branch": "JEZ SEMARANG", "cache_id": "SEMARANG_SALES_90D"}
+]
+
+def fetch_branch_sales_90days(session, st_id, branch_name, cache_id):
     now_dt = datetime.now(WIB)
-    start_date = now_dt - timedelta(days=60)
+    start_date = now_dt - timedelta(days=60)  # Rentang 90 hari terakhir
     p_start = start_date.strftime('%Y-%m-%d')
     p_end = now_dt.strftime('%Y-%m-%d')
     date_param = f"{p_start}|{p_end}"
 
-    print(f"   ⏳ [HEAVY] Menghitung rekap sales 60 hari Surabaya ({p_start} s/d {p_end})...")
+    print(f"   ⏳ [HEAVY] Menghitung rekap sales 90 hari {branch_name} ({p_start} s/d {p_end})...")
 
     url_dt = "https://jezpro.id/stock_tracking_datatables"
     headers_dt = {"Accept": "application/json, text/javascript, */*; q=0.01", "X-Requested-With": "XMLHttpRequest"}
@@ -1087,7 +1093,7 @@ def fetch_surabaya_sales_2months(session):
             "columns[8][data]": "status", "columns[9][data]": "instock_source",
             "order[0][column]": "0", "order[0][dir]": "desc",
             "start": str(start_row), "length": str(batch_size),
-            "status": "", "st_id": str(STORE_ID_SURABAYA), "date": date_param
+            "status": "", "st_id": str(st_id), "date": date_param
         }
         try:
             res_s = session.get(url_dt, params=params, headers=headers_dt, timeout=60)
@@ -1129,12 +1135,12 @@ def fetch_surabaya_sales_2months(session):
     summary_sales = list(sales_by_sku.values())
     if summary_sales:
         requests.post(f"{SUPABASE_URL}/rest/v1/balancing_sales_cache", headers=HEADERS_SB, json={
-            "id": "SURABAYA_SALES_90D", "branch": BRANCH_SURABAYA,
+            "id": cache_id, "branch": branch_name,
             "period_start": p_start, "period_end": p_end,
             "updated_at": datetime.now(WIB).isoformat(), "total_rows": total_raw_rows,
             "sales_data": summary_sales
         }, timeout=120)
-        print(f"   ✅ [HEAVY] Rekap Sales Surabaya Terkirim! ({len(summary_sales)} SKU terdeteksi)")
+        print(f"   ✅ [HEAVY] Rekap Sales {branch_name} Terkirim! ({len(summary_sales)} SKU terdeteksi)")
 
 def run_module_exports_and_balancing(session):
     print(f"\n📦 [{datetime.now(WIB).strftime('%H:%M:%S')}] [HEAVY] Memulai Ekspor Stok Excel Seluruh Cabang...")
@@ -1180,10 +1186,12 @@ def run_module_exports_and_balancing(session):
         except Exception as e:
             print(f"   ⚠️ [HEAVY] Gagal ekspor {branch_name}: {e}")
 
-    try:
-        fetch_surabaya_sales_2months(session)
-    except Exception as e:
-        print(f"   ⚠️ [HEAVY] Gagal balancing sales: {e}")
+    # Eksekusi penarikan sales 90 hari untuk Surabaya, Sidoarjo, dan Semarang
+    for b_sales in TARGET_SALES_BRANCHES:
+        try:
+            fetch_branch_sales_90days(session, b_sales["st_id"], b_sales["branch"], b_sales["cache_id"])
+        except Exception as e:
+            print(f"   ⚠️ [HEAVY] Gagal balancing sales {b_sales['branch']}: {e}")
 
     print(f"✅ [{datetime.now(WIB).strftime('%H:%M:%S')}] [HEAVY] Seluruh rangkaian ekspor berat selesai!\n")
 

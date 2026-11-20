@@ -3740,7 +3740,7 @@ def login_page():
                     ui.div(
                         ui.div(style="width: 6px; height: 26px; background: #E50914; border-radius: 4px; margin-right: 10px;"),
                         ui.div(
-                            ui.h3("Welcome to This Site", style="color: #FFFFFF; font-size: 18px; font-weight: 800; margin: 0; line-height: 1.2;"),
+                            ui.h3("Welcome", style="color: #FFFFFF; font-size: 18px; font-weight: 800; margin: 0; line-height: 1.2;"),
                             ui.span("Login with your account", style="color: #A0AEC0; font-size: 12px; font-weight: 500;"),
                             style="display: flex; flex-direction: column;"
                         ),
