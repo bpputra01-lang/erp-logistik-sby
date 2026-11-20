@@ -3675,7 +3675,7 @@ def sidebar(state: AppState):
 
 def login_page():
     # URL CDN gambar gudang yang Anda lampirkan (High Resolution & Cepat)
-    bg_img = "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070" 
+    bg_img = "./login_bg.png" 
     # ATAU jika sudah Anda upload ke imgur/postimages/supabase storage, paste URL-nya di atas.
 
     return ui.div(
