@@ -484,9 +484,16 @@ def run_module_instock_daily(session):
 
 # --- A. STAGING TRACKING (ALL CABANG) ---
 def fetch_staging_data(session):
-    print(f"   ⏳ [MONITOR 1/4] Menarik Data Staging & Refund (All Cabang)...")
+    print(f"   ⏳ [MONITOR 1/4] Menarik Data Staging & Refund (All Cabang - 3 Bulan Terakhir)...")
     url_stg = "https://jezpro.id/stock_tracking_datatables"
-    date_range = "2026-01-01|2030-12-31"
+    
+    # Dinamis 90 hari terakhir (3 bulan)
+    now_wib = datetime.now(WIB)
+    start_date_str = (now_wib - timedelta(days=90)).strftime("%Y-%m-%d")
+    today_str = now_wib.strftime("%Y-%m-%d")
+    date_range = f"{start_date_str}|{today_str}"
+    cutoff_dt = now_wib.replace(tzinfo=None) - timedelta(days=90)
+
     headers_req = {"Accept": "application/json, text/javascript, */*; q=0.01", "X-Requested-With": "XMLHttpRequest"}
 
     query_targets = [
@@ -535,15 +542,17 @@ def fetch_staging_data(session):
                 if not (is_refund or is_waiting or is_done_online): continue
 
                 dt_raw = strip_html(item.get("datetime") or item.get("plst_created") or "")
-                doc_year = None
+                
+                # Filter batas 3 bulan terakhir
+                doc_dt = None
                 for fmt in ("%d/%m/%Y %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%d-%m-%Y %H:%M:%S", "%d/%m/%Y", "%Y-%m-%d"):
                     try:
-                        doc_year = datetime.strptime(dt_raw[:19].strip(), fmt).year; break
+                        doc_dt = datetime.strptime(dt_raw[:19].strip(), fmt)
+                        break
                     except Exception: pass
-                if doc_year is None:
-                    y_match = re.findall(r'\b(20\d{2})\b', dt_raw)
-                    if y_match: doc_year = int(y_match[0])
-                if doc_year is not None and doc_year < 2026: continue
+                
+                if doc_dt and doc_dt < cutoff_dt:
+                    continue
 
                 raw_id = item.get("plst_id") or item.get("id")
                 p_id = safe_int_val(raw_id)
@@ -634,7 +643,7 @@ def fetch_all_items_for_single_tf(session, tf_code, status_txt, headers, now_wib
     return all_items
 
 def fetch_transfer_data(session):
-    print(f"   ⏳ [MONITOR 2/4] Menarik Seluruh Riwayat Transfer Stok (All Store)...")
+    print(f"   ⏳ [MONITOR 2/4] Menarik Seluruh Riwayat Transfer Stok (All Store - 3 Bulan Terakhir)...")
     url_history = "https://jezpro.id/transfer_history_datatables"
     headers = {"Accept": "application/json, text/javascript, */*; q=0.01", "X-Requested-With": "XMLHttpRequest", "Referer": "https://jezpro.id/transfer_stok"}
 
@@ -677,6 +686,7 @@ def fetch_transfer_data(session):
     open_headers = []
     open_items = []
     now_wib = datetime.now(WIB).replace(tzinfo=None)
+    cutoff_dt = now_wib - timedelta(days=90)
 
     for row in raw_history:
         status_txt = strip_html(row.get("stf_status") or row.get("status") or "").upper()
@@ -689,24 +699,20 @@ def fetch_transfer_data(session):
         if not tf_code: continue
 
         tgl_str = strip_html(row.get("stf_created") or row.get("tanggal") or "")
-        doc_year = None
         aging_jam = 0.0
+        dt_tf = None
 
         if tgl_str:
             for fmt in ("%Y-%m-%d %H:%M:%S", "%d-%m-%Y %H:%M:%S", "%Y-%m-%d", "%d/%m/%Y %H:%M:%S"):
                 try:
                     dt_tf = datetime.strptime(tgl_str[:19].strip(), fmt)
-                    doc_year = dt_tf.year
                     diff_sec = (now_wib - dt_tf).total_seconds()
                     aging_jam = max(0.0, round(diff_sec / 3600.0, 1))
                     break
                 except Exception: pass
 
-        if doc_year is None:
-            m_year = re.search(r'TF(\d{4})', tf_code)
-            if m_year: doc_year = int(m_year.group(1))
-
-        if doc_year is not None and doc_year < 2026:
+        # Abaikan dokumen yang lebih tua dari 90 hari
+        if dt_tf and dt_tf < cutoff_dt:
             continue
 
         open_headers.append({
@@ -730,9 +736,9 @@ def fetch_transfer_data(session):
     print(f"   -> Ditemukan {len(open_headers)} Surat Jalan TF Aktif & {len(open_items)} Rincian Item.")
     return open_headers, open_items
 
-# --- C. MASS ADJUSTMENT (ALL STORE - MENGGANTUNG >= 2026) ---
+# --- C. MASS ADJUSTMENT (ALL STORE - MENGGANTUNG 3 BULAN TERAKHIR) ---
 def fetch_mass_adjustment_data(session):
-    print(f"   ⏳ [MONITOR 3/4] Menarik Data Multiple Adjustment (Menggantung)...")
+    print(f"   ⏳ [MONITOR 3/4] Menarik Data Multiple Adjustment (Menggantung - 3 Bulan Terakhir)...")
     url_ma = "https://jezpro.id/mass_adjustment_datatables"
     headers = {"Accept": "application/json, text/javascript, */*; q=0.01", "X-Requested-With": "XMLHttpRequest", "Referer": "https://jezpro.id/mass_adjustment"}
 
@@ -778,6 +784,7 @@ def fetch_mass_adjustment_data(session):
     open_ma_headers = []
     open_ma_items = []
     now_wib = datetime.now(WIB).replace(tzinfo=None)
+    cutoff_dt = now_wib - timedelta(days=90)
 
     for row in raw_adjustments:
         status_raw = strip_html(row.get("ma_status") or "").upper()
@@ -797,24 +804,20 @@ def fetch_mass_adjustment_data(session):
             ma_id_val = abs(hash(ma_code)) % (10**10)
 
         tgl_str = strip_html(row.get("created_at") or "")
-        doc_year = None
         aging_jam = 0.0
+        dt_ma = None
 
         if tgl_str:
             for fmt in ("%d/%m/%Y %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%d-%m-%Y %H:%M:%S", "%d/%m/%Y"):
                 try:
                     dt_ma = datetime.strptime(tgl_str[:19].strip(), fmt)
-                    doc_year = dt_ma.year
                     diff_sec = (now_wib - dt_ma).total_seconds()
                     aging_jam = max(0.0, round(diff_sec / 3600.0, 1))
                     break
                 except Exception: pass
 
-        if doc_year is None and ma_code:
-            m_y = re.search(r'MADJ(\d{4})', ma_code)
-            if m_y: doc_year = int(m_y.group(1))
-
-        if doc_year is not None and doc_year < 2026:
+        # Abaikan dokumen MADJ yang lebih tua dari 90 hari
+        if dt_ma and dt_ma < cutoff_dt:
             continue
 
         open_ma_headers.append({
@@ -832,7 +835,7 @@ def fetch_mass_adjustment_data(session):
             "synced_at": now_wib.isoformat()
         })
 
-        # Ambil rincian detail barang MADJ
+        # Ambil rincian detail barang MADJ hanya untuk yang masuk 3 bulan terakhir
         start_item_ma = 0
         chunk_ma = 250
         while True:
@@ -892,15 +895,18 @@ def fetch_mass_adjustment_data(session):
     print(f"   -> Ditemukan {len(open_ma_headers)} MADJ Menggantung & {len(open_ma_items)} Rincian Item.")
     return open_ma_headers, open_ma_items
 
-# --- D. SINGLE ADJUSTMENT (NEED APPROVAL ALL CABANG) ---
+# --- D. SINGLE ADJUSTMENT (NEED APPROVAL ALL CABANG - 3 BULAN TERAKHIR) ---
 def fetch_single_adjustment_data(session):
-    print(f"   ⏳ [MONITOR 4/4] Menarik Data Single Adjustment (Need Approval All Store)...")
+    print(f"   ⏳ [MONITOR 4/4] Menarik Data Single Adjustment (Need Approval - 3 Bulan Terakhir)...")
     url_single = "https://jezpro.id/adjustment_history_datatables"
     headers = {"Accept": "application/json, text/javascript, */*; q=0.01", "X-Requested-With": "XMLHttpRequest", "Referer": "https://jezpro.id/adjustment"}
 
-    today_str = datetime.now(WIB).strftime("%Y-%m-%d")
-    date_range = f"2026-01-01|{today_str}"
-    now_wib = datetime.now(WIB).replace(tzinfo=None)
+    now_wib_dt = datetime.now(WIB)
+    start_date_90d = (now_wib_dt - timedelta(days=90)).strftime("%Y-%m-%d")
+    today_str = now_wib_dt.strftime("%Y-%m-%d")
+    date_range = f"{start_date_90d}|{today_str}"
+    
+    now_wib = now_wib_dt.replace(tzinfo=None)
     clean_single_records = []
 
     for branch_name, b_info in BRANCH_MAP.items():
@@ -1223,12 +1229,11 @@ if __name__ == "__main__":
             (current_hour == 21 and current_minute == 50)
         )
 
-        # 2. Interval rutin monitor tiap 2 jam (7200 detik)
-        is_two_hours_passed = (curr - last_monitor >= 7200)
+        # 2. Interval rutin Modul 2 (Monitor) tiap 1 JAM (3600 detik)
+        is_one_hour_passed_monitor = (curr - last_monitor >= 3600)
+        should_run_monitor = is_one_hour_passed_monitor or (is_specific_time and minute_str != last_triggered_minute)
 
-        should_run_monitor = is_two_hours_passed or (is_specific_time and minute_str != last_triggered_minute)
-
-        # Eksekusi Warehouse Activity Monitor (Staging, TF, MADJ, Single Adj)
+        # Eksekusi MODUL 2: Warehouse Activity Monitor (Tiap 1 Jam)
         if should_run_monitor:
             try:
                 run_module_warehouse_monitor(jez)
@@ -1238,8 +1243,8 @@ if __name__ == "__main__":
             except Exception as e:
                 print(f"❌ [MONITOR Error]: {e}")
 
-        # Eksekusi Sinkronisasi Berat (Heavy Export tiap 3 jam / 10800 detik)
-        if curr - last_heavy >= 10800 or last_heavy == 0:
+        # Eksekusi MODUL 3: Sinkronisasi Berat / Heavy Export (Tiap 1 JAM / 3600 detik)
+        if curr - last_heavy >= 3600 or last_heavy == 0:
             try:
                 run_module_exports_and_balancing(jez)
                 last_heavy = curr
@@ -1248,8 +1253,8 @@ if __name__ == "__main__":
 
         # Log heartbeat standby tiap 5 menit sekali
         if curr - last_standby_log >= 300:
-            sisa_monitor = max(0, int(7200 - (curr - last_monitor))) // 60
-            sisa_heavy = max(0, int(10800 - (curr - last_heavy))) // 60
+            sisa_monitor = max(0, int(3600 - (curr - last_monitor))) // 60
+            sisa_heavy = max(0, int(3600 - (curr - last_heavy))) // 60
             print(f"💤 [{now_wib.strftime('%H:%M:%S')}] [STANDBY] Orchestrator standby normal.")
             print(f"   -> Sisa waktu menuju Monitor (Staging/TF/Adj): ~{sisa_monitor} menit")
             print(f"   -> Sisa waktu menuju Heavy Export: ~{sisa_heavy} menit")
