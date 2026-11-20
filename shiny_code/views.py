@@ -3674,34 +3674,172 @@ def sidebar(state: AppState):
     )
 
 def login_page():
-    # URL CDN gambar gudang yang Anda lampirkan (High Resolution & Cepat)
-    bg_img = "https://fanzsmghhbefhhaicrok.supabase.co/storage/v1/object/public/assets/login_bg.png" 
-    # ATAU jika sudah Anda upload ke imgur/postimages/supabase storage, paste URL-nya di atas.
+    bg_img = "https://fanzsmghhbefhhaicrok.supabase.co/storage/v1/object/public/assets/login_bg.png"
 
     return ui.div(
+        # ======================================================================
+        # SISI KIRI: SHOWCASE GAMBAR DENGAN DEGRADASI HALUS KE KANAN
+        # ======================================================================
+        ui.div(
+            # Overlay Konten di Atas Gambar (Teks Branding & Badges)
+            ui.div(
+                # Header Brand Kiri Atas
+                ui.div(
+                    ui.div(
+                        ui.tags.i(class_="fa-solid fa-boxes-stacked", style="color: #FFFFFF; font-size: 20px;"),
+                        style="width: 44px; height: 44px; background: linear-gradient(135deg, #E50914 0%, #B20710 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(229, 9, 20, 0.4); margin-right: 12px;"
+                    ),
+                    ui.div(
+                        ui.h4("PT ZONA KARYA NUSANTARA", style="color: #FFFFFF; font-weight: 900; font-size: 15px; margin: 0; letter-spacing: 1px;"),
+                        ui.span("LOGISTIC DISTRIBUTION CENTER", style="color: #E50914; font-weight: 800; font-size: 10.5px; letter-spacing: 2px;"),
+                        style="display: flex; flex-direction: column;"
+                    ),
+                    style="display: flex; align-items: center; margin-bottom: auto;"
+                ),
+
+                # Teks Tagline & Fitur di Sisi Kiri Bawah
+                ui.div(
+                    ui.div(
+                        ui.span("ENTERPRISE WAREHOUSE MANAGEMENT SYSTEM", style="color: #C5A059; font-size: 11px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; display: block;"),
+                        ui.h1("Next-Gen Retail & Supply Chain Intelligence", style="color: #FFFFFF; font-size: 32px; font-weight: 900; line-height: 1.2; margin-bottom: 12px; text-shadow: 0 2px 10px rgba(0,0,0,0.5);"),
+                        ui.p("Platform terpadu untuk monitoring pergerakan stok antar rak, validasi audit kepatuhan, sinkronisasi transfer order, dan kontrol distribusi live multi-cabang.", style="color: #CBD5E0; font-size: 13.5px; line-height: 1.6; max-width: 520px; margin-bottom: 20px;"),
+                        style="margin-bottom: 1rem;"
+                    ),
+                    # Badges / Pill Tags
+                    ui.div(
+                        ui.span(ui.tags.i(class_="fa-solid fa-bolt", style="color: #10B981; margin-right: 6px;"), "Real-time Live Sync", style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #A7F3D0; font-size: 11.5px; font-weight: 700; padding: 6px 12px; border-radius: 20px;"),
+                        ui.span(ui.tags.i(class_="fa-solid fa-chart-line", style="color: #38BDF8; margin-right: 6px;"), "Cycle Count Analytics", style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); color: #BAE6FD; font-size: 11.5px; font-weight: 700; padding: 6px 12px; border-radius: 20px;"),
+                        ui.span(ui.tags.i(class_="fa-solid fa-shield-halved", style="color: #F59E0B; margin-right: 6px;"), "Audit Verified", style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); color: #FDE68A; font-size: 11.5px; font-weight: 700; padding: 6px 12px; border-radius: 20px;"),
+                        style="display: flex; gap: 10px; flex-wrap: wrap;"
+                    ),
+                    style="margin-top: auto;"
+                ),
+                style="position: relative; z-index: 2; height: 100%; display: flex; flex-direction: column; padding: 3.5rem 3rem; justify-content: space-between;"
+            ),
+            # Efek Gradasi Berlapis (Kiri Gelap, Kanan Menyatu Mulus ke #0E1015)
+            style=f"""
+                flex: 1.35;
+                height: 100vh;
+                position: relative;
+                background-image: 
+                    linear-gradient(to right, rgba(14, 16, 21, 0.35) 0%, rgba(14, 16, 21, 0.6) 60%, rgba(14, 16, 21, 0.95) 88%, #0E1015 100%),
+                    linear-gradient(to top, rgba(14, 16, 21, 0.85) 0%, transparent 45%),
+                    url('{bg_img}');
+                background-size: cover;
+                background-position: center;
+                background-repeat: no-repeat;
+                display: flex;
+            """,
+            class_="login-showcase-panel"
+        ),
+
+        # ======================================================================
+        # SISI KANAN: DEDICATED AUTH PANEL (FOKUS, BERSIH & PROFESIONAL)
+        # ======================================================================
         ui.div(
             ui.div(
+                # Header Kartu Login
                 ui.div(
-                    ui.div(style="width: 10px; height: 36px; background: #E50914; border-radius: 4px; margin-right: 12px;"), 
                     ui.div(
-                        ui.h2("LOGISTIC DISTRIBUTION CENTER", style="color: #FFFFFF; font-size: 20px; font-weight: 800; letter-spacing: 1px; margin: 0; line-height: 1.1;"), 
-                        ui.span("PT ZONA KARYA NUSANTARA • WAREHOUSE", style="color: #E50914; font-size: 10px; font-weight: 700; letter-spacing: 2px; margin-top: 2px;"), 
-                        style="display: flex; flex-direction: column;"
-                    ), 
-                    style="display: flex; align-items: center; margin-bottom: 0.5rem;"
+                        ui.div(style="width: 8px; height: 32px; background: #E50914; border-radius: 4px; margin-right: 12px;"),
+                        ui.div(
+                            ui.h3("Selamat Datang Kembali", style="color: #FFFFFF; font-size: 20px; font-weight: 800; margin: 0; line-height: 1.2;"),
+                            ui.span("Masuk ke akun operasional Anda", style="color: #A0AEC0; font-size: 12px; font-weight: 500;"),
+                            style="display: flex; flex-direction: column;"
+                        ),
+                        style="display: flex; align-items: center; margin-bottom: 1.5rem;"
+                    )
                 ),
-                ui.hr(style="border: 0; border-top: 1px solid rgba(255, 255, 255, 0.12); margin: 0.4rem 0 0.75rem 0;"),
-                ui.p("Silakan masuk dengan akun resmi gudang Anda.", style="color: #B0B0B0; font-size: 13px; margin: 0 0 1.1rem 0;"),
-                ui.div(ui.span("USERNAME", style="font-size: 11px; font-weight: 700; color: #FFFFFF; letter-spacing: 1px; margin-bottom: 4px; display: block;"), ui.tags.input(id="login_username_field", type="text", placeholder="Masukkan username...", onkeydown="if (event.key === 'Enter') document.getElementById('btn_sign_in').click();", style="background: rgba(0, 0, 0, 0.75); border: 1px solid rgba(229, 9, 20, 0.4); color: #FFFFFF; border-radius: 10px; padding: 0.8rem 1rem; width: 100%; outline: none;"), style="margin-bottom: 1rem;"),
-                ui.div(ui.span("PASSWORD", style="font-size: 11px; font-weight: 700; color: #FFFFFF; letter-spacing: 1px; margin-bottom: 4px; display: block;"), ui.tags.input(id="login_password_field", type="password", placeholder="Masukkan password...", onkeydown="if (event.key === 'Enter') document.getElementById('btn_sign_in').click();", style="background: rgba(0, 0, 0, 0.75); border: 1px solid rgba(229, 9, 20, 0.4); color: #FFFFFF; border-radius: 10px; padding: 0.8rem 1rem; width: 100%; outline: none;"), style="margin-bottom: 1.5rem;"),
-                ui.div(style="height: 6px;"),
-                ui.tags.button("SIGN IN TO SYSTEM →", id="btn_sign_in", onclick="Shiny.setInputValue('btn_submit_login', {user: document.getElementById('login_username_field').value, pass: document.getElementById('login_password_field').value}, {priority: 'event'})", class_="btn-red-gradient", style="width: 100%; height: 48px; font-size: 14px; font-weight: 800; border-radius: 10px; cursor: pointer; box-shadow: 0 4px 15px rgba(229, 9, 20, 0.4);"),
-                ui.div("🟢 Warehouse Supporting Tools v2.0", style="color: #888888; font-size: 12px; text-align: center; margin-top: 10px;"),
-                style="display: flex; flex-direction: column; width: 100%;"
+
+                # Form Input: Username
+                ui.div(
+                    ui.span("USERNAME", style="font-size: 11px; font-weight: 700; color: #CBD5E0; letter-spacing: 0.8px; margin-bottom: 6px; display: block;"),
+                    ui.div(
+                        ui.tags.i(class_="fa-solid fa-user", style="position: absolute; left: 14px; top: 14px; color: #718096; font-size: 14px;"),
+                        ui.tags.input(
+                            id="login_username_field",
+                            type="text",
+                            placeholder="Masukkan Username...",
+                            onkeydown="if (event.key === 'Enter') document.getElementById('btn_sign_in').click();",
+                            style="background: #1A1D24; border: 1.5px solid #2D3748; color: #FFFFFF; border-radius: 8px; padding: 0.75rem 1rem 0.75rem 2.5rem; width: 100%; outline: none; font-size: 13.5px; transition: border-color 0.2s ease;"
+                        ),
+                        style="position: relative; width: 100%;"
+                    ),
+                    style="margin-bottom: 1.25rem;"
+                ),
+
+                # Form Input: Password
+                ui.div(
+                    ui.span("PASSWORD", style="font-size: 11px; font-weight: 700; color: #CBD5E0; letter-spacing: 0.8px; margin-bottom: 6px; display: block;"),
+                    ui.div(
+                        ui.tags.i(class_="fa-solid fa-lock", style="position: absolute; left: 14px; top: 14px; color: #718096; font-size: 14px;"),
+                        ui.tags.input(
+                            id="login_password_field",
+                            type="password",
+                            placeholder="Masukkan Password...",
+                            onkeydown="if (event.key === 'Enter') document.getElementById('btn_sign_in').click();",
+                            style="background: #1A1D24; border: 1.5px solid #2D3748; color: #FFFFFF; border-radius: 8px; padding: 0.75rem 1rem 0.75rem 2.5rem; width: 100%; outline: none; font-size: 13.5px; transition: border-color 0.2s ease;"
+                        ),
+                        style="position: relative; width: 100%;"
+                    ),
+                    style="margin-bottom: 1.75rem;"
+                ),
+
+                # Tombol Masuk Red Gradient
+                ui.tags.button(
+                    ui.tags.span(
+                        ui.span("SIGN IN TO SYSTEM", style="margin-right: 8px; letter-spacing: 0.5px;"),
+                        ui.tags.i(class_="fa-solid fa-arrow-right")
+                    ),
+                    id="btn_sign_in",
+                    onclick="Shiny.setInputValue('btn_submit_login', {user: document.getElementById('login_username_field').value, pass: document.getElementById('login_password_field').value}, {priority: 'event'})",
+                    class_="btn-red-gradient",
+                    style="width: 100%; height: 46px; font-size: 13.5px; font-weight: 800; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(229, 9, 20, 0.4);"
+                ),
+
+                # Footer Bawah Card
+                ui.div(
+                    ui.span("🟢 Warehouse Mangement System", style="color: #10B981; font-size: 11.5px; font-weight: 700; margin-right: 8px;"),
+                    ui.span("• Warehouse Supporting Tools v2.0", style="color: #718096; font-size: 11.5px;"),
+                    style="display: flex; align-items: center; justify-content: center; margin-top: 1.5rem;"
+                ),
+                style="""
+                    width: 100%;
+                    max-width: 420px;
+                    background: #14161D;
+                    border: 1px solid #282C37;
+                    border-radius: 16px;
+                    padding: 2.5rem 2rem;
+                    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+                """
             ),
-            style="width: 100%; max-width: 520px; padding: 3rem 2.5rem; background: rgba(12, 12, 15, 0.88); backdrop-filter: blur(20px); border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.12); border-left: 5px solid #E50914; box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85);"
+            # CSS Kontainer Sisi Kanan
+            style="""
+                flex: 1;
+                min-width: 440px;
+                max-width: 520px;
+                height: 100vh;
+                background-color: #0E1015;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 2rem;
+                border-left: 1px solid #20242F;
+                box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+                z-index: 5;
+            """,
+            class_="login-form-panel"
         ),
-        style=f"background-image: radial-gradient(circle at center, rgba(0, 0, 0, 0.25) 0%, rgba(0, 0, 0, 0.65) 100%), url('{bg_img}'); background-size: cover; background-position: center; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem;"
+        # Wrapper Full Screen
+        style="""
+            display: flex;
+            width: 100vw;
+            height: 100vh;
+            background-color: #0E1015;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+        """
     )
 
 def global_header(state: AppState):
