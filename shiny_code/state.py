@@ -8506,28 +8506,24 @@ class AppState:
 
     def auto_save_cc_step_to_supabase(self, step_no: int, step_title: str, summary_data: dict):
         """Menyimpan progress eksekusi Cycle Count ke Supabase secara otomatis"""
-        br = self.cca_branch_selected().upper()
-        if br not in ["SURABAYA", "MALANG"] and self.cca_tujuan() != "ON SCHEDULE CC":
-            return  # Jika Trial / Latihan, skip penyimpanan database
+        # Semua cabang jika memilih TRIAL / LATIHAN tidak disimpan ke riwayat monitoring
+        if self.cca_tujuan() != "ON SCHEDULE CC":
+            return
 
         try:
             client = get_supabase()
             if not client:
                 return
 
-            # 🌟 OTOMATIS GABUNGKAN: Ambil BIN fisik dari Data Scan + BIN dari Dropdown
-            # Walaupun dropdown kurang (cuma A & B), BIN C di file data scan tetap otomatis masuk!
             scanned_bins = getattr(self, "_cca_scanned_bins", [])
             dropdown_bins = list(self.cca_target_bins_schedule())
-
-            # Union semua BIN yang ada
             all_completed_bins = sorted(list(set(scanned_bins) | set(dropdown_bins)))
 
             payload = {
                 "branch": self.cca_branch_selected(),
                 "step_no": step_no,
                 "step_title": step_title,
-                "target_bins": all_completed_bins,  # <-- Otomatis memuat A, B, dan C
+                "target_bins": all_completed_bins,
                 "summary": summary_data,
                 "created_at": datetime.now(WIB).isoformat()
             }
@@ -8783,9 +8779,9 @@ class AppState:
             self.ccm_schedule_data.set(raw_schedule_items)
 
             # ------------------------------------------------------------------
-            # 2. Status Upload Seluruh Cabang
+            # 2. Status Upload Seluruh Cabang (Tambahkan SURABAYA dan MALANG)
             # ------------------------------------------------------------------
-            all_branches = ["HUB JAKARTA", "SEMARANG", "SIDOARJO", "KEDIRI", "JEMBER"]
+            all_branches = ["SURABAYA", "MALANG", "HUB JAKARTA", "SEMARANG", "SIDOARJO", "KEDIRI", "JEMBER"]
             stat_res = client.table("cycle_count_schedules").select("branch").eq("month", month).eq("year", year).execute()
             uploaded_branches = set([
                 r.get("branch") for r in (stat_res.data or []) if isinstance(r, dict) and r.get("branch")

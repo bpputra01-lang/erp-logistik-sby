@@ -3373,7 +3373,7 @@ def dark_metric_box_with_delta(title: str, val_str: str, delta_val: float, unit_
 def cycle_count_monitoring_view(state: AppState):
     MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
     YEARS = [str(y) for y in range(2026, 2031)]
-    BRANCHES = ["HUB JAKARTA", "SEMARANG", "SIDOARJO", "KEDIRI", "JEMBER"]
+    BRANCHES = ["SURABAYA", "MALANG", "HUB JAKARTA", "SEMARANG", "SIDOARJO", "KEDIRI", "JEMBER"]
 
     # 🌟 KUNCI ANTI-LONCAT: Baca nilai reaktif secara terisolasi agar navset tab tidak ter-recreate
     with reactive.isolate():
@@ -3674,10 +3674,19 @@ def sidebar(state: AppState):
     )
 
 def login_page():
+    bg_img = get_image_base64("login_bg.png")
     return ui.div(
         ui.div(
             ui.div(
-                ui.div(ui.div(style="width: 10px; height: 36px; background: #E50914; border-radius: 4px; margin-right: 12px;"), ui.div(ui.h2("LOGISTIC DISTRIBUTION CENTER", style="color: #FFFFFF; font-size: 20px; font-weight: 800; letter-spacing: 1px; margin: 0; line-height: 1.1;"), ui.span("PT ZONA KARYA NUSANTARA • WAREHOUSE", style="color: #E50914; font-size: 10px; font-weight: 700; letter-spacing: 2px; margin-top: 2px;"), style="display: flex; flex-direction: column;"), style="display: flex; align-items: center; margin-bottom: 0.5rem;"),
+                ui.div(
+                    ui.div(style="width: 10px; height: 36px; background: #E50914; border-radius: 4px; margin-right: 12px;"), 
+                    ui.div(
+                        ui.h2("LOGISTIC DISTRIBUTION CENTER", style="color: #FFFFFF; font-size: 20px; font-weight: 800; letter-spacing: 1px; margin: 0; line-height: 1.1;"), 
+                        ui.span("PT ZONA KARYA NUSANTARA • WAREHOUSE", style="color: #E50914; font-size: 10px; font-weight: 700; letter-spacing: 2px; margin-top: 2px;"), 
+                        style="display: flex; flex-direction: column;"
+                    ), 
+                    style="display: flex; align-items: center; margin-bottom: 0.5rem;"
+                ),
                 ui.hr(style="border: 0; border-top: 1px solid rgba(255, 255, 255, 0.12); margin: 0.4rem 0 0.75rem 0;"),
                 ui.p("Silakan masuk dengan akun resmi gudang Anda.", style="color: #B0B0B0; font-size: 13px; margin: 0 0 1.1rem 0;"),
                 ui.div(ui.span("USERNAME", style="font-size: 11px; font-weight: 700; color: #FFFFFF; letter-spacing: 1px; margin-bottom: 4px; display: block;"), ui.tags.input(id="login_username_field", type="text", placeholder="Masukkan username...", onkeydown="if (event.key === 'Enter') document.getElementById('btn_sign_in').click();", style="background: rgba(0, 0, 0, 0.75); border: 1px solid rgba(229, 9, 20, 0.4); color: #FFFFFF; border-radius: 10px; padding: 0.8rem 1rem; width: 100%; outline: none;"), style="margin-bottom: 1rem;"),
@@ -3689,7 +3698,8 @@ def login_page():
             ),
             style="width: 100%; max-width: 520px; padding: 3rem 2.5rem; background: rgba(12, 12, 15, 0.88); backdrop-filter: blur(20px); border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.12); border-left: 5px solid #E50914; box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85);"
         ),
-        style="background-image: radial-gradient(circle at center, rgba(0, 0, 0, 0.15) 0%, rgba(0, 0, 0, 0.45) 100%), url('https://images.unsplash.com/photo-1553413077-190dd305871c?q=80&w=2070'); background-size: cover; background-position: center; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem;"
+        # Menggunakan background gambar yang dilampirkan
+        style=f"background-image: radial-gradient(circle at center, rgba(0, 0, 0, 0.2) 0%, rgba(0, 0, 0, 0.6) 100%), url('{bg_img}'); background-size: cover; background-position: center; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem;"
     )
 
 def global_header(state: AppState):

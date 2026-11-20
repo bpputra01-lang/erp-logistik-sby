@@ -1478,12 +1478,10 @@ def server(input: Inputs, output: Outputs, session: Session):
         if not br or br == "":
             return ui.div()
 
-        # 🛑 Jika cabang luar (selain Surabaya & Malang), WAJIB pilih tujuan dulu
-        if br.upper() not in ["SURABAYA", "MALANG"]:
-            if not tujuan or tujuan == "":
-                return ui.div()
+        # 🛑 SEMUA CABANG (termasuk Surabaya & Malang) WAJIB pilih tujuan terlebih dahulu
+        if not tujuan or tujuan == "":
+            return ui.div()
 
-        # 🌟 Jika lolos (Surabaya/Malang langsung lolos, cabang luar lolos setelah pilih tujuan):
         return ui.div(
             ui.h4("1️⃣ Upload Data Scan & All Data Stock", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
             ui.div(
@@ -1496,7 +1494,6 @@ def server(input: Inputs, output: Outputs, session: Session):
             class_="step-card-box",
             style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
         )
-
     # --- STEP 1 ---
     @render.ui
     def cca_step1_btn_ui():
@@ -6842,8 +6839,8 @@ def server(input: Inputs, output: Outputs, session: Session):
     def _on_change_cca_branch():
         br = input.change_cca_branch()
         state.cca_branch_selected.set(br)
-        if br not in ["SURABAYA", "MALANG", ""]:
-            # Tarik unique BIN dari stock_live_cache Supabase
+        if br and br != "":
+            # Tarik unique BIN dari database untuk semua cabang termasuk Surabaya & Malang
             state.load_bins_from_stock_cache(br)
 
     @reactive.Effect
@@ -6856,7 +6853,6 @@ def server(input: Inputs, output: Outputs, session: Session):
     def cca_dynamic_branch_options_ui():
         br = state.cca_branch_selected()
         
-        # 🌟 DAFTAR LENGKAP 24 SUB KATEGORI & 43 BRAND
         list_sub_kat = [
             "BAG", "BALL", "BASELAYER", "BOTTLE", "CLEANNING & CARE", "EXTRA SHOES", 
             "HARDWARE", "JACKET", "JERSEY", "LOWER BODY", "NUTRITION", "OTHER", 
@@ -6880,18 +6876,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                      style="color: #DD6B20; font-weight: bold; font-style: italic; background: #FFFFF0; border: 1px solid #F6E05E; padding: 1rem; border-radius: 8px; text-align: center;")
             )
 
-        # 🏢 KHUSUS SURABAYA & MALANG: LANGSUNG KELUAR FILTER TANPA DROPDOWN TUJUAN
-        if br.upper() in ["SURABAYA", "MALANG"]:
-            return ui.div(
-                ui.div(
-                    ui.div(ui.input_selectize("cca_sub_kat", "📁 Sub Kategori:", choices=list_sub_kat, multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
-                    ui.div(ui.input_selectize("cca_brand", "🏷️ Brand:", choices=list_brand, multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
-                    ui.div(ui.output_ui("cca_bin_sys_ui"), style="flex: 1; min-width: 180px;"),
-                    style="display: flex; gap: 1rem; width: 100%; flex-wrap: wrap;"
-                )
-            )
-
-        # 🏢 KHUSUS CABANG SELAIN SURABAYA & MALANG (SEMARANG, SIDOARJO, KEDIRI, JEMBER, JKT):
+        # 🏢 SEMUA CABANG WAJIB PILIH TUJUAN (TIDAK ADA LAGI BYPASS SURABAYA/MALANG)
         tujuan_cur = state.cca_tujuan()
         
         tujuan_box = ui.div(
@@ -6909,7 +6894,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             )
         )
 
-        # 🛑 Cabang luar tapi TUJUAN BELUM DIPILIH: STOP di dropdown tujuan saja!
+        # 🛑 Jika TUJUAN BELUM DIPILIH: Tahan di dropdown tujuan saja
         if not tujuan_cur or tujuan_cur == "":
             return ui.div(
                 tujuan_box,
@@ -6917,7 +6902,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                      style="color: #DD6B20; font-weight: 600; font-size: 12px; margin-top: 6px; font-style: italic;")
             )
 
-        # 🌟 Cabang luar & TUJUAN SUDAH DIPILIH: BARU MUNCULKAN FILTER LENGKAP
+        # 🌟 JIKA TUJUAN SUDAH DIPILIH: Tampilkan filter lengkap
         schedule_bin_selector = ui.div()
         if tujuan_cur == "ON SCHEDULE CC":
             bins_from_db = state.cca_available_bins_from_db()
