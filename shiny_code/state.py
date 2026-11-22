@@ -4353,24 +4353,24 @@ class AppState:
                     "STATUS": status_refill
                 })
 
-                # 4. TAB 2: PROGRESSIVE REFILL PER BIN
+                # --------------------------------------------------------------
+                # 4. TAB 2: PROGRESSIVE REFILL PER BIN (LOGIKA RESMI INB -> LOG -> OFF/ONL)
+                # --------------------------------------------------------------
                 rem_log = need_log if need_log > 0 else "NO REFILL"
                 rem_off = need_off if need_off > 0 else "NO REFILL"
                 rem_onl = need_onl if need_onl > 0 else "NO REFILL"
 
                 bins_available = sku_bins_map.get(sku, [])
-                def bin_prio(b_dict):
-                    bn = b_dict['BIN'].upper()
-                    if 'LOG' in bn: return 1
-                    if not ('OFF' in bn or 'RSN' in bn or 'ONL' in bn): return 2
-                    return 3
 
-                bins_available = sorted(bins_available, key=bin_prio)
+                # Urutkan BIN: Utamakan BIN yang punya stok terbanyak
+                bins_available = sorted(bins_available, key=lambda x: to_int(x['QTY']), reverse=True)
 
                 if bins_available and (rem_log != "NO REFILL" or rem_off != "NO REFILL" or rem_onl != "NO REFILL"):
                     for b_info in bins_available:
                         b_name = b_info['BIN']
+                        bn_upper = b_name.upper()
                         avail_qty = to_int(b_info['QTY'])
+
                         if not any(isinstance(v, (int, float)) and v > 0 for v in [rem_log, rem_off, rem_onl]):
                             break
 
@@ -4378,37 +4378,47 @@ class AppState:
                         alloc_off = "NO REFILL" if rem_off == "NO REFILL" else 0
                         alloc_onl = "NO REFILL" if rem_onl == "NO REFILL" else 0
 
-                        if isinstance(rem_off, (int, float)) and rem_off > 0 and avail_qty > 0:
-                            take = min(avail_qty, rem_off)
-                            alloc_off = take
-                            avail_qty -= take
-                            rem_off -= take
-                        elif isinstance(rem_off, (int, float)): alloc_off = 0
+                        # Klasifikasi Asal BIN
+                        is_inb = ('INB' in bn_upper or 'INBOUND' in bn_upper)
+                        is_log = ('LOG' in bn_upper) and not ('OFF' in bn_upper or 'RSN' in bn_upper or 'ONL' in bn_upper)
 
-                        if isinstance(rem_onl, (int, float)) and rem_onl > 0 and avail_qty > 0:
-                            take = min(avail_qty, rem_onl)
-                            alloc_onl = take
-                            avail_qty -= take
-                            rem_onl -= take
-                        elif isinstance(rem_onl, (int, float)): alloc_onl = 0
+                        # ATURAN 1: OFFLINE & ONLINE HANYA BOLEH AMBIL DARI BIN LOG
+                        if is_log and avail_qty > 0:
+                            # Ambil untuk Offline
+                            if isinstance(rem_off, (int, float)) and rem_off > 0 and avail_qty > 0:
+                                take = min(avail_qty, rem_off)
+                                alloc_off = take
+                                avail_qty -= take
+                                rem_off -= take
 
-                        if isinstance(rem_log, (int, float)) and rem_log > 0 and avail_qty > 0:
-                            take = min(avail_qty, rem_log)
-                            alloc_log = take
-                            avail_qty -= take
-                            rem_log -= take
-                        elif isinstance(rem_log, (int, float)): alloc_log = 0
+                            # Ambil untuk Online
+                            if isinstance(rem_onl, (int, float)) and rem_onl > 0 and avail_qty > 0:
+                                take = min(avail_qty, rem_onl)
+                                alloc_onl = take
+                                avail_qty -= take
+                                rem_onl -= take
 
-                        tab2_rows.append({
-                            "BIN": b_name,
-                            "SKU": sku,
-                            "BRAND": sku_meta_brand.get(sku, "-"),
-                            "ITEM NAME": sku_meta_name.get(sku, "-"),
-                            "SIZE": sku_meta_size.get(sku, "-"),
-                            "QTY LOG": alloc_log,
-                            "QTY OFF": alloc_off,
-                            "QTY ONL": alloc_onl
-                        })
+                        # ATURAN 2: LOGISTIK HANYA BOLEH AMBIL DARI BIN INB / INBOUND
+                        if is_inb and avail_qty > 0:
+                            if isinstance(rem_log, (int, float)) and rem_log > 0 and avail_qty > 0:
+                                take = min(avail_qty, rem_log)
+                                alloc_log = take
+                                avail_qty -= take
+                                rem_log -= take
+
+                        # Hanya masukkan ke tabel jika ada minimal 1 kuota refill yang dialokasikan dari BIN ini
+                        any_allocated = any(isinstance(x, (int, float)) and x > 0 for x in [alloc_log, alloc_off, alloc_onl])
+                        if any_allocated:
+                            tab2_rows.append({
+                                "BIN": b_name,
+                                "SKU": sku,
+                                "BRAND": sku_meta_brand.get(sku, "-"),
+                                "ITEM NAME": sku_meta_name.get(sku, "-"),
+                                "SIZE": sku_meta_size.get(sku, "-"),
+                                "QTY LOG": alloc_log,
+                                "QTY OFF": alloc_off,
+                                "QTY ONL": alloc_onl
+                            })
                 elif rem_log == "NO REFILL" and rem_off == "NO REFILL" and rem_onl == "NO REFILL":
                     default_bin = bins_available[0]['BIN'] if bins_available else "BIN RAK"
                     tab2_rows.append({
@@ -4477,22 +4487,33 @@ class AppState:
             df_refill = df_refill[mask_log].copy()
 
         # ----------------------------------------------------------------------
-        # HITUNG NILAI METRIK SAAT INI (CURRENT)
+        # HITUNG NILAI METRIK SAAT INI (PEMENUHAN TERHADAP TARGET)
         # ----------------------------------------------------------------------
         tot_sku = len(df_alloc)
         tot_stk = int(df_alloc["TOTAL STOK"].sum()) if not df_alloc.empty else 0
 
-        sku_ada_off = sum(1 for _, r in df_alloc.iterrows() if r["QTY OFF"] > 0)
-        sku_ada_onl = sum(1 for _, r in df_alloc.iterrows() if r["QTY ONL"] > 0)
-        sku_ada_log = sum(1 for _, r in df_alloc.iterrows() if r["QTY LOG"] > 0)
+        # Total QTY Aktual saat ini di masing-masing area
+        tot_qty_off = int(df_alloc["QTY OFF"].sum()) if not df_alloc.empty else 0
+        tot_qty_onl = int(df_alloc["QTY ONL"].sum()) if not df_alloc.empty else 0
+        tot_qty_log = int(df_alloc["QTY LOG"].sum()) if not df_alloc.empty else 0
 
-        defisit_off = max(0, tot_sku - sku_ada_off)
-        defisit_onl = max(0, tot_sku - sku_ada_onl)
-        defisit_log = max(0, tot_sku - sku_ada_log)
+        # Total Target Ideal masing-masing area
+        tot_tgt_off = int(df_alloc["TARGET OFF"].sum()) if not df_alloc.empty else 0
+        tot_tgt_onl = int(df_alloc["TARGET ONL"].sum()) if not df_alloc.empty else 0
+        tot_tgt_log = int(df_alloc["TARGET LOG"].sum()) if not df_alloc.empty else 0
 
-        perc_off = (sku_ada_off / tot_sku * 100.0) if tot_sku > 0 else 0.0
-        perc_on  = (sku_ada_onl / tot_sku * 100.0) if tot_sku > 0 else 0.0
-        perc_log = (sku_ada_log / tot_sku * 100.0) if tot_sku > 0 else 0.0
+        # Persentase pemenuhan:
+        # Area Offline & Online
+        perc_off = round((tot_qty_off / tot_tgt_off * 100.0), 1) if tot_tgt_off > 0 else 0.0
+        perc_on  = round((tot_qty_onl / tot_tgt_onl * 100.0), 1) if tot_tgt_onl > 0 else 0.0
+        
+        # 🌟 Area Logistik: Boleh lebih dari 100% (tidak di-cap / tidak dibatasi)
+        perc_log = round((tot_qty_log / tot_tgt_log * 100.0), 1) if tot_tgt_log > 0 else 0.0
+
+        # Defisit: Jumlah SKU yang stoknya masih di bawah target
+        defisit_off = sum(1 for _, r in df_alloc.iterrows() if r["TARGET OFF"] > r["QTY OFF"])
+        defisit_onl = sum(1 for _, r in df_alloc.iterrows() if r["TARGET ONL"] > r["QTY ONL"])
+        defisit_log = sum(1 for _, r in df_alloc.iterrows() if r["TARGET LOG"] > r["QTY LOG"])
 
         # Simpan nilai metrik ke reactive state
         self.bs_total_sku.set(tot_sku)
