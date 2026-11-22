@@ -7512,7 +7512,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             
             # 3 Kotak Metrik Ringkasan
             ui.div(
-                dark_metric_box("📦 TOTAL SKU FAST MOVING", f"{state.rto_dec_total_sku():,} SKU", "#3182CE"),
+                dark_metric_box("📦 TOTAL SKU REKOMENDASI", f"{state.rto_dec_total_sku():,} SKU", "#3182CE"),
                 dark_metric_box("🔢 TOTAL REKOMENDASI RTO", f"{state.rto_dec_total_qty_rto():,} PCS", "#10B981"),
                 dark_metric_box("🏭 TOTAL STOK SURABAYA", f"{state.rto_dec_total_qty_sby():,} PCS", "#C5A059"),
                 style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
@@ -7523,7 +7523,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                 ui.div(
                     ui.div(
                         ui.h4(f"📄 Rekomendasi Item Barang ke {target_br} (Proporsi 1:3)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 2px 0;"),
-                        ui.p("Barang yang masuk daftar hanya barang yang stoknya 0 di cabang target, berstatus Fast Moving, dan stok Surabaya minimal 3 pcs.", style="color: #718096; font-size: 12px; margin: 0;")
+                        ui.p("Barang yang masuk daftar adalah barang yang stoknya < 2 di cabang target dan stok Surabaya minimal 3 pcs. Gunakan filter Sub Kategori dan ToC untuk menyaring data.", style="color: #718096; font-size: 12px; margin: 0;")
                     ),
                     ui.download_button(
                         "btn_dl_rto_decision",
@@ -7537,7 +7537,6 @@ def server(input: Inputs, output: Outputs, session: Session):
             ),
             style="width: 100%;"
         )
-
     @render.download(
         filename=lambda: f"REKOMENDASI_RTO_{state.rto_dec_branch()}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
     )
@@ -7549,20 +7548,23 @@ def server(input: Inputs, output: Outputs, session: Session):
         yield buf.getvalue()
     
     # ==========================================================================
-    # FILTER SUB KATEGORI: STORE LEADER RTO DECISION
+    # FILTER SUB KATEGORI & TOC: STORE LEADER RTO DECISION
     # ==========================================================================
     @output
     @render.ui
     def rto_dec_sub_filter_ui():
-        # Jangan tampilkan jika belum diproses
         if not state.rto_dec_processed():
             return ui.div()
 
         subs = state.rto_dec_sub_list()
+        tocs = state.rto_dec_toc_list()
+
         with reactive.isolate():
-            current_selected = state.rto_dec_selected_subs()
+            current_selected_subs = state.rto_dec_selected_subs()
+            current_selected_tocs = state.rto_dec_selected_tocs()
 
         return ui.div(
+            # 1. Filter Sub Kategori
             ui.div(
                 ui.span("🗂️ Filter Sub Kategori (Kosongkan untuk SEMUA):", 
                         style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
@@ -7570,7 +7572,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                     "rto_dec_sub_select",
                     label=None,
                     choices=subs,
-                    selected=current_selected,  # Default [] = SEMUA
+                    selected=current_selected_subs,
                     multiple=True,
                     options={
                         "placeholder": "🔍 Tampilkan SEMUA Sub Kategori (atau pilih untuk menyaring...)",
@@ -7580,7 +7582,25 @@ def server(input: Inputs, output: Outputs, session: Session):
                 ),
                 style="flex: 1; min-width: 250px;"
             ),
-            style="display: flex; gap: 10px; align-items: flex-end; margin-bottom: 1rem; width: 100%;"
+            # 2. 🌟 Filter ToC (Turnover Class)
+            ui.div(
+                ui.span("⚡ Filter ToC Class (Kosongkan untuk SEMUA):", 
+                        style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
+                ui.input_selectize(
+                    "rto_dec_toc_select",
+                    label=None,
+                    choices=tocs,
+                    selected=current_selected_tocs,
+                    multiple=True,
+                    options={
+                        "placeholder": "🔍 Tampilkan SEMUA Kelas ToC (atau pilih untuk menyaring...)",
+                        "plugins": ["remove_button"]
+                    },
+                    width="100%"
+                ),
+                style="flex: 1; min-width: 250px;"
+            ),
+            style="display: flex; gap: 15px; align-items: flex-end; margin-bottom: 1rem; width: 100%; flex-wrap: wrap;"
         )
 
     @reactive.Effect
@@ -7590,6 +7610,13 @@ def server(input: Inputs, output: Outputs, session: Session):
             subs = list(sel) if sel else []
             state.apply_rto_dec_sub_filter(subs)
 
+    # 🌟 Listener untuk perubahan Filter ToC
+    @reactive.Effect
+    def _on_rto_dec_toc_filter_change():
+        if state.rto_dec_processed() and "rto_dec_toc_select" in input:
+            sel = input.rto_dec_toc_select()
+            tocs = list(sel) if sel else []
+            state.apply_rto_dec_toc_filter(tocs)
 from pathlib import Path
 
 app = App(app_ui, server)

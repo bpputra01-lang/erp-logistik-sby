@@ -766,6 +766,8 @@ class AppState:
         # 🌟 TAMBAHKAN 3 BARIS INI:
         self.rto_dec_sub_list = reactive.Value([])          # Daftar pilihan sub kategori
         self.rto_dec_selected_subs = reactive.Value([])     # Pilihan aktif (default [] = SEMUA)
+        self.rto_dec_toc_list = reactive.Value([])          # 🌟 [BARU] Daftar pilihan ToC
+        self.rto_dec_selected_tocs = reactive.Value([])     # 🌟 [BARU] Pilihan aktif ToC (default [] = SEMUA)
         self._raw_df_rto_dec_base = pd.DataFrame()          # Cache data master sebelum difilter
 
         # --- REFILL SHELVING STATE ---
@@ -9385,7 +9387,7 @@ class AppState:
                         if s_art_clean:
                             sales_pool_art[s_art_clean] = tot_s
 
-            # 5. MATCHING & FILTER: TARGET < 2 & FAST MOVING
+            # 5. MATCHING & FILTER: TARGET < 2 & REKOMENDASI RTO > 0 (SEMUA TOC DIAMBIL)
             records = []
             for sku, sby_data in pool_sby.items():
                 qty_sby = sby_data["qty"]
@@ -9397,10 +9399,14 @@ class AppState:
                 if qty_tgt >= 2:
                     continue
 
+                # Ambil status ToC (Jika kosong, beri label 'UNKNOWN / NO TOC')
                 toc_class = get_toc_status(item_name, sku)
-                if not toc_class or "FAST" not in toc_class.upper():
-                    continue
+                if not toc_class or toc_class.strip() == "":
+                    toc_class = "UNKNOWN / NO TOC"
+                else:
+                    toc_class = toc_class.strip().upper()
 
+                # 🌟 Filter FAST MOVING DIHILANGKAN agar semua kelas ToC masuk
                 rekomendasi_rto = qty_sby // 3
                 if rekomendasi_rto <= 0:
                     continue
@@ -9424,39 +9430,61 @@ class AppState:
             if not df_result.empty:
                 df_result = df_result.sort_values(by="REKOMENDASI RTO", ascending=False).reset_index(drop=True)
 
-            # 🌟 Simpan daftar sub kategori yang ada
+            # 🌟 Simpan daftar unik Sub Kategori dan ToC untuk filter
             unique_subs = sorted([
                 str(s).strip().upper() for s in df_result["SUB KATEGORI"].unique() 
                 if pd.notna(s) and str(s).strip() not in ["", "NAN", "NONE", "-", "UNKNOWN"]
             ]) if not df_result.empty else []
 
+            unique_tocs = sorted([
+                str(t).strip().upper() for t in df_result["LAST ToC"].unique()
+                if pd.notna(t) and str(t).strip() not in ["", "NAN", "NONE", "-"]
+            ]) if not df_result.empty else []
+
             self.rto_dec_sub_list.set(unique_subs)
+            self.rto_dec_toc_list.set(unique_tocs)  # 🌟 Set daftar ToC
             self._raw_df_rto_dec_base = df_result.copy()
 
-            # Terapkan filter awal (Default: Kosong = SEMUA Sub Kategori)
+            # Terapkan filter awal (Default: Kosong = SEMUA)
             self.apply_rto_dec_sub_filter([])
+            self.apply_rto_dec_toc_filter([])
             self.rto_dec_processed.set(True)
 
-            return True, f"Analisis Berhasil! Ditemukan {len(df_result)} SKU Fast Moving untuk RTO ke {target_branch}."
+            return True, f"Analisis Berhasil! Ditemukan {len(df_result)} SKU untuk rekomendasi RTO ke {target_branch}."
         except Exception as e:
             import traceback
             traceback.print_exc()
             return False, f"Terjadi kesalahan saat proses analisis: {str(e)}"
 
-    # 🌟 METODE FILTER SUB KATEGORI UNTUK STORE LEADER RTO
+    # 🌟 METODE FILTER SUB KATEGORI & TOC UNTUK STORE LEADER RTO
     def apply_rto_dec_sub_filter(self, selected_subs):
+        self.rto_dec_selected_subs.set(selected_subs if selected_subs else [])
+        self._apply_combined_rto_dec_filters()
+
+    def apply_rto_dec_toc_filter(self, selected_tocs):
+        self.rto_dec_selected_tocs.set(selected_tocs if selected_tocs else [])
+        self._apply_combined_rto_dec_filters()
+
+    def _apply_combined_rto_dec_filters(self):
         if self._raw_df_rto_dec_base.empty:
             return
 
         df = self._raw_df_rto_dec_base.copy()
+        selected_subs = self.rto_dec_selected_subs()
+        selected_tocs = self.rto_dec_selected_tocs()
 
-        # HANYA filter jika user memilih kategori tertentu. Jika kosong -> SEMUA!
+        # 1. Filter Sub Kategori
         if selected_subs and len(selected_subs) > 0:
             clean_subs = [str(x).strip().upper() for x in selected_subs if str(x).strip() != ""]
             if clean_subs:
                 df = df[df["SUB KATEGORI"].isin(clean_subs)].copy()
 
-        self.rto_dec_selected_subs.set(selected_subs if selected_subs else [])
+        # 2. Filter ToC (Turnover Class)
+        if selected_tocs and len(selected_tocs) > 0:
+            clean_tocs = [str(x).strip().upper() for x in selected_tocs if str(x).strip() != ""]
+            if clean_tocs:
+                df = df[df["LAST ToC"].isin(clean_tocs)].copy()
+
         self.rto_dec_total_sku.set(len(df))
         self.rto_dec_total_qty_rto.set(int(df["REKOMENDASI RTO"].sum()) if not df.empty else 0)
         self.rto_dec_total_qty_sby.set(int(df["QTY SURABAYA"].sum()) if not df.empty else 0)
