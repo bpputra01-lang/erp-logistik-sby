@@ -42,6 +42,9 @@ STORE_MASTER_MAP = {
 
 ALL_KNOWN_STORES = list(STORE_MASTER_MAP.values())
 
+# Variabel sesi global untuk menyimpan token CSRF
+CSRF_TOKEN_GLOBAL = ""
+
 # ==============================================================================
 # HELPER & VALIDATOR
 # ==============================================================================
@@ -91,6 +94,7 @@ def parse_iso_wib(dt_str):
 # LOGIN JEZPRO
 # ==============================================================================
 def create_jezpro_session():
+    global CSRF_TOKEN_GLOBAL
     session = requests.Session()
     session.headers.update({
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -103,37 +107,18 @@ def create_jezpro_session():
     if not token_tag:
         raise Exception("Gagal mendapatkan CSRF Token Jezpro!")
 
-    csrf_token = token_tag["value"]
+    CSRF_TOKEN_GLOBAL = token_tag["value"]
     session.post("https://jezpro.id/user_login", data={
-        "_token": csrf_token,
+        "_token": CSRF_TOKEN_GLOBAL,
         "u_email": JEZPRO_EMAIL,
         "password": JEZPRO_PASSWORD
     }, timeout=25)
     
     session.get("https://jezpro.id/dashboards", timeout=25)
-    session.headers.update({"X-CSRF-TOKEN": csrf_token})
+    session.headers.update({"X-CSRF-TOKEN": CSRF_TOKEN_GLOBAL})
     print("✅ Berhasil login ke Jezpro!")
     return session
 
-def get_dynamic_store_map(session):
-    try:
-        res = session.get("https://jezpro.id/setup_lokasi_stok_v2", timeout=20)
-        soup = BeautifulSoup(res.text, "html.parser")
-        store_map = {}
-        select_tag = soup.find("select", {"id": re.compile(r'st_id|store', re.I)}) or soup.find("select", {"name": re.compile(r'st_id|store', re.I)})
-        if select_tag:
-            for opt in select_tag.find_all("option"):
-                val = opt.get("value", "").strip()
-                txt = opt.get_text().strip().upper()
-                if val.isdigit() and txt not in ["PILIH", "SEMUA", "ALL", "SELECT STORE"]:
-                    store_map[int(val)] = txt
-        if store_map:
-            return store_map
-    except Exception:
-        pass
-    return STORE_MASTER_MAP
-
-# 🌟 FUNGSI INI DITAMBAHKAN KEMBALI AGAR TIDAK NAMEERROR:
 def get_store_list_from_page(session):
     try:
         res = session.get("https://jezpro.id/dashboards", timeout=20)
@@ -152,44 +137,59 @@ def get_store_list_from_page(session):
     return ALL_KNOWN_STORES
 
 # ==============================================================================
-# 📦 MODUL 1: SCRAPING MUTASI BIN (HANYA 7 HARI TERAKHIR DARI HARI INI)
+# 📦 MODUL 1: SMART PROBE SCRAPING MUTASI BIN (7 HARI TERAKHIR)
 # ==============================================================================
-def fetch_bin_mutations_page(session, date_str: str, start_idx=0, length=300):
+def query_jezpro_mutations(session, date_str: str, method="POST", start_idx=0, length=300):
     url = "https://jezpro.id/bin_history_datatables"
     headers = {
         "Accept": "application/json, text/javascript, */*; q=0.01",
         "X-Requested-With": "XMLHttpRequest",
         "Referer": "https://jezpro.id/setup_lokasi_stok_v2"
     }
-    params = {
+    
+    payload = {
+        "_token": CSRF_TOKEN_GLOBAL,
         "draw": "1",
-        "order[0][column]": "0",
-        "order[0][dir]": "desc",
         "start": str(start_idx),
         "length": str(length),
-        "search": "",
-        "date": date_str  # Wajib berisi tanggal (misal: 22-11-2026 atau 2026-11-22)
+        "search[value]": "",
+        "search[regex]": "false",
+        "order[0][column]": "0",
+        "order[0][dir]": "desc",
+        "date": date_str
     }
-    try:
-        res = session.get(url, params=params, headers=headers, timeout=30)
-        if res.status_code == 200:
-            return res.json()
-    except Exception as e:
-        print(f"      ⚠️ Gagal fetch mutasi tanggal {date_str}: {e}")
-    return None
 
-def parse_bin_mutation_row(raw_row, fallback_store=""):
+    try:
+        if method == "POST":
+            res = session.post(url, data=payload, headers=headers, timeout=25)
+        else:
+            res = session.get(url, params=payload, headers=headers, timeout=25)
+
+        if res.status_code == 200:
+            try:
+                js = res.json()
+                data_count = len(js.get("data", []))
+                records_total = js.get("recordsTotal", 0)
+                return js, data_count, records_total, res.status_code
+            except Exception:
+                return None, 0, 0, res.status_code
+        else:
+            return None, 0, 0, res.status_code
+    except Exception as e:
+        return None, 0, 0, str(e)
+
+def parse_bin_mutation_row(raw_row):
     if not raw_row: return None
 
-    # FORMAT OBJECT / DICTIONARY
+    # JIKA FORMAT OBJECT
     if isinstance(raw_row, dict):
         pmt_id = safe_int(raw_row.get("pmt_id") or raw_row.get("DT_RowIndex") or raw_row.get("id"))
         if not pmt_id: return None
-        st_name = strip_html(raw_row.get("st_name", fallback_store)).upper()
+        st_name = strip_html(raw_row.get("st_name", "-")).upper()
         return {
             "pmt_id": pmt_id,
             "created_at": parse_iso_wib(raw_row.get("pm_created_at") or raw_row.get("created_at")),
-            "store_name": st_name if st_name else fallback_store,
+            "store_name": st_name,
             "barcode_sku": strip_html(raw_row.get("ps_barcode", "-")).split('.')[0].strip().upper(),
             "article_name": strip_html(raw_row.get("article", "-")),
             "start_bin": strip_html(raw_row.get("start_bin", "-")).upper(),
@@ -202,16 +202,16 @@ def parse_bin_mutation_row(raw_row, fallback_store=""):
             "scraped_at": datetime.now(WIB).isoformat()
         }
 
-    # FORMAT LIST / ARRAY (PERSIS SESUAI SCREENSHOT TABEL HISTORY SETUP)
-    if isinstance(raw_row, (list, tuple)) and len(raw_row) >= 12:
+    # JIKA FORMAT LIST (PERSIS SESUAI SCREENSHOT TABEL HISTORY SETUP)
+    if isinstance(raw_row, (list, tuple)) and len(raw_row) >= 11:
         raw_no = safe_int(raw_row[0])
         st_name = strip_html(raw_row[4]).upper()
         sku_clean = strip_html(raw_row[3]).split('.')[0].strip().upper()
-        tgl_iso = parse_iso_wib(raw_row[11])
+        tgl_raw = raw_row[11] if len(raw_row) > 11 else ""
+        tgl_iso = parse_iso_wib(tgl_raw)
 
-        # Buat ID unik berbasis tanggal, toko, SKU, rak & nomor urut agar tidak bentrok
         tgl_num = tgl_iso[:10].replace('-', '')
-        unique_hash = abs(hash(st_name + sku_clean + str(raw_row[5]) + str(raw_row[9]) + tgl_iso)) % 100000
+        unique_hash = abs(hash(st_name + sku_clean + str(raw_row[5]) + tgl_iso)) % 100000
         final_pmt_id = safe_int(f"{tgl_num}{unique_hash:05d}{raw_no % 1000:03d}")
 
         return {
@@ -219,7 +219,7 @@ def parse_bin_mutation_row(raw_row, fallback_store=""):
             "user_name": strip_html(raw_row[1]),
             "article_name": strip_html(raw_row[2]),
             "barcode_sku": sku_clean,
-            "store_name": st_name if st_name else fallback_store,
+            "store_name": st_name,
             "start_bin": strip_html(raw_row[5]).upper(),
             "old_qty_start": safe_int(raw_row[6]),
             "qty_moved": safe_int(raw_row[7], 1),
@@ -248,54 +248,70 @@ def upsert_mutations_to_supabase(records: list):
     print(f"   ✅ [SUPABASE] Sukses simpan {total_saved} baris mutasi ke jezpro_bin_mutations!")
 
 def run_sync_all_branches_mutations(session):
-    """
-    🌟 Mengambil mutasi untuk SEMUA CABANG khusus 7 HARI TERAKHIR dari hari ini.
-    Penarikan dilakukan per tanggal agar Jezpro merespons data dengan akurat.
-    """
     now_wib = datetime.now(WIB)
     cutoff_dt = (now_wib - timedelta(days=7)).replace(hour=0, minute=0, second=0, microsecond=0)
-    
+
     print(f"\n📦 [{now_wib.strftime('%H:%M:%S')}] Memulai Scraping Mutasi BIN (7 Hari Terakhir):")
-    print(f"   ⏳ Rentang: {cutoff_dt.strftime('%d-%m-%Y')} s/d {now_wib.strftime('%d-%m-%Y')}")
+    print(f"   ⏳ Rentang Waktu: {cutoff_dt.strftime('%d-%m-%Y')} s/d {now_wib.strftime('%d-%m-%Y')}")
 
     total_mutations = []
+    working_config = None  # Menyimpan metode dan format tanggal yang berhasil
 
-    # Loop 7 hari ke belakang (mulai dari hari ini mundur ke H-6)
     for day_offset in range(7):
         target_date = now_wib - timedelta(days=day_offset)
-        d_dmy = target_date.strftime("%d-%m-%Y")  # Format web: 22-11-2026
-        d_iso = target_date.strftime("%Y-%m-%d")  # Format alternatif: 2026-11-22
         
-        print(f"   📅 Mengambil mutasi tanggal: {d_dmy}...")
+        # Variasi format tanggal yang mungkin diminta oleh backend Jezpro
+        date_candidates = [
+            target_date.strftime("%d-%m-%Y"),  # 22-11-2026
+            target_date.strftime("%d %b %Y"),  # 22 Nov 2026 (persis teks tombol web)
+            target_date.strftime("%Y-%m-%d"),  # 2026-11-22
+            target_date.strftime("%d/%m/%Y"),  # 22/11/2026
+        ]
+
+        print(f"\n   📅 Mengambil Mutasi Tanggal: {target_date.strftime('%d-%m-%Y')}...")
         daily_records = []
+        found_working = False
 
-        # Paginate jika ada lebih dari 300 transaksi per hari
-        for page in range(10):
-            start_idx = page * 300
-            # Coba format DD-MM-YYYY terlebih dahulu
-            raw_res = fetch_bin_mutations_page(session, date_str=d_dmy, start_idx=start_idx, length=300)
-            
-            # Jika kosong, fallback ke format YYYY-MM-DD
-            if not raw_res or not raw_res.get("data"):
-                raw_res = fetch_bin_mutations_page(session, date_str=d_iso, start_idx=start_idx, length=300)
+        # Jika sudah pernah berhasil di hari sebelumnya, pakai settingan yang sama
+        methods_to_test = [working_config["method"]] if working_config else ["POST", "GET"]
+        formats_to_test = [target_date.strftime(working_config["format"])] if working_config else date_candidates
 
-            if not raw_res or not isinstance(raw_res, dict):
-                break
+        for method in methods_to_test:
+            if found_working: break
+            for d_str in formats_to_test:
+                js, count, total, status = query_jezpro_mutations(session, date_str=d_str, method=method, start_idx=0, length=300)
+                print(f"      [DEBUG] Test {method} (date='{d_str}'): Status HTTP {status} -> recordsTotal: {total}")
 
-            data_rows = raw_res.get("data", [])
-            if not data_rows:
-                break
+                if count > 0:
+                    data_rows = js.get("data", [])
+                    for item in data_rows:
+                        parsed = parse_bin_mutation_row(item)
+                        if parsed: daily_records.append(parsed)
 
-            for item in data_rows:
-                parsed = parse_bin_mutation_row(item)
-                if parsed:
-                    daily_records.append(parsed)
+                    # Jika data lebih dari 300, tarik halaman berikutnya
+                    if total > 300:
+                        for page in range(1, 15):
+                            start_idx = page * 300
+                            js_p, c_p, _, _ = query_jezpro_mutations(session, date_str=d_str, method=method, start_idx=start_idx, length=300)
+                            if not js_p or c_p == 0: break
+                            for item in js_p.get("data", []):
+                                parsed = parse_bin_mutation_row(item)
+                                if parsed: daily_records.append(parsed)
+                            if c_p < 300: break
+                            time.sleep(0.15)
 
-            if len(data_rows) < 300:
-                break
-            time.sleep(0.15)
+                    # Simpan konfigurasi yang berhasil agar request berikutnya instan
+                    if not working_config:
+                        # Tentukan format mana yang barusan berhasil
+                        for fmt in ["%d-%m-%Y", "%d %b %Y", "%Y-%m-%d", "%d/%m/%Y"]:
+                            if target_date.strftime(fmt) == d_str:
+                                working_config = {"method": method, "format": fmt}
+                                break
+                    found_working = True
+                    break
+                time.sleep(0.15)
 
-        print(f"         -> Ditemukan {len(daily_records)} mutasi.")
+        print(f"         -> Hasil: Ditemukan {len(daily_records)} mutasi untuk tanggal ini.")
         total_mutations.extend(daily_records)
 
     upsert_mutations_to_supabase(total_mutations)
