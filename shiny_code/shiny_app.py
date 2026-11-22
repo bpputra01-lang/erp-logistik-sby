@@ -7548,7 +7548,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         yield buf.getvalue()
     
     # ==========================================================================
-    # FILTER SUB KATEGORI & TOC: STORE LEADER RTO DECISION
+    # FILTER SUB KATEGORI & TOC: STORE LEADER RTO DECISION (ANTI-LOOP & ANTI-BUSY)
     # ==========================================================================
     @output
     @render.ui
@@ -7575,14 +7575,14 @@ def server(input: Inputs, output: Outputs, session: Session):
                     selected=current_selected_subs,
                     multiple=True,
                     options={
-                        "placeholder": "🔍 Tampilkan SEMUA Sub Kategori (atau pilih untuk menyaring...)",
+                        "placeholder": "🔍 Tampilkan SEMUA Sub Kategori...",
                         "plugins": ["remove_button"]
                     },
                     width="100%"
                 ),
                 style="flex: 1; min-width: 250px;"
             ),
-            # 2. 🌟 Filter ToC (Turnover Class)
+            # 2. Filter ToC Class
             ui.div(
                 ui.span("⚡ Filter ToC Class (Kosongkan untuk SEMUA):", 
                         style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
@@ -7593,7 +7593,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                     selected=current_selected_tocs,
                     multiple=True,
                     options={
-                        "placeholder": "🔍 Tampilkan SEMUA Kelas ToC (atau pilih untuk menyaring...)",
+                        "placeholder": "🔍 Tampilkan SEMUA Kelas ToC...",
                         "plugins": ["remove_button"]
                     },
                     width="100%"
@@ -7603,20 +7603,20 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="display: flex; gap: 15px; align-items: flex-end; margin-bottom: 1rem; width: 100%; flex-wrap: wrap;"
         )
 
+    # 🌟 GABUNGKAN MENJADI SATU LISTENER TERISOLASI AGAR TIDAK LOOP
     @reactive.Effect
-    def _on_rto_dec_sub_filter_change():
-        if state.rto_dec_processed() and "rto_dec_sub_select" in input:
-            sel = input.rto_dec_sub_select()
-            subs = list(sel) if sel else []
-            state.apply_rto_dec_sub_filter(subs)
-
-    # 🌟 Listener untuk perubahan Filter ToC
-    @reactive.Effect
-    def _on_rto_dec_toc_filter_change():
-        if state.rto_dec_processed() and "rto_dec_toc_select" in input:
-            sel = input.rto_dec_toc_select()
-            tocs = list(sel) if sel else []
-            state.apply_rto_dec_toc_filter(tocs)
+    def _on_rto_dec_combined_filter_change():
+        if state.rto_dec_processed():
+            subs = list(input.rto_dec_sub_select()) if "rto_dec_sub_select" in input and input.rto_dec_sub_select() is not None else []
+            tocs = list(input.rto_dec_toc_select()) if "rto_dec_toc_select" in input and input.rto_dec_toc_select() is not None else []
+            
+            with reactive.isolate():
+                curr_subs = state.rto_dec_selected_subs()
+                curr_tocs = state.rto_dec_selected_tocs()
+                # Hanya jalankan kalkulasi jika pilihan benar-benar berubah
+                if subs != curr_subs or tocs != curr_tocs:
+                    state.apply_rto_dec_combined_filter(subs, tocs)
+                    
 from pathlib import Path
 
 app = App(app_ui, server)

@@ -9456,7 +9456,12 @@ class AppState:
             traceback.print_exc()
             return False, f"Terjadi kesalahan saat proses analisis: {str(e)}"
 
-    # 🌟 METODE FILTER SUB KATEGORI & TOC UNTUK STORE LEADER RTO
+    # 🌟 METODE FILTER TERPADU (DENGAN ISOLASI REAKTIF)
+    def apply_rto_dec_combined_filter(self, subs, tocs):
+        self.rto_dec_selected_subs.set(subs if subs else [])
+        self.rto_dec_selected_tocs.set(tocs if tocs else [])
+        self._apply_combined_rto_dec_filters()
+
     def apply_rto_dec_sub_filter(self, selected_subs):
         self.rto_dec_selected_subs.set(selected_subs if selected_subs else [])
         self._apply_combined_rto_dec_filters()
@@ -9469,26 +9474,29 @@ class AppState:
         if self._raw_df_rto_dec_base.empty:
             return
 
-        df = self._raw_df_rto_dec_base.copy()
-        selected_subs = self.rto_dec_selected_subs()
-        selected_tocs = self.rto_dec_selected_tocs()
+        # 🌟 Isolasi pembacaan agar tidak memicu reactive loop pada effect
+        with reactive.isolate():
+            selected_subs = self.rto_dec_selected_subs()
+            selected_tocs = self.rto_dec_selected_tocs()
 
-        # 1. Filter Sub Kategori
-        if selected_subs and len(selected_subs) > 0:
-            clean_subs = [str(x).strip().upper() for x in selected_subs if str(x).strip() != ""]
-            if clean_subs:
-                df = df[df["SUB KATEGORI"].isin(clean_subs)].copy()
+            df = self._raw_df_rto_dec_base.copy()
 
-        # 2. Filter ToC (Turnover Class)
-        if selected_tocs and len(selected_tocs) > 0:
-            clean_tocs = [str(x).strip().upper() for x in selected_tocs if str(x).strip() != ""]
-            if clean_tocs:
-                df = df[df["LAST ToC"].isin(clean_tocs)].copy()
+            # 1. Filter Sub Kategori
+            if selected_subs and len(selected_subs) > 0:
+                clean_subs = [str(x).strip().upper() for x in selected_subs if str(x).strip() != ""]
+                if clean_subs:
+                    df = df[df["SUB KATEGORI"].isin(clean_subs)].copy()
 
-        self.rto_dec_total_sku.set(len(df))
-        self.rto_dec_total_qty_rto.set(int(df["REKOMENDASI RTO"].sum()) if not df.empty else 0)
-        self.rto_dec_total_qty_sby.set(int(df["QTY SURABAYA"].sum()) if not df.empty else 0)
+            # 2. Filter ToC (Turnover Class)
+            if selected_tocs and len(selected_tocs) > 0:
+                clean_tocs = [str(x).strip().upper() for x in selected_tocs if str(x).strip() != ""]
+                if clean_tocs:
+                    df = df[df["LAST ToC"].isin(clean_tocs)].copy()
 
-        self._raw_df_rto_dec = df.copy()
-        self.df_rto_dec_headers.set(df.columns.tolist() if not df.empty else [])
-        self.df_rto_dec_rows.set(df.fillna("").astype(str).values.tolist() if not df.empty else [])
+            self.rto_dec_total_sku.set(len(df))
+            self.rto_dec_total_qty_rto.set(int(df["REKOMENDASI RTO"].sum()) if not df.empty else 0)
+            self.rto_dec_total_qty_sby.set(int(df["QTY SURABAYA"].sum()) if not df.empty else 0)
+
+            self._raw_df_rto_dec = df.copy()
+            self.df_rto_dec_headers.set(df.columns.tolist() if not df.empty else [])
+            self.df_rto_dec_rows.set(df.fillna("").astype(str).values.tolist() if not df.empty else [])
