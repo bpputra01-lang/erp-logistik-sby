@@ -9201,38 +9201,89 @@ class AppState:
                 return False, "Silakan pilih Cabang Tujuan (SEMARANG atau SIDOARJO) terlebih dahulu!"
 
             # ------------------------------------------------------------------
-            # 1. BACA FILE TOC (Kolom B: Last_ToC, Kolom G: Article Name)
+            # 1. BACA & PARSING FILE TOC SECARA FLEKSIBEL (ANTI-GESER POWER BI)
             # ------------------------------------------------------------------
             df_toc_raw = load_data_from_info(f_toc)
-            if df_toc_raw.empty or df_toc_raw.shape[1] < 2:
-                return False, "File ToC tidak valid atau kosong!"
+            if df_toc_raw.empty:
+                return False, "File ToC kosong atau tidak terbaca!"
+
+            # Jika file hasil export Power BI memiliki baris judul/filter di atas, cari header aslinya
+            has_toc_header = any(any(k in str(c).upper() for k in ['TOC', 'TURNOVER', 'ARTICLE']) for c in df_toc_raw.columns)
+            if not has_toc_header:
+                for r_i in range(min(5, len(df_toc_raw))):
+                    row_strs = [str(x).upper() for x in df_toc_raw.iloc[r_i].values]
+                    if any('TOC' in v or 'TURNOVER' in v for v in row_strs) and any('ARTICLE' in v or 'ITEM' in v for v in row_strs):
+                        df_toc_raw.columns = [str(x).strip() for x in df_toc_raw.iloc[r_i].values]
+                        df_toc_raw = df_toc_raw.iloc[r_i + 1:].reset_index(drop=True)
+                        break
 
             def norm_text(val):
                 if pd.isna(val) or val is None: return ""
                 return re.sub(r'[^A-Z0-9]', '', str(val).upper())
 
-            # Deteksi Kolom ToC dan Article Name di File ToC secara fleksibel
-            def find_toc_col(df, keywords, default_idx):
-                for col in df.columns:
-                    c_up = str(col).strip().upper()
-                    if any(k in c_up for k in keywords):
-                        return col
-                if df.shape[1] > default_idx:
-                    return df.columns[default_idx]
-                return df.columns[0]
+            # Deteksi Kolom Last_ToC dan Article Name di file ToC
+            col_toc = None
+            col_art = None
+            for c in df_toc_raw.columns:
+                c_up = str(c).strip().upper()
+                if ('LAST_TOC' in c_up or 'LAST TOC' in c_up or 'TOC' in c_up or 'TURNOVER' in c_up) and col_toc is None:
+                    col_toc = c
+                elif ('ARTICLE NAME' in c_up or 'ARTICLE_NAME' in c_up or 'NAMA ARTIKEL' in c_up or 'ARTIKEL' in c_up or 'ITEM NAME' in c_up) and col_art is None:
+                    col_art = c
 
-            col_toc = find_toc_col(df_toc_raw, ['LAST_TOC', 'TOC', 'KLASIFIKASI'], 1)  # Kolom B (index 1)
-            col_art = find_toc_col(df_toc_raw, ['ARTICLE NAME', 'ARTICLE', 'ITEM NAME', 'ARTIKEL', 'DESCRIPTION'], 6 if df_toc_raw.shape[1] > 6 else 1)  # Kolom G (index 6)
+            if col_toc is None: col_toc = df_toc_raw.columns[1] if df_toc_raw.shape[1] > 1 else df_toc_raw.columns[0]
+            if col_art is None: col_art = df_toc_raw.columns[6] if df_toc_raw.shape[1] > 6 else df_toc_raw.columns[-1]
 
-            toc_map = {}
+            # Simpan kamus ToC (Exact Map dan List Tuples untuk Partial Matching)
+            toc_exact_map = {}
+            toc_tuples = []
+
             for _, r in df_toc_raw.iterrows():
-                art_clean = norm_text(r[col_art])
-                toc_val = str(r[col_toc]).strip().upper()
-                if art_clean and art_clean not in toc_map:
-                    toc_map[art_clean] = toc_val
+                raw_a = str(r[col_art]).strip()
+                raw_t = str(r[col_toc]).strip().upper()
+                if not raw_a or raw_a.upper() in ["NAN", "NONE", "-", ""]:
+                    continue
+
+                clean_a = norm_text(raw_a)
+                if clean_a:
+                    toc_exact_map[clean_a] = raw_t
+                    # Simpan tuple: (norm_text, class_val, original_words)
+                    words_token = [w for w in re.split(r'[^A-Z0-9]', raw_a.upper()) if len(w) >= 3 and not w.isdigit()]
+                    toc_tuples.append((clean_a, raw_t, words_token))
+
+            # Helper pintar pencocokan nama artikel ke ToC
+            def get_toc_status(item_name, sku_code=""):
+                clean_name = norm_text(item_name)
+                if not clean_name: return ""
+
+                # 1. Exact match
+                if clean_name in toc_exact_map:
+                    return toc_exact_map[clean_name]
+
+                # 2. Match berdasarkan kode awalan SKU (6-8 digit kode artikel)
+                c_sku = norm_text(sku_code)
+                if len(c_sku) >= 6:
+                    prefix_8 = c_sku[:8] if len(c_sku) >= 8 else c_sku[:6]
+                    for t_norm, t_val, _ in toc_tuples:
+                        if t_norm.startswith(prefix_8) or prefix_8 in t_norm:
+                            return t_val
+
+                # 3. Partial match (Nama stok ada di dalam nama ToC, atau sebaliknya)
+                for t_norm, t_val, _ in toc_tuples:
+                    if len(clean_name) >= 5 and (clean_name in t_norm or t_norm in clean_name):
+                        return t_val
+
+                # 4. Token match (Kecocokan 2 kata utama nama artikel)
+                name_words = [w for w in re.split(r'[^A-Z0-9]', str(item_name).upper()) if len(w) >= 4 and not w.isdigit()]
+                if len(name_words) >= 2:
+                    for _, t_val, t_words in toc_tuples:
+                        if name_words[0] in t_words and name_words[1] in t_words:
+                            return t_val
+
+                return ""
 
             # ------------------------------------------------------------------
-            # 2. TARIK DATA STOK DARI SUPABASE (stock_live_cache)
+            # 2. TARIK DATA STOK SURABAYA & CABANG TARGET (stock_live_cache)
             # ------------------------------------------------------------------
             BRANCH_DB_MAP = {
                 "SURABAYA": "SURABAYA_LATEST",
@@ -9240,24 +9291,33 @@ class AppState:
                 "SIDOARJO": "SIDOARJO_LATEST"
             }
 
-            def fetch_cached_stock(db_id):
+            def fetch_cached_stock(db_id, branch_kw):
                 res = client.table("stock_live_cache").select("stock_data").eq("id", db_id).execute()
                 if res and res.data:
                     raw = res.data[0].get("stock_data", [])
                     if isinstance(raw, str):
                         try: raw = json.loads(raw)
                         except Exception: raw = []
-                    return pd.DataFrame(raw) if raw else pd.DataFrame()
-                return pd.DataFrame()
+                    if raw: return raw
 
-            df_stk_sby = fetch_cached_stock(BRANCH_DB_MAP["SURABAYA"])
-            df_stk_tgt = fetch_cached_stock(BRANCH_DB_MAP[target_branch])
+                # Fallback cari by branch
+                res_b = client.table("stock_live_cache").select("stock_data").ilike("branch", f"%{branch_kw}%").execute()
+                if res_b and res_b.data:
+                    raw = res_b.data[0].get("stock_data", [])
+                    if isinstance(raw, str):
+                        try: raw = json.loads(raw)
+                        except Exception: raw = []
+                    if raw: return raw
+                return []
 
-            if df_stk_sby.empty:
-                return False, "Data stok Surabaya di Supabase masih kosong!"
+            raw_sby = fetch_cached_stock(BRANCH_DB_MAP["SURABAYA"], "SURABAYA")
+            raw_tgt = fetch_cached_stock(BRANCH_DB_MAP[target_branch], target_branch)
+
+            if not raw_sby:
+                return False, "Data stok Surabaya di database Supabase masih kosong!"
 
             # ------------------------------------------------------------------
-            # 3. FILTER BIN NON-OPERASIONAL & PEMBACAAN KOLOM AKURAT
+            # 3. STANDARISASI STOK & FILTER BIN NON-OPERASIONAL
             # ------------------------------------------------------------------
             EXCL_BIN_REGEX = r"TOKO|STAG|KARANTINA|DEFECT|REJECT|RESELLER|LIVE|AMP|GIFT|EVENT|PERBAIKAN|GARAGE"
 
@@ -9267,65 +9327,53 @@ class AppState:
                 if s.endswith('.0'): s = s[:-2]
                 return s
 
-            def aggregate_valid_stock(df_raw):
-                if df_raw.empty:
-                    return {}
+            def normalize_sku_key(val):
+                s = clean_sku(val)
+                s_lstrip = s.lstrip('0')
+                return s_lstrip if s_lstrip != "" else "0"
 
-                # Helper pencari kolom cerdas (prioritaskan nama header, fallback ke posisi resmi)
-                def get_series(exact_names, fallback_kws, default_idx):
-                    col_map = {str(c).strip().upper(): c for c in df_raw.columns}
-                    for name in exact_names:
-                        if name.upper() in col_map:
-                            return df_raw[col_map[name.upper()]]
-                    for kw in fallback_kws:
-                        for c_up, orig in col_map.items():
-                            if kw.upper() in c_up:
-                                return df_raw[orig]
-                    if df_raw.shape[1] > default_idx:
-                        return df_raw.iloc[:, default_idx]
-                    return pd.Series("", index=df_raw.index)
+            def aggregate_valid_stock(raw_data):
+                if not raw_data: return {}
 
-                # 🌟 PEMETAAN RESMI:
-                # Kolom A = BIN
-                # Kolom B = SKU
-                # Kolom E = ITEM NAME
-                # Kolom J = QTY SYSTEM
-                s_bin  = get_series(['BIN', 'LOKASI', 'BIN_CODE'], ['BIN', 'LOKASI'], 0)
-                s_sku  = get_series(['SKU', 'BARCODE_SKU', 'BARCODE', 'PS_BARCODE'], ['SKU', 'BARCODE'], 1)
-                s_name = get_series(['ITEM NAME', 'ITEM_NAME', 'ARTIKEL', 'DESCRIPTION', 'NAMA BARANG'], ['ITEM NAME', 'ARTIKEL', 'DESCRIPTION', 'NAMA'], 4)
-                s_qty  = get_series(['QTY SYSTEM', 'QTY_SYSTEM', 'QTY SYS', 'QTY', 'QUANTITY', 'STOK'], ['QTY SYSTEM', 'QTY SYS', 'STOK', 'QTY'], 9 if df_raw.shape[1] > 9 else -1)
+                df_raw = pd.DataFrame(raw_data)
+                # Standarisasi kolom menggunakan fungsi resmi sistem
+                df_std = self._standardize_to_manual_excel_format(df_raw)
 
                 stock_pool = {}
-                for b_val, sku_raw, name_raw, q_raw in zip(s_bin, s_sku, s_name, s_qty):
-                    bin_txt = str(b_val).strip().upper()
+                for _, r in df_std.iterrows():
+                    bin_txt = str(r["BIN"]).strip().upper()
                     if re.search(EXCL_BIN_REGEX, bin_txt):
                         continue
 
-                    sku_txt = clean_sku(sku_raw)
+                    # Kolom B = Barcode SKU Resmi
+                    sku_txt = clean_sku(r["SKU"])
                     if not sku_txt or sku_txt in ["NAN", "NONE", "-", ""]:
                         continue
 
-                    qty_val = safe_int(q_raw, 0)
+                    qty_val = safe_int(r["QTY SYSTEM"], 0)
                     if qty_val <= 0:
                         continue
 
-                    item_name = str(name_raw).strip()
+                    # Kolom E = Nama Lengkap Artikel
+                    item_name = str(r["ITEM NAME"]).strip()
                     if sku_txt not in stock_pool:
                         stock_pool[sku_txt] = {"item_name": item_name, "qty": 0}
                     stock_pool[sku_txt]["qty"] += qty_val
 
                 return stock_pool
 
-            pool_sby = aggregate_valid_stock(df_stk_sby)
-            pool_tgt = aggregate_valid_stock(df_stk_tgt)
+            pool_sby = aggregate_valid_stock(raw_sby)
+            pool_tgt = aggregate_valid_stock(raw_tgt)
 
             # ------------------------------------------------------------------
-            # 4. TARIK SALES DARI SUPABASE (balancing_sales_cache)
+            # 4. TARIK DATA SALES CABANG TARGET (DUAL LOOKUP: SKU & ARTICLE)
             # ------------------------------------------------------------------
             sales_cache_id = f"{target_branch}_SALES_90D"
             res_sales = client.table("balancing_sales_cache").select("sales_data").eq("id", sales_cache_id).execute()
             
-            sales_pool = {}
+            sales_pool_sku = {}
+            sales_pool_art = {}
+
             if res_sales and res_sales.data:
                 raw_sls = res_sales.data[0].get("sales_data", [])
                 if isinstance(raw_sls, str):
@@ -9333,12 +9381,20 @@ class AppState:
                     except Exception: raw_sls = []
                 for s_item in raw_sls:
                     if isinstance(s_item, dict):
-                        s_code = clean_sku(s_item.get("SKU"))
+                        raw_k = s_item.get("SKU") or s_item.get("sku") or s_item.get("BARCODE") or ""
+                        s_code = clean_sku(raw_k)
+                        raw_art = s_item.get("ARTICLE") or s_item.get("article") or s_item.get("ITEM NAME") or ""
+                        s_art_clean = norm_text(raw_art)
+                        tot_s = safe_int(s_item.get("TOTAL_SALES") if s_item.get("TOTAL_SALES") is not None else s_item.get("total_sales", 0), 0)
+
                         if s_code:
-                            sales_pool[s_code] = safe_int(s_item.get("TOTAL_SALES", 0), 0)
+                            sales_pool_sku[s_code] = tot_s
+                            sales_pool_sku[normalize_sku_key(s_code)] = tot_s
+                        if s_art_clean:
+                            sales_pool_art[s_art_clean] = tot_s
 
             # ------------------------------------------------------------------
-            # 5. MATCHING & FILTER FAST MOVING (PROP. 1:3)
+            # 5. MATCHING & FILTER: STOK TARGET < 2 & FAST MOVING
             # ------------------------------------------------------------------
             records = []
             tot_rto_qty = 0
@@ -9348,52 +9404,38 @@ class AppState:
                 qty_sby = sby_data["qty"]
                 item_name = sby_data["item_name"]
 
-                # 🌟 PERBAIKAN: CEK STOK CABANG TARGET YANG < 2 (0 ATAU 1 PCS)
+                # 🌟 SYARAT 1: Stok cabang target < 2 (0 atau 1 pcs tetap lolos)
                 tgt_info = pool_tgt.get(sku, {"qty": 0})
                 qty_tgt = tgt_info["qty"]
-                
-                # Jika stok di cabang tujuan sudah >= 2, lewati (tidak perlu RTO)
                 if qty_tgt >= 2:
                     continue
 
-                # Cek ToC berdasarkan nama artikel
-                art_norm = norm_text(item_name)
-                toc_class = toc_map.get(art_norm, "")
-
-                # Jika tidak exact match, coba pencarian sebagian (partial match)
-                if not toc_class:
-                    for k_art, v_toc in toc_map.items():
-                        if k_art and (k_art in art_norm or art_norm in k_art):
-                            toc_class = v_toc
-                            break
-
-                # Lewati jika Non Moving atau Slow Moving
-                if not toc_class or "NON" in toc_class or "SLOW" in toc_class:
+                # 🌟 SYARAT 2: Klasifikasi Fast Moving dari ToC
+                toc_class = get_toc_status(item_name, sku)
+                if not toc_class or "FAST" not in toc_class.upper():
                     continue
 
-                # Wajib Fast Moving
-                if "FAST" not in toc_class:
-                    continue
-
-                # Hitung Sales 60d Cabang Target
-                sales_tgt = sales_pool.get(sku, 0)
-
-                # Rekomendasi RTO: Kelipatan 1:3 dari stok Surabaya
+                # 🌟 SYARAT 3: Rekomendasi RTO kelipatan 1:3 dari stok Surabaya
                 rekomendasi_rto = qty_sby // 3
+                if rekomendasi_rto <= 0:
+                    continue
 
-                # Masukkan ke daftar rekomendasi jika ada yang bisa dikirim
-                if rekomendasi_rto > 0:
-                    records.append({
-                        "SKU": sku,
-                        "ITEM NAME": item_name,
-                        "QTY SURABAYA": qty_sby,
-                        f"QTY {target_branch}": qty_tgt,
-                        f"SALES 60d {target_branch}": sales_tgt,
-                        "LAST ToC": toc_class,
-                        "REKOMENDASI RTO": rekomendasi_rto
-                    })
-                    tot_rto_qty += rekomendasi_rto
-                    tot_sby_qty += qty_sby
+                # Ambil sales cabang target (prioritas Barcode SKU, fallback Nama Artikel)
+                sales_tgt = sales_pool_sku.get(sku, sales_pool_sku.get(normalize_sku_key(sku), 0))
+                if sales_tgt == 0 and item_name:
+                    sales_tgt = sales_pool_art.get(norm_text(item_name), 0)
+
+                records.append({
+                    "SKU": sku,
+                    "ITEM NAME": item_name,
+                    "QTY SURABAYA": qty_sby,
+                    f"QTY {target_branch}": qty_tgt,
+                    f"SALES 60d {target_branch}": sales_tgt,
+                    "LAST ToC": toc_class,
+                    "REKOMENDASI RTO": rekomendasi_rto
+                })
+                tot_rto_qty += rekomendasi_rto
+                tot_sby_qty += qty_sby
 
             df_result = pd.DataFrame(records)
             if not df_result.empty:
