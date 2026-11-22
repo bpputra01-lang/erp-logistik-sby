@@ -1775,19 +1775,6 @@ class AppState:
                 df_sales_done['SOURCE'] = 'SALES (DONE)'
                 combined_picking_list.append(df_sales_done)
 
-                    # 🌟 B. STATUS 'INSTOCK' -> MASUK KE LIST PUTAWAY AUDIT
-                    mask_instock = df_sales_clean['STATUS'].str.contains('INSTOCK|IN STOCK', na=False)
-                    df_sales_instock = df_sales_clean[mask_instock].copy()
-                    if not df_sales_instock.empty:
-                        for _, r_in in df_sales_instock.iterrows():
-                            instock_putaway_records.append({
-                                'SKU': r_in['SKU'],
-                                'BIN AWAL': 'INSTOCK ENTRY',
-                                'LAST BIN MUTASI': r_in['BIN'],
-                                'TOTAL PERJALANAN': 1,
-                                'ALUR MUTASI': f"INSTOCK ➔ {r_in['BIN']} (Qty: {r_in['QTY']})"
-                            })
-
             # ------------------------------------------------------------------
             # 2. Olah File RTO (Tetap Masuk ke List Picking)
             # ------------------------------------------------------------------
@@ -1800,16 +1787,16 @@ class AppState:
                     df_rto['BIN'] = df_rto['BIN'].astype(str).str.strip().str.upper()
                     df_rto['QTY'] = pd.to_numeric(df_rto['QTY'], errors='coerce').fillna(0).astype(int)
                     df_rto = df_rto[(df_rto['SKU'] != '') & (df_rto['BIN'] != '') & (df_rto['SKU'] != 'SKU') & (df_rto['QTY'] > 0)]
-                    df_rto = df_rto.groupby(['SKU', 'BIN'], as_index=False)['QTY'].sum()
-                    df_rto['SOURCE'] = 'RTO'
-                    combined_picking_list.append(df_rto)
+                    if not df_rto.empty:
+                        df_rto = df_rto.groupby(['SKU', 'BIN'], as_index=False)['QTY'].sum()
+                        df_rto['SOURCE'] = 'RTO'
+                        combined_picking_list.append(df_rto)
 
             if combined_picking_list:
                 df_picking = pd.concat(combined_picking_list, ignore_index=True)
                 df_picking = df_picking[df_picking['QTY'] > 0].reset_index(drop=True)
             else:
                 df_picking = pd.DataFrame(columns=['SKU', 'BIN', 'QTY', 'SOURCE'])
-
             # ------------------------------------------------------------------
             # 3. Olah File Mutasi & Gabungkan dengan Sales INSTOCK
             # ------------------------------------------------------------------
