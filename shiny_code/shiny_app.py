@@ -3302,32 +3302,40 @@ def server(input: Inputs, output: Outputs, session: Session):
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
 
+    @output
     @render.ui
     def bs_category_filter_container_ui():
-        if not state.bs_processed():
-            return ui.div()
+        cats = state.bs_category_list()
+        
+        # 🌟 Gunakan reactive.isolate agar dropdown TIDAK berkedip/re-render saat user memilih kategori
+        with reactive.isolate():
+            current_selected = state.bs_selected_categories()
 
-        choices = state.bs_category_list()
         return ui.div(
-            ui.div(
-                ui.span("📁 Filter Sub Kategori (Category):", style="font-size: 12px; font-weight: 800; color: #1A202C; margin-bottom: 4px; display: block;"),
-                ui.input_selectize(
-                    "bs_filter_category_select",
-                    None,
-                    choices=choices,
-                    multiple=True,
-                    width="100%"
-                ),
-                style="width: 100%;"
+            ui.span("Filter Sub Kategori (Kosongkan untuk SEMUA KATEGORI):", 
+                    style="font-size: 12px; font-weight: 800; color: #4A5568; margin-bottom: 4px; display: block;"),
+            ui.input_selectize(
+                "bs_category_select",  # 👈 ID RESMI
+                label=None,
+                choices=cats,
+                selected=current_selected,  # Default [] (Kosong = Semua Kategori)
+                multiple=True,
+                options={
+                    "placeholder": "🔍 Menampilkan SEMUA Kategori (atau pilih untuk menyaring...)",
+                    "plugins": ["remove_button"]
+                },
+                width="100%"
             ),
-            style="background: #F8FAFC; border: 1px solid #CBD5E0; padding: 12px 16px; border-radius: 8px; margin-top: 1rem;"
+            style="width: 100%; margin-top: 10px;"
         )
 
+    # 🌟 ID SUDAH DISAMAKAN: "bs_category_select"
     @reactive.Effect
     def _on_bs_category_filter_change():
-        if state.bs_processed() and "bs_filter_category_select" in input:
-            sel = input.bs_filter_category_select()
-            cats = list(sel) if sel is not None else []
+        if state.bs_processed() and "bs_category_select" in input:
+            sel = input.bs_category_select()
+            # Jika user mengosongkan (None atau tuple kosong ()), kirim [] agar menampilkan SEMUA
+            cats = list(sel) if sel else []
             state.apply_bs_category_filter(cats)
     
     @reactive.Effect

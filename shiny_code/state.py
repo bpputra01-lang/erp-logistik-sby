@@ -4465,10 +4465,15 @@ class AppState:
             return False, f"Terjadi kesalahan saat kalkulasi: {str(e)}"
 
     def apply_bs_category_filter(self, selected_cats):
-        """Memfilter berdasarkan Sub Kategori dan mempertahankan filter Area aktif"""
-        self.bs_selected_categories.set(selected_cats if selected_cats is not None else [])
+        """Jika selected_cats kosong / None, set ke [] (artinya SEMUA KATEGORI)"""
+        if not selected_cats or selected_cats is None:
+            self.bs_selected_categories.set([])
+        else:
+            # Bersihkan jika ada string kosong atau pilihan 'SEMUA'
+            clean_list = [str(x).strip().upper() for x in selected_cats if str(x).strip().upper() not in ["", "SEMUA", "ALL"]]
+            self.bs_selected_categories.set(clean_list)
+            
         self._apply_combined_bs_filters()
-
     def apply_bs_area_filter(self, selected_area):
         """Memfilter Tab 2 berdasarkan Area (OFFLINE, ONLINE, LOGISTIK)"""
         self.bs_selected_area.set(selected_area if selected_area else "SEMUA AREA")
@@ -4485,12 +4490,18 @@ class AppState:
         selected_cats = self.bs_selected_categories()
         selected_area = self.bs_selected_area()
 
-        # 1. Filter Sub Kategori
+        # ----------------------------------------------------------------------
+        # 1. FILTER SUB KATEGORI:
+        # HANYA filter jika selected_cats ADA ISINYA.
+        # JIKA KOSONG -> TAMPILKAN 100% SEMUA SUB KATEGORI!
+        # ----------------------------------------------------------------------
         if selected_cats and len(selected_cats) > 0:
-            selected_clean = [str(x).strip().upper() for x in selected_cats]
-            df_alloc = df_alloc[df_alloc["SUB KATEGORI"].isin(selected_clean)].copy()
-            skus_valid = set(df_alloc["SKU"].unique())
-            df_refill = df_refill[df_refill["SKU"].isin(skus_valid)].copy()
+            selected_clean = [str(x).strip().upper() for x in selected_cats if str(x).strip() != ""]
+            if selected_clean:
+                df_alloc = df_alloc[df_alloc["SUB KATEGORI"].isin(selected_clean)].copy()
+                skus_valid = set(df_alloc["SKU"].unique())
+                df_refill = df_refill[df_refill["SKU"].isin(skus_valid)].copy()
+        # Jika selected_cats kosong ([]), kode TIDAK memotong apa pun (Semua kategori tampil)
 
         # 2. Filter Area Khusus Tab 2
         if selected_area == "AREA OFFLINE":
@@ -4533,7 +4544,7 @@ class AppState:
         defisit_off = sum(1 for _, r in df_alloc.iterrows() if r["TARGET OFF"] > r["QTY OFF"])
         defisit_onl = sum(1 for _, r in df_alloc.iterrows() if r["TARGET ONL"] > r["QTY ONL"])
         defisit_log = sum(1 for _, r in df_alloc.iterrows() if r["TARGET LOG"] > r["QTY LOG"])
-        
+
         # Simpan nilai metrik ke reactive state
         self.bs_total_sku.set(tot_sku)
         self.bs_total_stock.set(tot_stk)
