@@ -9204,16 +9204,25 @@ class AppState:
             # 1. BACA FILE TOC (Kolom B: Last_ToC, Kolom G: Article Name)
             # ------------------------------------------------------------------
             df_toc_raw = load_data_from_info(f_toc)
-            if df_toc_raw.empty or df_toc_raw.shape[1] < 7:
-                return False, "File ToC minimal harus memiliki 7 kolom (hingga Kolom G: Article Name)!"
+            if df_toc_raw.empty or df_toc_raw.shape[1] < 2:
+                return False, "File ToC tidak valid atau kosong!"
 
             def norm_text(val):
                 if pd.isna(val) or val is None: return ""
                 return re.sub(r'[^A-Z0-9]', '', str(val).upper())
 
-            # Ambil Kolom B (index 1) dan Kolom G (index 6)
-            col_toc = df_toc_raw.columns[1]
-            col_art = df_toc_raw.columns[6]
+            # Deteksi Kolom ToC dan Article Name di File ToC secara fleksibel
+            def find_toc_col(df, keywords, default_idx):
+                for col in df.columns:
+                    c_up = str(col).strip().upper()
+                    if any(k in c_up for k in keywords):
+                        return col
+                if df.shape[1] > default_idx:
+                    return df.columns[default_idx]
+                return df.columns[0]
+
+            col_toc = find_toc_col(df_toc_raw, ['LAST_TOC', 'TOC', 'KLASIFIKASI'], 1)  # Kolom B (index 1)
+            col_art = find_toc_col(df_toc_raw, ['ARTICLE NAME', 'ARTICLE', 'ITEM NAME', 'ARTIKEL', 'DESCRIPTION'], 6 if df_toc_raw.shape[1] > 6 else 1)  # Kolom G (index 6)
 
             toc_map = {}
             for _, r in df_toc_raw.iterrows():
@@ -9248,7 +9257,7 @@ class AppState:
                 return False, "Data stok Surabaya di Supabase masih kosong!"
 
             # ------------------------------------------------------------------
-            # 3. FILTER BIN NON-OPERASIONAL
+            # 3. FILTER BIN NON-OPERASIONAL & PEMBACAAN KOLOM AKURAT
             # ------------------------------------------------------------------
             EXCL_BIN_REGEX = r"TOKO|STAG|KARANTINA|DEFECT|REJECT|RESELLER|LIVE|AMP|GIFT|EVENT|PERBAIKAN|GARAGE"
 
@@ -9259,29 +9268,48 @@ class AppState:
                 return s
 
             def aggregate_valid_stock(df_raw):
-                if df_raw.empty or df_raw.shape[1] < 10:
+                if df_raw.empty:
                     return {}
-                # Kolom B = BIN (idx 1), C = SKU (idx 2), E = ITEM NAME (idx 4), J = QTY (idx 9)
-                col_b = df_raw.columns[1]
-                col_c = df_raw.columns[2]
-                col_e = df_raw.columns[4]
-                col_j = df_raw.columns[9]
+
+                # Helper pencari kolom cerdas (prioritaskan nama header, fallback ke posisi resmi)
+                def get_series(exact_names, fallback_kws, default_idx):
+                    col_map = {str(c).strip().upper(): c for c in df_raw.columns}
+                    for name in exact_names:
+                        if name.upper() in col_map:
+                            return df_raw[col_map[name.upper()]]
+                    for kw in fallback_kws:
+                        for c_up, orig in col_map.items():
+                            if kw.upper() in c_up:
+                                return df_raw[orig]
+                    if df_raw.shape[1] > default_idx:
+                        return df_raw.iloc[:, default_idx]
+                    return pd.Series("", index=df_raw.index)
+
+                # 🌟 PEMETAAN RESMI:
+                # Kolom A = BIN
+                # Kolom B = SKU
+                # Kolom E = ITEM NAME
+                # Kolom J = QTY SYSTEM
+                s_bin  = get_series(['BIN', 'LOKASI', 'BIN_CODE'], ['BIN', 'LOKASI'], 0)
+                s_sku  = get_series(['SKU', 'BARCODE_SKU', 'BARCODE', 'PS_BARCODE'], ['SKU', 'BARCODE'], 1)
+                s_name = get_series(['ITEM NAME', 'ITEM_NAME', 'ARTIKEL', 'DESCRIPTION', 'NAMA BARANG'], ['ITEM NAME', 'ARTIKEL', 'DESCRIPTION', 'NAMA'], 4)
+                s_qty  = get_series(['QTY SYSTEM', 'QTY_SYSTEM', 'QTY SYS', 'QTY', 'QUANTITY', 'STOK'], ['QTY SYSTEM', 'QTY SYS', 'STOK', 'QTY'], 9 if df_raw.shape[1] > 9 else -1)
 
                 stock_pool = {}
-                for _, r in df_raw.iterrows():
-                    bin_txt = str(r[col_b]).strip().upper()
+                for b_val, sku_raw, name_raw, q_raw in zip(s_bin, s_sku, s_name, s_qty):
+                    bin_txt = str(b_val).strip().upper()
                     if re.search(EXCL_BIN_REGEX, bin_txt):
                         continue
 
-                    sku_txt = clean_sku(r[col_c])
+                    sku_txt = clean_sku(sku_raw)
                     if not sku_txt or sku_txt in ["NAN", "NONE", "-", ""]:
                         continue
 
-                    qty_val = safe_int(r[col_j], 0)
+                    qty_val = safe_int(q_raw, 0)
                     if qty_val <= 0:
                         continue
 
-                    item_name = str(r[col_e]).strip()
+                    item_name = str(name_raw).strip()
                     if sku_txt not in stock_pool:
                         stock_pool[sku_txt] = {"item_name": item_name, "qty": 0}
                     stock_pool[sku_txt]["qty"] += qty_val
@@ -9320,17 +9348,19 @@ class AppState:
                 qty_sby = sby_data["qty"]
                 item_name = sby_data["item_name"]
 
-                # Syarat: Ada di Surabaya, tapi TIDAK ADA / 0 di Cabang Target
+                # 🌟 PERBAIKAN: CEK STOK CABANG TARGET YANG < 2 (0 ATAU 1 PCS)
                 tgt_info = pool_tgt.get(sku, {"qty": 0})
                 qty_tgt = tgt_info["qty"]
-                if qty_tgt > 0:
+                
+                # Jika stok di cabang tujuan sudah >= 2, lewati (tidak perlu RTO)
+                if qty_tgt >= 2:
                     continue
 
                 # Cek ToC berdasarkan nama artikel
                 art_norm = norm_text(item_name)
                 toc_class = toc_map.get(art_norm, "")
 
-                # Jika tidak exact, coba pencarian sebagian (partial match)
+                # Jika tidak exact match, coba pencarian sebagian (partial match)
                 if not toc_class:
                     for k_art, v_toc in toc_map.items():
                         if k_art and (k_art in art_norm or art_norm in k_art):
@@ -9351,7 +9381,7 @@ class AppState:
                 # Rekomendasi RTO: Kelipatan 1:3 dari stok Surabaya
                 rekomendasi_rto = qty_sby // 3
 
-                # Masukkan ke daftar rekomendasi
+                # Masukkan ke daftar rekomendasi jika ada yang bisa dikirim
                 if rekomendasi_rto > 0:
                     records.append({
                         "SKU": sku,
