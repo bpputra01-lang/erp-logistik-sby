@@ -6,6 +6,7 @@ import calendar
 import requests
 from datetime import datetime, timezone, timedelta
 from bs4 import BeautifulSoup
+from collections import defaultdict
 
 # ==============================================================================
 # 🔑 KREDENSIAL & KONFIGURASI PUSAT
@@ -28,6 +29,7 @@ HEADERS_SB = {
     "Prefer": "resolution=merge-duplicates"
 }
 
+# DAFTAR SEMUA CABANG TARGET
 ALL_KNOWN_STORES = [
     "JEZ SURABAYA",
     "ONLINE HUB SURABAYA",
@@ -105,7 +107,7 @@ def create_jezpro_session():
         "Referer": "https://jezpro.id/dashboards"
     })
     print(f"🔐 [{datetime.now(WIB).strftime('%H:%M:%S')}] Login ke Jezpro ({JEZPRO_EMAIL})...")
-    res = session.get("https://jezpro.id/", timeout=25)
+    res = session.get("https://jezpro.id/", timeout=30)
     soup = BeautifulSoup(res.text, "html.parser")
     token_tag = soup.find("input", {"name": "_token"})
     if not token_tag:
@@ -116,34 +118,39 @@ def create_jezpro_session():
         "_token": csrf_token,
         "u_email": JEZPRO_EMAIL,
         "password": JEZPRO_PASSWORD
-    }, timeout=25)
+    }, timeout=30)
     
-    session.get("https://jezpro.id/dashboards", timeout=25)
+    session.get("https://jezpro.id/dashboards", timeout=30)
     session.headers.update({"X-CSRF-TOKEN": csrf_token})
     print("✅ Berhasil login ke Jezpro!")
     return session
 
-def get_store_list_from_page(session):
+def get_combined_store_list(session):
+    """Menggabungkan store yang terdaftar di akun dengan list cabang target"""
+    stores_found = []
     try:
         res = session.get("https://jezpro.id/dashboards", timeout=20)
         soup = BeautifulSoup(res.text, "html.parser")
-        stores = []
         select_tag = soup.find("select", {"id": re.compile(r'store', re.I)}) or soup.find("select", {"name": re.compile(r'store', re.I)})
         if select_tag:
             for opt in select_tag.find_all("option"):
                 txt = opt.get_text().strip()
-                if txt and txt.upper() not in ["PILIH", "ALL", "SEMUA", "SELECT STORE"]:
-                    stores.append(txt)
-        if stores:
-            return list(dict.fromkeys(stores))
+                val = opt.get("value", "").strip()
+                target_str = txt if txt else val
+                if target_str and target_str.upper() not in ["PILIH", "ALL", "SEMUA", "SELECT STORE", ""]:
+                    stores_found.append(target_str)
     except Exception:
         pass
-    return ALL_KNOWN_STORES
+
+    # Gabungkan dengan ALL_KNOWN_STORES agar cabang lain tetap dieksekusi
+    final_stores = list(dict.fromkeys(ALL_KNOWN_STORES + stores_found))
+    print(f"ℹ️  [STORE LIST] Total cabang yang akan diproses: {len(final_stores)} cabang.")
+    return final_stores
 
 # ==============================================================================
-# 📦 MODUL 1: SCRAPING MUTASI BIN DENGAN PARAMETER ASLI JEZPRO
+# 📦 MODUL 1: SCRAPING MUTASI BIN DENGAN RETRY & PER-BRANCH SUMMARY
 # ==============================================================================
-def fetch_bin_mutations_page(session, start_idx=0, length=300):
+def fetch_bin_mutations_page(session, start_idx=0, length=150, max_retries=3):
     url = "https://jezpro.id/bin_history_datatables"
     headers = {
         "Accept": "application/json, text/javascript, */*; q=0.01",
@@ -151,11 +158,10 @@ def fetch_bin_mutations_page(session, start_idx=0, length=300):
         "Referer": "https://jezpro.id/setup_lokasi_stok_v2"
     }
     
-    # 🌟 PARAMETER PERSIS SESUAI HASIL INSPECT NETWORK ANDA:
     params = {
         "draw": "1",
         "start": str(start_idx),
-        "length": str(length),
+        "length": str(length),  # Diubah jadi 150 agar database Jezpro tidak timeout
         "search": "",
         "st_id": "",
         "date": "",
@@ -187,21 +193,26 @@ def fetch_bin_mutations_page(session, start_idx=0, length=300):
         "columns[11][name]": "pm_created_at"
     }
 
-    try:
-        # Request GET resmi sesuai Inspect Element
-        res = session.get(url, params=params, headers=headers, timeout=30)
-        if res.status_code == 200:
-            return res.json()
-        else:
-            print(f"      [DEBUG] Gagal fetch DataTables: HTTP {res.status_code}")
-    except Exception as e:
-        print(f"      ⚠️ Gagal request mutasi: {e}")
+    # Mekanisme retry otomatis jika timeout
+    for attempt in range(1, max_retries + 1):
+        try:
+            res = session.get(url, params=params, headers=headers, timeout=45)
+            if res.status_code == 200:
+                return res.json()
+            elif res.status_code == 500:
+                print(f"      ⚠️ Jezpro 500 Server Error (Percobaan {attempt}/{max_retries})")
+        except requests.exceptions.Timeout:
+            print(f"      ⚠️ Timeout mengambil data mutasi (Percobaan {attempt}/{max_retries}). Mencoba ulang...")
+        except Exception as e:
+            print(f"      ⚠️ Error request mutasi: {e} (Percobaan {attempt}/{max_retries})")
+        
+        time.sleep(2 * attempt)
+        
     return None
 
 def parse_bin_mutation_row(raw_row):
     if not raw_row: return None
 
-    # JIKA FORMAT OBJECT (DICTIONARY)
     if isinstance(raw_row, dict):
         pmt_id = safe_int(raw_row.get("pmt_id") or raw_row.get("DT_RowIndex") or raw_row.get("id"))
         st_name = strip_html(raw_row.get("st_name", "-")).upper()
@@ -230,7 +241,6 @@ def parse_bin_mutation_row(raw_row):
             "scraped_at": datetime.now(WIB).isoformat()
         }
 
-    # JIKA FORMAT ARRAY / LIST (INDEX 0 s/d 11)
     if isinstance(raw_row, (list, tuple)) and len(raw_row) >= 11:
         raw_no = safe_int(raw_row[0])
         st_name = strip_html(raw_row[4]).upper()
@@ -262,7 +272,7 @@ def parse_bin_mutation_row(raw_row):
 def upsert_mutations_to_supabase(records: list):
     if not records:
         print("   ⚠️ Tidak ada data mutasi untuk disimpan.")
-        return
+        return 0
     batch_size = 200
     total_saved = 0
     for i in range(0, len(records), batch_size):
@@ -272,38 +282,36 @@ def upsert_mutations_to_supabase(records: list):
         if res.status_code in [200, 201]:
             total_saved += len(chunk)
         else:
-            print(f"   ❌ Gagal simpan batch mutasi {i}: {res.status_code}")
-    print(f"   ✅ [SUPABASE] Sukses simpan {total_saved} baris mutasi ke jezpro_bin_mutations!")
+            print(f"   ❌ Gagal simpan batch mutasi {i}: HTTP {res.status_code} - {res.text}")
+    return total_saved
 
 def run_sync_all_branches_mutations(session):
     now_wib = datetime.now(WIB)
-    # Batas 7 hari kebelakang (00:00:00 WIB)
     cutoff_dt = (now_wib - timedelta(days=7)).replace(hour=0, minute=0, second=0, microsecond=0)
 
     print(f"\n📦 [{now_wib.strftime('%H:%M:%S')}] Memulai Scraping Mutasi BIN (7 Hari Terakhir):")
-    print(f"   ⏳ Batas Tanggal: Sejak {cutoff_dt.strftime('%d-%m-%Y %H:%M:%S')} WIB s/d Sekarang")
+    print(f"   ⏳ Rentang Waktu: {cutoff_dt.strftime('%d-%m-%Y')} s/d Sekarang ({now_wib.strftime('%d-%m-%Y %H:%M')})")
 
     valid_mutations = []
+    store_mutation_count = defaultdict(int)
     page = 0
     stop_scraping = False
+    page_size = 150
 
     while not stop_scraping:
-        start_idx = page * 300
-        print(f"   📄 Mengambil data halaman {page + 1} (Offset: {start_idx})...")
+        start_idx = page * page_size
+        print(f"   ⏳ Mengunduh data mutasi batch ke-{page + 1}...", end="\r")
         
-        js = fetch_bin_mutations_page(session, start_idx=start_idx, length=300)
+        js = fetch_bin_mutations_page(session, start_idx=start_idx, length=page_size)
         if not js or not isinstance(js, dict):
+            print(f"\n   ⚠️ Terhenti pada batch ke-{page + 1}: Server Jezpro tidak memberikan respon.")
             break
 
         data_rows = js.get("data", [])
         if not data_rows:
-            print("         -> Tidak ada data lagi dari server.")
             break
 
-        print(f"         -> Diterima {len(data_rows)} data dari Jezpro. Memeriksa rentang tanggal...")
-
         for item in data_rows:
-            # Ambil tanggal transaksi mentah
             raw_dt_str = None
             if isinstance(item, dict):
                 raw_dt_str = item.get("pm_created_at") or item.get("created_at")
@@ -312,28 +320,44 @@ def run_sync_all_branches_mutations(session):
 
             row_dt = extract_mutation_datetime(raw_dt_str)
 
-            # Jika data sudah lebih lama dari 7 hari lalu, hentikan penarikan
             if row_dt and row_dt < cutoff_dt:
                 stop_scraping = True
-                print(f"   ⏹️ Mencapai data tanggal {row_dt.strftime('%d-%m-%Y')} (< 7 hari lalu). Scraping mutasi selesai.")
                 break
 
             parsed = parse_bin_mutation_row(item)
             if parsed:
                 valid_mutations.append(parsed)
+                store_name = parsed.get("store_name", "UNKNOWN")
+                store_mutation_count[store_name] += 1
 
-        # Jika data yang diterima kurang dari limit 300, berarti sudah halaman terakhir
-        if len(data_rows) < 300:
+        if len(data_rows) < page_size:
             break
 
         page += 1
-        time.sleep(0.2)
+        time.sleep(0.15)
 
-    print(f"   🎯 Total mutasi valid dalam 7 hari terakhir: {len(valid_mutations)} data.")
-    upsert_mutations_to_supabase(valid_mutations)
+    print("\n   ------------------------------------------------------------")
+    print("   📊 REKAPITULASI MUTASI BIN PER CABANG (7 HARI TERAKHIR):")
+    print("   ------------------------------------------------------------")
+    if not store_mutation_count:
+        print("   ⚠️ Tidak ada data mutasi yang ditemukan dalam 7 hari terakhir.")
+    else:
+        for store in sorted(ALL_KNOWN_STORES):
+            count = store_mutation_count.get(store, 0)
+            status = "✅ Sukses Terambil" if count > 0 else "⚪ Tidak Ada Mutasi"
+            print(f"   📍 {store.ljust(25)} : {str(count).rjust(4)} data ({status})")
+        
+        # Cek jika ada cabang di luar ALL_KNOWN_STORES
+        for store, count in store_mutation_count.items():
+            if store not in ALL_KNOWN_STORES:
+                print(f"   📍 {store.ljust(25)} : {str(count).rjust(4)} data (✅ Sukses Terambil - Cabang Baru)")
+
+    print("   ------------------------------------------------------------")
+    saved_count = upsert_mutations_to_supabase(valid_mutations)
+    print(f"   🎯 TOTAL: {len(valid_mutations)} data mutasi divalidasi | {saved_count} berhasil disimpan ke Supabase.")
 
 # ==============================================================================
-# 💰 MODUL 2: SCRAPING NET SALES UNTUK SEMUA CABANG (TETAP SAMA)
+# 💰 MODUL 2: SCRAPING NET SALES SEMUA CABANG DENGAN STATUS LAPORAN
 # ==============================================================================
 def fetch_metrics_single_store(session, start_date: str, end_date: str, store_name: str, channel="ALL"):
     url = "https://jezpro.id/dashboards/metrics"
@@ -350,17 +374,19 @@ def fetch_metrics_single_store(session, start_date: str, end_date: str, store_na
         "Referer": "https://jezpro.id/dashboards"
     }
     try:
-        res = session.get(url, params=params, headers=headers, timeout=25)
+        res = session.get(url, params=params, headers=headers, timeout=30)
         if res.status_code == 200:
             return res.json()
+        elif res.status_code == 403:
+            return {"error": "Akses Ditolak (Periksa role/izin akun cabang ini)"}
     except Exception as e:
-        print(f"      ⚠️ Gagal fetch sales {store_name}: {e}")
+        return {"error": str(e)}
     return None
 
 def parse_single_store_data(raw_json, store_name: str, channel="ALL"):
     records = []
     now_iso = datetime.now(WIB).isoformat()
-    if not raw_json or not isinstance(raw_json, dict):
+    if not raw_json or not isinstance(raw_json, dict) or "error" in raw_json:
         return records
 
     detail_table = raw_json.get("detail_table")
@@ -422,7 +448,7 @@ def parse_single_store_data(raw_json, store_name: str, channel="ALL"):
     return records
 
 def upsert_sales_to_supabase(records: list):
-    if not records: return
+    if not records: return 0
     batch_size = 150
     total_saved = 0
     for i in range(0, len(records), batch_size):
@@ -431,11 +457,11 @@ def upsert_sales_to_supabase(records: list):
         res = requests.post(url, headers=HEADERS_SB, json=chunk, timeout=25)
         if res.status_code in [200, 201]:
             total_saved += len(chunk)
-    print(f"   ✅ [SUPABASE] Sukses simpan {total_saved} baris data sales!")
+    return total_saved
 
 def run_sync_all_branches_sales(session, full_history=False):
     now_wib = datetime.now(WIB)
-    store_list = get_store_list_from_page(session)
+    store_list = get_combined_store_list(session)
 
     if full_history:
         current_year, current_month = 2026, 9
@@ -444,7 +470,7 @@ def run_sync_all_branches_sales(session, full_history=False):
     else:
         current_year, current_month = now_wib.year, now_wib.month
         end_year, end_month = now_wib.year, now_wib.month
-        print(f"\n🏢 [SALES] Hourly Sync Semua Cabang ({now_wib.strftime('%B %Y')})")
+        print(f"\n🏢 [SALES] Sync Rutin Semua Cabang ({now_wib.strftime('%B %Y')})")
 
     while (current_year < end_year) or (current_year == end_year and current_month <= end_month):
         start_date = f"{current_year}-{current_month:02d}-01"
@@ -454,16 +480,28 @@ def run_sync_all_branches_sales(session, full_history=False):
             last_day = calendar.monthrange(current_year, current_month)[1]
             end_date = f"{current_year}-{current_month:02d}-{last_day:02d}"
 
-        print(f"   📅 Sales Periode: {start_date} s/d {end_date} ({len(store_list)} Cabang)")
+        print(f"\n   📅 Periode: {start_date} s/d {end_date}")
         month_records = []
-        for idx, store in enumerate(store_list, 1):
+        
+        for store in store_list:
             raw_data = fetch_metrics_single_store(session, start_date, end_date, store)
-            if raw_data:
-                store_rows = parse_single_store_data(raw_data, store, channel="ALL")
+            
+            if isinstance(raw_data, dict) and "error" in raw_data:
+                print(f"      📍 {store.ljust(22)} : ❌ Gagal ({raw_data['error']})")
+                continue
+
+            store_rows = parse_single_store_data(raw_data, store, channel="ALL")
+            if store_rows:
+                total_nominal = sum(r['net_sales'] for r in store_rows)
+                print(f"      📍 {store.ljust(22)} : ✅ {len(store_rows)} hari sales (Total: Rp {total_nominal:,.0f})")
                 month_records.extend(store_rows)
+            else:
+                print(f"      📍 {store.ljust(22)} : ⚠️ 0 data (Kemungkinan akun tidak punya hak akses atau belum ada sales)")
+
             time.sleep(0.1)
 
-        upsert_sales_to_supabase(month_records)
+        saved = upsert_sales_to_supabase(month_records)
+        print(f"   💾 Tersimpan {saved} data sales ke Supabase jezpro_daily_net_sales.")
 
         if current_month == 12:
             current_month = 1
@@ -472,7 +510,7 @@ def run_sync_all_branches_sales(session, full_history=False):
             current_month += 1
 
 # ==============================================================================
-# SIKLUS UTAMA / SCHEDULER SETIAP 1 JAM (DAEMON LOOP)
+# SIKLUS UTAMA / SCHEDULER SETIAP 1 JAM
 # ==============================================================================
 def execute_master_sync(is_first_cycle=False):
     print("\n" + "=" * 70)
@@ -485,18 +523,18 @@ def execute_master_sync(is_first_cycle=False):
         # 1. Tarik Mutasi BIN (7 Hari Terakhir)
         run_sync_all_branches_mutations(session)
 
-        # 2. Tarik Net Sales Semua Cabang (Sept 2026 jika first_cycle)
+        # 2. Tarik Net Sales Semua Cabang
         run_sync_all_branches_sales(session, full_history=is_first_cycle)
 
-        print(f"\n🎉 [SELESAI] Semua data cabang berhasil di-sync pukul {datetime.now(WIB).strftime('%H:%M:%S')} WIB.")
+        print(f"\n🎉 [SELESAI] Semua proses sync cabang rampung pukul {datetime.now(WIB).strftime('%H:%M:%S')} WIB.")
     except Exception as e:
         print(f"\n❌ Terjadi kesalahan pada siklus ini: {e}")
 
 def start_hourly_scheduler():
     print("=" * 70)
     print("🚀 JEZPRO ALL-BRANCH MASTER SCRAPER WORKER")
-    print("   Target 1: Mutasi BIN SEMUA CABANG (HANYA 7 HARI TERAKHIR) -> public.jezpro_bin_mutations")
-    print("   Target 2: Net Sales SEMUA CABANG (SEPT 2026 ONWARDS)     -> public.jezpro_daily_net_sales")
+    print("   Target 1: Mutasi BIN SEMUA CABANG (7 HARI) -> public.jezpro_bin_mutations")
+    print("   Target 2: Net Sales SEMUA CABANG           -> public.jezpro_daily_net_sales")
     print("   Frekuensi: Otomatis Setiap 1 Jam (3600 Detik)")
     print("=" * 70)
 
@@ -507,7 +545,7 @@ def start_hourly_scheduler():
 
         sleep_seconds = 3600
         next_run = datetime.now(WIB) + timedelta(seconds=sleep_seconds)
-        print(f"💤 Tidur 1 jam. Siklus berikutnya dijadwalkan pukul: {next_run.strftime('%H:%M:%S')} WIB\n")
+        print(f"\n💤 Standby 1 jam. Siklus berikutnya pukul: {next_run.strftime('%H:%M:%S')} WIB\n")
         time.sleep(sleep_seconds)
 
 if __name__ == "__main__":
