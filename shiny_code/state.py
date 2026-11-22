@@ -1676,27 +1676,67 @@ class AppState:
         self.df_cc_headers.set(display_df.columns.tolist() if not display_df.empty else [])
         self.df_cc_rows.set(display_df.fillna("").astype(str).values.tolist() if not display_df.empty else [])
 
-        # --- PUTAWAY & PICKING AUDIT ALGORITHM ---
+     # ==========================================================================
+    # PUTAWAY & PICKING AUDIT ALGORITHM (DONE -> PICKING, INSTOCK -> PUTAWAY)
+    # ==========================================================================
     def process_ppa_audit(self, f_sales, f_rto, f_mutasi):
         try:
             if not f_sales and not f_rto and not f_mutasi:
                 return False, "Harap upload setidaknya salah satu file (Sales, RTO, atau Mutasi)!"
 
-            # 1. Olah Data Picking (Sales & RTO)
-            combined_list = []
+            combined_picking_list = []
+            instock_putaway_records = []
+
+            # ------------------------------------------------------------------
+            # 1. Olah File Sales (Baca Kolom 9: DONE vs INSTOCK)
+            # ------------------------------------------------------------------
             if f_sales:
                 df_s = load_data_from_info(f_sales)
                 if not df_s.empty and df_s.shape[1] > 10:
-                    df_sales = df_s.iloc[:, [1, 6, 10]].copy()
-                    df_sales.columns = ['SKU', 'BIN', 'QTY']
-                    df_sales['SKU'] = df_sales['SKU'].astype(str).str.strip().str.upper()
-                    df_sales['BIN'] = df_sales['BIN'].astype(str).str.strip().str.upper()
-                    df_sales['QTY'] = pd.to_numeric(df_sales['QTY'], errors='coerce').fillna(0).astype(int)
-                    df_sales = df_sales[(df_sales['SKU'] != '') & (df_sales['BIN'] != '') & (df_sales['SKU'] != 'SKU')]
-                    df_sales = df_sales.groupby(['SKU', 'BIN'], as_index=False)['QTY'].sum()
-                    df_sales['SOURCE'] = 'SALES'
-                    combined_list.append(df_sales)
+                    # Ambil Kolom 1 (SKU), 6 (BIN), 9 (STATUS), dan 10 (QTY)
+                    df_sales_raw = df_s.iloc[:, [1, 6, 9, 10]].copy()
+                    df_sales_raw.columns = ['SKU', 'BIN', 'STATUS', 'QTY']
 
+                    df_sales_raw['SKU'] = df_sales_raw['SKU'].astype(str).str.strip().str.upper()
+                    df_sales_raw['BIN'] = df_sales_raw['BIN'].astype(str).str.strip().str.upper()
+                    df_sales_raw['STATUS'] = df_sales_raw['STATUS'].astype(str).str.strip().str.upper()
+                    df_sales_raw['QTY'] = pd.to_numeric(df_sales_raw['QTY'], errors='coerce').fillna(0).astype(int)
+
+                    # Bersihkan baris kosong / header duplikat
+                    valid_mask = (
+                        (df_sales_raw['SKU'] != '') & 
+                        (df_sales_raw['SKU'] != 'NAN') & 
+                        (df_sales_raw['SKU'] != 'SKU') & 
+                        (df_sales_raw['BIN'] != '') & 
+                        (df_sales_raw['BIN'] != 'NAN') & 
+                        (df_sales_raw['QTY'] > 0)
+                    )
+                    df_sales_clean = df_sales_raw[valid_mask].copy()
+
+                    # 🌟 A. STATUS 'DONE' -> MASUK KE LIST PICKING
+                    mask_done = df_sales_clean['STATUS'].str.contains('DONE|SELESAI', na=False)
+                    df_sales_done = df_sales_clean[mask_done].copy()
+                    if not df_sales_done.empty:
+                        df_sales_done = df_sales_done.groupby(['SKU', 'BIN'], as_index=False)['QTY'].sum()
+                        df_sales_done['SOURCE'] = 'SALES (DONE)'
+                        combined_picking_list.append(df_sales_done)
+
+                    # 🌟 B. STATUS 'INSTOCK' -> MASUK KE LIST PUTAWAY AUDIT
+                    mask_instock = df_sales_clean['STATUS'].str.contains('INSTOCK|IN STOCK', na=False)
+                    df_sales_instock = df_sales_clean[mask_instock].copy()
+                    if not df_sales_instock.empty:
+                        for _, r_in in df_sales_instock.iterrows():
+                            instock_putaway_records.append({
+                                'SKU': r_in['SKU'],
+                                'BIN AWAL': 'INSTOCK ENTRY',
+                                'LAST BIN MUTASI': r_in['BIN'],
+                                'TOTAL PERJALANAN': 1,
+                                'ALUR MUTASI': f"INSTOCK ➔ {r_in['BIN']} (Qty: {r_in['QTY']})"
+                            })
+
+            # ------------------------------------------------------------------
+            # 2. Olah File RTO (Tetap Masuk ke List Picking)
+            # ------------------------------------------------------------------
             if f_rto:
                 df_r = load_data_from_info(f_rto)
                 if not df_r.empty and df_r.shape[1] > 8:
@@ -1705,18 +1745,21 @@ class AppState:
                     df_rto['SKU'] = df_rto['SKU'].astype(str).str.strip().str.upper()
                     df_rto['BIN'] = df_rto['BIN'].astype(str).str.strip().str.upper()
                     df_rto['QTY'] = pd.to_numeric(df_rto['QTY'], errors='coerce').fillna(0).astype(int)
-                    df_rto = df_rto[(df_rto['SKU'] != '') & (df_rto['BIN'] != '') & (df_rto['SKU'] != 'SKU')]
+                    df_rto = df_rto[(df_rto['SKU'] != '') & (df_rto['BIN'] != '') & (df_rto['SKU'] != 'SKU') & (df_rto['QTY'] > 0)]
                     df_rto = df_rto.groupby(['SKU', 'BIN'], as_index=False)['QTY'].sum()
                     df_rto['SOURCE'] = 'RTO'
-                    combined_list.append(df_rto)
+                    combined_picking_list.append(df_rto)
 
-            if combined_list:
-                df_picking = pd.concat(combined_list, ignore_index=True)
+            if combined_picking_list:
+                df_picking = pd.concat(combined_picking_list, ignore_index=True)
                 df_picking = df_picking[df_picking['QTY'] > 0].reset_index(drop=True)
             else:
                 df_picking = pd.DataFrame(columns=['SKU', 'BIN', 'QTY', 'SOURCE'])
 
-            # 2. Olah Data Putaway (Rantai Mutasi)
+            # ------------------------------------------------------------------
+            # 3. Olah File Mutasi & Gabungkan dengan Sales INSTOCK
+            # ------------------------------------------------------------------
+            putaway_records = []
             if f_mutasi:
                 df_m = load_data_from_info(f_mutasi)
                 if not df_m.empty and df_m.shape[1] >= 13:
@@ -1729,12 +1772,11 @@ class AppState:
                     df_mutasi = df_mutasi.dropna(subset=['SKU'])
                     df_mutasi = df_mutasi[(df_mutasi['BIN AWAL'] != '') & (df_mutasi['BIN TUJUAN'] != '') & (df_mutasi['BIN AWAL'] != 'NAN') & (df_mutasi['BIN TUJUAN'] != 'NAN')]
 
-                    # Process Mutation Chain
-                    records = []
+                    # Rantai Mutasi Kronologis
                     for sku, group in df_mutasi.groupby('SKU', sort=False):
                         group_sorted = group.sort_values(by='WAKTU', ascending=True)
                         active_chains = []
-                        for idx, row in group_sorted.iterrows():
+                        for _, row in group_sorted.iterrows():
                             bin_awal, bin_tujuan = row['BIN AWAL'], row['BIN TUJUAN']
                             matched = False
                             for chain in active_chains:
@@ -1746,24 +1788,30 @@ class AppState:
                             if not matched:
                                 active_chains.append({'current_bin': bin_tujuan, 'history': [bin_awal, bin_tujuan]})
                         for chain in active_chains:
-                            records.append({
+                            putaway_records.append({
                                 'SKU': sku,
                                 'BIN AWAL': chain['history'][0],
                                 'LAST BIN MUTASI': chain['current_bin'],
                                 'TOTAL PERJALANAN': len(chain['history']) - 1,
                                 'ALUR MUTASI': " ➔ ".join(chain['history'])
                             })
-                    df_putaway = pd.DataFrame(records).drop_duplicates().reset_index(drop=True) if records else pd.DataFrame(columns=['SKU', 'BIN AWAL', 'LAST BIN MUTASI', 'TOTAL PERJALANAN', 'ALUR MUTASI'])
-                else:
-                    df_putaway = pd.DataFrame(columns=['SKU', 'BIN AWAL', 'LAST BIN MUTASI', 'TOTAL PERJALANAN', 'ALUR MUTASI'])
+
+            # 🌟 Gabungkan data mutasi rak dengan data INSTOCK dari sales
+            if instock_putaway_records:
+                putaway_records.extend(instock_putaway_records)
+
+            if putaway_records:
+                df_putaway = pd.DataFrame(putaway_records).drop_duplicates().reset_index(drop=True)
             else:
                 df_putaway = pd.DataFrame(columns=['SKU', 'BIN AWAL', 'LAST BIN MUTASI', 'TOTAL PERJALANAN', 'ALUR MUTASI'])
 
-            # 3. Unique BIN DataFrames
+            # ------------------------------------------------------------------
+            # 4. Rekap Unique BIN & Final Match
+            # ------------------------------------------------------------------
             df_upicking = pd.DataFrame({'BIN': sorted(df_picking['BIN'].unique())}) if not df_picking.empty else pd.DataFrame(columns=['BIN'])
             df_uputaway = pd.DataFrame({'LAST BIN MUTASI': sorted(df_putaway['LAST BIN MUTASI'].unique())}) if not df_putaway.empty else pd.DataFrame(columns=['LAST BIN MUTASI'])
 
-            # 4. Final Matching List (Irisan)
+            # Final Match (BIN yang mengalami Picking dan Putaway)
             if not df_picking.empty and not df_putaway.empty:
                 set_p = set(df_picking['BIN'].astype(str).str.strip())
                 set_m = set(df_putaway['LAST BIN MUTASI'].astype(str).str.strip())
@@ -1778,7 +1826,7 @@ class AppState:
             self.ppa_unique_putaway_bin.set(len(df_uputaway))
             self.ppa_final_matching_bin.set(len(df_final))
 
-            # Set Data Tabel
+            # Set Reactive State untuk Tabel
             self._raw_df_ppa_picking = df_picking
             self._raw_df_ppa_upicking = df_upicking
             self._raw_df_ppa_putaway = df_putaway
@@ -1801,8 +1849,10 @@ class AppState:
             self.df_ppa_final_rows.set(df_final.fillna("").astype(str).values.tolist() if not df_final.empty else [])
 
             self.ppa_processed.set(True)
-            return True, "Seluruh proses audit berhasil dijalankan!"
+            return True, "Audit berhasil diproses! (DONE masuk Picking, INSTOCK masuk Putaway)"
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             return False, f"Terjadi kesalahan saat memproses data: {e}"
 
 # ==========================================================================
