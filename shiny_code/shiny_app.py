@@ -7547,6 +7547,48 @@ def server(input: Inputs, output: Outputs, session: Session):
             state._raw_df_rto_dec.to_excel(writer, sheet_name=f'RTO_{state.rto_dec_branch()}', index=False)
         buf.seek(0)
         yield buf.getvalue()
+    
+    # ==========================================================================
+    # FILTER SUB KATEGORI: STORE LEADER RTO DECISION
+    # ==========================================================================
+    @output
+    @render.ui
+    def rto_dec_sub_filter_ui():
+        # Jangan tampilkan jika belum diproses
+        if not state.rto_dec_processed():
+            return ui.div()
+
+        subs = state.rto_dec_sub_list()
+        with reactive.isolate():
+            current_selected = state.rto_dec_selected_subs()
+
+        return ui.div(
+            ui.div(
+                ui.span("🗂️ Filter Sub Kategori (Kosongkan untuk SEMUA):", 
+                        style="font-size: 11px; font-weight: 800; color: #4A5568; margin-bottom: 2px; display: block;"),
+                ui.input_selectize(
+                    "rto_dec_sub_select",
+                    label=None,
+                    choices=subs,
+                    selected=current_selected,  # Default [] = SEMUA
+                    multiple=True,
+                    options={
+                        "placeholder": "🔍 Tampilkan SEMUA Sub Kategori (atau pilih untuk menyaring...)",
+                        "plugins": ["remove_button"]
+                    },
+                    width="100%"
+                ),
+                style="flex: 1; min-width: 250px;"
+            ),
+            style="display: flex; gap: 10px; align-items: flex-end; margin-bottom: 1rem; width: 100%;"
+        )
+
+    @reactive.Effect
+    def _on_rto_dec_sub_filter_change():
+        if state.rto_dec_processed() and "rto_dec_sub_select" in input:
+            sel = input.rto_dec_sub_select()
+            subs = list(sel) if sel else []
+            state.apply_rto_dec_sub_filter(subs)
 
 from pathlib import Path
 

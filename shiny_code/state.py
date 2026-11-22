@@ -763,6 +763,11 @@ class AppState:
         self.df_rto_dec_rows = reactive.Value([])
         self._raw_df_rto_dec = pd.DataFrame()
 
+        # 🌟 TAMBAHKAN 3 BARIS INI:
+        self.rto_dec_sub_list = reactive.Value([])          # Daftar pilihan sub kategori
+        self.rto_dec_selected_subs = reactive.Value([])     # Pilihan aktif (default [] = SEMUA)
+        self._raw_df_rto_dec_base = pd.DataFrame()          # Cache data master sebelum difilter
+
         # --- REFILL SHELVING STATE ---
         self.rs_processed = reactive.Value(False)
         self.rs_total_sku = reactive.Value(0)       # 🌟 Tambahan state SKU perlu refill
@@ -9183,7 +9188,7 @@ class AppState:
             return False, str(e)
 
     # ==========================================================================
-    # LOGIKA STORE LEADER RTO DECISION (SURABAYA VS SIDOARJO/SEMARANG)
+    # LOGIKA STORE LEADER RTO DECISION (DENGAN FILTER SUB KATEGORI)
     # ==========================================================================
     def process_store_leader_rto_decision(self, f_toc):
         try:
@@ -9200,14 +9205,11 @@ class AppState:
             if not target_branch or target_branch not in ["SEMARANG", "SIDOARJO"]:
                 return False, "Silakan pilih Cabang Tujuan (SEMARANG atau SIDOARJO) terlebih dahulu!"
 
-            # ------------------------------------------------------------------
-            # 1. BACA & PARSING FILE TOC SECARA FLEKSIBEL (ANTI-GESER POWER BI)
-            # ------------------------------------------------------------------
+            # 1. BACA & PARSING FILE TOC
             df_toc_raw = load_data_from_info(f_toc)
             if df_toc_raw.empty:
                 return False, "File ToC kosong atau tidak terbaca!"
 
-            # Jika file hasil export Power BI memiliki baris judul/filter di atas, cari header aslinya
             has_toc_header = any(any(k in str(c).upper() for k in ['TOC', 'TURNOVER', 'ARTICLE']) for c in df_toc_raw.columns)
             if not has_toc_header:
                 for r_i in range(min(5, len(df_toc_raw))):
@@ -9221,7 +9223,6 @@ class AppState:
                 if pd.isna(val) or val is None: return ""
                 return re.sub(r'[^A-Z0-9]', '', str(val).upper())
 
-            # Deteksi Kolom Last_ToC dan Article Name di file ToC
             col_toc = None
             col_art = None
             for c in df_toc_raw.columns:
@@ -9234,7 +9235,6 @@ class AppState:
             if col_toc is None: col_toc = df_toc_raw.columns[1] if df_toc_raw.shape[1] > 1 else df_toc_raw.columns[0]
             if col_art is None: col_art = df_toc_raw.columns[6] if df_toc_raw.shape[1] > 6 else df_toc_raw.columns[-1]
 
-            # Simpan kamus ToC (Exact Map dan List Tuples untuk Partial Matching)
             toc_exact_map = {}
             toc_tuples = []
 
@@ -9247,20 +9247,16 @@ class AppState:
                 clean_a = norm_text(raw_a)
                 if clean_a:
                     toc_exact_map[clean_a] = raw_t
-                    # Simpan tuple: (norm_text, class_val, original_words)
                     words_token = [w for w in re.split(r'[^A-Z0-9]', raw_a.upper()) if len(w) >= 3 and not w.isdigit()]
                     toc_tuples.append((clean_a, raw_t, words_token))
 
-            # Helper pintar pencocokan nama artikel ke ToC
             def get_toc_status(item_name, sku_code=""):
                 clean_name = norm_text(item_name)
                 if not clean_name: return ""
 
-                # 1. Exact match
                 if clean_name in toc_exact_map:
                     return toc_exact_map[clean_name]
 
-                # 2. Match berdasarkan kode awalan SKU (6-8 digit kode artikel)
                 c_sku = norm_text(sku_code)
                 if len(c_sku) >= 6:
                     prefix_8 = c_sku[:8] if len(c_sku) >= 8 else c_sku[:6]
@@ -9268,12 +9264,10 @@ class AppState:
                         if t_norm.startswith(prefix_8) or prefix_8 in t_norm:
                             return t_val
 
-                # 3. Partial match (Nama stok ada di dalam nama ToC, atau sebaliknya)
                 for t_norm, t_val, _ in toc_tuples:
                     if len(clean_name) >= 5 and (clean_name in t_norm or t_norm in clean_name):
                         return t_val
 
-                # 4. Token match (Kecocokan 2 kata utama nama artikel)
                 name_words = [w for w in re.split(r'[^A-Z0-9]', str(item_name).upper()) if len(w) >= 4 and not w.isdigit()]
                 if len(name_words) >= 2:
                     for _, t_val, t_words in toc_tuples:
@@ -9282,9 +9276,7 @@ class AppState:
 
                 return ""
 
-            # ------------------------------------------------------------------
-            # 2. TARIK DATA STOK SURABAYA & CABANG TARGET (stock_live_cache)
-            # ------------------------------------------------------------------
+            # 2. TARIK DATA STOK SURABAYA & TARGET
             BRANCH_DB_MAP = {
                 "SURABAYA": "SURABAYA_LATEST",
                 "SEMARANG": "SEMARANG_LATEST",
@@ -9300,7 +9292,6 @@ class AppState:
                         except Exception: raw = []
                     if raw: return raw
 
-                # Fallback cari by branch
                 res_b = client.table("stock_live_cache").select("stock_data").ilike("branch", f"%{branch_kw}%").execute()
                 if res_b and res_b.data:
                     raw = res_b.data[0].get("stock_data", [])
@@ -9316,9 +9307,7 @@ class AppState:
             if not raw_sby:
                 return False, "Data stok Surabaya di database Supabase masih kosong!"
 
-            # ------------------------------------------------------------------
-            # 3. STANDARISASI STOK & FILTER BIN NON-OPERASIONAL
-            # ------------------------------------------------------------------
+            # 3. STANDARISASI STOK DENGAN SUB KATEGORI
             EXCL_BIN_REGEX = r"TOKO|STAG|KARANTINA|DEFECT|REJECT|RESELLER|LIVE|AMP|GIFT|EVENT|PERBAIKAN|GARAGE"
 
             def clean_sku(val):
@@ -9336,7 +9325,6 @@ class AppState:
                 if not raw_data: return {}
 
                 df_raw = pd.DataFrame(raw_data)
-                # Standarisasi kolom menggunakan fungsi resmi sistem
                 df_std = self._standardize_to_manual_excel_format(df_raw)
 
                 stock_pool = {}
@@ -9345,7 +9333,6 @@ class AppState:
                     if re.search(EXCL_BIN_REGEX, bin_txt):
                         continue
 
-                    # Kolom B = Barcode SKU Resmi
                     sku_txt = clean_sku(r["SKU"])
                     if not sku_txt or sku_txt in ["NAN", "NONE", "-", ""]:
                         continue
@@ -9354,10 +9341,17 @@ class AppState:
                     if qty_val <= 0:
                         continue
 
-                    # Kolom E = Nama Lengkap Artikel
                     item_name = str(r["ITEM NAME"]).strip()
+                    # 🌟 Ambil Sub Kategori dari hasil standardizer
+                    sub_cat = str(r.get("SUB KATEGORI", "-")).strip().upper()
+                    if sub_cat in ["", "NAN", "NONE"]: sub_cat = "-"
+
                     if sku_txt not in stock_pool:
-                        stock_pool[sku_txt] = {"item_name": item_name, "qty": 0}
+                        stock_pool[sku_txt] = {
+                            "item_name": item_name, 
+                            "sub_kategori": sub_cat,
+                            "qty": 0
+                        }
                     stock_pool[sku_txt]["qty"] += qty_val
 
                 return stock_pool
@@ -9365,9 +9359,7 @@ class AppState:
             pool_sby = aggregate_valid_stock(raw_sby)
             pool_tgt = aggregate_valid_stock(raw_tgt)
 
-            # ------------------------------------------------------------------
-            # 4. TARIK DATA SALES CABANG TARGET (DUAL LOOKUP: SKU & ARTICLE)
-            # ------------------------------------------------------------------
+            # 4. TARIK SALES DARI SUPABASE
             sales_cache_id = f"{target_branch}_SALES_90D"
             res_sales = client.table("balancing_sales_cache").select("sales_data").eq("id", sales_cache_id).execute()
             
@@ -9393,34 +9385,26 @@ class AppState:
                         if s_art_clean:
                             sales_pool_art[s_art_clean] = tot_s
 
-            # ------------------------------------------------------------------
-            # 5. MATCHING & FILTER: STOK TARGET < 2 & FAST MOVING
-            # ------------------------------------------------------------------
+            # 5. MATCHING & FILTER: TARGET < 2 & FAST MOVING
             records = []
-            tot_rto_qty = 0
-            tot_sby_qty = 0
-
             for sku, sby_data in pool_sby.items():
                 qty_sby = sby_data["qty"]
                 item_name = sby_data["item_name"]
+                sub_kat = sby_data.get("sub_kategori", "-")
 
-                # 🌟 SYARAT 1: Stok cabang target < 2 (0 atau 1 pcs tetap lolos)
                 tgt_info = pool_tgt.get(sku, {"qty": 0})
                 qty_tgt = tgt_info["qty"]
                 if qty_tgt >= 2:
                     continue
 
-                # 🌟 SYARAT 2: Klasifikasi Fast Moving dari ToC
                 toc_class = get_toc_status(item_name, sku)
                 if not toc_class or "FAST" not in toc_class.upper():
                     continue
 
-                # 🌟 SYARAT 3: Rekomendasi RTO kelipatan 1:3 dari stok Surabaya
                 rekomendasi_rto = qty_sby // 3
                 if rekomendasi_rto <= 0:
                     continue
 
-                # Ambil sales cabang target (prioritas Barcode SKU, fallback Nama Artikel)
                 sales_tgt = sales_pool_sku.get(sku, sales_pool_sku.get(normalize_sku_key(sku), 0))
                 if sales_tgt == 0 and item_name:
                     sales_tgt = sales_pool_art.get(norm_text(item_name), 0)
@@ -9428,26 +9412,29 @@ class AppState:
                 records.append({
                     "SKU": sku,
                     "ITEM NAME": item_name,
+                    "SUB KATEGORI": sub_kat,
                     "QTY SURABAYA": qty_sby,
                     f"QTY {target_branch}": qty_tgt,
                     f"SALES 60d {target_branch}": sales_tgt,
                     "LAST ToC": toc_class,
                     "REKOMENDASI RTO": rekomendasi_rto
                 })
-                tot_rto_qty += rekomendasi_rto
-                tot_sby_qty += qty_sby
 
             df_result = pd.DataFrame(records)
             if not df_result.empty:
                 df_result = df_result.sort_values(by="REKOMENDASI RTO", ascending=False).reset_index(drop=True)
 
-            self.rto_dec_total_sku.set(len(df_result))
-            self.rto_dec_total_qty_rto.set(tot_rto_qty)
-            self.rto_dec_total_qty_sby.set(tot_sby_qty)
+            # 🌟 Simpan daftar sub kategori yang ada
+            unique_subs = sorted([
+                str(s).strip().upper() for s in df_result["SUB KATEGORI"].unique() 
+                if pd.notna(s) and str(s).strip() not in ["", "NAN", "NONE", "-", "UNKNOWN"]
+            ]) if not df_result.empty else []
 
-            self._raw_df_rto_dec = df_result.copy()
-            self.df_rto_dec_headers.set(df_result.columns.tolist() if not df_result.empty else [])
-            self.df_rto_dec_rows.set(df_result.fillna("").astype(str).values.tolist() if not df_result.empty else [])
+            self.rto_dec_sub_list.set(unique_subs)
+            self._raw_df_rto_dec_base = df_result.copy()
+
+            # Terapkan filter awal (Default: Kosong = SEMUA Sub Kategori)
+            self.apply_rto_dec_sub_filter([])
             self.rto_dec_processed.set(True)
 
             return True, f"Analisis Berhasil! Ditemukan {len(df_result)} SKU Fast Moving untuk RTO ke {target_branch}."
@@ -9455,3 +9442,25 @@ class AppState:
             import traceback
             traceback.print_exc()
             return False, f"Terjadi kesalahan saat proses analisis: {str(e)}"
+
+    # 🌟 METODE FILTER SUB KATEGORI UNTUK STORE LEADER RTO
+    def apply_rto_dec_sub_filter(self, selected_subs):
+        if self._raw_df_rto_dec_base.empty:
+            return
+
+        df = self._raw_df_rto_dec_base.copy()
+
+        # HANYA filter jika user memilih kategori tertentu. Jika kosong -> SEMUA!
+        if selected_subs and len(selected_subs) > 0:
+            clean_subs = [str(x).strip().upper() for x in selected_subs if str(x).strip() != ""]
+            if clean_subs:
+                df = df[df["SUB KATEGORI"].isin(clean_subs)].copy()
+
+        self.rto_dec_selected_subs.set(selected_subs if selected_subs else [])
+        self.rto_dec_total_sku.set(len(df))
+        self.rto_dec_total_qty_rto.set(int(df["REKOMENDASI RTO"].sum()) if not df.empty else 0)
+        self.rto_dec_total_qty_sby.set(int(df["QTY SURABAYA"].sum()) if not df.empty else 0)
+
+        self._raw_df_rto_dec = df.copy()
+        self.df_rto_dec_headers.set(df.columns.tolist() if not df.empty else [])
+        self.df_rto_dec_rows.set(df.fillna("").astype(str).values.tolist() if not df.empty else [])

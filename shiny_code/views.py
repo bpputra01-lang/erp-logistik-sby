@@ -3539,16 +3539,15 @@ def store_leader_rto_decision_view(state: AppState):
         ui.div(
             ui.div(
                 ui.h4("🎯 Store Leader RTO Decision Maker", style="font-size: 16px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
-                ui.p("Rekomendasi replenishment/RTO otomatis: Membandingkan stok kosong di cabang target dengan stok Surabaya, memvalidasi kelas perputaran barang (Fast Moving), dan menghitung alokasi proporsional 1:3.", style="color: #718096; font-size: 12.5px; margin: 0;"),
+                ui.p("Rekomendasi replenishment/RTO otomatis: Membandingkan stok < 2 di cabang target dengan stok Surabaya, memvalidasi kelas perputaran barang (Fast Moving), dan menghitung alokasi proporsional 1:3.", style="color: #718096; font-size: 12.5px; margin: 0;"),
             ),
             style="margin-bottom: 1.25rem;"
         ),
         ui.div(
-            # 1. Filter Cabang (Default KOSONG)
+            # 1. Filter Cabang
             ui.div(
                 ui.span("🏢 Pilih Cabang Tujuan RTO:", style="font-size: 12px; font-weight: 800; color: #1A202C; margin-bottom: 4px; display: block;"),
                 ui.tags.select(
-                    # 👇 Opsi default kosong
                     ui.tags.option("-- Silakan Pilih Cabang Tujuan --", value="", selected=(not cur_branch or cur_branch == "")),
                     *[ui.tags.option(b, value=b, selected=(b == cur_branch)) for b in branch_choices],
                     id="rto_dec_branch_select",
@@ -3561,6 +3560,8 @@ def store_leader_rto_decision_view(state: AppState):
             custom_uploader_box("uploader_rto_toc", "📥 Upload File ToC (Kolom B: Last_ToC, Kolom G: Article Name)"),
             style="display: flex; gap: 1rem; width: 100%; flex-wrap: wrap; margin-bottom: 1rem;"
         ),
+        # 🌟 DROPDOWN FILTER SUB KATEGORI (MUNCUL OTOMATIS SETELAH DIPROSES)
+        ui.output_ui("rto_dec_sub_filter_ui"),
         ui.output_ui("rto_dec_action_btn_ui"),
         style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.02);"
     )
