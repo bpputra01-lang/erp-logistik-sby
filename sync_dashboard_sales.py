@@ -80,12 +80,40 @@ def extract_valid_date(val):
 def parse_iso_wib(dt_str):
     if not dt_str:
         return datetime.now(WIB).isoformat()
-    try:
-        clean_s = strip_html(str(dt_str))[:19]
-        dt = datetime.strptime(clean_s, "%Y-%m-%d %H:%M:%S")
-        return dt.replace(tzinfo=WIB).isoformat()
-    except Exception:
-        return datetime.now(WIB).isoformat()
+    clean_s = strip_html(str(dt_str)).strip()[:19]
+    # Coba kedua format: DD-MM-YYYY (seperti di screenshot) dan YYYY-MM-DD
+    for fmt in ("%d-%m-%Y %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%d/%m/%Y %H:%M:%S", "%d-%m-%Y", "%Y-%m-%d"):
+        try:
+            dt = datetime.strptime(clean_s, fmt)
+            return dt.replace(tzinfo=WIB).isoformat()
+        except Exception:
+            pass
+    return datetime.now(WIB).isoformat()
+
+def extract_mutation_datetime(dt_str):
+    """Mengekstrak tanggal dan jam mutasi menjadi objek datetime WIB untuk filter 7 hari"""
+    if not dt_str:
+        return None
+    s = strip_html(str(dt_str)).strip()
+    
+    # Format YYYY-MM-DD HH:MM:SS
+    m1 = re.search(r'(\d{4}[-/]\d{1,2}[-/]\d{1,2}(?:\s+\d{1,2}:\d{1,2}:\d{1,2})?)', s)
+    if m1:
+        t_str = m1.group(1).replace('/', '-')
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+            try:
+                return datetime.strptime(t_str, fmt).replace(tzinfo=WIB)
+            except Exception: pass
+
+    # Format DD-MM-YYYY HH:MM:SS
+    m2 = re.search(r'(\d{1,2}[-/]\d{1,2}[-/]\d{4}(?:\s+\d{1,2}:\d{1,2}:\d{1,2})?)', s)
+    if m2:
+        t_str = m2.group(1)
+        for fmt in ("%d-%m-%Y %H:%M:%S", "%d/%m/%Y %H:%M:%S", "%d-%m-%Y", "%d/%m/%Y"):
+            try:
+                return datetime.strptime(t_str, fmt).replace(tzinfo=WIB)
+            except Exception: pass
+    return None
 
 # ==============================================================================
 # LOGIN JEZPRO (SESI BERSIH TIAP SIKLUS)
@@ -135,7 +163,7 @@ def get_dynamic_store_map(session):
     return STORE_MASTER_MAP
 
 # ==============================================================================
-# 📦 MODUL 1: SCRAPING MUTASI BIN UNTUK SEMUA CABANG
+# 📦 MODUL 1: SCRAPING MUTASI BIN (HANYA 1 MINGGU TERAKHIR DARI HARI INI)
 # ==============================================================================
 def fetch_bin_mutations_page(session, st_id=None, start_idx=0, length=300):
     url = "https://jezpro.id/bin_history_datatables"
@@ -165,13 +193,14 @@ def fetch_bin_mutations_page(session, st_id=None, start_idx=0, length=300):
 def parse_bin_mutation_row(raw_row, fallback_store=""):
     if not raw_row: return None
 
+    # JIKA FORMAT DICTIONARY
     if isinstance(raw_row, dict):
         pmt_id = safe_int(raw_row.get("pmt_id") or raw_row.get("DT_RowIndex"))
         if not pmt_id: return None
         st_name = strip_html(raw_row.get("st_name", fallback_store)).upper()
         return {
             "pmt_id": pmt_id,
-            "created_at": parse_iso_wib(raw_row.get("pm_created_at")),
+            "created_at": parse_iso_wib(raw_row.get("pm_created_at") or raw_row.get("created_at")),
             "store_name": st_name if st_name else fallback_store,
             "barcode_sku": strip_html(raw_row.get("ps_barcode", "-")).split('.')[0].strip().upper(),
             "article_name": strip_html(raw_row.get("article", "-")),
@@ -185,15 +214,27 @@ def parse_bin_mutation_row(raw_row, fallback_store=""):
             "scraped_at": datetime.now(WIB).isoformat()
         }
 
-    if isinstance(raw_row, (list, tuple)) and len(raw_row) >= 11:
-        pmt_id = safe_int(raw_row[0])
-        if not pmt_id: return None
+    # JIKA FORMAT LIST / ARRAY (PERSIS SESUAI SCREENSHOT TABEL ANDA)
+    if isinstance(raw_row, (list, tuple)) and len(raw_row) >= 12:
+        raw_no = safe_int(raw_row[0])
         st_name = strip_html(raw_row[4]).upper()
+        sku_clean = strip_html(raw_row[3]).split('.')[0].strip().upper()
+        tgl_iso = parse_iso_wib(raw_row[11])
+        
+        # Mencegah ID kembar jika kolom NO hanya 1, 2, 3:
+        # Gunakan hash/kombinasi unik jika raw_no < 10000
+        if raw_no and raw_no > 10000:
+            final_pmt_id = raw_no
+        else:
+            # Contoh ID unik: gabungan tanggal, store, SKU, dan baris
+            tgl_code = tgl_iso[:10].replace('-', '')
+            final_pmt_id = safe_int(f"{tgl_code}{abs(hash(st_name + sku_clean + str(raw_row[5]))) % 100000:05d}{raw_no}")
+
         return {
-            "pmt_id": pmt_id,
+            "pmt_id": final_pmt_id,
             "user_name": strip_html(raw_row[1]),
             "article_name": strip_html(raw_row[2]),
-            "barcode_sku": strip_html(raw_row[3]).split('.')[0].strip().upper(),
+            "barcode_sku": sku_clean,
             "store_name": st_name if st_name else fallback_store,
             "start_bin": strip_html(raw_row[5]).upper(),
             "old_qty_start": safe_int(raw_row[6]),
@@ -201,13 +242,15 @@ def parse_bin_mutation_row(raw_row, fallback_store=""):
             "old_qty_end": safe_int(raw_row[8]),
             "end_bin": strip_html(raw_row[9]).upper(),
             "notes": strip_html(raw_row[10]),
-            "created_at": parse_iso_wib(raw_row[11] if len(raw_row) > 11 else None),
+            "created_at": tgl_iso,
             "scraped_at": datetime.now(WIB).isoformat()
         }
     return None
-
+    
 def upsert_mutations_to_supabase(records: list):
-    if not records: return
+    if not records: 
+        print("   ⚠️ Tidak ada data mutasi baru untuk disimpan.")
+        return
     batch_size = 200
     total_saved = 0
     for i in range(0, len(records), batch_size):
@@ -221,18 +264,27 @@ def upsert_mutations_to_supabase(records: list):
     print(f"   ✅ [SUPABASE] Sukses simpan {total_saved} baris mutasi ke jezpro_bin_mutations!")
 
 def run_sync_all_branches_mutations(session):
-    """🌟 Menarik data mutasi untuk SEMUA CABANG secara bergiliran"""
+    """
+    🌟 Menarik data mutasi untuk SEMUA CABANG 
+    KHUSUS 1 MINGGU TERAKHIR (7 HARI KEBELAKANG DARI HARI INI)
+    """
+    now_wib = datetime.now(WIB)
+    # Batas 7 hari kebelakang mulai jam 00:00:00 WIB
+    cutoff_dt = (now_wib - timedelta(days=7)).replace(hour=0, minute=0, second=0, microsecond=0)
+    
     store_map = get_dynamic_store_map(session)
-    print(f"\n📦 [{datetime.now(WIB).strftime('%H:%M:%S')}] Memulai Scraping Mutasi BIN untuk {len(store_map)} Cabang:")
+    print(f"\n📦 [{now_wib.strftime('%H:%M:%S')}] Memulai Scraping Mutasi BIN untuk {len(store_map)} Cabang:")
+    print(f"   ⏳ Filter: Hanya mutasi 1 minggu terakhir (Sejak: {cutoff_dt.strftime('%d-%m-%Y %H:%M:%S')} WIB)")
     
     total_all_branch_mutations = []
 
     for store_id, store_name in store_map.items():
         print(f"   🏢 [{store_id}] Cabang: {store_name}...")
         branch_records = []
+        stop_branch = False
         
-        # Tarik hingga 2 halaman (600 transaksi terakhir per cabang per jam)
-        for page in range(2):
+        # Paginate sampai data mutasi menyentuh tanggal sebelum batas 7 hari (maksimal cek hingga 15 page/4500 rows)
+        for page in range(15):
             start_idx = page * 300
             raw_res = fetch_bin_mutations_page(session, st_id=store_id, start_idx=start_idx, length=300)
             if not raw_res or not isinstance(raw_res, dict):
@@ -243,21 +295,36 @@ def run_sync_all_branches_mutations(session):
                 break
             
             for item in data_rows:
+                # Cek tanggal mutasi
+                raw_dt_str = None
+                if isinstance(item, dict):
+                    raw_dt_str = item.get("pm_created_at")
+                elif isinstance(item, (list, tuple)) and len(item) > 11:
+                    raw_dt_str = item[11]
+
+                row_dt = extract_mutation_datetime(raw_dt_str)
+
+                # Karena Jezpro mengurutkan dari paling baru (DESC),
+                # jika tanggal transaksi sudah lebih tua dari 7 hari lalu, stop pencarian cabang ini!
+                if row_dt and row_dt < cutoff_dt:
+                    stop_branch = True
+                    break
+
                 parsed = parse_bin_mutation_row(item, fallback_store=store_name)
                 if parsed:
                     branch_records.append(parsed)
 
-            if len(data_rows) < 300:
+            if stop_branch or len(data_rows) < 300:
                 break
             time.sleep(0.15)
 
-        print(f"         -> Ditemukan {len(branch_records)} mutasi.")
+        print(f"         -> Ditemukan {len(branch_records)} mutasi dalam 7 hari terakhir.")
         total_all_branch_mutations.extend(branch_records)
 
     upsert_mutations_to_supabase(total_all_branch_mutations)
 
 # ==============================================================================
-# 💰 MODUL 2: SCRAPING NET SALES UNTUK SEMUA CABANG
+# 💰 MODUL 2: SCRAPING NET SALES UNTUK SEMUA CABANG (TETAP SAMA)
 # ==============================================================================
 def fetch_metrics_single_store(session, start_date: str, end_date: str, store_name: str, channel="ALL"):
     url = "https://jezpro.id/dashboards/metrics"
@@ -359,7 +426,7 @@ def upsert_sales_to_supabase(records: list):
     print(f"   ✅ [SUPABASE] Sukses simpan {total_saved} baris data sales!")
 
 def run_sync_all_branches_sales(session, full_history=False):
-    """🌟 Menarik Net Sales untuk SEMUA CABANG"""
+    """🌟 Menarik Net Sales untuk SEMUA CABANG (Mulai Sept 2026 jika full_history)"""
     now_wib = datetime.now(WIB)
     store_list = get_store_list_from_page(session)
 
@@ -408,10 +475,10 @@ def execute_master_sync(is_first_cycle=False):
     try:
         session = create_jezpro_session()
 
-        # 1. Tarik Mutasi BIN Semua Cabang
+        # 1. Tarik Mutasi BIN Semua Cabang (HANYA 7 HARI TERAKHIR)
         run_sync_all_branches_mutations(session)
 
-        # 2. Tarik Net Sales Semua Cabang
+        # 2. Tarik Net Sales Semua Cabang (Full Sept 2026 jika siklus pertama)
         run_sync_all_branches_sales(session, full_history=is_first_cycle)
 
         print(f"\n🎉 [SELESAI] Semua data cabang berhasil di-sync pukul {datetime.now(WIB).strftime('%H:%M:%S')} WIB.")
@@ -421,8 +488,8 @@ def execute_master_sync(is_first_cycle=False):
 def start_hourly_scheduler():
     print("=" * 70)
     print("🚀 JEZPRO ALL-BRANCH MASTER SCRAPER WORKER")
-    print("   Target 1: Mutasi BIN SEMUA CABANG -> public.jezpro_bin_mutations")
-    print("   Target 2: Net Sales SEMUA CABANG   -> public.jezpro_daily_net_sales")
+    print("   Target 1: Mutasi BIN SEMUA CABANG (HANYA 7 HARI TERAKHIR) -> public.jezpro_bin_mutations")
+    print("   Target 2: Net Sales SEMUA CABANG (SEPT 2026 ONWARDS)     -> public.jezpro_daily_net_sales")
     print("   Frekuensi: Otomatis Setiap 1 Jam (3600 Detik)")
     print("=" * 70)
 
