@@ -1692,75 +1692,88 @@ class AppState:
             # ------------------------------------------------------------------
             if f_sales:
                 df_s = load_data_from_info(f_sales)
-                # Syarat minimal 12 kolom (karena Kolom L adalah kolom ke-12)
-                if not df_s.empty and df_s.shape[1] >= 12:
-                    df_s_cols_upper = [str(c).strip().upper() for c in df_s.columns]
-                    
-                    def get_col_series(candidates, default_idx):
-                        for cand in candidates:
-                            for idx, c in enumerate(df_s_cols_upper):
-                                if cand in c:
-                                    return df_s.iloc[:, idx]
-                        if df_s.shape[1] > default_idx:
-                            return df_s.iloc[:, default_idx]
-                        return pd.Series("", index=df_s.index)
+                if df_s.empty:
+                    return False, "File Sales yang diupload kosong!"
 
-                    # B = Index 1 (SKU)
-                    s_sku = get_col_series(['SKU', 'BARCODE', 'ITEM CODE'], 1).fillna('').astype(str).str.strip().str.upper()
-                    
-                    # G = Index 6 (BIN)
-                    s_bin = get_col_series(['BIN', 'LOKASI', 'RAK'], 6).fillna('').astype(str).str.strip().str.upper()
-                    
-                    # J = Index 9 (STATUS)
-                    s_status = get_col_series(['STATUS', 'STATE', 'KET'], 9).fillna('').astype(str).str.strip().str.upper()
-                    
-                    # 🌟 L = Index 11 (QTY SALES) -> SEKARANG SUDAH TEPAT MEMBACA KOLOM L
-                    qty_series = get_col_series(['QTY', 'JUMLAH', 'TOTAL'], 11)
-                    s_qty = pd.to_numeric(qty_series, errors='coerce').fillna(0).astype(int)
+                # Syarat minimal 12 kolom (hingga Kolom L untuk QTY)
+                if df_s.shape[1] < 12:
+                    return False, f"File Sales kurang dari 12 kolom (terdeteksi {df_s.shape[1]} kolom)! Minimal wajib sampai Kolom L (QTY)."
 
-                    df_sales_clean = pd.DataFrame({
-                        'SKU': s_sku,
-                        'BIN': s_bin,
-                        'STATUS': s_status,
-                        'QTY': s_qty
+                df_s_cols_upper = [str(c).strip().upper() for c in df_s.columns]
+                
+                def get_col_series(candidates, default_idx):
+                    for cand in candidates:
+                        for idx, c in enumerate(df_s_cols_upper):
+                            if cand in c:
+                                return df_s.iloc[:, idx]
+                    if df_s.shape[1] > default_idx:
+                        return df_s.iloc[:, default_idx]
+                    return pd.Series("", index=df_s.index)
+
+                # B = Index 1 (SKU)
+                s_sku = get_col_series(['SKU', 'BARCODE', 'ITEM CODE'], 1).fillna('').astype(str).str.strip().str.upper()
+                
+                # G = Index 6 (BIN)
+                s_bin = get_col_series(['BIN', 'LOKASI', 'RAK'], 6).fillna('').astype(str).str.strip().str.upper()
+                
+                # J = Index 9 (STATUS)
+                s_status = get_col_series(['STATUS', 'STATE', 'KET'], 9).fillna('').astype(str).str.strip().str.upper()
+                
+                # L = Index 11 (QTY SALES)
+                qty_series = get_col_series(['QTY', 'JUMLAH', 'TOTAL'], 11)
+                s_qty = pd.to_numeric(qty_series, errors='coerce').fillna(0).astype(int)
+
+                df_sales_clean = pd.DataFrame({
+                    'SKU': s_sku,
+                    'BIN': s_bin,
+                    'STATUS': s_status,
+                    'QTY': s_qty
+                })
+
+                # Filter baris dasar yang valid
+                valid_mask = (
+                    (df_sales_clean['SKU'] != '') & 
+                    (df_sales_clean['SKU'] != 'NAN') & 
+                    (df_sales_clean['SKU'] != 'SKU') & 
+                    (df_sales_clean['BIN'] != '') & 
+                    (df_sales_clean['BIN'] != 'NAN') & 
+                    (df_sales_clean['QTY'] > 0)
+                )
+                df_sales_clean = df_sales_clean[valid_mask].copy()
+
+                if df_sales_clean.empty:
+                    return False, "Tidak ditemukan baris transaksi yang valid pada file Sales! Periksa kembali file Anda."
+
+                # 🌟 VALIDASI KETAT: CEK KEBERADAAN STATUS 'DONE' DAN 'INSTOCK'
+                has_done = df_sales_clean['STATUS'].str.contains('DONE|SELESAI', na=False).any()
+                has_instock = df_sales_clean['STATUS'].str.contains('INSTOCK|IN STOCK', na=False).any()
+
+                # Jika file hanya memuat salah satu atau tidak memuat keduanya
+                if not has_done and not has_instock:
+                    return False, "File Sales TIDAK VALID! Kolom J (Status) tidak memuat status 'DONE' maupun 'INSTOCK'. File wajib memuat KEDUA status tersebut!"
+                elif not has_instock:
+                    return False, "⚠️ File Sales HANYA berisi status 'DONE'! File yang diupload WAJIB memuat status 'DONE' dan 'INSTOCK' sekaligus!"
+                elif not has_done:
+                    return False, "⚠️ File Sales HANYA berisi status 'INSTOCK'! File yang diupload WAJIB memuat status 'DONE' dan 'INSTOCK' sekaligus!"
+
+                # 🌟 A. STATUS 'INSTOCK' (Kolom J) -> MASUK LIST PUTAWAY
+                mask_instock = df_sales_clean['STATUS'].str.contains('INSTOCK|IN STOCK', na=False)
+                df_sales_instock = df_sales_clean[mask_instock].copy()
+                for _, r_in in df_sales_instock.iterrows():
+                    instock_putaway_records.append({
+                        'SKU': r_in['SKU'],
+                        'BIN AWAL': 'INSTOCK ENTRY',
+                        'LAST BIN MUTASI': r_in['BIN'],
+                        'TOTAL PERJALANAN': 1,
+                        'ALUR MUTASI': f"INSTOCK ➔ {r_in['BIN']} (Qty: {r_in['QTY']})"
                     })
 
-                    # Filter baris dasar yang valid
-                    valid_mask = (
-                        (df_sales_clean['SKU'] != '') & 
-                        (df_sales_clean['SKU'] != 'NAN') & 
-                        (df_sales_clean['SKU'] != 'SKU') & 
-                        (df_sales_clean['BIN'] != '') & 
-                        (df_sales_clean['BIN'] != 'NAN') & 
-                        (df_sales_clean['QTY'] > 0)
-                    )
-                    df_sales_clean = df_sales_clean[valid_mask].copy()
-
-                    # 🌟 A. STATUS 'INSTOCK' (Kolom J) -> MASUK LIST PUTAWAY
-                    mask_instock = df_sales_clean['STATUS'].str.contains('INSTOCK|IN STOCK', na=False)
-                    df_sales_instock = df_sales_clean[mask_instock].copy()
-                    if not df_sales_instock.empty:
-                        for _, r_in in df_sales_instock.iterrows():
-                            instock_putaway_records.append({
-                                'SKU': r_in['SKU'],
-                                'BIN AWAL': 'INSTOCK ENTRY',
-                                'LAST BIN MUTASI': r_in['BIN'],
-                                'TOTAL PERJALANAN': 1,
-                                'ALUR MUTASI': f"INSTOCK ➔ {r_in['BIN']} (Qty: {r_in['QTY']})"
-                            })
-
-                    # 🌟 B. STATUS 'DONE' (Kolom J) -> MASUK LIST PICKING
-                    has_done_status = df_sales_clean['STATUS'].str.contains('DONE|SELESAI|FINISH|DELIVERED|SUCCESS', na=False).any()
-                    if has_done_status:
-                        mask_picking = df_sales_clean['STATUS'].str.contains('DONE|SELESAI|FINISH|DELIVERED|SUCCESS', na=False)
-                    else:
-                        mask_picking = (~mask_instock) & (~df_sales_clean['STATUS'].str.contains('CANCEL|BATAL', na=False))
-
-                    df_sales_done = df_sales_clean[mask_picking].copy()
-                    if not df_sales_done.empty:
-                        df_sales_done = df_sales_done.groupby(['SKU', 'BIN'], as_index=False)['QTY'].sum()
-                        df_sales_done['SOURCE'] = 'SALES (DONE)'
-                        combined_picking_list.append(df_sales_done)
+                # 🌟 B. STATUS 'DONE' (Kolom J) -> MASUK LIST PICKING
+                mask_picking = df_sales_clean['STATUS'].str.contains('DONE|SELESAI', na=False)
+                df_sales_done = df_sales_clean[mask_picking].copy()
+                df_sales_done = df_sales_done.groupby(['SKU', 'BIN'], as_index=False)['QTY'].sum()
+                df_sales_done['SOURCE'] = 'SALES (DONE)'
+                combined_picking_list.append(df_sales_done)
 
                     # 🌟 B. STATUS 'INSTOCK' -> MASUK KE LIST PUTAWAY AUDIT
                     mask_instock = df_sales_clean['STATUS'].str.contains('INSTOCK|IN STOCK', na=False)

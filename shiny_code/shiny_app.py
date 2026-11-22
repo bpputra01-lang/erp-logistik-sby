@@ -1433,12 +1433,19 @@ def server(input: Inputs, output: Outputs, session: Session):
         f_mutasi = input.uploader_ppa_mutasi()
 
         succ, msg = state.process_ppa_audit(f_sales, f_rto, f_mutasi)
+        
+        # 🌟 Pastikan spinner langsung hilang saat pop-up error muncul
+        ui.insert_ui(ui.tags.script("""
+            if (window.hideGlobalSpinner) window.hideGlobalSpinner();
+            document.body.classList.remove('process-running');
+        """), selector="head", where="beforeEnd")
+
         if succ:
             state.show_success_modal.set(True)
         else:
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
-
+            
     # Handler Download Excel Multi-Sheet
     @render.download(filename="REPORT_PUTAWAY_PICKING_AUDIT.xlsx")
     def btn_dl_ppa_all():
