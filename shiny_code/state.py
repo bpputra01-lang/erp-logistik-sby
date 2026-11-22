@@ -4216,16 +4216,27 @@ class AppState:
                 sales_norm_map[s_norm]['TOTAL_SALES'] += data['TOTAL_SALES']
 
             # ------------------------------------------------------------------
-            # 3. 🌟 PEMBAGIAN QTY BIN SESUAI INSTRUKSI:
-            # - LOGISTIK : BIN mengandung kata 'LOG'
-            # - OFFLINE  : BIN mengandung kata 'OFF' (atau 'RSN')
-            # - ONLINE   : BIN mengandung kata 'ONL'
+            # 3. 🌟 PEMBAGIAN QTY BIN BERDASARKAN LOGIKA BARU:
+            # - DAFTAR PENGECUALIAN KHUSUS: DEFECT, REJECT, MARKOM, RESELLER, TOKO, 
+            #   PERBAIKAN, INB, INBOUND, GARAGE, KARANTINA
+            # - OFFLINE  : BIN mengandung 'OFF'
+            # - ONLINE   : BIN mengandung 'ONL'
+            # - LOGISTIK : SEMUA BIN SELAIN KETIGA KELOMPOK DI ATAS (termasuk RSN, KL, dll.)
             # ------------------------------------------------------------------
             df_stk['QTY_POS'] = df_stk['QTY'].clip(lower=0)
+            bin_upper = df_stk['BIN'].str.upper()
 
-            df_stk['IS_LOG'] = df_stk['BIN'].str.contains('LOG', na=False, case=False)
-            df_stk['IS_OFF'] = df_stk['BIN'].str.contains('OFF|RSN', na=False, case=False)
-            df_stk['IS_ONL'] = df_stk['BIN'].str.contains('ONL', na=False, case=False)
+            # Regex pengecualian khusus
+            excl_special_pattern = r"DEFECT|REJECT|MARKOM|RESELLER|TOKO|PERBAIKAN|INB|INBOUND|GARAGE|KARANTINA"
+            is_excl_special = bin_upper.str.contains(excl_special_pattern, na=False, regex=True)
+
+            # Area Offline & Online
+            df_stk['IS_OFF'] = bin_upper.str.contains('OFF', na=False) & (~is_excl_special)
+            df_stk['IS_ONL'] = bin_upper.str.contains('ONL', na=False) & (~is_excl_special)
+
+            # 🌟 Area Logistik: Semua BIN operasional yang bukan OFF, bukan ONL, dan bukan Excluded Special
+            # (Otomatis mencakup RSN, KL, RAK, LOG, dll.)
+            df_stk['IS_LOG'] = (~is_excl_special) & (~df_stk['IS_OFF']) & (~df_stk['IS_ONL'])
 
             df_stk['QTY_LOG'] = np.where(df_stk['IS_LOG'], df_stk['QTY_POS'], 0)
             df_stk['QTY_OFF'] = np.where(df_stk['IS_OFF'], df_stk['QTY_POS'], 0)
@@ -4354,7 +4365,10 @@ class AppState:
                 })
 
                 # --------------------------------------------------------------
-                # 4. TAB 2: PROGRESSIVE REFILL PER BIN (LOGIKA RESMI INB -> LOG -> OFF/ONL)
+                # 4. TAB 2: PROGRESSIVE REFILL PER BIN
+                # - Online & Offline: Boleh ambil dari semua BIN KECUALI 
+                #   DEFECT, REJECT, MARKOM, RESELLER, TOKO, PERBAIKAN, INB, INBOUND, GARAGE, KARANTINA, ONL, OFF
+                # - Logistik: HANYA boleh ambil dari BIN yang mengandung INB / INBOUND
                 # --------------------------------------------------------------
                 rem_log = need_log if need_log > 0 else "NO REFILL"
                 rem_off = need_off if need_off > 0 else "NO REFILL"
@@ -4362,7 +4376,7 @@ class AppState:
 
                 bins_available = sku_bins_map.get(sku, [])
 
-                # Urutkan BIN: Utamakan BIN yang punya stok terbanyak
+                # Urutkan BIN berdasarkan ketersediaan stok terbanyak dulu
                 bins_available = sorted(bins_available, key=lambda x: to_int(x['QTY']), reverse=True)
 
                 if bins_available and (rem_log != "NO REFILL" or rem_off != "NO REFILL" or rem_onl != "NO REFILL"):
@@ -4378,27 +4392,33 @@ class AppState:
                         alloc_off = "NO REFILL" if rem_off == "NO REFILL" else 0
                         alloc_onl = "NO REFILL" if rem_onl == "NO REFILL" else 0
 
-                        # Klasifikasi Asal BIN
-                        is_inb = ('INB' in bn_upper or 'INBOUND' in bn_upper)
-                        is_log = ('LOG' in bn_upper) and not ('OFF' in bn_upper or 'RSN' in bn_upper or 'ONL' in bn_upper)
+                        # 🛑 Pengecualian mutlak untuk sumber refill Online & Offline:
+                        excl_for_off_onl = bool(re.search(
+                            r"DEFECT|REJECT|MARKOM|RESELLER|TOKO|PERBAIKAN|INB|INBOUND|GARAGE|KARANTINA|ONL|OFF", 
+                            bn_upper
+                        ))
 
-                        # ATURAN 1: OFFLINE & ONLINE HANYA BOLEH AMBIL DARI BIN LOG
-                        if is_log and avail_qty > 0:
-                            # Ambil untuk Offline
+                        # 📥 Syarat mutlak untuk sumber refill Logistik:
+                        is_inb = bool(re.search(r"INB|INBOUND", bn_upper))
+
+                        # 1. OFFLINE & ONLINE: Boleh ambil dari semua BIN Logistik (RSN, KL, LOG, dll)
+                        # asalkan BUKAN dari daftar BIN yang dikecualikan di atas
+                        if not excl_for_off_onl and avail_qty > 0:
+                            # Prioritas ambil untuk Offline
                             if isinstance(rem_off, (int, float)) and rem_off > 0 and avail_qty > 0:
                                 take = min(avail_qty, rem_off)
                                 alloc_off = take
                                 avail_qty -= take
                                 rem_off -= take
 
-                            # Ambil untuk Online
+                            # Sisa stok diambil untuk Online
                             if isinstance(rem_onl, (int, float)) and rem_onl > 0 and avail_qty > 0:
                                 take = min(avail_qty, rem_onl)
                                 alloc_onl = take
                                 avail_qty -= take
                                 rem_onl -= take
 
-                        # ATURAN 2: LOGISTIK HANYA BOLEH AMBIL DARI BIN INB / INBOUND
+                        # 2. LOGISTIK: HANYA BOLEH AMBIL DARI BIN INB / INBOUND
                         if is_inb and avail_qty > 0:
                             if isinstance(rem_log, (int, float)) and rem_log > 0 and avail_qty > 0:
                                 take = min(avail_qty, rem_log)
@@ -4406,7 +4426,7 @@ class AppState:
                                 avail_qty -= take
                                 rem_log -= take
 
-                        # Hanya masukkan ke tabel jika ada minimal 1 kuota refill yang dialokasikan dari BIN ini
+                        # Masukkan ke tabel jika ada minimal salah satu kuota refill yang dialokasikan
                         any_allocated = any(isinstance(x, (int, float)) and x > 0 for x in [alloc_log, alloc_off, alloc_onl])
                         if any_allocated:
                             tab2_rows.append({
@@ -4502,19 +4522,18 @@ class AppState:
         tot_tgt_onl = int(df_alloc["TARGET ONL"].sum()) if not df_alloc.empty else 0
         tot_tgt_log = int(df_alloc["TARGET LOG"].sum()) if not df_alloc.empty else 0
 
-        # Persentase pemenuhan:
-        # Area Offline & Online
+        # Persentase pemenuhan terhadap target:
         perc_off = round((tot_qty_off / tot_tgt_off * 100.0), 1) if tot_tgt_off > 0 else 0.0
         perc_on  = round((tot_qty_onl / tot_tgt_onl * 100.0), 1) if tot_tgt_onl > 0 else 0.0
         
-        # 🌟 Area Logistik: Boleh lebih dari 100% (tidak di-cap / tidak dibatasi)
+        # 🌟 Area Logistik: Boleh lebih dari 100% (tidak di-cap / bebas naik)
         perc_log = round((tot_qty_log / tot_tgt_log * 100.0), 1) if tot_tgt_log > 0 else 0.0
 
-        # Defisit: Jumlah SKU yang stoknya masih di bawah target
+        # Defisit SKU
         defisit_off = sum(1 for _, r in df_alloc.iterrows() if r["TARGET OFF"] > r["QTY OFF"])
         defisit_onl = sum(1 for _, r in df_alloc.iterrows() if r["TARGET ONL"] > r["QTY ONL"])
         defisit_log = sum(1 for _, r in df_alloc.iterrows() if r["TARGET LOG"] > r["QTY LOG"])
-
+        
         # Simpan nilai metrik ke reactive state
         self.bs_total_sku.set(tot_sku)
         self.bs_total_stock.set(tot_stk)
