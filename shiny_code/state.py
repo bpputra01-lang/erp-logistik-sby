@@ -4365,10 +4365,10 @@ class AppState:
                 })
 
                 # --------------------------------------------------------------
-                # 4. TAB 2: PROGRESSIVE REFILL PER BIN
-                # - Online & Offline: Boleh ambil dari semua BIN KECUALI 
-                #   DEFECT, REJECT, MARKOM, RESELLER, TOKO, PERBAIKAN, INB, INBOUND, GARAGE, KARANTINA, ONL, OFF
-                # - Logistik: HANYA boleh ambil dari BIN yang mengandung INB / INBOUND
+                # 4. TAB 2: PROGRESSIVE REFILL PER BIN (LOGIKA PENGALIHAN STOK)
+                # - Offline : Boleh ambil dari Logistik DAN dari BIN ONL (Pengalihan)
+                # - Online  : Boleh ambil dari Logistik
+                # - Logistik: Boleh ambil dari INB/INBOUND, SERTA dari ONL & OFF (Tarik Balik)
                 # --------------------------------------------------------------
                 rem_log = need_log if need_log > 0 else "NO REFILL"
                 rem_off = need_off if need_off > 0 else "NO REFILL"
@@ -4376,7 +4376,7 @@ class AppState:
 
                 bins_available = sku_bins_map.get(sku, [])
 
-                # Urutkan BIN berdasarkan ketersediaan stok terbanyak dulu
+                # Urutkan BIN berdasarkan stok terbanyak
                 bins_available = sorted(bins_available, key=lambda x: to_int(x['QTY']), reverse=True)
 
                 if bins_available and (rem_log != "NO REFILL" or rem_off != "NO REFILL" or rem_onl != "NO REFILL"):
@@ -4392,41 +4392,54 @@ class AppState:
                         alloc_off = "NO REFILL" if rem_off == "NO REFILL" else 0
                         alloc_onl = "NO REFILL" if rem_onl == "NO REFILL" else 0
 
-                        # 🛑 Pengecualian mutlak untuk sumber refill Online & Offline:
-                        excl_for_off_onl = bool(re.search(
-                            r"DEFECT|REJECT|MARKOM|RESELLER|TOKO|PERBAIKAN|INB|INBOUND|GARAGE|KARANTINA|ONL|OFF", 
+                        # 🛑 BIN yang MUTLAK DILARANG untuk segala jenis refill
+                        is_special_defect = bool(re.search(
+                            r"DEFECT|REJECT|MARKOM|RESELLER|TOKO|PERBAIKAN|GARAGE|KARANTINA", 
                             bn_upper
                         ))
+                        if is_special_defect or avail_qty <= 0:
+                            continue
 
-                        # 📥 Syarat mutlak untuk sumber refill Logistik:
                         is_inb = bool(re.search(r"INB|INBOUND", bn_upper))
+                        is_off = ('OFF' in bn_upper)
+                        is_onl = ('ONL' in bn_upper)
+                        # BIN Logistik Umum (seperti RSN, KL, RAK, GL yang bukan INB, bukan OFF, bukan ONL)
+                        is_log_general = (not is_inb) and (not is_off) and (not is_onl)
 
-                        # 1. OFFLINE & ONLINE: Boleh ambil dari semua BIN Logistik (RSN, KL, LOG, dll)
-                        # asalkan BUKAN dari daftar BIN yang dikecualikan di atas
-                        if not excl_for_off_onl and avail_qty > 0:
-                            # Prioritas ambil untuk Offline
-                            if isinstance(rem_off, (int, float)) and rem_off > 0 and avail_qty > 0:
-                                take = min(avail_qty, rem_off)
-                                alloc_off = take
-                                avail_qty -= take
-                                rem_off -= take
+                        # ------------------------------------------------------
+                        # 1. ALOKASI KE OFFLINE:
+                        # Boleh dari BIN Logistik Umum ATAU dialihkan dari BIN ONL!
+                        # ------------------------------------------------------
+                        can_fill_off = (is_log_general or is_onl)
+                        if can_fill_off and isinstance(rem_off, (int, float)) and rem_off > 0 and avail_qty > 0:
+                            take = min(avail_qty, rem_off)
+                            alloc_off = take
+                            avail_qty -= take
+                            rem_off -= take
 
-                            # Sisa stok diambil untuk Online
-                            if isinstance(rem_onl, (int, float)) and rem_onl > 0 and avail_qty > 0:
-                                take = min(avail_qty, rem_onl)
-                                alloc_onl = take
-                                avail_qty -= take
-                                rem_onl -= take
+                        # ------------------------------------------------------
+                        # 2. ALOKASI KE ONLINE:
+                        # Boleh diambil dari BIN Logistik Umum
+                        # ------------------------------------------------------
+                        can_fill_onl = is_log_general
+                        if can_fill_onl and isinstance(rem_onl, (int, float)) and rem_onl > 0 and avail_qty > 0:
+                            take = min(avail_qty, rem_onl)
+                            alloc_onl = take
+                            avail_qty -= take
+                            rem_onl -= take
 
-                        # 2. LOGISTIK: HANYA BOLEH AMBIL DARI BIN INB / INBOUND
-                        if is_inb and avail_qty > 0:
-                            if isinstance(rem_log, (int, float)) and rem_log > 0 and avail_qty > 0:
-                                take = min(avail_qty, rem_log)
-                                alloc_log = take
-                                avail_qty -= take
-                                rem_log -= take
+                        # ------------------------------------------------------
+                        # 3. ALOKASI KE LOGISTIK:
+                        # Boleh dari INB/INBOUND, SERTA dari BIN ONL & OFF!
+                        # ------------------------------------------------------
+                        can_fill_log = (is_inb or is_onl or is_off)
+                        if can_fill_log and isinstance(rem_log, (int, float)) and rem_log > 0 and avail_qty > 0:
+                            take = min(avail_qty, rem_log)
+                            alloc_log = take
+                            avail_qty -= take
+                            rem_log -= take
 
-                        # Masukkan ke tabel jika ada minimal salah satu kuota refill yang dialokasikan
+                        # Catat ke list jika ada alokasi > 0
                         any_allocated = any(isinstance(x, (int, float)) and x > 0 for x in [alloc_log, alloc_off, alloc_onl])
                         if any_allocated:
                             tab2_rows.append({
