@@ -2873,6 +2873,9 @@ def server(input: Inputs, output: Outputs, session: Session):
     # ==========================================================================
     # FULL REPORT STOCK OPNAME (FIXED: ANTI 0 BYTES)
     # ==========================================================================
+    # ==========================================================================
+    # FULL REPORT STOCK OPNAME (STREAMING CHUNK - ANTI TIMEOUT & ANTI 0 BYTES)
+    # ==========================================================================
     @render.download(filename="FULL_SO_ANALYZER_REPORT.xlsx")
     def btn_dl_so_master_all():
         sheets_list = [
@@ -2893,39 +2896,55 @@ def server(input: Inputs, output: Outputs, session: Session):
             ('15_SUMMARY ADJ', getattr(state, "_raw_df_so_adj_sum", pd.DataFrame())),
         ]
 
-        buf = io.BytesIO()
+        # Simpan file di folder kerja aplikasi lokal (bukan di /tmp/ agar tidak dihapus OS)
+        local_report_path = os.path.join(os.getcwd(), "_cache_so_full_report.xlsx")
+        
+        # Bersihkan cache lama jika ada
+        if os.path.exists(local_report_path):
+            try:
+                os.remove(local_report_path)
+            except Exception:
+                pass
+
         illegal_xml_re = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f]')
-        has_any_sheet = False
+        valid_sheets = []
 
-        # 1. Pastikan writer selesai dan tertutup di dalam blok 'with'
-        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-            for sheet_name, df in sheets_list:
-                if df is not None and isinstance(df, pd.DataFrame) and not df.empty:
-                    df_clean = df.copy()
-                    
-                    # Bersihkan timezone & karakter ilegal XML
-                    for col in df_clean.columns:
-                        if pd.api.types.is_datetime64_any_dtype(df_clean[col]):
-                            df_clean[col] = df_clean[col].astype(str)
-                        elif df_clean[col].dtype == object or pd.api.types.is_string_dtype(df_clean[col]):
-                            df_clean[col] = df_clean[col].astype(str).str.replace(illegal_xml_re, '', regex=True)
+        for name, df in sheets_list:
+            if df is not None and isinstance(df, pd.DataFrame) and not df.empty:
+                df_clean = df.copy()
+                for col in df_clean.columns:
+                    if pd.api.types.is_datetime64_any_dtype(df_clean[col]):
+                        df_clean[col] = df_clean[col].astype(str)
+                    elif df_clean[col].dtype == object or pd.api.types.is_string_dtype(df_clean[col]):
+                        df_clean[col] = df_clean[col].astype(str).str.replace(illegal_xml_re, '', regex=True)
+                valid_sheets.append((name[:31], df_clean))
 
-                    df_clean.to_excel(writer, sheet_name=sheet_name[:31], index=False)
-                    has_any_sheet = True
+        if not valid_sheets:
+            valid_sheets = [("INFO", pd.DataFrame({"STATUS": ["Belum ada step yang dijalankan atau data kosong."]}))]
 
-            # Minimal harus ada 1 sheet agar openpyxl tidak korup jika data belum diproses
-            if not has_any_sheet:
-                pd.DataFrame({"STATUS": ["Belum ada step yang dijalankan atau data kosong."]}).to_excel(
-                    writer, sheet_name="INFO", index=False
-                )
+        # Tulis ke file fisik dengan engine tercepat
+        try:
+            with pd.ExcelWriter(
+                local_report_path, 
+                engine="xlsxwriter", 
+                engine_kwargs={'options': {'constant_memory': True}}
+            ) as writer:
+                for sheet_name, df_data in valid_sheets:
+                    df_data.to_excel(writer, sheet_name=sheet_name, index=False)
+        except Exception:
+            with pd.ExcelWriter(local_report_path, engine="openpyxl") as writer:
+                for sheet_name, df_data in valid_sheets:
+                    df_data.to_excel(writer, sheet_name=sheet_name, index=False)
 
-        # 2. DI LUAR 'with': Arsip zip/excel sudah 100% matang dan terkunci di dalam memori
-        # Kembalikan kursor ke awal dan ambil seluruh binary bytes-nya
-        buf.seek(0)
-        content_bytes = buf.getvalue()
-
-        # 3. Alirkan bytes ke browser (Pasti ada isi dan bukan 0 bytes)
-        yield content_bytes
+        # 🌟 KUNCI UTAMA: STREAMING PER 64 KB (CHUNKING)
+        # Koneksi tidak akan timeout karena browser terus menerima data bit demi bit hingga selesai
+        if os.path.exists(local_report_path):
+            with open(local_report_path, "rb") as f:
+                while True:
+                    chunk = f.read(65536)  # 64 KB per paket
+                    if not chunk:
+                        break
+                    yield chunk
 # ==========================================================================
     # JUSTIFICATION SO CONTROLLER (DYNAMIC MODE: REVERSAL & NON REVERSAL)
     # ==========================================================================
