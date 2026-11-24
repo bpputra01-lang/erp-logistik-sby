@@ -32,7 +32,7 @@ app_ui = ui.page_fluid(
 )
 
 def build_full_report_file_sync(sheets_list: list) -> str:
-    # Buat file sementara
+    # 1. Buat file sementara
     tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
     tmp_path = tmp.name
     tmp.close()
@@ -40,48 +40,77 @@ def build_full_report_file_sync(sheets_list: list) -> str:
     seen_sheets = set()
     valid = []
     
-    # Regex untuk membersihkan karakter ilegal XML agar Excel tidak korup
+    # Regex untuk membersihkan karakter kontrol ilegal XML agar Excel tidak korup
     illegal_xml_re = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f]')
 
     for raw_title, df in sheets_list:
         if df is None or not isinstance(df, pd.DataFrame) or df.empty:
             continue
             
+        # Sanitasi nama sheet (Maksimal 31 karakter & buang karakter ilegal Excel)
         clean_title = re.sub(r'[\\/*?:\[\]]', '', str(raw_title))[:31].strip() or "Sheet"
-        base = clean_title[:28]
+        base = clean_title[:27]
         n = 1
         while clean_title.upper() in seen_sheets:
-            clean_title = f"{base}_{n}"
+            clean_title = f"{base}_{n}"[:31]
             n += 1
         seen_sheets.add(clean_title.upper())
 
-        # Sanitasi data: buang timezone dan buang karakter kontrol
-        df_clean = df.copy()
+        # 🌟 PERBAIKAN 1: Buang kolom duplikat agar df[col] selalu menghasilkan Series (bukan DataFrame)
+        df_clean = df.loc[:, ~df.columns.duplicated()].copy()
+
+        # 🌟 PERBAIKAN 2: Sanitasi header kolom (hindari karakter kontrol pada nama kolom)
+        df_clean.columns = [re.sub(illegal_xml_re, '', str(c)).strip() for c in df_clean.columns]
+
+        # 🌟 PERBAIKAN 3: Sanitasi isi per kolom secara aman
         for col in df_clean.columns:
-            if pd.api.types.is_datetime64_any_dtype(df_clean[col]):
-                df_clean[col] = df_clean[col].astype(str)
-            elif df_clean[col].dtype == object or pd.api.types.is_string_dtype(df_clean[col]):
-                df_clean[col] = df_clean[col].astype(str).str.replace(illegal_xml_re, '', regex=True)
+            s = df_clean[col]
+
+            # Jika tipe data datetime / timezone
+            if pd.api.types.is_datetime64_any_dtype(s):
+                try:
+                    df_clean[col] = s.dt.strftime('%Y-%m-%d %H:%M:%S').fillna('')
+                except Exception:
+                    df_clean[col] = s.astype(str).replace({'NaT': '', 'nan': ''})
+
+            # Jika tipe data teks / object
+            elif s.dtype == object or pd.api.types.is_string_dtype(s):
+                # Bersihkan karakter XML ilegal tanpa mengubah NaN menjadi teks "nan"
+                df_clean[col] = s.apply(
+                    lambda x: re.sub(illegal_xml_re, '', str(x)) if pd.notna(x) and x is not None else ""
+                )
 
         valid.append((clean_title, df_clean))
 
+    # Jika semua sheet kosong, berikan sheet informasi default
     if not valid:
         valid = [("INFO", pd.DataFrame({"STATUS": ["Belum ada step yang dijalankan atau data kosong."]}))]
 
-    # Tulis menggunakan xlsxwriter (hemat RAM & cepat) atau fallback ke openpyxl
+    # 🌟 PERBAIKAN 4: Penulisan file dengan proteksi fallback yang bersih
+    success_write = False
+    
+    # Coba 1: xlsxwriter (Cepat & hemat RAM)
     try:
         with pd.ExcelWriter(
             tmp_path, 
             engine="xlsxwriter", 
             engine_kwargs={'options': {'constant_memory': True}}
         ) as writer:
-            for title, df in valid:
-                df.to_excel(writer, sheet_name=title, index=False)
+            for title, df_data in valid:
+                df_data.to_excel(writer, sheet_name=title, index=False)
+        success_write = True
     except Exception as e_writer:
-        print(f"xlsxwriter error: {e_writer}, mencoba openpyxl...")
-        with pd.ExcelWriter(tmp_path, engine="openpyxl") as writer:
-            for title, df in valid:
-                df.to_excel(writer, sheet_name=title, index=False)
+        print(f"[Export Warning] xlsxwriter gagal ({e_writer}), mencoba fallback openpyxl...")
+
+    # Coba 2: openpyxl (Jika xlsxwriter gagal atau belum terinstall)
+    if not success_write:
+        try:
+            with pd.ExcelWriter(tmp_path, engine="openpyxl") as writer:
+                for title, df_data in valid:
+                    df_data.to_excel(writer, sheet_name=title, index=False)
+            success_write = True
+        except Exception as e_openpyxl:
+            print(f"[Export Error] openpyxl juga gagal: {e_openpyxl}")
 
     return tmp_path
         
@@ -2874,7 +2903,7 @@ def server(input: Inputs, output: Outputs, session: Session):
     # FULL REPORT STOCK OPNAME (FIXED: ANTI 0 BYTES)
     # ==========================================================================
     # ==========================================================================
-    # FULL REPORT STOCK OPNAME (STREAMING CHUNK - ANTI TIMEOUT & ANTI 0 BYTES)
+    # FULL REPORT STOCK OPNAME (FIXED: MENGGUNAKAN BUILD SYNC SEPERTI CYCLE COUNT)
     # ==========================================================================
     @render.download(filename="FULL_SO_ANALYZER_REPORT.xlsx")
     def btn_dl_so_master_all():
@@ -2896,55 +2925,9 @@ def server(input: Inputs, output: Outputs, session: Session):
             ('15_SUMMARY ADJ', getattr(state, "_raw_df_so_adj_sum", pd.DataFrame())),
         ]
 
-        # Simpan file di folder kerja aplikasi lokal (bukan di /tmp/ agar tidak dihapus OS)
-        local_report_path = os.path.join(os.getcwd(), "_cache_so_full_report.xlsx")
-        
-        # Bersihkan cache lama jika ada
-        if os.path.exists(local_report_path):
-            try:
-                os.remove(local_report_path)
-            except Exception:
-                pass
-
-        illegal_xml_re = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f]')
-        valid_sheets = []
-
-        for name, df in sheets_list:
-            if df is not None and isinstance(df, pd.DataFrame) and not df.empty:
-                df_clean = df.copy()
-                for col in df_clean.columns:
-                    if pd.api.types.is_datetime64_any_dtype(df_clean[col]):
-                        df_clean[col] = df_clean[col].astype(str)
-                    elif df_clean[col].dtype == object or pd.api.types.is_string_dtype(df_clean[col]):
-                        df_clean[col] = df_clean[col].astype(str).str.replace(illegal_xml_re, '', regex=True)
-                valid_sheets.append((name[:31], df_clean))
-
-        if not valid_sheets:
-            valid_sheets = [("INFO", pd.DataFrame({"STATUS": ["Belum ada step yang dijalankan atau data kosong."]}))]
-
-        # Tulis ke file fisik dengan engine tercepat
-        try:
-            with pd.ExcelWriter(
-                local_report_path, 
-                engine="xlsxwriter", 
-                engine_kwargs={'options': {'constant_memory': True}}
-            ) as writer:
-                for sheet_name, df_data in valid_sheets:
-                    df_data.to_excel(writer, sheet_name=sheet_name, index=False)
-        except Exception:
-            with pd.ExcelWriter(local_report_path, engine="openpyxl") as writer:
-                for sheet_name, df_data in valid_sheets:
-                    df_data.to_excel(writer, sheet_name=sheet_name, index=False)
-
-        # 🌟 KUNCI UTAMA: STREAMING PER 64 KB (CHUNKING)
-        # Koneksi tidak akan timeout karena browser terus menerima data bit demi bit hingga selesai
-        if os.path.exists(local_report_path):
-            with open(local_report_path, "rb") as f:
-                while True:
-                    chunk = f.read(65536)  # 64 KB per paket
-                    if not chunk:
-                        break
-                    yield chunk
+        # Langsung panggil helper resmi dan return file_path persis seperti Cycle Count
+        file_path = build_full_report_file_sync(sheets_list)
+        return file_path
 # ==========================================================================
     # JUSTIFICATION SO CONTROLLER (DYNAMIC MODE: REVERSAL & NON REVERSAL)
     # ==========================================================================
