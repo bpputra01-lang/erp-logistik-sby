@@ -32,6 +32,7 @@ app_ui = ui.page_fluid(
 )
 
 def build_full_report_file_sync(sheets_list: list) -> str:
+    import traceback
     tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
     tmp_path = tmp.name
     tmp.close()
@@ -52,39 +53,52 @@ def build_full_report_file_sync(sheets_list: list) -> str:
             n += 1
         seen_sheets.add(clean_title.upper())
 
-        # Pastikan bebas kolom duplikat agar df_clean[col] tidak jadi DataFrame
+        # Buang kolom duplikat agar tidak crash AttributeError
         df_clean = df.loc[:, ~df.columns.duplicated()].copy()
         for col in df_clean.columns:
             s = df_clean[col]
             if pd.api.types.is_datetime64_any_dtype(s):
                 df_clean[col] = s.astype(str)
             elif s.dtype == object or pd.api.types.is_string_dtype(s):
-                # Hanya regex jika memang ada data object, hindari overhead berlebih
                 df_clean[col] = s.fillna("").astype(str).str.replace(illegal_xml_re, '', regex=True)
 
+        print(f"[FULL REPORT] Sheet '{clean_title}': {len(df_clean)} baris, {len(df_clean.columns)} kolom")
         valid.append((clean_title, df_clean))
 
     if not valid:
         valid = [("INFO", pd.DataFrame({"STATUS": ["Belum ada step yang dijalankan atau data kosong."]}))]
 
     try:
+        import xlsxwriter
+        print("[FULL REPORT] Menulis dengan xlsxwriter...")
         with pd.ExcelWriter(
             tmp_path,
             engine="xlsxwriter",
-            engine_kwargs={'options': {'constant_memory': True, 'strings_to_urls': False}}
+            engine_kwargs={'options': {'constant_memory': True, 'strings_to_urls': False, 'nan_inf_to_errors': True}}
         ) as writer:
             for title, df in valid:
                 df.to_excel(writer, sheet_name=title, index=False)
+        print(f"[FULL REPORT] Selesai xlsxwriter! Ukuran file: {os.path.getsize(tmp_path)} bytes")
     except Exception as e_writer:
-        print(f"xlsxwriter error: {e_writer}, mencoba openpyxl write_only...")
-        from openpyxl import Workbook
-        wb = Workbook(write_only=True)
-        for title, df in valid:
-            ws = wb.create_sheet(title=title)
-            ws.append(df.columns.tolist())
-            for row in df.itertuples(index=False, name=None):
-                ws.append(list(row))
-        wb.save(tmp_path)
+        print(f"[FULL REPORT] xlsxwriter gagal: {e_writer}")
+        traceback.print_exc()
+        try:
+            print("[FULL REPORT] Mencoba fallback openpyxl write_only...")
+            from openpyxl import Workbook
+            wb = Workbook(write_only=True)
+            for title, df in valid:
+                ws = wb.create_sheet(title=title)
+                ws.append([str(c) for c in df.columns.tolist()])
+                for row in df.itertuples(index=False, name=None):
+                    clean_row = ["" if pd.isna(v) else (str(v) if not isinstance(v, (int, float)) else v) for v in row]
+                    ws.append(clean_row)
+            wb.save(tmp_path)
+            print(f"[FULL REPORT] Selesai openpyxl! Ukuran file: {os.path.getsize(tmp_path)} bytes")
+        except Exception as e_opx:
+            print(f"[FULL REPORT] openpyxl juga gagal: {e_opx}")
+            traceback.print_exc()
+            with pd.ExcelWriter(tmp_path, engine="openpyxl") as writer:
+                pd.DataFrame({"ERROR": [str(e_writer), str(e_opx)]}).to_excel(writer, sheet_name="ERROR_LOG", index=False)
 
     return tmp_path
         
@@ -2032,9 +2046,6 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         yield buf.getvalue()
 
-    # ==========================================================================
-    # FULL REPORT CYCLE COUNT
-    # ==========================================================================
     @render.download(filename="FULL_CYCLE_COUNT_ANALYZER_REPORT.xlsx")
     async def btn_dl_cca_master_all():
         sheets_list = [
@@ -2055,7 +2066,11 @@ def server(input: Inputs, output: Outputs, session: Session):
         file_path = await asyncio.to_thread(build_full_report_file_sync, sheets_list)
         try:
             with open(file_path, "rb") as f:
-                yield f.read()
+                while True:
+                    chunk = f.read(65536)
+                    if not chunk:
+                        break
+                    yield chunk
         finally:
             if os.path.exists(file_path):
                 os.remove(file_path)
@@ -2902,7 +2917,11 @@ def server(input: Inputs, output: Outputs, session: Session):
         file_path = await asyncio.to_thread(build_full_report_file_sync, sheets_list)
         try:
             with open(file_path, "rb") as f:
-                yield f.read()
+                while True:
+                    chunk = f.read(65536)
+                    if not chunk:
+                        break
+                    yield chunk
         finally:
             if os.path.exists(file_path):
                 os.remove(file_path)
