@@ -1796,7 +1796,7 @@ class AppState:
                 df_picking = pd.concat(combined_picking_list, ignore_index=True)
                 df_picking = df_picking[df_picking['QTY'] > 0].reset_index(drop=True)
             else:
-                df_picking = pd.DataFrame(columns=['SKU', 'BIN', 'QTY', 'SOURCE'])
+                df_picking = pd.DataFrame(columns=['SKU', 'BIN', 'QTY', 'SOURCE']) 
             # ------------------------------------------------------------------
             # 3. Olah File Mutasi & Gabungkan dengan Sales INSTOCK
             # ------------------------------------------------------------------
