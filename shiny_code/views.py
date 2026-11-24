@@ -3150,9 +3150,6 @@ def target_progress_view(state: AppState):
         style="width: 100%; padding: 1rem;"
     )
 
-# ==============================================================================
-# MODAL OVERVIEW ALL HASIL VISUAL (CYCLE COUNT & STOCK OPNAME)
-# ==============================================================================
 def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict):
     q_real_init = metrics.get("q_real_init", 0)
     q_sys_init = metrics.get("q_sys_init", 0)
@@ -3162,6 +3159,13 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
     sku_need_adj = metrics.get("sku_need_adj", 0)
     q_karantina = metrics.get("q_karantina", 0)
     sku_karantina = metrics.get("sku_karantina", 0)
+
+    # 🌟 METRIK FINANSIAL VALUE ADJUSTMENT (RP)
+    val_adj_p = metrics.get("val_adj_p", 0)
+    val_adj_m = abs(metrics.get("val_adj_m", 0))
+    val_adj_net = metrics.get("val_adj_net", val_adj_p - val_adj_m)
+    net_color = "#10B981" if val_adj_net >= 0 else "#EF4444"
+    net_sign = "+" if val_adj_net > 0 else ""
 
     tot_resolusi = q_miss_loc + q_need_adj + q_karantina
     pct_miss = (q_miss_loc / tot_resolusi * 100) if tot_resolusi > 0 else 0.0
@@ -3184,7 +3188,7 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
             style="display: flex; justify-content: space-between; align-items: center; background: #1A1D24; padding: 1.25rem 1.5rem; border-radius: 12px; border: 1px solid #2D3748; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 10px;"
         ),
 
-        # --- 4 PILAR UTAMA KPI CARDS ---
+        # --- 4 PILAR UTAMA KPI CARDS (FISIK/KUANTITAS) ---
         ui.div(
             # Card 1: Selisih Awal
             ui.div(
@@ -3218,50 +3222,71 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
                     style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;"
                 ),
                 ui.span(f"{q_miss_loc:,} PCS", style="color: #10B981; font-size: 24px; font-weight: 900; display: block; line-height: 1.1;"),
-                ui.span(f"📦 Total {sku_miss_loc:,} SKU • Terselesaikan tanpa adjustment", style="color: #718096; font-size: 11.5px; margin-top: 4px; display: block;"),
+                ui.span(f"📦 Total {sku_miss_loc:,} SKU • Mutasi antar rak (No Adj)", style="color: #718096; font-size: 11.5px; margin-top: 4px; display: block;"),
                 style="background: #161920; padding: 1rem 1.25rem; border-radius: 10px; border-left: 4px solid #10B981; border-top: 1px solid #2D3748; border-right: 1px solid #2D3748; border-bottom: 1px solid #2D3748;"
             ),
 
-            # Card 3: Real + Need Adjustment (SUDAH DIPERBAIKI TANDA PETIKNYA)
+            # Card 3: Real + Need Adjustment
             ui.div(
                 ui.div(
-                    ui.span("3. REAL + NEED ADJUSTMENT", style="font-size: 11px; font-weight: 800; color: #A0AEC0; letter-spacing: 0.5px;"),
+                    ui.span("3. REAL + NEED ADJ", style="font-size: 11px; font-weight: 800; color: #A0AEC0; letter-spacing: 0.5px;"),
                     ui.tags.i(class_="fa-solid fa-circle-plus", style="color: #F59E0B; font-size: 16px;"),
                     style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;"
                 ),
                 ui.span(f"{q_need_adj:,} PCS", style="color: #F59E0B; font-size: 24px; font-weight: 900; display: block; line-height: 1.1;"),
-                ui.span(f"🏷️ Sebanyak {sku_need_adj:,} SKU • Perlu Adjustment", style="color: #718096; font-size: 11.5px; margin-top: 4px; display: block;"),
+                ui.span(f"🏷️ {sku_need_adj:,} SKU • Valuasi: Rp {val_adj_p:,}", style="color: #718096; font-size: 11.5px; margin-top: 4px; display: block;"),
                 style="background: #161920; padding: 1rem 1.25rem; border-radius: 10px; border-left: 4px solid #F59E0B; border-top: 1px solid #2D3748; border-right: 1px solid #2D3748; border-bottom: 1px solid #2D3748;"
             ),
 
             # Card 4: Mutasi Karantina
             ui.div(
                 ui.div(
-                    ui.span("4. MUTASI KE KARANTINA", style="font-size: 11px; font-weight: 800; color: #A0AEC0; letter-spacing: 0.5px;"),
+                    ui.span("4. MUTASI KARANTINA", style="font-size: 11px; font-weight: 800; color: #A0AEC0; letter-spacing: 0.5px;"),
                     ui.tags.i(class_="fa-solid fa-shield-virus", style="color: #EF4444; font-size: 16px;"),
                     style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;"
                 ),
                 ui.span(f"{q_karantina:,} PCS", style="color: #EF4444; font-size: 24px; font-weight: 900; display: block; line-height: 1.1;"),
-                ui.span(f"☣️ Sebanyak {sku_karantina:,} SKU • Real (Not Found)", style="color: #718096; font-size: 11.5px; margin-top: 4px; display: block;"),
+                ui.span(f"☣️ {sku_karantina:,} SKU • Valuasi: Rp {val_adj_m:,}", style="color: #718096; font-size: 11.5px; margin-top: 4px; display: block;"),
                 style="background: #161920; padding: 1rem 1.25rem; border-radius: 10px; border-left: 4px solid #EF4444; border-top: 1px solid #2D3748; border-right: 1px solid #2D3748; border-bottom: 1px solid #2D3748;"
             ),
-            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.5rem;"
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+        ),
+
+        # --- 🌟 PILAR VALUASI FINANSIAL ADJUSTMENT (RP) ---
+        ui.div(
+            ui.div(
+                ui.div(
+                    ui.span("VALUE ADJUSTMENT (+)", style="color: #A0AEC0; font-size: 11px; font-weight: 800; display: block; margin-bottom: 4px;"),
+                    ui.span(f"Rp {val_adj_p:,}", style="color: #10B981; font-size: 22px; font-weight: 900;"),
+                    style="background: #161920; padding: 1rem; border-radius: 10px; border-left: 4px solid #10B981; border: 1px solid #2D3748; border-left-width: 4px; text-align: center; flex: 1; min-width: 220px;"
+                ),
+                ui.div(
+                    ui.span("VALUE ADJUSTMENT (-)", style="color: #A0AEC0; font-size: 11px; font-weight: 800; display: block; margin-bottom: 4px;"),
+                    ui.span(f"-Rp {val_adj_m:,}", style="color: #EF4444; font-size: 22px; font-weight: 900;"),
+                    style="background: #161920; padding: 1rem; border-radius: 10px; border-left: 4px solid #EF4444; border: 1px solid #2D3748; border-left-width: 4px; text-align: center; flex: 1; min-width: 220px;"
+                ),
+                ui.div(
+                    ui.span("NET VALUE IMPACT", style="color: #A0AEC0; font-size: 11px; font-weight: 800; display: block; margin-bottom: 4px;"),
+                    ui.span(f"{net_sign}Rp {val_adj_net:,}", style=f"color: {net_color}; font-size: 22px; font-weight: 900;"),
+                    style=f"background: #161920; padding: 1rem; border-radius: 10px; border-left: 4px solid {net_color}; border: 1px solid #2D3748; border-left-width: 4px; text-align: center; flex: 1; min-width: 220px;"
+                ),
+                style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%;"
+            ),
+            style="margin-bottom: 1.5rem;"
         ),
 
         # --- VISUAL BREAKDOWN & PROPORTION BAR ---
         ui.div(
             ui.div(
                 ui.h4("📊 Distribusi Chart Bar Case to Case", style="font-size: 14px; font-weight: 800; color: #FFFFFF; margin: 0 0 6px 0;"),
-                ui.p("Proporsi Case to Case Dalam Proses Cycle Count.", style="color: #A0AEC0; font-size: 12px; margin: 0;"),
+                ui.p("Proporsi penanganan selisih Stock Opname: Miss Location vs Need Adj (+) vs Karantina (-).", style="color: #A0AEC0; font-size: 12px; margin: 0;"),
             ),
-            # Visual Multi-Color Stacked Bar
             ui.div(
                 ui.div(style=f"width: {max(2.0, pct_miss):.1f}%; height: 18px; background: #10B981; border-radius: 4px 0 0 4px; transition: width 0.5s ease; position: relative;", title=f"Miss Location: {pct_miss:.1f}%"),
                 ui.div(style=f"width: {max(2.0, pct_adj):.1f}%; height: 18px; background: #F59E0B; transition: width 0.5s ease; position: relative;", title=f"Need Adj (+): {pct_adj:.1f}%"),
                 ui.div(style=f"width: {max(2.0, pct_karan):.1f}%; height: 18px; background: #EF4444; border-radius: 0 4px 4px 0; transition: width 0.5s ease; position: relative;", title=f"Karantina: {pct_karan:.1f}%"),
                 style="display: flex; width: 100%; background: #2D3748; border-radius: 6px; overflow: hidden; height: 18px; margin: 12px 0 16px 0;"
             ),
-            # Legenda & Persentase
             ui.div(
                 ui.div(
                     ui.div(style="width: 12px; height: 12px; background: #10B981; border-radius: 3px; margin-right: 6px;"),
@@ -3272,13 +3297,13 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
                 ui.div(
                     ui.div(style="width: 12px; height: 12px; background: #F59E0B; border-radius: 3px; margin-right: 6px;"),
                     ui.span(f"Real + Need Adj ({pct_adj:.1f}%) : ", style="color: #A0AEC0; font-size: 12px; font-weight: 600;"),
-                    ui.strong(f"{q_need_adj:,} PCS", style="color: #FFFFFF; font-size: 12px; margin-left: 4px;"),
+                    ui.strong(f"{q_need_adj:,} PCS (Rp {val_adj_p:,})", style="color: #FFFFFF; font-size: 12px; margin-left: 4px;"),
                     style="display: flex; align-items: center;"
                 ),
                 ui.div(
                     ui.div(style="width: 12px; height: 12px; background: #EF4444; border-radius: 3px; margin-right: 6px;"),
                     ui.span(f"Karantina ({pct_karan:.1f}%) : ", style="color: #A0AEC0; font-size: 12px; font-weight: 600;"),
-                    ui.strong(f"{q_karantina:,} PCS", style="color: #FFFFFF; font-size: 12px; margin-left: 4px;"),
+                    ui.strong(f"{q_karantina:,} PCS (Rp {val_adj_m:,})", style="color: #FFFFFF; font-size: 12px; margin-left: 4px;"),
                     style="display: flex; align-items: center;"
                 ),
                 style="display: flex; justify-content: space-around; width: 100%; flex-wrap: wrap; gap: 12px;"
@@ -3290,15 +3315,14 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
         ui.div(
             ui.div(
                 ui.tags.i(class_="fa-solid fa-lightbulb", style="color: #C5A059; font-size: 18px; margin-right: 10px;"),
-                ui.strong("Insight Cycle Count Result:", style="color: #C5A059; font-size: 13px;"),
+                ui.strong("Executive Insight & Financial Impact (Stock Opname):", style="color: #C5A059; font-size: 13px;"),
                 style="display: flex; align-items: center; margin-bottom: 6px;"
             ),
-            # Teks di bawah sudah diganti menjadi hitam (#000000)
             ui.p(
-                f"Dari total case selisih sebanyak {tot_resolusi:,} pcs, sebesar {pct_miss:.1f}% merupakan kesalahan penempatan barang (Miss Location) yang dapat diselesaikan melalui mutasi antar BIN tanpa proses adjustment. Total barang dimutasi ke karantina sebesar {pct_karan:.1f}%, dan Item Real + sebesar {pct_adj:.1f}%.",
-                style="color: #000000; font-size: 12.5px; line-height: 1.5; margin: 0;"
+                f"Dari total {tot_resolusi:,} pcs kasus selisih, sebesar {pct_miss:.1f}% ({q_miss_loc:,} pcs) diselesaikan lewat mutasi rak (Miss Location) tanpa proses adjustment. Nilai penambahan barang (Value Adj +) sebesar Rp {val_adj_p:,}, nilai pengurangan/karantina (Value Adj -) sebesar Rp {val_adj_m:,}, sehingga dampak bersih terhadap pembukuan stok adalah {net_sign}Rp {abs(val_adj_net):,}.",
+                style="color: #1A202C; font-size: 12.5px; line-height: 1.5; margin: 0;"
             ),
-            style="background: rgba(197, 160, 89, 0.08); border-left: 4px solid #C5A059; border-top: 1px solid rgba(197, 160, 89, 0.2); border-right: 1px solid rgba(197, 160, 89, 0.2); border-bottom: 1px solid rgba(197, 160, 89, 0.2); padding: 1rem 1.25rem; border-radius: 8px;"
+            style="background: rgba(197, 160, 89, 0.12); border-left: 4px solid #C5A059; border-top: 1px solid rgba(197, 160, 89, 0.25); border-right: 1px solid rgba(197, 160, 89, 0.25); border-bottom: 1px solid rgba(197, 160, 89, 0.25); padding: 1rem 1.25rem; border-radius: 8px;"
         ),
         style="padding: 0.5rem 0; width: 100%;"
     )

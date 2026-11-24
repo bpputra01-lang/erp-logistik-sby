@@ -2696,22 +2696,26 @@ def server(input: Inputs, output: Outputs, session: Session):
     # --- STEP 6 STOCK OPNAME ---
     @render.ui
     def so_step6_card_ui():
-        # Step 6 baru muncul jika Step 5 selesai
+        # Step 6 baru muncul jika Step 2 dan Step 5 selesai
         if not state.so_step2_done() or not state.so_step5_done():
             return ui.div()
 
-        # Miss Location Results
+        # 1. Hasil Miss Location (5A)
         miss_loc_results = ui.div()
         if state.so_step6a_done():
             miss_loc_results = ui.div(
                 ui.hr(style="margin: 1rem 0; border-color: #E2E8F0;"),
                 ui.div(
-                    dark_metric_box("📦 TOTAL SKU MISS LOC.", f"{state.so_sku_miss_loc():,} ITEM", "#E53E3E"),
+                    dark_metric_box("📦 TOTAL SKU MISS LOC.", f"{state.so_sku_miss_loc():,} ITEM", "#3182CE"),
                     dark_metric_box("🔢 TOTAL QTY MISS LOC.", f"{state.so_qty_miss_loc():,} ITEM", "#E53E3E"),
                     style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
                 ),
                 ui.div(
-                    ui.download_button("btn_dl_so_miss_loc", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD MISS LOC REPORT (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"),
+                    ui.download_button(
+                        "btn_dl_so_miss_loc", 
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD MISS LOC REPORT (.xlsx)"), 
+                        style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
+                    ),
                     style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
                 ),
                 ui.navset_card_tab(
@@ -2720,21 +2724,24 @@ def server(input: Inputs, output: Outputs, session: Session):
                 )
             )
 
-        # Summary Adj Results
+        # 2. Hasil Summary Adjustment (5B)
         summary_adj_results = ui.div()
         if state.so_step6b_done():
             c_val_p = "#10B981" if state.so_adj_val_p() >= 0 else "#E53E3E"
-            c_val_m = "#10B981" if state.so_adj_val_m() >= 0 else "#E53E3E"
+            c_val_m = "#EF4444"
             c_val_n = "#10B981" if state.so_adj_val_net() >= 0 else "#E53E3E"
+            net_sign = "+" if state.so_adj_val_net() > 0 else ""
 
             summary_adj_results = ui.div(
                 ui.hr(style="margin: 1rem 0; border-color: #E2E8F0;"),
+                # Baris 1: Nilai Finansial (Rp)
                 ui.div(
                     dark_metric_box("📈 TOTAL VALUE ADJ (+)", f"Rp {state.so_adj_val_p():,.0f}", c_val_p),
-                    dark_metric_box("📉 TOTAL VALUE ADJ (-)", f"Rp {state.so_adj_val_m():,.0f}", c_val_m),
-                    dark_metric_box("⚖️ NET VALUE ADJ", f"Rp {state.so_adj_val_net():,.0f}", c_val_n),
+                    dark_metric_box("📉 TOTAL VALUE ADJ (-)", f"-Rp {abs(state.so_adj_val_m()):,.0f}", c_val_m),
+                    dark_metric_box("⚖️ NET VALUE ADJ", f"{net_sign}Rp {state.so_adj_val_net():,.0f}", c_val_n),
                     style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
                 ),
+                # Baris 2: Kuantitas Fisik
                 ui.div(
                     dark_metric_box("🟢 TOTAL QTY ADJ (+)", f"{state.so_adj_qty_p():,} ITEM", "#10B981"),
                     dark_metric_box("🔴 TOTAL QTY ADJ (-)", f"{state.so_adj_qty_m():,} ITEM", "#E53E3E"),
@@ -2742,7 +2749,11 @@ def server(input: Inputs, output: Outputs, session: Session):
                     style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
                 ),
                 ui.div(
-                    ui.download_button("btn_dl_so_adj_master", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD MASTER ADJUSTMENT REPORT (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"),
+                    ui.download_button(
+                        "btn_dl_so_adj_master", 
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD MASTER ADJUSTMENT REPORT (.xlsx)"), 
+                        style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
+                    ),
                     style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
                 ),
                 ui.navset_card_tab(
@@ -2752,7 +2763,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             )
 
         return ui.div(
-            # 5A. Miss Location Section
+            # 5A. Bagian Miss Location
             ui.div(
                 ui.h4("5️⃣ Miss Location Report", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
                 ui.div(
@@ -2767,7 +2778,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                 style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
             ),
 
-            # 5B. Summary Adjustment Section
+            # 5B. Bagian Summary Adjustment
             ui.div(
                 ui.h4("6️⃣ Summary Adjustment Report (Financial & Inventory)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
                 ui.div(
@@ -2787,18 +2798,37 @@ def server(input: Inputs, output: Outputs, session: Session):
                 style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
             ),
 
-            # 5C. Master Full Report (All 11 Sheets)
+            # 🌟 5C. MASTER REPORT DENGAN TOMBOL "OVERVIEW ALL HASIL (VISUAL)"
             ui.div(
                 ui.div(
-                    ui.h4("🏆 Download Full Master Report (All 11 Sheets)", style="font-size: 16px; font-weight: 800; color: #065F46; margin: 0;"),
-                    ui.download_button(
-                        "btn_dl_so_master_all",
-                        ui.tags.span(ui.tags.i(class_="fa-solid fa-file-excel", style="margin-right: 8px; font-size: 16px;"), "DOWNLOAD FULL SO ANALYZER REPORT (.XLSX)"),
-                        style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; font-weight: 800; border-radius: 8px; border: none; padding: 12px 24px; cursor: pointer; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);"
+                    ui.div(
+                        ui.h4("🏆 Master Report & Executive Overview (Stock Opname)", style="font-size: 16px; font-weight: 800; color: #065F46; margin: 0 0 4px 0;"),
+                        ui.p("Unduh kompilasi laporan lengkap atau buka rangkuman visual eksekutif.", style="color: #047857; font-size: 13px; margin: 0;"),
                     ),
-                    style="display: flex; justify-content: space-between; align-items: center; width: 100%;"
+                    ui.div(
+                        # Tombol Visualizer Overview
+                        ui.tags.button(
+                            ui.tags.span(
+                                ui.tags.i(class_="fa-solid fa-chart-pie", style="margin-right: 8px; font-size: 14px;"),
+                                "📊 OVERVIEW ALL HASIL (VISUAL)"
+                            ),
+                            onclick="Shiny.setInputValue('btn_open_so_overview_modal', Math.random(), {priority: 'event'});",
+                            style="background: #1A202C; color: #FFFFFF; font-weight: 800; border-radius: 8px; border: 1.5px solid #4A5568; padding: 10px 18px; cursor: pointer; font-size: 13px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"
+                        ),
+                        # Tombol Download Full Report
+                        ui.download_button(
+                            "btn_dl_so_master_all",
+                            ui.tags.span(
+                                ui.tags.i(class_="fa-solid fa-file-excel", style="margin-right: 8px; font-size: 14px;"),
+                                "DOWNLOAD FULL REPORT (.XLSX)"
+                            ),
+                            style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; font-weight: 800; border-radius: 8px; border: none; padding: 10px 20px; cursor: pointer; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); font-size: 13px;"
+                        ),
+                        style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;"
+                    ),
+                    style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 12px;"
                 ),
-                style="background: #D1FAE5; border: 1.5px solid #A7F3D0; padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem;"
+                style="background: #D1FAE5; border: 1.5px solid #A7F3D0; padding: 1.25rem 1.5rem; border-radius: 12px; margin-bottom: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.04);"
             )
         )
 
@@ -6737,20 +6767,41 @@ def server(input: Inputs, output: Outputs, session: Session):
     @reactive.event(input.btn_open_so_overview_modal)
     def _open_so_overview():
         from views import render_executive_overview_modal
+        
         q_need_so = int(state._raw_df_so_mult['QTY SO'].sum()) if hasattr(state, '_raw_df_so_mult') and not state._raw_df_so_mult.empty and 'QTY SO' in state._raw_df_so_mult.columns else 0
         sku_need_so = state._raw_df_so_mult.shape[0] if hasattr(state, '_raw_df_so_mult') and not state._raw_df_so_mult.empty else 0
+
+        # Ambil nilai finansial langsung dari metrik Stock Opname Step 6B
+        val_adj_p = int(round(state.so_adj_val_p()))
+        val_adj_m = int(round(abs(state.so_adj_val_m())))
+        val_adj_net = int(round(state.so_adj_val_net()))
+
+        # Fallback perhitungan otomatis jika Step 6B belum di-generate secara manual
+        if val_adj_p == 0 and not state._raw_df_so_mult.empty:
+            col_hb = next((c for c in state._raw_df_so_mult.columns if any(k in str(c).upper() for k in ['HARGA BELI', 'COGS', 'BELI'])), None)
+            col_q = next((c for c in state._raw_df_so_mult.columns if 'QTY' in str(c).upper()), None)
+            if col_hb and col_q:
+                val_adj_p = int((pd.to_numeric(state._raw_df_so_mult[col_q], errors='coerce').fillna(0) * pd.to_numeric(state._raw_df_so_mult[col_hb], errors='coerce').fillna(0)).sum())
+
+        if val_adj_net == 0 and (val_adj_p > 0 or val_adj_m > 0):
+            val_adj_net = val_adj_p - val_adj_m
 
         data_m = {
             "q_real_init": state.so_qty_real_plus(),
             "q_sys_init": state.so_qty_sys_plus(),
             "q_miss_loc": state.so_qty_miss_loc(),
             "sku_miss_loc": state.so_sku_miss_loc(),
-            "q_need_adj": q_need_so,
+            "q_need_adj": state.so_adj_qty_p() if state.so_adj_qty_p() > 0 else q_need_so,
             "sku_need_adj": sku_need_so,
             "q_karantina": state.so_qty_karantina(),
             "sku_karantina": state.so_sku_karantina(),
+            "val_adj_p": val_adj_p,
+            "val_adj_m": val_adj_m,
+            "val_adj_net": val_adj_net,
         }
-        modal_content = render_executive_overview_modal("Stock Opname", "SURABAYA", data_m)
+
+        # Panggil modal executive overview khusus Stock Opname
+        modal_content = render_executive_overview_modal("Stock Opname", input.so_branch() if "so_branch" in input else "SURABAYA", data_m)
         ui.modal_show(ui.modal(
             modal_content,
             title=ui.div(ui.tags.i(class_="fa-solid fa-chart-line", style="color: #C5A059; margin-right: 8px;"), "Executive Summary: Stock Opname Analyzer"),
