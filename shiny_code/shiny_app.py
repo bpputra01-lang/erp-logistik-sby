@@ -31,12 +31,8 @@ app_ui = ui.page_fluid(
     style="padding: 0; margin: 0; background-color: #111318;"
 )
 
-def build_full_report_file_sync(sheets_list: list) -> str:
-    # Buat file sementara
-    tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
-    tmp_path = tmp.name
-    tmp.close()
-
+def build_full_report_bytes(sheets_list: list) -> bytes:
+    buf = io.BytesIO()
     seen_sheets = set()
     valid = []
     
@@ -54,13 +50,11 @@ def build_full_report_file_sync(sheets_list: list) -> str:
             n += 1
         seen_sheets.add(clean_title.upper())
 
-        # Buang kolom duplikat
+        # Buang kolom duplikat & sanitasi nama kolom
         df_clean = df.loc[:, ~df.columns.duplicated()].copy()
-
-        # Sanitasi nama kolom
         df_clean.columns = [re.sub(illegal_xml_re, '', str(c)).strip() for c in df_clean.columns]
 
-        # 🌟 Sanitasi Vektorisasi Cepat (Tanpa apply lambda lambat)
+        # Sanitasi data string dan datetime
         for col in df_clean.columns:
             if pd.api.types.is_datetime64_any_dtype(df_clean[col]):
                 df_clean[col] = df_clean[col].astype(str).replace({'NaT': '', 'nan': ''})
@@ -72,29 +66,13 @@ def build_full_report_file_sync(sheets_list: list) -> str:
     if not valid:
         valid = [("INFO", pd.DataFrame({"STATUS": ["Belum ada step yang dijalankan atau data kosong."]}))]
 
-    # 🌟 Tulis file: Hapus 'constant_memory: True' agar tidak merusak format Excel Pandas
-    success_write = False
-    try:
-        with pd.ExcelWriter(
-            tmp_path, 
-            engine="xlsxwriter",
-            engine_kwargs={'options': {'remove_timezone': True}}
-        ) as writer:
-            for title, df_data in valid:
-                df_data.to_excel(writer, sheet_name=title, index=False)
-        success_write = True
-    except Exception as e_writer:
-        print(f"[Export Warning] xlsxwriter gagal: {e_writer}, mencoba fallback openpyxl...")
+    # Tulis langsung ke buffer memori openpyxl
+    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+        for title, df_data in valid:
+            df_data.to_excel(writer, sheet_name=title, index=False)
 
-    if not success_write:
-        try:
-            with pd.ExcelWriter(tmp_path, engine="openpyxl") as writer:
-                for title, df_data in valid:
-                    df_data.to_excel(writer, sheet_name=title, index=False)
-        except Exception as e_openpyxl:
-            print(f"[Export Error] openpyxl gagal: {e_openpyxl}")
-
-    return tmp_path
+    buf.seek(0)
+    return buf.getvalue()
         
 def server(input: Inputs, output: Outputs, session: Session):
     state = AppState()
@@ -2061,9 +2039,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             ('13_SUMMARY MISS LOC', getattr(state, "_raw_df_cca_sum_miss", pd.DataFrame())),
         ]
         
-        # LANGSUNG RETURN PATH FILE: Shiny akan menanganinya via Starlette FileResponse resmi
-        file_path = build_full_report_file_sync(sheets_list)
-        return file_path
+        yield build_full_report_bytes(sheets_list)  # <-- SUDAH DISAMAKAN
         
 # ==========================================================================
     # COMPARE RTO CONTROLLER & HANDLERS
@@ -2882,44 +2858,27 @@ def server(input: Inputs, output: Outputs, session: Session):
         yield buf.getvalue()
 
     # ==========================================================================
-    # FULL REPORT STOCK OPNAME (FIXED: ANTI 0 BYTES)
+    # FULL REPORT STOCK OPNAME (13 SHEET - PERSIS SEPERTI CYCLE COUNT)
     # ==========================================================================
     @render.download(filename="FULL_SO_ANALYZER_REPORT.xlsx")
-    async def btn_dl_so_master_all():
+    def btn_dl_so_master_all():
         sheets_list = [
             ('1_DATA SCAN', getattr(state, "_raw_df_so_scan", pd.DataFrame())),
             ('2_STOCK SYSTEM', getattr(state, "_raw_df_so_stock", pd.DataFrame())),
             ('3_REAL PLUS', getattr(state, "_raw_df_so_real_plus", pd.DataFrame())),
             ('4_SYSTEM PLUS', getattr(state, "_raw_df_so_sys_plus", pd.DataFrame())),
-            ('5_SET UP REAL PLUS', getattr(state, "_raw_df_so_setup_real", pd.DataFrame())),
-            ('6_REAL PLUS RECON', getattr(state, "_raw_df_so_rec_real", pd.DataFrame())),
-            ('7_SYSTEM OUTSTANDING', getattr(state, "_raw_df_so_rec_sys", pd.DataFrame())),
-            ('8_MULTIPLE ADJ PLUS', getattr(state, "_raw_df_so_mult", pd.DataFrame())),  # <-- DIPERBAIKI
-            ('9_SINGLE ADJ PLUS', getattr(state, "_raw_df_so_sing", pd.DataFrame())),
-            ('10_HASIL CEK ADJ', getattr(state, "_raw_df_so_res4", pd.DataFrame())),
-            ('11_KARANTINA', getattr(state, "_raw_df_so_karantina", pd.DataFrame())),
+            ('5_ALLOCATION DETAIL', getattr(state, "_raw_df_so_alloc", pd.DataFrame())),
+            ('6_SET UP REAL PLUS', getattr(state, "_raw_df_so_setup_real", pd.DataFrame())),
+            ('7_REAL PLUS RECON', getattr(state, "_raw_df_so_rec_real", pd.DataFrame())),
+            ('8_SYSTEM OUTSTANDING', getattr(state, "_raw_df_so_rec_sys", pd.DataFrame())),
+            ('9_REAL PLUS NEED ADJ', getattr(state, "_raw_df_so_mult", pd.DataFrame())),
+            ('10_KARANTINA', getattr(state, "_raw_df_so_karantina", pd.DataFrame())),
+            ('11_CHECK AUDIT', getattr(state, "_raw_df_so_check5", pd.DataFrame())),
             ('12_MISS LOCATION', getattr(state, "_raw_df_so_miss_loc", pd.DataFrame())),
             ('13_SUMMARY MISS LOC', getattr(state, "_raw_df_so_sum_miss", pd.DataFrame())),
-            ('14_DETAIL ADJUSTMENT', getattr(state, "_raw_df_so_adj_detail", pd.DataFrame())),
-            ('15_SUMMARY ADJ', getattr(state, "_raw_df_so_adj_sum", pd.DataFrame())),
         ]
-        # 🌟 Jalankan di background thread agar websocket tidak mati
-        file_path = await asyncio.to_thread(build_full_report_file_sync, sheets_list)
 
-        # 🌟 Alirkan data file ke browser
-        try:
-            with open(file_path, "rb") as f:
-                while True:
-                    chunk = f.read(65536)  # 64 KB per paket
-                    if not chunk:
-                        break
-                    yield chunk
-        finally:
-            if os.path.exists(file_path):
-                try:
-                    os.remove(file_path)
-                except Exception:
-                    pass
+        yield build_full_report_bytes(sheets_list)
 # ==========================================================================
     # JUSTIFICATION SO CONTROLLER (DYNAMIC MODE: REVERSAL & NON REVERSAL)
     # ==========================================================================
