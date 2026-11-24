@@ -2874,7 +2874,7 @@ def server(input: Inputs, output: Outputs, session: Session):
     # FULL REPORT STOCK OPNAME (FIXED: ANTI 0 BYTES)
     # ==========================================================================
     # ==========================================================================
-    # FULL REPORT STOCK OPNAME
+    # FULL REPORT STOCK OPNAME (FIXED: BEBAS ENTRY NOT FOUND & ANTI-KORUP)
     # ==========================================================================
     @render.download(filename="FULL_SO_ANALYZER_REPORT.xlsx")
     def btn_dl_so_master_all():
@@ -2895,10 +2895,35 @@ def server(input: Inputs, output: Outputs, session: Session):
             ('14_DETAIL ADJUSTMENT', getattr(state, "_raw_df_so_adj_detail", pd.DataFrame())),
             ('15_SUMMARY ADJ', getattr(state, "_raw_df_so_adj_sum", pd.DataFrame())),
         ]
-        
-        file_path = build_full_report_file_sync(sheets_list)
-        return file_path
 
+        buf = io.BytesIO()
+        illegal_xml_re = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f]')
+        has_any_sheet = False
+
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            for sheet_name, df in sheets_list:
+                if df is not None and isinstance(df, pd.DataFrame) and not df.empty:
+                    df_clean = df.copy()
+                    
+                    # Bersihkan timezone & karakter kontrol ilegal agar XML Excel valid
+                    for col in df_clean.columns:
+                        if pd.api.types.is_datetime64_any_dtype(df_clean[col]):
+                            df_clean[col] = df_clean[col].astype(str)
+                        elif df_clean[col].dtype == object or pd.api.types.is_string_dtype(df_clean[col]):
+                            df_clean[col] = df_clean[col].astype(str).str.replace(illegal_xml_re, '', regex=True)
+
+                    # Simpan per sheet (maksimal 31 karakter nama sheet)
+                    df_clean.to_excel(writer, sheet_name=sheet_name[:31], index=False)
+                    has_any_sheet = True
+
+            # Jika belum ada step yang dijalankan, buat sheet pemberitahuan agar tidak crash
+            if not has_any_sheet:
+                pd.DataFrame({"STATUS": ["Belum ada step yang dijalankan atau data kosong."]}).to_excel(
+                    writer, sheet_name="INFO", index=False
+                )
+
+        buf.seek(0)
+        yield buf.getvalue()
 # ==========================================================================
     # JUSTIFICATION SO CONTROLLER (DYNAMIC MODE: REVERSAL & NON REVERSAL)
     # ==========================================================================
