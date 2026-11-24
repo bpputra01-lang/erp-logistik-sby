@@ -32,7 +32,7 @@ app_ui = ui.page_fluid(
 )
 
 def build_full_report_file_sync(sheets_list: list) -> str:
-    # 1. Buat file sementara
+    # Buat file sementara
     tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
     tmp_path = tmp.name
     tmp.close()
@@ -40,14 +40,12 @@ def build_full_report_file_sync(sheets_list: list) -> str:
     seen_sheets = set()
     valid = []
     
-    # Regex untuk membersihkan karakter kontrol ilegal XML agar Excel tidak korup
     illegal_xml_re = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f]')
 
     for raw_title, df in sheets_list:
         if df is None or not isinstance(df, pd.DataFrame) or df.empty:
             continue
             
-        # Sanitasi nama sheet (Maksimal 31 karakter & buang karakter ilegal Excel)
         clean_title = re.sub(r'[\\/*?:\[\]]', '', str(raw_title))[:31].strip() or "Sheet"
         base = clean_title[:27]
         n = 1
@@ -56,61 +54,45 @@ def build_full_report_file_sync(sheets_list: list) -> str:
             n += 1
         seen_sheets.add(clean_title.upper())
 
-        # 🌟 PERBAIKAN 1: Buang kolom duplikat agar df[col] selalu menghasilkan Series (bukan DataFrame)
+        # Buang kolom duplikat
         df_clean = df.loc[:, ~df.columns.duplicated()].copy()
 
-        # 🌟 PERBAIKAN 2: Sanitasi header kolom (hindari karakter kontrol pada nama kolom)
+        # Sanitasi nama kolom
         df_clean.columns = [re.sub(illegal_xml_re, '', str(c)).strip() for c in df_clean.columns]
 
-        # 🌟 PERBAIKAN 3: Sanitasi isi per kolom secara aman
+        # 🌟 Sanitasi Vektorisasi Cepat (Tanpa apply lambda lambat)
         for col in df_clean.columns:
-            s = df_clean[col]
-
-            # Jika tipe data datetime / timezone
-            if pd.api.types.is_datetime64_any_dtype(s):
-                try:
-                    df_clean[col] = s.dt.strftime('%Y-%m-%d %H:%M:%S').fillna('')
-                except Exception:
-                    df_clean[col] = s.astype(str).replace({'NaT': '', 'nan': ''})
-
-            # Jika tipe data teks / object
-            elif s.dtype == object or pd.api.types.is_string_dtype(s):
-                # Bersihkan karakter XML ilegal tanpa mengubah NaN menjadi teks "nan"
-                df_clean[col] = s.apply(
-                    lambda x: re.sub(illegal_xml_re, '', str(x)) if pd.notna(x) and x is not None else ""
-                )
+            if pd.api.types.is_datetime64_any_dtype(df_clean[col]):
+                df_clean[col] = df_clean[col].astype(str).replace({'NaT': '', 'nan': ''})
+            elif df_clean[col].dtype == object or pd.api.types.is_string_dtype(df_clean[col]):
+                df_clean[col] = df_clean[col].astype(str).str.replace(illegal_xml_re, '', regex=True).replace({'nan': '', 'None': ''})
 
         valid.append((clean_title, df_clean))
 
-    # Jika semua sheet kosong, berikan sheet informasi default
     if not valid:
         valid = [("INFO", pd.DataFrame({"STATUS": ["Belum ada step yang dijalankan atau data kosong."]}))]
 
-    # 🌟 PERBAIKAN 4: Penulisan file dengan proteksi fallback yang bersih
+    # 🌟 Tulis file: Hapus 'constant_memory: True' agar tidak merusak format Excel Pandas
     success_write = False
-    
-    # Coba 1: xlsxwriter (Cepat & hemat RAM)
     try:
         with pd.ExcelWriter(
             tmp_path, 
-            engine="xlsxwriter", 
-            engine_kwargs={'options': {'constant_memory': True}}
+            engine="xlsxwriter",
+            engine_kwargs={'options': {'remove_timezone': True}}
         ) as writer:
             for title, df_data in valid:
                 df_data.to_excel(writer, sheet_name=title, index=False)
         success_write = True
     except Exception as e_writer:
-        print(f"[Export Warning] xlsxwriter gagal ({e_writer}), mencoba fallback openpyxl...")
+        print(f"[Export Warning] xlsxwriter gagal: {e_writer}, mencoba fallback openpyxl...")
 
-    # Coba 2: openpyxl (Jika xlsxwriter gagal atau belum terinstall)
     if not success_write:
         try:
             with pd.ExcelWriter(tmp_path, engine="openpyxl") as writer:
                 for title, df_data in valid:
                     df_data.to_excel(writer, sheet_name=title, index=False)
-            success_write = True
         except Exception as e_openpyxl:
-            print(f"[Export Error] openpyxl juga gagal: {e_openpyxl}")
+            print(f"[Export Error] openpyxl gagal: {e_openpyxl}")
 
     return tmp_path
         
@@ -2903,10 +2885,10 @@ def server(input: Inputs, output: Outputs, session: Session):
     # FULL REPORT STOCK OPNAME (FIXED: ANTI 0 BYTES)
     # ==========================================================================
     # ==========================================================================
-    # FULL REPORT STOCK OPNAME (FIXED: MENGGUNAKAN BUILD SYNC SEPERTI CYCLE COUNT)
+    # FULL REPORT STOCK OPNAME (ASYNC NON-BLOCKING - ANTI TIMEOUT & ANTI 404)
     # ==========================================================================
     @render.download(filename="FULL_SO_ANALYZER_REPORT.xlsx")
-    def btn_dl_so_master_all():
+    async def btn_dl_so_master_all():
         sheets_list = [
             ('1_DATA SCAN', getattr(state, "_raw_df_so_scan", pd.DataFrame())),
             ('2_STOCK SYSTEM', getattr(state, "_raw_df_so_stock", pd.DataFrame())),
@@ -2915,7 +2897,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             ('5_SET UP REAL PLUS', getattr(state, "_raw_df_so_setup_real", pd.DataFrame())),
             ('6_REAL PLUS RECON', getattr(state, "_raw_df_so_rec_real", pd.DataFrame())),
             ('7_SYSTEM OUTSTANDING', getattr(state, "_raw_df_so_rec_sys", pd.DataFrame())),
-            ('8_MULTIPLE ADJ PLUS', getattr(state, "_raw_df_so_mult", pd.DataFrame())),
+            ('())),
             ('9_SINGLE ADJ PLUS', getattr(state, "_raw_df_so_sing", pd.DataFrame())),
             ('10_HASIL CEK ADJ', getattr(state, "_raw_df_so_res4", pd.DataFrame())),
             ('11_KARANTINA', getattr(state, "_raw_df_so_karantina", pd.DataFrame())),
@@ -2925,9 +2907,23 @@ def server(input: Inputs, output: Outputs, session: Session):
             ('15_SUMMARY ADJ', getattr(state, "_raw_df_so_adj_sum", pd.DataFrame())),
         ]
 
-        # Langsung panggil helper resmi dan return file_path persis seperti Cycle Count
-        file_path = build_full_report_file_sync(sheets_list)
-        return file_path
+        # 🌟 Jalankan di background thread agar websocket tidak mati
+        file_path = await asyncio.to_thread(build_full_report_file_sync, sheets_list)
+
+        # 🌟 Alirkan data file ke browser
+        try:
+            with open(file_path, "rb") as f:
+                while True:
+                    chunk = f.read(65536)  # 64 KB per paket
+                    if not chunk:
+                        break
+                    yield chunk
+        finally:
+            if os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                except Exception:
+                    pass
 # ==========================================================================
     # JUSTIFICATION SO CONTROLLER (DYNAMIC MODE: REVERSAL & NON REVERSAL)
     # ==========================================================================
