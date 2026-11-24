@@ -2871,7 +2871,10 @@ def server(input: Inputs, output: Outputs, session: Session):
         yield buf.getvalue()
 
     # ==========================================================================
-    # FULL REPORT STOCK OPNAME (PERSIS CYCLE COUNT - 13 SHEET)
+    # FULL REPORT STOCK OPNAME (FIXED: ANTI 0 BYTES)
+    # ==========================================================================
+    # ==========================================================================
+    # FULL REPORT STOCK OPNAME
     # ==========================================================================
     @render.download(filename="FULL_SO_ANALYZER_REPORT.xlsx")
     def btn_dl_so_master_all():
@@ -2880,15 +2883,17 @@ def server(input: Inputs, output: Outputs, session: Session):
             ('2_STOCK SYSTEM', getattr(state, "_raw_df_so_stock", pd.DataFrame())),
             ('3_REAL PLUS', getattr(state, "_raw_df_so_real_plus", pd.DataFrame())),
             ('4_SYSTEM PLUS', getattr(state, "_raw_df_so_sys_plus", pd.DataFrame())),
-            ('5_ALLOCATION DETAIL', getattr(state, "_raw_df_so_alloc", pd.DataFrame())),
-            ('6_SET UP REAL PLUS', getattr(state, "_raw_df_so_setup_real", pd.DataFrame())),
-            ('7_REAL PLUS RECON', getattr(state, "_raw_df_so_rec_real", pd.DataFrame())),
-            ('8_SYSTEM OUTSTANDING', getattr(state, "_raw_df_so_rec_sys", pd.DataFrame())),
-            ('9_REAL PLUS NEED ADJ', getattr(state, "_raw_df_so_mult", pd.DataFrame())),
-            ('10_KARANTINA', getattr(state, "_raw_df_so_karantina", pd.DataFrame())),
-            ('11_CHECK AUDIT', getattr(state, "_raw_df_so_check5", pd.DataFrame())),
+            ('5_SET UP REAL PLUS', getattr(state, "_raw_df_so_setup_real", pd.DataFrame())),
+            ('6_REAL PLUS RECON', getattr(state, "_raw_df_so_rec_real", pd.DataFrame())),
+            ('7_SYSTEM OUTSTANDING', getattr(state, "_raw_df_so_rec_sys", pd.DataFrame())),
+            ('8_MULTIPLE ADJ PLUS', getattr(state, "_raw_df_so_mult", pd.DataFrame())),
+            ('9_SINGLE ADJ PLUS', getattr(state, "_raw_df_so_sing", pd.DataFrame())),
+            ('10_HASIL CEK ADJ', getattr(state, "_raw_df_so_res4", pd.DataFrame())),
+            ('11_KARANTINA', getattr(state, "_raw_df_so_karantina", pd.DataFrame())),
             ('12_MISS LOCATION', getattr(state, "_raw_df_so_miss_loc", pd.DataFrame())),
             ('13_SUMMARY MISS LOC', getattr(state, "_raw_df_so_sum_miss", pd.DataFrame())),
+            ('14_DETAIL ADJUSTMENT', getattr(state, "_raw_df_so_adj_detail", pd.DataFrame())),
+            ('15_SUMMARY ADJ', getattr(state, "_raw_df_so_adj_sum", pd.DataFrame())),
         ]
         
         file_path = build_full_report_file_sync(sheets_list)
