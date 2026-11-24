@@ -32,21 +32,18 @@ app_ui = ui.page_fluid(
 )
 
 def build_full_report_file_sync(sheets_list: list) -> str:
-    # Buat file sementara
     tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
     tmp_path = tmp.name
     tmp.close()
 
     seen_sheets = set()
     valid = []
-    
-    # Regex untuk membersihkan karakter ilegal XML agar Excel tidak korup
     illegal_xml_re = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f]')
 
     for raw_title, df in sheets_list:
         if df is None or not isinstance(df, pd.DataFrame) or df.empty:
             continue
-            
+
         clean_title = re.sub(r'[\\/*?:\[\]]', '', str(raw_title))[:31].strip() or "Sheet"
         base = clean_title[:28]
         n = 1
@@ -55,33 +52,39 @@ def build_full_report_file_sync(sheets_list: list) -> str:
             n += 1
         seen_sheets.add(clean_title.upper())
 
-        # Sanitasi data: buang timezone dan buang karakter kontrol
-        df_clean = df.copy()
+        # Pastikan bebas kolom duplikat agar df_clean[col] tidak jadi DataFrame
+        df_clean = df.loc[:, ~df.columns.duplicated()].copy()
         for col in df_clean.columns:
-            if pd.api.types.is_datetime64_any_dtype(df_clean[col]):
-                df_clean[col] = df_clean[col].astype(str)
-            elif df_clean[col].dtype == object or pd.api.types.is_string_dtype(df_clean[col]):
-                df_clean[col] = df_clean[col].astype(str).str.replace(illegal_xml_re, '', regex=True)
+            s = df_clean[col]
+            if pd.api.types.is_datetime64_any_dtype(s):
+                df_clean[col] = s.astype(str)
+            elif s.dtype == object or pd.api.types.is_string_dtype(s):
+                # Hanya regex jika memang ada data object, hindari overhead berlebih
+                df_clean[col] = s.fillna("").astype(str).str.replace(illegal_xml_re, '', regex=True)
 
         valid.append((clean_title, df_clean))
 
     if not valid:
         valid = [("INFO", pd.DataFrame({"STATUS": ["Belum ada step yang dijalankan atau data kosong."]}))]
 
-    # Tulis menggunakan xlsxwriter (hemat RAM & cepat) atau fallback ke openpyxl
     try:
         with pd.ExcelWriter(
-            tmp_path, 
-            engine="xlsxwriter", 
-            engine_kwargs={'options': {'constant_memory': True}}
+            tmp_path,
+            engine="xlsxwriter",
+            engine_kwargs={'options': {'constant_memory': True, 'strings_to_urls': False}}
         ) as writer:
             for title, df in valid:
                 df.to_excel(writer, sheet_name=title, index=False)
     except Exception as e_writer:
-        print(f"xlsxwriter error: {e_writer}, mencoba openpyxl...")
-        with pd.ExcelWriter(tmp_path, engine="openpyxl") as writer:
-            for title, df in valid:
-                df.to_excel(writer, sheet_name=title, index=False)
+        print(f"xlsxwriter error: {e_writer}, mencoba openpyxl write_only...")
+        from openpyxl import Workbook
+        wb = Workbook(write_only=True)
+        for title, df in valid:
+            ws = wb.create_sheet(title=title)
+            ws.append(df.columns.tolist())
+            for row in df.itertuples(index=False, name=None):
+                ws.append(list(row))
+        wb.save(tmp_path)
 
     return tmp_path
         
@@ -2033,7 +2036,7 @@ def server(input: Inputs, output: Outputs, session: Session):
     # FULL REPORT CYCLE COUNT
     # ==========================================================================
     @render.download(filename="FULL_CYCLE_COUNT_ANALYZER_REPORT.xlsx")
-    def btn_dl_cca_master_all():
+    async def btn_dl_cca_master_all():
         sheets_list = [
             ('1_DATA SCAN', getattr(state, "_raw_df_cca_scan", pd.DataFrame())),
             ('2_STOCK SYSTEM', getattr(state, "_raw_df_cca_stock", pd.DataFrame())),
@@ -2049,10 +2052,13 @@ def server(input: Inputs, output: Outputs, session: Session):
             ('12_MISS LOCATION', getattr(state, "_raw_df_cca_miss_loc", pd.DataFrame())),
             ('13_SUMMARY MISS LOC', getattr(state, "_raw_df_cca_sum_miss", pd.DataFrame())),
         ]
-        
-        # LANGSUNG RETURN PATH FILE: Shiny akan menanganinya via Starlette FileResponse resmi
-        file_path = build_full_report_file_sync(sheets_list)
-        return file_path
+        file_path = await asyncio.to_thread(build_full_report_file_sync, sheets_list)
+        try:
+            with open(file_path, "rb") as f:
+                yield f.read()
+        finally:
+            if os.path.exists(file_path):
+                os.remove(file_path)
         
 # ==========================================================================
     # COMPARE RTO CONTROLLER & HANDLERS
@@ -2873,11 +2879,8 @@ def server(input: Inputs, output: Outputs, session: Session):
     # ==========================================================================
     # FULL REPORT STOCK OPNAME (FIXED: ANTI 0 BYTES)
     # ==========================================================================
-    # ==========================================================================
-    # FULL REPORT STOCK OPNAME
-    # ==========================================================================
     @render.download(filename="FULL_SO_ANALYZER_REPORT.xlsx")
-    def btn_dl_so_master_all():
+    async def btn_dl_so_master_all():
         sheets_list = [
             ('1_DATA SCAN', getattr(state, "_raw_df_so_scan", pd.DataFrame())),
             ('2_STOCK SYSTEM', getattr(state, "_raw_df_so_stock", pd.DataFrame())),
@@ -2895,9 +2898,14 @@ def server(input: Inputs, output: Outputs, session: Session):
             ('14_DETAIL ADJUSTMENT', getattr(state, "_raw_df_so_adj_detail", pd.DataFrame())),
             ('15_SUMMARY ADJ', getattr(state, "_raw_df_so_adj_sum", pd.DataFrame())),
         ]
-        
-        file_path = build_full_report_file_sync(sheets_list)
-        return file_path
+
+        file_path = await asyncio.to_thread(build_full_report_file_sync, sheets_list)
+        try:
+            with open(file_path, "rb") as f:
+                yield f.read()
+        finally:
+            if os.path.exists(file_path):
+                os.remove(file_path)
 
 # ==========================================================================
     # JUSTIFICATION SO CONTROLLER (DYNAMIC MODE: REVERSAL & NON REVERSAL)
