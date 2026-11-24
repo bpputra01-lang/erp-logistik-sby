@@ -3151,6 +3151,9 @@ def target_progress_view(state: AppState):
     )
 
 def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict):
+    # Cek apakah menu yang aktif adalah Stock Opname atau Cycle Count
+    is_so = "STOCK OPNAME" in str(title_menu).upper()
+
     q_real_init = metrics.get("q_real_init", 0)
     q_sys_init = metrics.get("q_sys_init", 0)
     q_miss_loc = metrics.get("q_miss_loc", 0)
@@ -3160,7 +3163,7 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
     q_karantina = metrics.get("q_karantina", 0)
     sku_karantina = metrics.get("sku_karantina", 0)
 
-    # 🌟 METRIK FINANSIAL VALUE ADJUSTMENT (RP)
+    # METRIK FINANSIAL KHUSUS STOCK OPNAME
     val_adj_p = metrics.get("val_adj_p", 0)
     val_adj_m = abs(metrics.get("val_adj_m", 0))
     val_adj_net = metrics.get("val_adj_net", val_adj_p - val_adj_m)
@@ -3171,6 +3174,56 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
     pct_miss = (q_miss_loc / tot_resolusi * 100) if tot_resolusi > 0 else 0.0
     pct_karan = (q_karantina / tot_resolusi * 100) if tot_resolusi > 0 else 0.0
     pct_adj = (q_need_adj / tot_resolusi * 100) if tot_resolusi > 0 else 0.0
+
+    # 1. Subtitle Kartu 3 & Kartu 4 (Tampilkan Rupiah hanya di Stock Opname)
+    sub_card_need_adj = f"🏷️ {sku_need_adj:,} SKU • Valuasi: Rp {val_adj_p:,}" if is_so else f"🏷️ {sku_need_adj:,} SKU • Perlu Tindak Lanjut"
+    sub_card_karantina = f"☣️ {sku_karantina:,} SKU • Valuasi: Rp {val_adj_m:,}" if is_so else f"☣️ {sku_karantina:,} SKU • Not Found"
+
+    # 2. Kotak 3 Pilar Finansial (Hanya muncul jika Stock Opname)
+    financial_section = ui.div()
+    if is_so:
+        financial_section = ui.div(
+            ui.div(
+                ui.div(
+                    ui.span("VALUE ADJUSTMENT (+)", style="color: #A0AEC0; font-size: 11px; font-weight: 800; display: block; margin-bottom: 4px;"),
+                    ui.span(f"Rp {val_adj_p:,}", style="color: #10B981; font-size: 22px; font-weight: 900;"),
+                    style="background: #161920; padding: 1rem; border-radius: 10px; border-left: 4px solid #10B981; border: 1px solid #2D3748; border-left-width: 4px; text-align: center; flex: 1; min-width: 220px;"
+                ),
+                ui.div(
+                    ui.span("VALUE ADJUSTMENT (-)", style="color: #A0AEC0; font-size: 11px; font-weight: 800; display: block; margin-bottom: 4px;"),
+                    ui.span(f"-Rp {val_adj_m:,}", style="color: #EF4444; font-size: 22px; font-weight: 900;"),
+                    style="background: #161920; padding: 1rem; border-radius: 10px; border-left: 4px solid #EF4444; border: 1px solid #2D3748; border-left-width: 4px; text-align: center; flex: 1; min-width: 220px;"
+                ),
+                ui.div(
+                    ui.span("NET VALUE IMPACT", style="color: #A0AEC0; font-size: 11px; font-weight: 800; display: block; margin-bottom: 4px;"),
+                    ui.span(f"{net_sign}Rp {val_adj_net:,}", style=f"color: {net_color}; font-size: 22px; font-weight: 900;"),
+                    style=f"background: #161920; padding: 1rem; border-radius: 10px; border-left: 4px solid {net_color}; border: 1px solid #2D3748; border-left-width: 4px; text-align: center; flex: 1; min-width: 220px;"
+                ),
+                style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%;"
+            ),
+            style="margin-bottom: 1.5rem;"
+        )
+
+    # 3. Label Rincian Legend Distribusi
+    legend_need_adj = f"{q_need_adj:,} PCS (Rp {val_adj_p:,})" if is_so else f"{q_need_adj:,} PCS"
+    legend_karantina = f"{q_karantina:,} PCS (Rp {val_adj_m:,})" if is_so else f"{q_karantina:,} PCS"
+
+    # 4. Teks Insight Kesimpulan
+    if is_so:
+        insight_title = "Executive Insight & Financial Impact (Stock Opname):"
+        insight_desc = (
+            f"Dari total {tot_resolusi:,} pcs kasus selisih, sebesar {pct_miss:.1f}% ({q_miss_loc:,} pcs) diselesaikan "
+            f"lewat mutasi rak (Miss Location) tanpa proses adjustment. Nilai penambahan barang (Value Adj +) sebesar "
+            f"Rp {val_adj_p:,}, nilai pengurangan/karantina (Value Adj -) sebesar Rp {val_adj_m:,}, sehingga dampak bersih "
+            f"terhadap pembukuan stok adalah {net_sign}Rp {abs(val_adj_net):,}."
+        )
+    else:
+        insight_title = "Executive Insight & Reconciliation (Cycle Count):"
+        insight_desc = (
+            f"Dari total {tot_resolusi:,} pcs kasus selisih fisik yang dianalisa, sebesar {pct_miss:.1f}% ({q_miss_loc:,} pcs) "
+            f"berhasil diselesaikan lewat mutasi antar-rak (Miss Location). Sisa selisih fisik positif ({q_need_adj:,} pcs) "
+            f"dan selisih belum ditemukan ({q_karantina:,} pcs) telah dipetakan untuk tindak lanjut verifikasi lapangan."
+        )
 
     return ui.div(
         # --- HEADER EXECUTIVE ---
@@ -3234,7 +3287,7 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
                     style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;"
                 ),
                 ui.span(f"{q_need_adj:,} PCS", style="color: #F59E0B; font-size: 24px; font-weight: 900; display: block; line-height: 1.1;"),
-                ui.span(f"🏷️ {sku_need_adj:,} SKU • Valuasi: Rp {val_adj_p:,}", style="color: #718096; font-size: 11.5px; margin-top: 4px; display: block;"),
+                ui.span(sub_card_need_adj, style="color: #718096; font-size: 11.5px; margin-top: 4px; display: block;"),
                 style="background: #161920; padding: 1rem 1.25rem; border-radius: 10px; border-left: 4px solid #F59E0B; border-top: 1px solid #2D3748; border-right: 1px solid #2D3748; border-bottom: 1px solid #2D3748;"
             ),
 
@@ -3246,40 +3299,20 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
                     style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;"
                 ),
                 ui.span(f"{q_karantina:,} PCS", style="color: #EF4444; font-size: 24px; font-weight: 900; display: block; line-height: 1.1;"),
-                ui.span(f"☣️ {sku_karantina:,} SKU • Valuasi: Rp {val_adj_m:,}", style="color: #718096; font-size: 11.5px; margin-top: 4px; display: block;"),
+                ui.span(sub_card_karantina, style="color: #718096; font-size: 11.5px; margin-top: 4px; display: block;"),
                 style="background: #161920; padding: 1rem 1.25rem; border-radius: 10px; border-left: 4px solid #EF4444; border-top: 1px solid #2D3748; border-right: 1px solid #2D3748; border-bottom: 1px solid #2D3748;"
             ),
             style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
         ),
 
-        # --- 🌟 PILAR VALUASI FINANSIAL ADJUSTMENT (RP) ---
-        ui.div(
-            ui.div(
-                ui.div(
-                    ui.span("VALUE ADJUSTMENT (+)", style="color: #A0AEC0; font-size: 11px; font-weight: 800; display: block; margin-bottom: 4px;"),
-                    ui.span(f"Rp {val_adj_p:,}", style="color: #10B981; font-size: 22px; font-weight: 900;"),
-                    style="background: #161920; padding: 1rem; border-radius: 10px; border-left: 4px solid #10B981; border: 1px solid #2D3748; border-left-width: 4px; text-align: center; flex: 1; min-width: 220px;"
-                ),
-                ui.div(
-                    ui.span("VALUE ADJUSTMENT (-)", style="color: #A0AEC0; font-size: 11px; font-weight: 800; display: block; margin-bottom: 4px;"),
-                    ui.span(f"-Rp {val_adj_m:,}", style="color: #EF4444; font-size: 22px; font-weight: 900;"),
-                    style="background: #161920; padding: 1rem; border-radius: 10px; border-left: 4px solid #EF4444; border: 1px solid #2D3748; border-left-width: 4px; text-align: center; flex: 1; min-width: 220px;"
-                ),
-                ui.div(
-                    ui.span("NET VALUE IMPACT", style="color: #A0AEC0; font-size: 11px; font-weight: 800; display: block; margin-bottom: 4px;"),
-                    ui.span(f"{net_sign}Rp {val_adj_net:,}", style=f"color: {net_color}; font-size: 22px; font-weight: 900;"),
-                    style=f"background: #161920; padding: 1rem; border-radius: 10px; border-left: 4px solid {net_color}; border: 1px solid #2D3748; border-left-width: 4px; text-align: center; flex: 1; min-width: 220px;"
-                ),
-                style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%;"
-            ),
-            style="margin-bottom: 1.5rem;"
-        ),
+        # --- PILAR VALUASI FINANSIAL ADJUSTMENT (RP) (HANYA STOCK OPNAME) ---
+        financial_section,
 
         # --- VISUAL BREAKDOWN & PROPORTION BAR ---
         ui.div(
             ui.div(
                 ui.h4("📊 Distribusi Chart Bar Case to Case", style="font-size: 14px; font-weight: 800; color: #FFFFFF; margin: 0 0 6px 0;"),
-                ui.p("Proporsi penanganan selisih Stock Opname: Miss Location vs Need Adj (+) vs Karantina (-).", style="color: #A0AEC0; font-size: 12px; margin: 0;"),
+                ui.p("Proporsi penanganan selisih: Miss Location vs Need Adj (+) vs Karantina (-).", style="color: #A0AEC0; font-size: 12px; margin: 0;"),
             ),
             ui.div(
                 ui.div(style=f"width: {max(2.0, pct_miss):.1f}%; height: 18px; background: #10B981; border-radius: 4px 0 0 4px; transition: width 0.5s ease; position: relative;", title=f"Miss Location: {pct_miss:.1f}%"),
@@ -3297,13 +3330,13 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
                 ui.div(
                     ui.div(style="width: 12px; height: 12px; background: #F59E0B; border-radius: 3px; margin-right: 6px;"),
                     ui.span(f"Real + Need Adj ({pct_adj:.1f}%) : ", style="color: #A0AEC0; font-size: 12px; font-weight: 600;"),
-                    ui.strong(f"{q_need_adj:,} PCS (Rp {val_adj_p:,})", style="color: #FFFFFF; font-size: 12px; margin-left: 4px;"),
+                    ui.strong(legend_need_adj, style="color: #FFFFFF; font-size: 12px; margin-left: 4px;"),
                     style="display: flex; align-items: center;"
                 ),
                 ui.div(
                     ui.div(style="width: 12px; height: 12px; background: #EF4444; border-radius: 3px; margin-right: 6px;"),
                     ui.span(f"Karantina ({pct_karan:.1f}%) : ", style="color: #A0AEC0; font-size: 12px; font-weight: 600;"),
-                    ui.strong(f"{q_karantina:,} PCS (Rp {val_adj_m:,})", style="color: #FFFFFF; font-size: 12px; margin-left: 4px;"),
+                    ui.strong(legend_karantina, style="color: #FFFFFF; font-size: 12px; margin-left: 4px;"),
                     style="display: flex; align-items: center;"
                 ),
                 style="display: flex; justify-content: space-around; width: 100%; flex-wrap: wrap; gap: 12px;"
@@ -3315,11 +3348,11 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
         ui.div(
             ui.div(
                 ui.tags.i(class_="fa-solid fa-lightbulb", style="color: #C5A059; font-size: 18px; margin-right: 10px;"),
-                ui.strong("Executive Insight & Financial Impact (Stock Opname):", style="color: #C5A059; font-size: 13px;"),
+                ui.strong(insight_title, style="color: #C5A059; font-size: 13px;"),
                 style="display: flex; align-items: center; margin-bottom: 6px;"
             ),
             ui.p(
-                f"Dari total {tot_resolusi:,} pcs kasus selisih, sebesar {pct_miss:.1f}% ({q_miss_loc:,} pcs) diselesaikan lewat mutasi rak (Miss Location) tanpa proses adjustment. Nilai penambahan barang (Value Adj +) sebesar Rp {val_adj_p:,}, nilai pengurangan/karantina (Value Adj -) sebesar Rp {val_adj_m:,}, sehingga dampak bersih terhadap pembukuan stok adalah {net_sign}Rp {abs(val_adj_net):,}.",
+                insight_desc,
                 style="color: #1A202C; font-size: 12.5px; line-height: 1.5; margin: 0;"
             ),
             style="background: rgba(197, 160, 89, 0.12); border-left: 4px solid #C5A059; border-top: 1px solid rgba(197, 160, 89, 0.25); border-right: 1px solid rgba(197, 160, 89, 0.25); border-bottom: 1px solid rgba(197, 160, 89, 0.25); padding: 1rem 1.25rem; border-radius: 8px;"
