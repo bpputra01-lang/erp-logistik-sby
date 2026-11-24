@@ -31,11 +31,16 @@ app_ui = ui.page_fluid(
     style="padding: 0; margin: 0; background-color: #111318;"
 )
 
-def build_full_report_bytes(sheets_list: list) -> bytes:
-    buf = io.BytesIO()
+def build_full_report_file_sync(sheets_list: list) -> str:
+    # Buat file sementara
+    tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
+    tmp_path = tmp.name
+    tmp.close()
+
     seen_sheets = set()
     valid = []
     
+    # Regex untuk membersihkan karakter ilegal XML agar Excel tidak korup
     illegal_xml_re = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f]')
 
     for raw_title, df in sheets_list:
@@ -43,36 +48,42 @@ def build_full_report_bytes(sheets_list: list) -> bytes:
             continue
             
         clean_title = re.sub(r'[\\/*?:\[\]]', '', str(raw_title))[:31].strip() or "Sheet"
-        base = clean_title[:27]
+        base = clean_title[:28]
         n = 1
         while clean_title.upper() in seen_sheets:
-            clean_title = f"{base}_{n}"[:31]
+            clean_title = f"{base}_{n}"
             n += 1
         seen_sheets.add(clean_title.upper())
 
-        # Buang kolom duplikat & sanitasi nama kolom
-        df_clean = df.loc[:, ~df.columns.duplicated()].copy()
-        df_clean.columns = [re.sub(illegal_xml_re, '', str(c)).strip() for c in df_clean.columns]
-
-        # Sanitasi data string dan datetime
+        # Sanitasi data: buang timezone dan buang karakter kontrol
+        df_clean = df.copy()
         for col in df_clean.columns:
             if pd.api.types.is_datetime64_any_dtype(df_clean[col]):
-                df_clean[col] = df_clean[col].astype(str).replace({'NaT': '', 'nan': ''})
+                df_clean[col] = df_clean[col].astype(str)
             elif df_clean[col].dtype == object or pd.api.types.is_string_dtype(df_clean[col]):
-                df_clean[col] = df_clean[col].astype(str).str.replace(illegal_xml_re, '', regex=True).replace({'nan': '', 'None': ''})
+                df_clean[col] = df_clean[col].astype(str).str.replace(illegal_xml_re, '', regex=True)
 
         valid.append((clean_title, df_clean))
 
     if not valid:
         valid = [("INFO", pd.DataFrame({"STATUS": ["Belum ada step yang dijalankan atau data kosong."]}))]
 
-    # Tulis langsung ke buffer memori openpyxl
-    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
-        for title, df_data in valid:
-            df_data.to_excel(writer, sheet_name=title, index=False)
+    # Tulis menggunakan xlsxwriter (hemat RAM & cepat) atau fallback ke openpyxl
+    try:
+        with pd.ExcelWriter(
+            tmp_path, 
+            engine="xlsxwriter", 
+            engine_kwargs={'options': {'constant_memory': True}}
+        ) as writer:
+            for title, df in valid:
+                df.to_excel(writer, sheet_name=title, index=False)
+    except Exception as e_writer:
+        print(f"xlsxwriter error: {e_writer}, mencoba openpyxl...")
+        with pd.ExcelWriter(tmp_path, engine="openpyxl") as writer:
+            for title, df in valid:
+                df.to_excel(writer, sheet_name=title, index=False)
 
-    buf.seek(0)
-    return buf.getvalue()
+    return tmp_path
         
 def server(input: Inputs, output: Outputs, session: Session):
     state = AppState()
@@ -2039,7 +2050,9 @@ def server(input: Inputs, output: Outputs, session: Session):
             ('13_SUMMARY MISS LOC', getattr(state, "_raw_df_cca_sum_miss", pd.DataFrame())),
         ]
         
-        yield build_full_report_bytes(sheets_list)  # <-- SUDAH DISAMAKAN
+        # LANGSUNG RETURN PATH FILE: Shiny akan menanganinya via Starlette FileResponse resmi
+        file_path = build_full_report_file_sync(sheets_list)
+        return file_path
         
 # ==========================================================================
     # COMPARE RTO CONTROLLER & HANDLERS
@@ -2858,7 +2871,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         yield buf.getvalue()
 
     # ==========================================================================
-    # FULL REPORT STOCK OPNAME (13 SHEET - PERSIS SEPERTI CYCLE COUNT)
+    # FULL REPORT STOCK OPNAME (PERSIS CYCLE COUNT - 13 SHEET)
     # ==========================================================================
     @render.download(filename="FULL_SO_ANALYZER_REPORT.xlsx")
     def btn_dl_so_master_all():
@@ -2877,8 +2890,10 @@ def server(input: Inputs, output: Outputs, session: Session):
             ('12_MISS LOCATION', getattr(state, "_raw_df_so_miss_loc", pd.DataFrame())),
             ('13_SUMMARY MISS LOC', getattr(state, "_raw_df_so_sum_miss", pd.DataFrame())),
         ]
+        
+        file_path = build_full_report_file_sync(sheets_list)
+        return file_path
 
-        yield build_full_report_bytes(sheets_list)
 # ==========================================================================
     # JUSTIFICATION SO CONTROLLER (DYNAMIC MODE: REVERSAL & NON REVERSAL)
     # ==========================================================================
