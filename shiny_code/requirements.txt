@@ -2,6 +2,5 @@ pandas
 numpy
 openpyxl
 shiny
-reportlab
-pillow
+reportlab<=4.2.5
 pytz
