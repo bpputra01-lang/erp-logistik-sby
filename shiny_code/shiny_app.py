@@ -31,12 +31,12 @@ app_ui = ui.page_fluid(
     style="padding: 0; margin: 0; background-color: #111318;"
 )
 
-def build_full_report_file_sync(sheets_list: list) -> str:
-    import traceback
-    tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
-    tmp_path = tmp.name
-    tmp.close()
+def build_full_report_bytes(sheets_list: list) -> bytes:
+    import io
+    import re
+    import pandas as pd
 
+    buf = io.BytesIO()
     seen_sheets = set()
     valid = []
     illegal_xml_re = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f]')
@@ -53,54 +53,35 @@ def build_full_report_file_sync(sheets_list: list) -> str:
             n += 1
         seen_sheets.add(clean_title.upper())
 
-        # Buang kolom duplikat agar tidak crash AttributeError
+        # Buang kolom duplikat jika ada (agar tidak AttributeError)
         df_clean = df.loc[:, ~df.columns.duplicated()].copy()
-        for col in df_clean.columns:
-            s = df_clean[col]
-            if pd.api.types.is_datetime64_any_dtype(s):
-                df_clean[col] = s.astype(str)
-            elif s.dtype == object or pd.api.types.is_string_dtype(s):
-                df_clean[col] = s.fillna("").astype(str).str.replace(illegal_xml_re, '', regex=True)
 
-        print(f"[FULL REPORT] Sheet '{clean_title}': {len(df_clean)} baris, {len(df_clean.columns)} kolom")
+        # Ringankan Sheet 2 (Stock System): Buang baris yang Qty System == 0 agar file cepat dan tidak berat
+        if any(k in clean_title.upper() for k in ["STOCK_SYSTEM", "STOCK SYSTEM"]):
+            qty_col = next((c for c in df_clean.columns if "QTY" in str(c).upper()), None)
+            if qty_col:
+                # Ambil hanya yang ada stok atau minus
+                df_clean = df_clean[df_clean[qty_col] != 0].copy()
+
+        # Bersihkan karakter ilegal XML & format tanggal
+        for col in df_clean.columns:
+            if pd.api.types.is_datetime64_any_dtype(df_clean[col]):
+                df_clean[col] = df_clean[col].astype(str)
+            elif df_clean[col].dtype == object or pd.api.types.is_string_dtype(df_clean[col]):
+                df_clean[col] = df_clean[col].fillna("").astype(str).str.replace(illegal_xml_re, '', regex=True)
+
         valid.append((clean_title, df_clean))
 
     if not valid:
         valid = [("INFO", pd.DataFrame({"STATUS": ["Belum ada step yang dijalankan atau data kosong."]}))]
 
-    try:
-        import xlsxwriter
-        print("[FULL REPORT] Menulis dengan xlsxwriter...")
-        with pd.ExcelWriter(
-            tmp_path,
-            engine="xlsxwriter",
-            engine_kwargs={'options': {'constant_memory': True, 'strings_to_urls': False, 'nan_inf_to_errors': True}}
-        ) as writer:
-            for title, df in valid:
-                df.to_excel(writer, sheet_name=title, index=False)
-        print(f"[FULL REPORT] Selesai xlsxwriter! Ukuran file: {os.path.getsize(tmp_path)} bytes")
-    except Exception as e_writer:
-        print(f"[FULL REPORT] xlsxwriter gagal: {e_writer}")
-        traceback.print_exc()
-        try:
-            print("[FULL REPORT] Mencoba fallback openpyxl write_only...")
-            from openpyxl import Workbook
-            wb = Workbook(write_only=True)
-            for title, df in valid:
-                ws = wb.create_sheet(title=title)
-                ws.append([str(c) for c in df.columns.tolist()])
-                for row in df.itertuples(index=False, name=None):
-                    clean_row = ["" if pd.isna(v) else (str(v) if not isinstance(v, (int, float)) else v) for v in row]
-                    ws.append(clean_row)
-            wb.save(tmp_path)
-            print(f"[FULL REPORT] Selesai openpyxl! Ukuran file: {os.path.getsize(tmp_path)} bytes")
-        except Exception as e_opx:
-            print(f"[FULL REPORT] openpyxl juga gagal: {e_opx}")
-            traceback.print_exc()
-            with pd.ExcelWriter(tmp_path, engine="openpyxl") as writer:
-                pd.DataFrame({"ERROR": [str(e_writer), str(e_opx)]}).to_excel(writer, sheet_name="ERROR_LOG", index=False)
+    # Tulis langsung ke RAM buffer (Sangat stabil, cepat, dan tidak butuh file di disk)
+    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+        for title, df in valid:
+            df.to_excel(writer, sheet_name=title, index=False)
 
-    return tmp_path
+    buf.seek(0)
+    return buf.getvalue()
         
 def server(input: Inputs, output: Outputs, session: Session):
     state = AppState()
@@ -2046,8 +2027,10 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         yield buf.getvalue()
 
-    @render.download(filename="FULL_CYCLE_COUNT_ANALYZER_REPORT.xlsx")
-    async def btn_dl_cca_master_all():
+    @render.download(
+        filename=lambda: f"FULL_CYCLE_COUNT_{state.cca_branch_selected() or 'REPORT'}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    )
+    def btn_dl_cca_master_all():
         sheets_list = [
             ('1_DATA SCAN', getattr(state, "_raw_df_cca_scan", pd.DataFrame())),
             ('2_STOCK SYSTEM', getattr(state, "_raw_df_cca_stock", pd.DataFrame())),
@@ -2063,17 +2046,8 @@ def server(input: Inputs, output: Outputs, session: Session):
             ('12_MISS LOCATION', getattr(state, "_raw_df_cca_miss_loc", pd.DataFrame())),
             ('13_SUMMARY MISS LOC', getattr(state, "_raw_df_cca_sum_miss", pd.DataFrame())),
         ]
-        file_path = await asyncio.to_thread(build_full_report_file_sync, sheets_list)
-        try:
-            with open(file_path, "rb") as f:
-                while True:
-                    chunk = f.read(65536)
-                    if not chunk:
-                        break
-                    yield chunk
-        finally:
-            if os.path.exists(file_path):
-                os.remove(file_path)
+        excel_bytes = build_full_report_bytes(sheets_list)
+        yield excel_bytes
         
 # ==========================================================================
     # COMPARE RTO CONTROLLER & HANDLERS
@@ -2894,8 +2868,10 @@ def server(input: Inputs, output: Outputs, session: Session):
     # ==========================================================================
     # FULL REPORT STOCK OPNAME (FIXED: ANTI 0 BYTES)
     # ==========================================================================
-    @render.download(filename="FULL_SO_ANALYZER_REPORT.xlsx")
-    async def btn_dl_so_master_all():
+    @render.download(
+        filename=lambda: f"FULL_STOCK_OPNAME_{input.so_branch() if 'so_branch' in input else 'SURABAYA'}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    )
+    def btn_dl_so_master_all():
         sheets_list = [
             ('1_DATA SCAN', getattr(state, "_raw_df_so_scan", pd.DataFrame())),
             ('2_STOCK SYSTEM', getattr(state, "_raw_df_so_stock", pd.DataFrame())),
@@ -2913,18 +2889,8 @@ def server(input: Inputs, output: Outputs, session: Session):
             ('14_DETAIL ADJUSTMENT', getattr(state, "_raw_df_so_adj_detail", pd.DataFrame())),
             ('15_SUMMARY ADJ', getattr(state, "_raw_df_so_adj_sum", pd.DataFrame())),
         ]
-
-        file_path = await asyncio.to_thread(build_full_report_file_sync, sheets_list)
-        try:
-            with open(file_path, "rb") as f:
-                while True:
-                    chunk = f.read(65536)
-                    if not chunk:
-                        break
-                    yield chunk
-        finally:
-            if os.path.exists(file_path):
-                os.remove(file_path)
+        excel_bytes = build_full_report_bytes(sheets_list)
+        yield excel_bytes
 
 # ==========================================================================
     # JUSTIFICATION SO CONTROLLER (DYNAMIC MODE: REVERSAL & NON REVERSAL)
