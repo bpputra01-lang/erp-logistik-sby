@@ -2884,9 +2884,6 @@ def server(input: Inputs, output: Outputs, session: Session):
     # ==========================================================================
     # FULL REPORT STOCK OPNAME (FIXED: ANTI 0 BYTES)
     # ==========================================================================
-    # ==========================================================================
-    # FULL REPORT STOCK OPNAME (ASYNC NON-BLOCKING - ANTI TIMEOUT & ANTI 404)
-    # ==========================================================================
     @render.download(filename="FULL_SO_ANALYZER_REPORT.xlsx")
     async def btn_dl_so_master_all():
         sheets_list = [
@@ -2897,7 +2894,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             ('5_SET UP REAL PLUS', getattr(state, "_raw_df_so_setup_real", pd.DataFrame())),
             ('6_REAL PLUS RECON', getattr(state, "_raw_df_so_rec_real", pd.DataFrame())),
             ('7_SYSTEM OUTSTANDING', getattr(state, "_raw_df_so_rec_sys", pd.DataFrame())),
-            ('())),
+            ('8_MULTIPLE ADJ PLUS', getattr(state, "_raw_df_so_mult", pd.DataFrame())),  # <-- DIPERBAIKI
             ('9_SINGLE ADJ PLUS', getattr(state, "_raw_df_so_sing", pd.DataFrame())),
             ('10_HASIL CEK ADJ', getattr(state, "_raw_df_so_res4", pd.DataFrame())),
             ('11_KARANTINA', getattr(state, "_raw_df_so_karantina", pd.DataFrame())),
@@ -2906,7 +2903,6 @@ def server(input: Inputs, output: Outputs, session: Session):
             ('14_DETAIL ADJUSTMENT', getattr(state, "_raw_df_so_adj_detail", pd.DataFrame())),
             ('15_SUMMARY ADJ', getattr(state, "_raw_df_so_adj_sum", pd.DataFrame())),
         ]
-
         # 🌟 Jalankan di background thread agar websocket tidak mati
         file_path = await asyncio.to_thread(build_full_report_file_sync, sheets_list)
 
