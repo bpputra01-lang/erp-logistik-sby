@@ -7,7 +7,7 @@ from datetime import datetime, date, timedelta, timezone
 from bs4 import BeautifulSoup
 
 # ==============================================================================
-# 🔑 KREDENSIAL & KONFIGURASI (SAMA PERSIS DENGAN ORCHESTRATOR ANDA)
+# 🔑 KREDENSIAL & KONFIGURASI PUSAT
 # ==============================================================================
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://fanzsmghhbefhhaicrok.supabase.co")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhbnpzbWdoaGJlZmhoYWljcm9rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxNTQzNDgsImV4cCI6MjEwMzczMDM0OH0.brCSOO9nHAUK8CxDWPperpJ--_NA_nwy5cO9OqGv3I0")
@@ -17,7 +17,6 @@ JEZPRO_PASSWORD = os.environ.get("JEZPRO_PASSWORD", "131199")
 
 WIB = timezone(timedelta(hours=7))
 
-# Header Supabase (Prefer resolution=merge-duplicates agar aman dari duplikasi)
 HEADERS_SB = {
     "apikey": SUPABASE_KEY,
     "Authorization": f"Bearer {SUPABASE_KEY}",
@@ -25,7 +24,6 @@ HEADERS_SB = {
     "Prefer": "resolution=merge-duplicates"
 }
 
-# Regex fleksibel penangkap variasi Miss Location
 PATTERN_MISS_LOC = re.compile(r"mis+[\s\-_]*loc", re.IGNORECASE)
 
 
@@ -42,21 +40,29 @@ def strip_html(val):
 
 
 def parse_datetime(dt_str):
+    if not dt_str:
+        return datetime.now(WIB).strftime("%Y-%m-%d %H:%M:%S")
+    clean = strip_html(dt_str).strip()
+    for fmt in ("%d-%m-%Y %H:%M:%S", "%d/%m/%Y %H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+        try:
+            return datetime.strptime(clean[:19], fmt).strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            pass
     try:
-        return pd.to_datetime(dt_str, dayfirst=True).strftime("%Y-%m-%d %H:%M:%S")
+        return pd.to_datetime(clean, dayfirst=True).strftime("%Y-%m-%d %H:%M:%S")
     except Exception:
         return datetime.now(WIB).strftime("%Y-%m-%d %H:%M:%S")
 
 
 # ==============================================================================
-# AUTENTIKASI OTOMATIS KE JEZPRO
+# AUTENTIKASI KE JEZPRO
 # ==============================================================================
 def create_jezpro_session():
     session = requests.Session()
     session.headers.update({
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:160.0) Gecko/20100101 Firefox/160.0"
     })
-    print(f"🔐 [{datetime.now(WIB).strftime('%H:%M:%S')}] Login otomatis ke Jezpro ({JEZPRO_EMAIL})...")
+    print(f"🔐 [{datetime.now(WIB).strftime('%H:%M:%S')}] Login ke Jezpro ({JEZPRO_EMAIL})...")
     res = session.get("https://jezpro.id/", timeout=20)
     soup = BeautifulSoup(res.text, "html.parser")
     token_tag = soup.find("input", {"name": "_token"})
@@ -72,6 +78,7 @@ def create_jezpro_session():
         },
         timeout=20,
     )
+    # Buka route setup lokasi stok agar session cookie aktif
     session.get("https://jezpro.id/setup_lokasi_stok_v2", timeout=15)
     print("✅ Berhasil login Jezpro!\n")
     return session
@@ -103,7 +110,7 @@ def relogin_jezpro(session):
 
 
 # ==============================================================================
-# FUNGSI UTAMA SINKRONISASI MISS LOCATION 2 BULAN TERAKHIR
+# SINKRONISASI MISS LOCATION
 # ==============================================================================
 def run_sync_miss_location(days_back: int = 60, batch_upload_size: int = 500):
     session = create_jezpro_session()
@@ -117,7 +124,7 @@ def run_sync_miss_location(days_back: int = 60, batch_upload_size: int = 500):
     print(f"🚀 SCRAPING & SINKRONISASI MISS LOCATION ({date_list[-1]} s/d {date_list[0]})")
     print("   -> Filter Note : Mengandung variasi MISS LOCATION")
     print("   -> Filter BIN  : Mengecualikan BIN Tujuan KARANTINA")
-    print("   -> Cabang      : Menarik seluruh cabang")
+    print("   -> Cabang      : Seluruh Cabang")
     print("=" * 80 + "\n")
 
     url_history = "https://jezpro.id/bin_history_datatables"
@@ -130,13 +137,28 @@ def run_sync_miss_location(days_back: int = 60, batch_upload_size: int = 500):
     all_matched_records = []
 
     for idx, target_date in enumerate(date_list, start=1):
+        # 🌟 PARAMETER LENGKAP DATATABLES (MENCEGAH ERROR 500 LARAVEL)
         params = {
             "draw": str(idx),
+            "columns[0][data]": "DT_RowIndex", "columns[0][name]": "pmt_id", "columns[0][searchable]": "false", "columns[0][orderable]": "true",
+            "columns[1][data]": "u_name", "columns[1][name]": "u_name", "columns[1][searchable]": "true", "columns[1][orderable]": "true",
+            "columns[2][data]": "article", "columns[2][name]": "article", "columns[2][searchable]": "true", "columns[2][orderable]": "false",
+            "columns[3][data]": "ps_barcode", "columns[3][name]": "ps_barcode", "columns[3][searchable]": "true", "columns[3][orderable]": "false",
+            "columns[4][data]": "st_name", "columns[4][name]": "st_name", "columns[4][searchable]": "true", "columns[4][orderable]": "true",
+            "columns[5][data]": "start_bin", "columns[5][name]": "start_bin", "columns[5][searchable]": "true", "columns[5][orderable]": "false",
+            "columns[6][data]": "pmt_old_qty", "columns[6][name]": "pmt_old_qty", "columns[6][searchable]": "true", "columns[6][orderable]": "false",
+            "columns[7][data]": "pmt_qty", "columns[7][name]": "pmt_qty", "columns[7][searchable]": "true", "columns[7][orderable]": "false",
+            "columns[8][data]": "pmt_old_qty_new", "columns[8][name]": "pmt_old_qty_new", "columns[8][searchable]": "true", "columns[8][orderable]": "false",
+            "columns[9][data]": "end_bin", "columns[9][name]": "end_bin", "columns[9][searchable]": "true", "columns[9][orderable]": "false",
+            "columns[10][data]": "notes", "columns[10][name]": "notes", "columns[10][searchable]": "true", "columns[10][orderable]": "false",
+            "columns[11][data]": "pm_created_at", "columns[11][name]": "pm_created_at", "columns[11][searchable]": "true", "columns[11][orderable]": "false",
+            "order[0][column]": "0", "order[0][dir]": "desc",
             "start": "0",
-            "length": "10000",  # Tarik seluruh transaksi di tanggal tersebut
+            "length": "1000",   # 🌟 Panjang 1000 baris stabil (tidak bikin crash memori server)
             "search[value]": "",
+            "search[regex]": "false",
+            "st_id": "",
             "date": target_date,
-            "st_id": "",        # Kosong = Semua cabang
             "history_bin_start": "",
             "history_bin_end": "",
             "_": int(time.time() * 1000)
@@ -145,13 +167,13 @@ def run_sync_miss_location(days_back: int = 60, batch_upload_size: int = 500):
         try:
             resp = session.get(url_history, headers=headers_req, params=params, timeout=30)
             
-            # Jika terkena logout di tengah proses looping
+            # Jika terkena session timeout
             if resp.status_code in [401, 419] or "login" in resp.url:
                 if relogin_jezpro(session):
                     resp = session.get(url_history, headers=headers_req, params=params, timeout=30)
 
             if resp.status_code != 200:
-                print(f"⚠️ [{idx}/{len(date_list)}] Tgl {target_date}: Status {resp.status_code}")
+                print(f"⚠️ [{idx:02d}/{len(date_list)}] Tgl {target_date}: Status {resp.status_code}")
                 continue
 
             raw_json = resp.json().get("data", [])
@@ -161,8 +183,7 @@ def run_sync_miss_location(days_back: int = 60, batch_upload_size: int = 500):
                 note_text = strip_html(item.get("notes") or "")
                 end_bin = strip_html(item.get("end_bin") or "").upper()
 
-                # SYARAT 1: Catatan mengandung pola Miss Location
-                # SYARAT 2: BIN TUJUAN bukan Karantina
+                # Filter Note Miss Location & Bukan Karantina
                 if PATTERN_MISS_LOC.search(note_text) and ("KARANTINA" not in end_bin):
                     clean_dt = parse_datetime(item.get("pm_created_at"))
                     try:
@@ -195,7 +216,7 @@ def run_sync_miss_location(days_back: int = 60, batch_upload_size: int = 500):
             else:
                 print(f"⚪ [{idx:02d}/{len(date_list)}] Tgl {target_date}: 0")
 
-            time.sleep(0.15)  # Jeda aman
+            time.sleep(0.2)
 
         except Exception as e:
             print(f"❌ Error pada tanggal {target_date}: {e}")
