@@ -7,7 +7,7 @@ import pandas as pd
 import requests
 
 # ==============================================================================
-# 🔑 KREDENSIAL & KONFIGURASI SUPABASE & JEZPRO
+# 🔑 KREDENSIAL & KONFIGURASI PUSAT
 # ==============================================================================
 SUPABASE_URL = os.environ.get(
     "SUPABASE_URL", "https://fanzsmghhbefhhaicrok.supabase.co"
@@ -20,8 +20,10 @@ SUPABASE_KEY = os.environ.get(
 JEZPRO_EMAIL = os.environ.get("JEZPRO_EMAIL", "fajarbintang786@jez.co.id")
 JEZPRO_PASSWORD = os.environ.get("JEZPRO_PASSWORD", "131199")
 
+STORE_ID_SURABAYA = 3
 WIB = timezone(timedelta(hours=7))
 
+# Mapping Semua Cabang Resmi Jezpro
 BRANCH_MAP = {
     "JEZ SURABAYA": 3,
     "JEZ SEMARANG": 53,
@@ -41,10 +43,12 @@ HEADERS_SB = {
     "Prefer": "resolution=merge-duplicates",
 }
 
-# Regex fleksibel penangkap variasi MISS LOCATION & MISLOCATION
 PATTERN_MISS_LOC = re.compile(r"mis+[\s\-_]*loc", re.IGNORECASE)
 
 
+# ==============================================================================
+# HELPER PEMBERSIH & PARSER
+# ==============================================================================
 def strip_html(val):
     if not val:
         return ""
@@ -73,6 +77,9 @@ def parse_datetime(dt_str):
         return datetime.now(WIB).strftime("%Y-%m-%d %H:%M:%S")
 
 
+# ==============================================================================
+# AUTENTIKASI KE JEZPRO
+# ==============================================================================
 def create_jezpro_session():
     session = requests.Session()
     session.headers.update({
@@ -128,25 +135,30 @@ def relogin_jezpro(session):
         return False
 
 
-def run_sync_miss_location(days_back: int = 60, batch_upload_size: int = 500):
-    session = create_jezpro_session()
+# ==============================================================================
+# FUNGSI UTAMA SINKRONISASI (ALL CABANG MISS LOC + KHUSUS SURABAYA OFF/ONL/TOKO)
+# ==============================================================================
+def execute_sync_all(session, days_back: int = 60, batch_upload_size: int = 500):
     today = date.today()
     date_list = [
         (today - timedelta(days=i)).strftime("%Y-%m-%d")
         for i in range(days_back)
     ]
 
-    print("=" * 80)
+    print("=" * 85)
     print(
-        f"🚀 SCRAPING MISS LOCATION (PERIODE: {date_list[-1]} s/d"
+        f"🚀 SINKRONISASI MUTASI SETUP (2 BULAN: {date_list[-1]} s/d"
         f" {date_list[0]})"
     )
-    print(f"   -> Total Cabang : {len(BRANCH_MAP)} Cabang")
     print(
-        "   -> Filter       : Catatan MISS LOCATION / MISLOCATION (Bukan"
+        f"   -> Semua Cabang ({len(BRANCH_MAP)}) : Miss Location (Bukan"
         " Karantina)"
     )
-    print("=" * 80 + "\n")
+    print(
+        "   -> Khusus SURABAYA  : + Masuk OFF/ONL (Beda Asal) & Masuk TOKO"
+        " (Non-Missloc)"
+    )
+    print("=" * 85 + "\n")
 
     url_history = "https://jezpro.id/bin_history_datatables"
     headers_req = {
@@ -158,15 +170,22 @@ def run_sync_miss_location(days_back: int = 60, batch_upload_size: int = 500):
     all_matched_records = []
     start_time_all = time.time()
 
+    count_rule_missloc = 0
+    count_rule_off_onl = 0
+    count_rule_toko = 0
+
     for b_idx, (branch_name, st_id) in enumerate(BRANCH_MAP.items(), start=1):
+        is_surabaya = st_id == STORE_ID_SURABAYA
+        mode_desc = (
+            "MissLoc + OFF/ONL + TOKO" if is_surabaya else "Miss Location Only"
+        )
         print(
             f"🏢 [{b_idx}/{len(BRANCH_MAP)}] Memeriksa: {branch_name} (ID:"
-            f" {st_id})"
+            f" {st_id}) [{mode_desc}]"
         )
         branch_found = 0
 
         for d_idx, target_date in enumerate(date_list, start=1):
-            # 🌟 JANGAN GUNAKAN search="MIS" karena Jezpro hanya mencari di Artikel/SKU/User
             params = {
                 "draw": str(d_idx),
                 "columns[0][data]": "DT_RowIndex",
@@ -209,7 +228,7 @@ def run_sync_miss_location(days_back: int = 60, batch_upload_size: int = 500):
                 "order[0][dir]": "desc",
                 "start": "0",
                 "length": "1000",
-                "search[value]": "",  # 👈 Kosongkan agar semua transaksi hari itu ditarik
+                "search[value]": "",
                 "search": "",
                 "st_id": str(st_id),
                 "date": target_date,
@@ -240,12 +259,38 @@ def run_sync_miss_location(days_back: int = 60, batch_upload_size: int = 500):
 
                 for item in raw_json:
                     note_text = strip_html(item.get("notes") or "")
+                    start_bin = strip_html(item.get("start_bin") or "").upper()
                     end_bin = strip_html(item.get("end_bin") or "").upper()
 
-                    # 🌟 FILTER PYTHON: Catatan Miss Location & BIN Tujuan bukan Karantina
-                    if PATTERN_MISS_LOC.search(note_text) and (
-                        "KARANTINA" not in end_bin
-                    ):
+                    is_miss_loc = bool(PATTERN_MISS_LOC.search(note_text))
+                    is_karantina = "KARANTINA" in end_bin
+
+                    # ----------------------------------------------------------
+                    # ATURAN 1 (BERLAKU UNTUK SEMUA CABANG): MISS LOCATION
+                    # ----------------------------------------------------------
+                    rule_1 = is_miss_loc and (not is_karantina)
+
+                    # ----------------------------------------------------------
+                    # ATURAN 2 & 3 (KHUSUS CABANG SURABAYA SAJA)
+                    # ----------------------------------------------------------
+                    rule_2 = False
+                    rule_3 = False
+                    if is_surabaya:
+                        # Masuk OFF/ONL namun tidak berasal dari jenis yang sama
+                        rule_2_off = ("OFF" in end_bin) and (
+                            "OFF" not in start_bin
+                        )
+                        rule_2_onl = ("ONL" in end_bin) and (
+                            "ONL" not in start_bin
+                        )
+                        rule_2 = (rule_2_off or rule_2_onl) and (
+                            not is_karantina
+                        )
+
+                        # Masuk TOKO dengan catatan bukan Miss Location
+                        rule_3 = ("TOKO" in end_bin) and (not is_miss_loc)
+
+                    if rule_1 or rule_2 or rule_3:
                         clean_dt = parse_datetime(item.get("pm_created_at"))
                         try:
                             q_val = int(item.get("pmt_qty", 1))
@@ -258,6 +303,13 @@ def run_sync_miss_location(days_back: int = 60, batch_upload_size: int = 500):
                         except Exception:
                             pmt_id_val = None
 
+                        if rule_1:
+                            count_rule_missloc += 1
+                        elif rule_2:
+                            count_rule_off_onl += 1
+                        elif rule_3:
+                            count_rule_toko += 1
+
                         all_matched_records.append({
                             "pmt_id": pmt_id_val,
                             "tanggal": clean_dt,
@@ -269,9 +321,7 @@ def run_sync_miss_location(days_back: int = 60, batch_upload_size: int = 500):
                                 .upper()
                             ),
                             "artikel": strip_html(item.get("article", "-")),
-                            "bin_awal": strip_html(
-                                item.get("start_bin", "-")
-                            ).upper(),
+                            "bin_awal": start_bin,
                             "qty_mutasi": q_val,
                             "bin_tujuan": end_bin,
                             "catatan": note_text,
@@ -279,48 +329,41 @@ def run_sync_miss_location(days_back: int = 60, batch_upload_size: int = 500):
                         daily_found += 1
                         branch_found += 1
 
-                # Cetak progres langsung per tanggal
-                if daily_found > 0:
-                    print(
-                        f"   ➔ [{d_idx:02d}/{len(date_list)}] Tgl"
-                        f" {target_date}: {len(raw_json)} mutasi diperiksa ->"
-                        f" DITEMUKAN +{daily_found} Miss Loc ✅"
-                    )
-                else:
-                    print(
-                        f"   ➔ [{d_idx:02d}/{len(date_list)}] Tgl"
-                        f" {target_date}: {len(raw_json)} mutasi diperiksa (0"
-                        " Miss Loc)"
-                    )
+                pct_date = int((d_idx / len(date_list)) * 100)
+                print(
+                    f"\r   ➔ [{pct_date:02d}%] Tgl {target_date} (Ditemukan:"
+                    f" {branch_found} baris)",
+                    end="",
+                    flush=True,
+                )
 
-                time.sleep(0.04)
+                time.sleep(0.03)
 
-            except Exception as e:
-                print(f"   ❌ Error {target_date}: {e}")
+            except Exception:
                 continue
 
         print(
-            f"   ✅ Selesai {branch_name}: Total {branch_found} baris Miss"
-            " Location.\n"
+            f"\n   ✅ Selesai {branch_name}: Total {branch_found} baris"
+            " tertangkap.\n"
         )
 
     total_scraped = len(all_matched_records)
-    durasi_total = int(time.time() - start_time_all)
-    print(
-        f"🎯 SELESAI SCRAPING dalam {durasi_total} detik! Total terkumpul:"
-        f" {total_scraped:,} baris.\n"
-    )
+    durasi = int(time.time() - start_time_all)
+    print(f"📊 Rangkuman Sesi ({durasi} detik):")
+    print(f"   -> Miss Location (All Cabang)    : {count_rule_missloc:,} baris")
+    print(f"   -> Mutasi ke OFF/ONL (Surabaya)  : {count_rule_off_onl:,} baris")
+    print(f"   -> Mutasi ke TOKO (Surabaya)     : {count_rule_toko:,} baris")
+    print(f"   -> TOTAL DATA TERKUMPUL          : {total_scraped:,} baris\n")
 
     if total_scraped == 0:
-        print("ℹ️ Tidak ada data Miss Location yang memenuhi kriteria.")
+        print("ℹ️ Tidak ada data yang perlu diunggah.")
         return
 
     # ==========================================================================
-    # UPLOAD LANGSUNG KE SUPABASE (BERSIHKAN DUPLIKASI DATA)
+    # UPLOAD KE SUPABASE (BERSIH DARI DUPLIKASI)
     # ==========================================================================
     print("📤 Mengunggah data ke tabel Supabase 'jezpro_miss_location_logs'...")
 
-    # Drop duplikat di memori sebelum insert ke database
     df_upload = pd.DataFrame(all_matched_records).drop_duplicates(
         subset=["tanggal", "sku", "bin_awal", "bin_tujuan", "qty_mutasi"]
     )
@@ -340,7 +383,7 @@ def run_sync_miss_location(days_back: int = 60, batch_upload_size: int = 500):
             if res_up.status_code in [200, 201, 204]:
                 inserted_count += len(chunk)
                 print(
-                    f"   ➔ Berhasil upload batch {i + 1} s/d"
+                    f"   ➔ Upload batch {i + 1} s/d"
                     f" {min(i + batch_upload_size, len(records_to_upload))}..."
                 )
             else:
@@ -349,13 +392,40 @@ def run_sync_miss_location(days_back: int = 60, batch_upload_size: int = 500):
                     f" {res_up.text}"
                 )
         except Exception as e_up:
-            print(f"   ⚠️ Kendala upload batch {i}: {e_up}")
+            print(f"   ⚠️ Kendala upload: {e_up}")
 
     print(
-        f"\n🎉 100% SUKSES! {inserted_count:,} baris data Miss Location"
-        " tersimpan di Supabase!"
+        f"\n🎉 Sukses! {inserted_count:,} baris tersimpan aman di Supabase.\n"
     )
 
 
+# ==============================================================================
+# MAIN LOOP: BERJALAN OTOMATIS TIAP 2 JAM SEKALI
+# ==============================================================================
 if __name__ == "__main__":
-    run_sync_miss_location(days_back=60)
+    INTERVAL_DETIK = 7200  # 2 jam = 2 * 3600 detik
+
+    print("=" * 85)
+    print(
+        "🔄 DAEMON SINKRONISASI: ALL CABANG (MISS LOC) + SURABAYA (OFF/ONL/TOKO)"
+    )
+    print("   Berjalan continuous otomatis setiap 2 jam sekali.")
+    print("=" * 85)
+
+    jez = create_jezpro_session()
+
+    while True:
+        try:
+            execute_sync_all(jez, days_back=60)
+        except Exception as e_main:
+            print(f"❌ Terjadi kesalahan pada siklus ini: {e_main}")
+
+        waktu_berikutnya = (
+            datetime.now(WIB) + timedelta(seconds=INTERVAL_DETIK)
+        ).strftime("%H:%M:%S")
+        print(
+            "💤 Standby 2 jam. Jadwal sinkronisasi berikutnya: pukul"
+            f" {waktu_berikutnya} WIB...\n"
+        )
+
+        time.sleep(INTERVAL_DETIK)
