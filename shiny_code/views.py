@@ -3508,7 +3508,20 @@ def cycle_count_monitoring_view(state: AppState):
         ui.h4("📊 Status Kelengkapan Upload Jadwal Seluruh Cabang", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 1rem;"),
         ui.output_ui("ccm_status_cabang_cards_ui"),
         ui.hr(style="margin: 1.5rem 0; border-color: #E2E8F0;"),
-        ui.h4("📋 Preview Jadwal Cabang Terpilih", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+        ui.div(
+            ui.div(
+                ui.h4("📋 Preview Jadwal Cabang Terpilih", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 2px 0;"),
+                ui.p("Jadwal aktif yang tersimpan untuk cabang, bulan, dan tahun terpilih.", style="color: #718096; font-size: 12px; margin: 0;")
+            ),
+            ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-trash-can", style="margin-right: 6px;"), 
+                "HAPUS JADWAL BULAN INI",
+                onclick="Shiny.setInputValue('btn_open_del_ccm_schedule_modal', Math.random(), {priority: 'event'})",
+                style="background: #FFF5F5; color: #E53E3E; border: 1.5px solid #FEB2B2; padding: 7px 14px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer; transition: all 0.2s;"
+            ),
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 8px;"
+        ),
+        ui.output_ui("ccm_schedule_table_ui"),
         ui.output_ui("ccm_schedule_table_ui"),
         style="padding: 0.5rem 0;"
     )

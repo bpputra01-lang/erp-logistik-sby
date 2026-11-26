@@ -9182,8 +9182,30 @@ class AppState:
             return False, f"Gagal menghitung metrik: {e}"
 
     # ==============================================================================
-    # REFRESH CEPAT KHUSUS NET SALES & BTSB (INSTAN < 0.2 DETIK)
+    # DELETE CYCLE COUNT SCHEDULE
     # ==============================================================================
+
+    def delete_cycle_count_schedule(self, branch: str, month: str, year: str):
+        """Menghapus seluruh jadwal cabang terpilih pada bulan dan tahun aktif dari Supabase & RAM"""
+        try:
+            client = get_supabase()
+            if not client:
+                return False, "Koneksi ke Supabase gagal!"
+
+            doc_id = f"{branch.upper()}_{month.upper()}_{year}"
+
+            # 1. Hapus dari tabel Supabase
+            res = client.table("cycle_count_schedules").delete().eq("id", doc_id).execute()
+
+            # 2. Kosongkan data preview di memori jika sedang melihat jadwal tersebut
+            self.ccm_schedule_data.set([])
+
+            # 3. Muat ulang status cabang & metrik monitoring
+            self.load_cycle_count_monitoring_data()
+
+            return True, f"✅ Seluruh jadwal Cycle Count untuk {branch.upper()} periode {month.upper()} {year} berhasil dihapus dari database!"
+        except Exception as e:
+            return False, f"Gagal menghapus jadwal: {str(e)}"
     # ==============================================================================
     # HELPER TERPUSAT: PENJUMLAHAN HARIAN NET SALES (MENDUKUNG RENTANG TANGGAL)
     # ==============================================================================

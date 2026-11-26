@@ -7074,7 +7074,67 @@ def server(input: Inputs, output: Outputs, session: Session):
         else:
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
+    # ==========================================================================
+    # MODAL & EKSEKUSI HAPUS JADWAL CYCLE COUNT PER BULAN (CONNECT SUPABASE)
+    # ==========================================================================
+    @reactive.Effect
+    @reactive.event(input.btn_open_del_ccm_schedule_modal)
+    def _open_del_ccm_schedule_modal():
+        br = state.ccm_branch()
+        mo = state.ccm_month()
+        yr = state.ccm_year()
 
+        # Cek apakah jadwalnya memang ada sebelum konfirmasi
+        current_sched = state.ccm_schedule_data()
+        if not current_sched:
+            ui.notification_show(f"⚠️ Tidak ada jadwal tersimpan untuk {br} ({mo} {yr}) yang bisa dihapus.", type="warning", duration=4)
+            return
+
+        ui.modal_show(ui.modal(
+            ui.div(
+                ui.tags.i(class_="fa-solid fa-triangle-exclamation", style="font-size: 42px; color: #E53E3E; margin-bottom: 10px;"),
+                ui.h4("Konfirmasi Hapus Seluruh Jadwal", style="font-weight: 800; color: #1A202C; margin: 0 0 8px 0;"),
+                ui.p(
+                    ui.HTML(f"Apakah Anda yakin ingin menghapus <b>SEMUA</b> jadwal Cycle Count untuk cabang <b>{br}</b> pada bulan <b>{mo} {yr}</b>?"),
+                    style="color: #4A5568; font-size: 13.5px; margin-bottom: 8px;"
+                ),
+                ui.p(
+                    "Tindakan ini akan menghapus jadwal secara permanen dari database Supabase dan tidak bisa dibatalkan.",
+                    style="color: #E53E3E; font-size: 12px; font-weight: bold; margin: 0;"
+                ),
+                style="text-align: center; padding: 1rem 0.5rem;"
+            ),
+            title="🗑️ Hapus Jadwal Bulanan",
+            easy_close=True,
+            footer=ui.div(
+                ui.modal_button("Batal"),
+                ui.tags.button(
+                    "Ya, Hapus Semua Jadwal",
+                    onclick="window.showGlobalSpinner(); Shiny.setInputValue('btn_confirm_del_ccm_schedule', Math.random(), {priority: 'event'});",
+                    style="background: #E53E3E; color: white; border: none; padding: 7px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-left: 8px;"
+                ),
+                style="display: flex; justify-content: flex-end;"
+            )
+        ))
+
+    @reactive.Effect
+    @reactive.event(input.btn_confirm_del_ccm_schedule)
+    def _confirm_del_ccm_schedule():
+        ui.modal_remove()
+        br = state.ccm_branch()
+        mo = state.ccm_month()
+        yr = state.ccm_year()
+
+        succ, msg = state.delete_cycle_count_schedule(br, mo, yr)
+        ui.insert_ui(ui.tags.script("if (window.hideGlobalSpinner) window.hideGlobalSpinner();"), selector="head", where="beforeEnd")
+        
+        if succ:
+            state.show_success_modal.set(True)
+            ui.notification_show(msg, type="message", duration=4)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+            
     # Status Cabang Upload Jadwal
     @render.ui
     def ccm_status_cabang_cards_ui():
