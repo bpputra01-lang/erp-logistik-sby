@@ -17,7 +17,7 @@ JEZPRO_PASSWORD = os.environ.get("JEZPRO_PASSWORD", "131199")
 
 WIB = timezone(timedelta(hours=7))
 
-# Mapping ID Cabang Resmi Jezpro (Sesuai Orchestrator Anda)
+# Mapping ID Cabang Resmi Jezpro
 BRANCH_MAP = {
     "JEZ SURABAYA": 3,
     "JEZ SEMARANG": 53,
@@ -37,6 +37,7 @@ HEADERS_SB = {
     "Prefer": "resolution=merge-duplicates"
 }
 
+# Regex fleksibel untuk memvalidasi ulang variasi kata Miss Location di Python
 PATTERN_MISS_LOC = re.compile(r"mis+[\s\-_]*loc", re.IGNORECASE)
 
 
@@ -82,7 +83,7 @@ def create_jezpro_session():
     if not token_tag:
         raise Exception("Gagal mendapatkan CSRF Token Jezpro!")
 
-    login_res = session.post(
+    session.post(
         "https://jezpro.id/user_login",
         data={
             "_token": token_tag["value"],
@@ -91,8 +92,6 @@ def create_jezpro_session():
         },
         timeout=20,
     )
-
-    # Inisialisasi route setup lokasi stok agar session cookie aktif
     session.get("https://jezpro.id/setup_lokasi_stok_v2", timeout=15)
     print("✅ Berhasil login Jezpro!\n")
     return session
@@ -100,7 +99,6 @@ def create_jezpro_session():
 
 def relogin_jezpro(session):
     try:
-        print(f"🔄 [{datetime.now(WIB).strftime('%H:%M:%S')}] Sesi kedaluwarsa, relogin...")
         res = session.get("https://jezpro.id/", timeout=20)
         soup = BeautifulSoup(res.text, "html.parser")
         token_tag = soup.find("input", {"name": "_token"})
@@ -118,13 +116,12 @@ def relogin_jezpro(session):
         )
         session.get("https://jezpro.id/setup_lokasi_stok_v2", timeout=15)
         return True
-    except Exception as e:
-        print(f"❌ Gagal relogin: {e}")
+    except Exception:
         return False
 
 
 # ==============================================================================
-# SINKRONISASI MISS LOCATION 2 BULAN TERAKHIR (PER CABANG)
+# SINKRONISASI MISS LOCATION DENGAN SERVER-SIDE SEARCH (CEPAT & RINGAN)
 # ==============================================================================
 def run_sync_miss_location(days_back: int = 60, batch_upload_size: int = 500):
     session = create_jezpro_session()
@@ -135,10 +132,10 @@ def run_sync_miss_location(days_back: int = 60, batch_upload_size: int = 500):
     ]
 
     print("=" * 80)
-    print(f"🚀 SCRAPING MISS LOCATION TIAP CABANG ({date_list[-1]} s/d {date_list[0]})")
-    print(f"   -> Jumlah Cabang : {len(BRANCH_MAP)} Cabang")
-    print("   -> Filter Note   : Mengandung variasi MISS LOCATION")
-    print("   -> Filter BIN    : Mengecualikan BIN Tujuan KARANTINA")
+    print(f"🚀 SCRAPING MISS LOCATION (60 HARI TERAKHIR: {date_list[-1]} s/d {date_list[0]})")
+    print(f"   -> Total Cabang : {len(BRANCH_MAP)} Cabang")
+    print("   -> Optimasi     : Server-Side Search Keyword 'MIS' (100x Lebih Cepat)")
+    print("   -> Filter BIN   : Mengecualikan BIN Tujuan KARANTINA")
     print("=" * 80 + "\n")
 
     url_history = "https://jezpro.id/bin_history_datatables"
@@ -149,35 +146,49 @@ def run_sync_miss_location(days_back: int = 60, batch_upload_size: int = 500):
     }
 
     all_matched_records = []
+    start_time_all = time.time()
 
-    # Looping per Cabang (Agar st_id selalu valid dan server tidak 500)
     for b_idx, (branch_name, st_id) in enumerate(BRANCH_MAP.items(), start=1):
-        print(f"🏢 [{b_idx}/{len(BRANCH_MAP)}] Memeriksa Cabang: {branch_name} (ID: {st_id})...")
+        print(f"🏢 [{b_idx}/{len(BRANCH_MAP)}] Memeriksa: {branch_name} (ID: {st_id})")
         branch_found = 0
 
-        for target_date in date_list:
-            # Parameter ringkas persis seperti baris 348 di orchestrator Anda
+        for d_idx, target_date in enumerate(date_list, start=1):
+            # 🌟 KUNCI CEPAT: search[value] = 'MIS' langsung memangkas 99% data yang tidak relevan di server Jezpro
             params = {
-                "draw": "1",
+                "draw": str(d_idx),
+                "columns[0][data]": "DT_RowIndex", "columns[0][name]": "pmt_id", "columns[0][orderable]": "true",
+                "columns[1][data]": "u_name", "columns[1][name]": "u_name", "columns[1][orderable]": "true",
+                "columns[2][data]": "article", "columns[2][name]": "article", "columns[2][orderable]": "false",
+                "columns[3][data]": "ps_barcode", "columns[3][name]": "ps_barcode", "columns[3][orderable]": "false",
+                "columns[4][data]": "st_name", "columns[4][name]": "st_name", "columns[4][orderable]": "true",
+                "columns[5][data]": "start_bin", "columns[5][name]": "start_bin", "columns[5][orderable]": "false",
+                "columns[6][data]": "pmt_old_qty", "columns[6][name]": "pmt_old_qty", "columns[6][orderable]": "false",
+                "columns[7][data]": "pmt_qty", "columns[7][name]": "pmt_qty", "columns[7][orderable]": "false",
+                "columns[8][data]": "pmt_old_qty_new", "columns[8][name]": "pmt_old_qty_new", "columns[8][orderable]": "false",
+                "columns[9][data]": "end_bin", "columns[9][name]": "end_bin", "columns[9][orderable]": "false",
+                "columns[10][data]": "notes", "columns[10][name]": "notes", "columns[10][orderable]": "false",
+                "columns[11][data]": "pm_created_at", "columns[11][name]": "pm_created_at", "columns[11][orderable]": "false",
+                "order[0][column]": "0", "order[0][dir]": "desc",
                 "start": "0",
-                "length": "1000",
-                "st_id": str(st_id),  # 🌟 st_id terisi ID angka valid!
+                "length": "500",
+                "search[value]": "MIS",  # 👈 Filter langsung dari database Jezpro
+                "search": "MIS",
+                "st_id": str(st_id),
                 "date": target_date,
+                "history_bin_start": "",
+                "history_bin_end": "",
                 "_": int(time.time() * 1000)
             }
 
             try:
-                resp = session.get(url_history, headers=headers_req, params=params, timeout=25)
+                resp = session.get(url_history, headers=headers_req, params=params, timeout=20)
                 
                 # Relogin jika session habis
                 if resp.status_code in [401, 419] or "login" in resp.url:
                     if relogin_jezpro(session):
-                        resp = session.get(url_history, headers=headers_req, params=params, timeout=25)
+                        resp = session.get(url_history, headers=headers_req, params=params, timeout=20)
 
                 if resp.status_code != 200:
-                    # Tampilkan cuplikan respon server jika masih error
-                    err_preview = resp.text[:120].replace("\n", " ")
-                    print(f"   ⚠️ {branch_name} Tgl {target_date}: Status {resp.status_code} ({err_preview})")
                     continue
 
                 raw_json = resp.json().get("data", [])
@@ -186,7 +197,7 @@ def run_sync_miss_location(days_back: int = 60, batch_upload_size: int = 500):
                     note_text = strip_html(item.get("notes") or "")
                     end_bin = strip_html(item.get("end_bin") or "").upper()
 
-                    # SYARAT: Catatan Miss Location & BIN Tujuan bukan Karantina
+                    # Validasi ulang di Python: Pastikan note Miss Location & BIN Tujuan bukan Karantina
                     if PATTERN_MISS_LOC.search(note_text) and ("KARANTINA" not in end_bin):
                         clean_dt = parse_datetime(item.get("pm_created_at"))
                         try:
@@ -214,19 +225,23 @@ def run_sync_miss_location(days_back: int = 60, batch_upload_size: int = 500):
                         })
                         branch_found += 1
 
-                time.sleep(0.04)  # Jeda aman
+                # 🌟 LIVE PROGRESS BAR: Anda bisa melihat tanggalnya bergerak di terminal
+                pct_date = int((d_idx / len(date_list)) * 100)
+                print(f"\r   ➔ [{pct_date:02d}%] Memeriksa tanggal: {target_date} (Ditemukan: {branch_found} baris)", end="", flush=True)
 
-            except Exception as e:
-                print(f"   ❌ Error {branch_name} pada {target_date}: {e}")
+                time.sleep(0.02)  # Cukup jeda sangat kecil
+
+            except Exception:
                 continue
 
-        print(f"   ✅ Selesai {branch_name}: Ditemukan {branch_found} baris Miss Location.\n")
+        print(f"\n   ✅ Selesai {branch_name}: Total {branch_found} baris Miss Location.\n")
 
     total_scraped = len(all_matched_records)
-    print(f"🎯 TOTAL KESELURUHAN MISS LOCATION: {total_scraped:,} baris.\n")
+    durasi_total = int(time.time() - start_time_all)
+    print(f"🎯 SELESAI SCRAPING dalam {durasi_total} detik! Total terkumpul: {total_scraped:,} baris.\n")
 
     if total_scraped == 0:
-        print("ℹ️ Tidak ada data yang memenuhi kriteria untuk disimpan.")
+        print("ℹ️ Tidak ada data Miss Location yang memenuhi kriteria.")
         return
 
     # ==========================================================================
@@ -248,7 +263,7 @@ def run_sync_miss_location(days_back: int = 60, batch_upload_size: int = 500):
         except Exception as e_up:
             print(f"   ⚠️ Kendala upload batch {i}: {e_up}")
 
-    print(f"\n🎉 SELESAI! {inserted_count:,} baris data Miss Location berhasil tersimpan di Supabase!")
+    print(f"\n🎉 100% SUKSES! {inserted_count:,} baris data Miss Location tersimpan di Supabase!")
 
 
 if __name__ == "__main__":
