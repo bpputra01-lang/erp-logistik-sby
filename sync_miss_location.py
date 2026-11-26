@@ -255,7 +255,6 @@ def execute_sync_all(session, days_back: int = 60, batch_upload_size: int = 500)
                     continue
 
                 raw_json = resp.json().get("data", [])
-                daily_found = 0
 
                 for item in raw_json:
                     note_text = strip_html(item.get("notes") or "")
@@ -326,7 +325,6 @@ def execute_sync_all(session, days_back: int = 60, batch_upload_size: int = 500)
                             "bin_tujuan": end_bin,
                             "catatan": note_text,
                         })
-                        daily_found += 1
                         branch_found += 1
 
                 pct_date = int((d_idx / len(date_list)) * 100)
@@ -356,19 +354,35 @@ def execute_sync_all(session, days_back: int = 60, batch_upload_size: int = 500)
     print(f"   -> TOTAL DATA TERKUMPUL          : {total_scraped:,} baris\n")
 
     if total_scraped == 0:
-        print("ℹ️ Tidak ada data yang perlu diunggah.")
+        print("ℹ️ Tidak ada data yang perlu diunggah (Data lama di Supabase dipertahankan).")
         return
 
     # ==========================================================================
-    # UPLOAD KE SUPABASE (BERSIH DARI DUPLIKASI)
+    # HAPUS DATA LAMA & UPLOAD DATA TERBARU KE SUPABASE
     # ==========================================================================
-    print("📤 Mengunggah data ke tabel Supabase 'jezpro_miss_location_logs'...")
-
     df_upload = pd.DataFrame(all_matched_records).drop_duplicates(
         subset=["tanggal", "sku", "bin_awal", "bin_tujuan", "qty_mutasi"]
     )
     records_to_upload = df_upload.to_dict(orient="records")
 
+    print("🗑️ Menghapus data lama di tabel Supabase 'jezpro_miss_location_logs'...")
+    try:
+        res_del = requests.delete(
+            f"{SUPABASE_URL}/rest/v1/jezpro_miss_location_logs?id=gt.0",
+            headers=HEADERS_SB,
+            timeout=30,
+        )
+        if res_del.status_code in [200, 204]:
+            print("   ✅ Data lama berhasil dibersihkan.")
+        else:
+            print(
+                f"   ⚠️ Gagal hapus data lama ({res_del.status_code}):"
+                f" {res_del.text}"
+            )
+    except Exception as e_del:
+        print(f"   ⚠️ Error saat menghapus data lama: {e_del}")
+
+    print("📤 Mengunggah data terbaru ke tabel Supabase 'jezpro_miss_location_logs'...")
     inserted_count = 0
     upsert_url = (
         f"{SUPABASE_URL}/rest/v1/jezpro_miss_location_logs?on_conflict=tanggal,sku,bin_awal,bin_tujuan,qty_mutasi"
@@ -395,7 +409,8 @@ def execute_sync_all(session, days_back: int = 60, batch_upload_size: int = 500)
             print(f"   ⚠️ Kendala upload: {e_up}")
 
     print(
-        f"\n🎉 Sukses! {inserted_count:,} baris tersimpan aman di Supabase.\n"
+        f"\n🎉 Sukses! {inserted_count:,} baris data terbaru menggantikan data"
+        " lama di Supabase.\n"
     )
 
 
