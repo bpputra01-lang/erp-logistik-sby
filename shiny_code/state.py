@@ -4810,6 +4810,43 @@ class AppState:
             import traceback
             traceback.print_exc()
             return False, f"Terjadi kesalahan saat kalkulasi: {str(e)}"
+    def apply_bs_category_filter(self, selected_cats):
+        """Jika selected_cats kosong / None, set ke [] (artinya SEMUA KATEGORI)"""
+        if not selected_cats or selected_cats is None:
+            self.bs_selected_categories.set([])
+        else:
+            clean_list = [str(x).strip().upper() for x in selected_cats if str(x).strip().upper() not in ["", "SEMUA", "ALL"]]
+            self.bs_selected_categories.set(clean_list)
+
+        self._apply_combined_bs_filters()
+
+    def apply_bs_area_filter(self, selected_area):
+        """Memfilter Tab 2 berdasarkan Area (OFFLINE, ONLINE, LOGISTIK)"""
+        self.bs_selected_area.set(selected_area if selected_area else "SEMUA AREA")
+        self._apply_combined_bs_filters()
+
+    def apply_bs_analysis_filter(self, filter_mode: str):
+        """Memfilter Tab 3 berdasarkan jenis perubahan stok/penjualan"""
+        self.bs_analysis_filter.set(filter_mode if filter_mode else "SEMUA")
+        self._apply_tab3_display_filter()
+
+    def _apply_tab3_display_filter(self):
+        if self._raw_df_bs_analysis_base.empty:
+            self._raw_df_bs_analysis = pd.DataFrame()
+            self.df_bs_analysis_headers.set([])
+            self.df_bs_analysis_rows.set([])
+            return
+
+        df_base = self._raw_df_bs_analysis_base.copy()
+        flt = self.bs_analysis_filter()
+
+        if flt != "SEMUA" and "_TAGS" in df_base.columns:
+            df_base = df_base[df_base["_TAGS"].str.contains(flt, na=False)].copy()
+
+        df_disp = df_base.drop(columns=["_TAGS", "_ABS_MOVE"], errors="ignore")
+        self._raw_df_bs_analysis = df_disp.copy()
+        self.df_bs_analysis_headers.set(df_disp.columns.tolist() if not df_disp.empty else [])
+        self.df_bs_analysis_rows.set(df_disp.fillna("").astype(str).values.tolist() if not df_disp.empty else [])
 
     def _compute_tab3_analysis(self, selected_cats: list):
         """Analisa detail Tab 3 terpisah untuk LOG, OFF, ONL_REG, dan ONL_HUB"""
