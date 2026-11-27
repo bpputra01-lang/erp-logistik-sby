@@ -1154,7 +1154,7 @@ def balancing_stock_view(state: AppState):
         ui.div(
             ui.div(
                 ui.h4("Balancing Stock & Dynamic Distribution", style="font-size: 16px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
-                ui.p("Data disinkronkan otomatis dari database Supabase ('balancing_stock_cache' & 'balancing_sales_cache') dengan pengecualian BIN Defect, Reject, Karantina, Perbaikan, dan Toko.", style="color: #718096; font-size: 12.5px; margin: 0;"),
+                ui.p("Data disinkronkan otomatis dari database Supabase ('stock_live_cache': Surabaya + Online Hub Surabaya & 'balancing_sales_cache') dengan pengecualian BIN Defect, Reject, Karantina, Perbaikan, dan Toko.", style="color: #718096; font-size: 12.5px; margin: 0;"),
             ),
             ui.div(
                 ui.tags.button(

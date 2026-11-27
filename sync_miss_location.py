@@ -443,4 +443,4 @@ if __name__ == "__main__":
             f" {waktu_berikutnya} WIB...\n"
         )
 
-        time.sleep(INTERVAL_DETIK)
+        time.sleep(INTERVAL_DETIK) 

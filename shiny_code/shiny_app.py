@@ -700,22 +700,23 @@ def server(input: Inputs, output: Outputs, session: Session):
                     ui.tags.summary("📋 1. Sumber Data & Ketentuan Kolom (Supabase Cache)"),
                     ui.div(
                         ui.div(
-                            ui.p(ui.strong("Sinkronisasi Otomatis Supabase:"), " Data ditarik langsung dari tabel ", ui.code("balancing_stock_cache"), " dan ", ui.code("balancing_sales_cache"), " tanpa perlu upload manual.", style="margin-bottom: 6px; color: #1A365D; font-size: 13px;"),
+                            ui.tags.p(ui.strong("Sinkronisasi Otomatis Supabase:"), " Data ditarik langsung dari tabel ", ui.code("stock_live_cache"), " (Surabaya & Online Hub Surabaya) dan ", ui.code("balancing_sales_cache"), " tanpa perlu upload manual.", style="margin-bottom: 6px; color: #1A365D; font-size: 13px;"),
                             style="background: #EBF8FF; border-left: 4px solid #3182CE; padding: 10px 14px; border-radius: 6px; margin-bottom: 0.75rem;"
                         ),
-                        ui.tags.strong("Struktur Kolom Acuan:"),
-                        ui.tags.ul(
-                            ui.tags.li(ui.strong("Stok (All Stock):"), " Kolom B (BIN), Kolom C (SKU), Kolom D (Brand), Kolom E (Item Name), Kolom F (Size/Variant), Kolom G (Sub Kategori), dan ", ui.strong("Kolom J (Qty System)"), "."),
-                            ui.tags.li(ui.strong("Sales (Report/Tracking):"), " Kolom A (Invoice), Kolom B (SKU), dan ", ui.strong("Kolom L (Qty Sales)"), "."),
-                            ui.tags.li(ui.strong("Normalisasi SKU:"), " SKU dengan angka nol di depan (misal: 00009048) otomatis dicocokkan dengan angka murninya (9048) secara dua arah agar data penjualan terbaca akurat.")
+                        ui.tags.li(ui.strong("Aturan Sumber BIN Refill:"),
+                            ui.tags.ul(
+                                ui.tags.li(ui.strong("Refill AREA LOGISTIK:"), " HANYA diambil dari BIN yang mengandung ", ui.code("INB"), " / ", ui.code("INBOUND"), " (dilarang mengambil dari OFF, ONL, maupun sesama LOG)."),
+                                ui.tags.li(ui.strong("Refill AREA OFFLINE:"), " HANYA diambil dari BIN Gudang Area ", ui.code("LOG"), " (termasuk ", ui.code("RSN"), ", ", ui.code("LOG-KL"), ", ", ui.code("LOG-RAK"), ", dll. — dilarang mengambil dari ONL maupun OFF)."),
+                                ui.tags.li(ui.strong("Refill AREA ONLINE:"), " HANYA diambil dari BIN Gudang Area ", ui.code("LOG"), " (termasuk ", ui.code("RSN"), ", ", ui.code("LOG-KL"), ", ", ui.code("LOG-RAK"), ", dll. — dilarang mengambil dari OFF maupun ONL).")
+                            )
                         ),
                         ui.hr(style="margin: 8px 0; border-color: #CBD5E0;"),
                         ui.tags.strong("Pengecualian & Klasifikasi Area BIN:"),
                         ui.tags.ul(
                             ui.tags.li("🛑 ", ui.strong("BIN yang Dikecualikan:"), " BIN yang mengandung kata ", ui.code("DEFECT"), ", ", ui.code("REJECT"), ", ", ui.code("KARANTINA"), ", ", ui.code("PERBAIKAN"), ", dan ", ui.code("TOKO"), " otomatis dihapus dari perhitungan stok."),
-                            ui.tags.li("📦 ", ui.strong("Area Logistik (QTY LOG):"), " Dihitung dari seluruh BIN yang mengandung kata ", ui.code("LOG"), "."),
-                            ui.tags.li("🏪 ", ui.strong("Area Offline (QTY OFF):"), " Dihitung dari seluruh BIN yang mengandung kata ", ui.code("OFF"), " atau ", ui.code("RSN"), "."),
-                            ui.tags.li("🌐 ", ui.strong("Area Online (QTY ONL):"), " Dihitung dari seluruh BIN yang mengandung kata ", ui.code("ONL"), ".")
+                            ui.tags.li("📦 ", ui.strong("Area Logistik (QTY LOG):"), " Dihitung dari BIN Logistik Surabaya termasuk yang mengandung kata ", ui.code("LOG"), ", ", ui.code("RSN"), ", ", ui.code("KL"), ", dan rak reguler non-OFF/non-ONL."),
+                            ui.tags.li("🏪 ", ui.strong("Area Offline (QTY OFF):"), " Dihitung dari seluruh BIN yang mengandung kata ", ui.code("OFF"), "."),
+                            ui.tags.li("🌐 ", ui.strong("Area Online (QTY ONL):"), " Dihitung dari seluruh BIN yang mengandung kata ", ui.code("ONL"), " serta seluruh stok valid dari cabang ", ui.strong("ONLINE HUB SURABAYA"), ".")
                         ),
                         class_="accordion-content"
                     ), open=True
@@ -3369,10 +3370,27 @@ def server(input: Inputs, output: Outputs, session: Session):
             state.apply_bs_category_filter(cats)
     
     @reactive.Effect
-    @reactive.event(input.change_bs_filter_area)
-    def _on_bs_area_filter_change():
-        val = input.change_bs_filter_area()
-        state.apply_bs_area_filter(val)
+    @reactive.event(input.change_bs_analysis_filter)
+    def _on_bs_analysis_filter_change():
+        val = input.change_bs_analysis_filter()
+        state.apply_bs_analysis_filter(val)
+
+    @render.ui
+    def balancing_stock_results_container():
+        if not state.bs_processed():
+            return ui.div()
+
+        return ui.div(
+            ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
+            ui.output_ui("bs_metrics_container_ui"),
+            ui.navset_card_tab(
+                ui.nav_panel("1. COMPARE STOK & SALES (UNIQUE SKU)", ui.output_ui("bs_tab1_content_ui")),
+                ui.nav_panel("2. LIST REFILL PROGRESIF", ui.output_ui("bs_tab2_content_ui")),
+                ui.nav_panel("3. ANALISA PENINGKATAN & PENURUNAN", ui.output_ui("bs_tab3_content_ui")),
+                id="bs_navset_tab"
+            ),
+            style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
+        )
 
     # ==========================================================================
     # BALANCING STOCK: WADAH TAB STATIS (ANTI-RESET / ANTI-LONCAT KE TAB 1)
@@ -3517,6 +3535,157 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine='openpyxl') as writer:
             state._raw_df_bs_refill.to_excel(writer, sheet_name='LIST_REFILL', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+    # --------------------------------------------------------------------------
+    # 4. OUTPUT REAKTIF KONTEN TAB 3 (ANALISA PENINGKATAN & PENURUNAN PER AREA)
+    # --------------------------------------------------------------------------
+    @render.ui
+    def bs_tab3_content_ui():
+        if not state.bs_processed():
+            return ui.div()
+
+        has_prev = state.bs_analysis_has_prev()
+        period_lbl = state.bs_analysis_period_label()
+        area_sum = state.bs_area_analysis_summary() or {}
+        cur_flt = state.bs_analysis_filter()
+
+        def render_area_card(area_key, title, icon, accent_color):
+            st = area_sum.get(area_key, {})
+            p_qty = st.get("prev_qty", 0)
+            c_qty = st.get("curr_qty", 0)
+            d_qty = st.get("net_qty_delta", 0)
+            p_pct = st.get("prev_pct", 0.0)
+            c_pct = st.get("curr_pct", 0.0)
+            d_pct = st.get("delta_pct", 0.0)
+            s_in = st.get("stock_in", 0)
+            in_skus = st.get("in_skus", 0)
+            s_out = st.get("stock_out", 0)
+            sls_inc = st.get("sales_inc", 0)
+
+            delta_color = "#10B981" if d_pct >= 0 else "#E53E3E"
+            qty_color = "#10B981" if d_qty >= 0 else "#E53E3E"
+
+            if has_prev:
+                if d_qty > 0 and s_in > 0:
+                    kesimpulan = f"Meningkat karena ada stock masuk di BIN {area_key} (+{s_in:,} pcs di {in_skus:,} SKU)."
+                elif d_qty < 0 and sls_inc > 0:
+                    kesimpulan = f"Menurun karena ada penjualan (+{sls_inc:,} pcs terjual) dan keluar dari BIN {area_key}."
+                elif d_qty < 0:
+                    kesimpulan = f"Stok di BIN {area_key} turun (-{abs(d_qty):,} pcs) akibat mutasi keluar / penyesuaian stok."
+                else:
+                    kesimpulan = f"Relatif stabil (Masuk BIN {area_key}: +{s_in:,} pcs | Keluar: -{s_out:,} pcs)."
+
+                body_rows = ui.div(
+                    ui.div(
+                        ui.span("Balance Area:", style="color: #A0AEC0; font-size: 11.5px;"),
+                        ui.span(f"{p_pct:.1f}% ➔ {c_pct:.1f}% ({d_pct:+.1f}%)", style=f"color: {delta_color}; font-weight: 800; font-size: 12.5px;"),
+                        style="display: flex; justify-content: space-between; margin-bottom: 4px;"
+                    ),
+                    ui.div(
+                        ui.span("Total Stok Area:", style="color: #A0AEC0; font-size: 11.5px;"),
+                        ui.span(f"{p_qty:,} ➔ {c_qty:,} ({d_qty:+,} pcs)", style=f"color: {qty_color}; font-weight: 800; font-size: 12.5px;"),
+                        style="display: flex; justify-content: space-between; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px dashed #2D3748;"
+                    ),
+                    ui.div(
+                        ui.span(f"📥 Stock Masuk BIN {area_key}:", style="color: #CBD5E0; font-size: 11.5px;"),
+                        ui.span(f"+{s_in:,} pcs ({in_skus:,} SKU)", style="color: #10B981; font-weight: 700; font-size: 11.5px;"),
+                        style="display: flex; justify-content: space-between; margin-bottom: 3px;"
+                    ),
+                    ui.div(
+                        ui.span(f"📤 Stock Keluar BIN {area_key}:", style="color: #CBD5E0; font-size: 11.5px;"),
+                        ui.span(f"-{s_out:,} pcs", style="color: #F59E0B; font-weight: 700; font-size: 11.5px;"),
+                        style="display: flex; justify-content: space-between; margin-bottom: 3px;"
+                    ),
+                    ui.div(
+                        ui.span("🛒 Kenaikan Penjualan:", style="color: #CBD5E0; font-size: 11.5px;"),
+                        ui.span(f"+{sls_inc:,} pcs terjual", style="color: #38BDF8; font-weight: 700; font-size: 11.5px;"),
+                        style="display: flex; justify-content: space-between; margin-bottom: 8px;"
+                    ),
+                    ui.div(
+                        ui.span(kesimpulan, style="color: #E2E8F0; font-size: 11px; line-height: 1.4;"),
+                        style="background: rgba(255,255,255,0.06); padding: 7px 10px; border-radius: 6px;"
+                    )
+                )
+            else:
+                tgt_qty = st.get("curr_tgt", 0)
+                gap_q = c_qty - tgt_qty
+                body_rows = ui.div(
+                    ui.div(
+                        ui.span("Balance Saat Ini:", style="color: #A0AEC0; font-size: 11.5px;"),
+                        ui.span(f"{c_pct:.1f}%", style=f"color: {accent_color}; font-weight: 800; font-size: 13px;"),
+                        style="display: flex; justify-content: space-between; margin-bottom: 4px;"
+                    ),
+                    ui.div(
+                        ui.span("Stok vs Target:", style="color: #A0AEC0; font-size: 11.5px;"),
+                        ui.span(f"{c_qty:,} / {tgt_qty:,} pcs ({gap_q:+,})", style="color: #FFFFFF; font-weight: 800; font-size: 12px;"),
+                        style="display: flex; justify-content: space-between;"
+                    )
+                )
+
+            return ui.div(
+                ui.div(
+                    ui.span(f"{icon} {title}", style=f"color: {accent_color}; font-weight: 900; font-size: 13px;"),
+                    style="margin-bottom: 8px;"
+                ),
+                body_rows,
+                style=f"flex: 1; min-width: 260px; background: #1A1D24; border: 1px solid #2D3748; border-left: 4px solid {accent_color}; border-radius: 10px; padding: 1rem 1.15rem;"
+            )
+
+        area_cards = ui.div(
+            render_area_card("LOG", "AREA LOGISTIK (LOG & RSN)", "📦", "#C5A059"),
+            render_area_card("OFF", "AREA OFFLINE (BIN OFF)", "🏪", "#DD6B20"),
+            render_area_card("ONL", "AREA ONLINE (BIN ONL & HUB)", "🌐", "#3182CE"),
+            style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%; margin-bottom: 1.25rem;"
+        )
+
+        filter_opts = [
+            ("SEMUA", "SEMUA PERUBAHAN"),
+            ("STOCK_MASUK", "📈 ADA STOCK MASUK (LOG / OFF / ONL)"),
+            ("TURUN_SALES", "📉 MENURUN KARENA PENJUALAN (SALES)"),
+            ("TURUN_NON_SALES", "⚠️ MENURUN TANPA PENJUALAN (MUTASI/KELUAR)"),
+            ("GESER_AREA", "🔄 PERGESERAN ANTAR AREA (LOG ↔ OFF ↔ ONL)")
+        ]
+
+        return ui.div(
+            ui.div(
+                ui.div(
+                    ui.h4("📊 Analisa Detail Peningkatan & Penurunan Stok / Balance", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0 0 4px 0;"),
+                    ui.p(period_lbl, style="color: #2B6CB0; font-weight: 700; font-size: 12px; margin: 0;"),
+                ),
+                ui.div(
+                    ui.div(
+                        ui.span("🔍 Filter Penyebab:", style="font-size: 12px; font-weight: 800; color: #1A202C; margin-right: 6px;"),
+                        ui.tags.select(
+                            *[ui.tags.option(lbl, value=val, selected=(cur_flt == val)) for val, lbl in filter_opts],
+                            id="bs_analysis_filter_select",
+                            onchange="Shiny.setInputValue('change_bs_analysis_filter', this.value, {priority: 'event'})",
+                            style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; background: white; cursor: pointer;"
+                        ),
+                        style="display: flex; align-items: center;"
+                    ),
+                    ui.download_button(
+                        "btn_dl_bs_tab3",
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-file-excel", style="margin-right: 6px; font-size: 13px;"), "DOWNLOAD ANALISA (.XLSX)"),
+                        style="background: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer; font-size: 12px;"
+                    ),
+                    style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;"
+                ),
+                style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 1rem; flex-wrap: wrap; gap: 10px;"
+            ),
+            area_cards,
+            render_clean_table(state.df_bs_analysis_headers(), state.df_bs_analysis_rows(), "tbl_bs_tab3"),
+            style="padding: 0.75rem 0;"
+        )
+
+    @render.download(filename="ANALISA_PENINGKATAN_PENURUNAN_STOK.xlsx")
+    def btn_dl_bs_tab3():
+        buf = io.BytesIO()
+        df_out = getattr(state, "_raw_df_bs_analysis", pd.DataFrame())
+        if df_out is None or df_out.empty:
+            df_out = pd.DataFrame({"INFO": ["Tidak ada data analisa perubahan untuk filter ini."]})
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            df_out.to_excel(writer, sheet_name='ANALISA_PERUBAHAN', index=False)
         buf.seek(0)
         yield buf.getvalue()
 
