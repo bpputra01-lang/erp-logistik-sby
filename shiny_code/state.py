@@ -4275,7 +4275,7 @@ class AppState:
     def _sync_bs_snapshots(self, curr_snapshot: dict):
         """
         Menyimpan & merotasi snapshot Balancing Stock (Latest vs Prev) secara hybrid:
-        1. File cache lokal di temp folder (selalu berhasil, tahan refresh)
+        1. File cache lokal di temp folder (tahan refresh & tidak terblokir RLS)
         2. Supabase balancing_stock_cache (jika diizinkan write)
         """
         import json
@@ -4291,10 +4291,11 @@ class AppState:
                 v2 = s2_skus.get(k)
                 if not v2:
                     return False
-                if (v1.get("l"), v1.get("f"), v1.get("o"), v1.get("t"), v1.get("sf"), v1.get("so")) != \
-                   (v2.get("l"), v2.get("f"), v2.get("o"), v2.get("t"), v2.get("sf"), v2.get("so")):
+                if (v1.get("l"), v1.get("f"), v1.get("or", 0), v1.get("oh", 0), v1.get("t"), v1.get("sf"), v1.get("so")) != \
+                   (v2.get("l"), v2.get("f"), v2.get("or", 0), v2.get("oh", 0), v2.get("t"), v2.get("sf"), v2.get("so")):
                     return False
-                if v1.get("bl") != v2.get("bl") or v1.get("bf") != v2.get("bf") or v1.get("bn") != v2.get("bn"):
+                if v1.get("bl") != v2.get("bl") or v1.get("bf") != v2.get("bf") or \
+                   v1.get("bor", {}) != v2.get("bor", {}) or v1.get("boh", {}) != v2.get("boh", {}):
                     return False
             return True
 
@@ -4448,7 +4449,6 @@ class AppState:
             qty_series = pd.to_numeric(qty_raw, errors='coerce').fillna(0)
             src_series = src_area_raw.fillna('SURABAYA').astype(str).str.strip().str.upper()
 
-            # Pengecualian BIN non-operasional (termasuk TOKO agar tidak ikut dihitung dalam TOTAL_STOK)
             excl_pattern = "DEFECT|REJECT|KARANTINA|PERBAIKAN|EVENT|LIVE|PUTAWAY|RESELLER|MARKOM|GARAGE|TOKO"
             mask_valid = ~bin_series.str.contains(excl_pattern, na=False) & (sku_series != "") & (sku_series != "NAN")
 
@@ -4518,11 +4518,7 @@ class AppState:
                 sales_norm_map[s_norm]['TOTAL_SALES'] += data['TOTAL_SALES']
 
             # ------------------------------------------------------------------
-            # 3. KLASIFIKASI AREA BIN:
-            #    - INB      : BIN mengandung 'INB' / 'INBOUND' (khusus sumber refill LOG)
-            #    - ONLINE   : BIN mengandung 'ONL' ATAU berasal dari ONLINE HUB SURABAYA
-            #    - OFFLINE  : BIN mengandung 'OFF' (selain INB, ONL & excluded)
-            #    - LOGISTIK : Semua BIN gudang operasional lain (RSN, LOG-KL, LOG-RAK, dll.)
+            # 3. KLASIFIKASI AREA BIN (ONLINE DIPISAH: ONL_REG vs ONL_HUB)
             # ------------------------------------------------------------------
             df_stk['QTY_POS'] = df_stk['QTY'].clip(lower=0)
             bin_upper = df_stk['BIN'].str.upper()
@@ -4532,20 +4528,29 @@ class AppState:
             is_hard_excl = bin_upper.str.contains(excl_hard_pattern, na=False, regex=True)
             is_inb_mask = bin_upper.str.contains(r"INB|INBOUND", na=False, regex=True) & (~is_hard_excl)
 
-            df_stk['IS_ONL'] = (~is_hard_excl) & (~is_inb_mask) & (bin_upper.str.contains('ONL', na=False) | is_from_onl_hub)
+            # Online Reguler: BIN mengandung 'ONL' dari gudang Surabaya Reguler
+            df_stk['IS_ONL_REG'] = (~is_hard_excl) & (~is_inb_mask) & (~is_from_onl_hub) & bin_upper.str.contains('ONL', na=False)
+            # Hub Online: Seluruh stok operasional dari cabang ONLINE HUB SURABAYA
+            df_stk['IS_ONL_HUB'] = (~is_hard_excl) & (~is_inb_mask) & is_from_onl_hub
+            df_stk['IS_ONL']     = df_stk['IS_ONL_REG'] | df_stk['IS_ONL_HUB']
+
+            # Offline & Logistik (termasuk RSN)
             df_stk['IS_OFF'] = (~is_hard_excl) & (~is_inb_mask) & (~df_stk['IS_ONL']) & bin_upper.str.contains('OFF', na=False)
             df_stk['IS_LOG'] = (~is_hard_excl) & (~is_inb_mask) & (~df_stk['IS_ONL']) & (~df_stk['IS_OFF'])
 
             df_stk['AREA_TAG'] = np.where(
                 is_inb_mask, 'INB',
-                np.where(df_stk['IS_ONL'], 'ONL',
-                         np.where(df_stk['IS_OFF'], 'OFF',
-                                  np.where(df_stk['IS_LOG'], 'LOG', 'EXCL')))
+                np.where(df_stk['IS_ONL_HUB'], 'ONL_HUB',
+                         np.where(df_stk['IS_ONL_REG'], 'ONL_REG',
+                                  np.where(df_stk['IS_OFF'], 'OFF',
+                                           np.where(df_stk['IS_LOG'], 'LOG', 'EXCL'))))
             )
 
-            df_stk['QTY_LOG'] = np.where(df_stk['IS_LOG'], df_stk['QTY_POS'], 0)
-            df_stk['QTY_OFF'] = np.where(df_stk['IS_OFF'], df_stk['QTY_POS'], 0)
-            df_stk['QTY_ONL'] = np.where(df_stk['IS_ONL'], df_stk['QTY_POS'], 0)
+            df_stk['QTY_LOG']     = np.where(df_stk['IS_LOG'], df_stk['QTY_POS'], 0)
+            df_stk['QTY_OFF']     = np.where(df_stk['IS_OFF'], df_stk['QTY_POS'], 0)
+            df_stk['QTY_ONL_REG'] = np.where(df_stk['IS_ONL_REG'], df_stk['QTY_POS'], 0)
+            df_stk['QTY_ONL_HUB'] = np.where(df_stk['IS_ONL_HUB'], df_stk['QTY_POS'], 0)
+            df_stk['QTY_ONL']     = np.where(df_stk['IS_ONL'], df_stk['QTY_POS'], 0)
 
             sku_meta_brand = df_stk.drop_duplicates('SKU').set_index('SKU')['BRAND'].to_dict()
             sku_meta_name  = df_stk.drop_duplicates('SKU').set_index('SKU')['ITEM_NAME'].to_dict()
@@ -4555,6 +4560,8 @@ class AppState:
             sku_grouped = df_stk.groupby('SKU', as_index=False).agg(
                 QTY_LOG=('QTY_LOG', 'sum'),
                 QTY_OFF=('QTY_OFF', 'sum'),
+                QTY_ONL_REG=('QTY_ONL_REG', 'sum'),
+                QTY_ONL_HUB=('QTY_ONL_HUB', 'sum'),
                 QTY_ONL=('QTY_ONL', 'sum'),
                 TOTAL_STOK=('QTY_POS', 'sum')
             )
@@ -4571,9 +4578,9 @@ class AppState:
                     sku_bins_map[s] = []
                 sku_bins_map[s].append({'BIN': b, 'AREA': a, 'QTY': q})
 
-                if a in ('LOG', 'OFF', 'ONL'):
+                if a in ('LOG', 'OFF', 'ONL_REG', 'ONL_HUB'):
                     if s not in sku_area_bins_detail:
-                        sku_area_bins_detail[s] = {'LOG': {}, 'OFF': {}, 'ONL': {}}
+                        sku_area_bins_detail[s] = {'LOG': {}, 'OFF': {}, 'ONL_REG': {}, 'ONL_HUB': {}}
                     sku_area_bins_detail[s][a][b] = sku_area_bins_detail[s][a].get(b, 0) + q
 
             tab1_rows = []
@@ -4584,6 +4591,8 @@ class AppState:
                 sku = str(r_sku['SKU'])
                 q_log = to_int(r_sku['QTY_LOG'])
                 q_off = to_int(r_sku['QTY_OFF'])
+                q_onl_reg = to_int(r_sku['QTY_ONL_REG'])
+                q_onl_hub = to_int(r_sku['QTY_ONL_HUB'])
                 q_onl = to_int(r_sku['QTY_ONL'])
                 tot_stk = to_int(r_sku['TOTAL_STOK'])
 
@@ -4676,7 +4685,9 @@ class AppState:
                     "SUB KATEGORI": sub_kat,
                     "QTY LOG": q_log,
                     "QTY OFF": q_off,
-                    "QTY ONL": q_onl,
+                    "QTY ONL REG": q_onl_reg,
+                    "QTY HUB ONL": q_onl_hub,
+                    "QTY ONL TOTAL": q_onl,
                     "TOTAL STOK": tot_stk,
                     "SALES OFFLINE": s_off,
                     "SALES ONLINE": s_onl,
@@ -4687,13 +4698,14 @@ class AppState:
                     "STATUS": status_refill
                 })
 
-                # Simpan snapshot ringan per SKU untuk Tab 3 Analisa
-                b_det = sku_area_bins_detail.get(sku, {'LOG': {}, 'OFF': {}, 'ONL': {}})
+                b_det = sku_area_bins_detail.get(sku, {'LOG': {}, 'OFF': {}, 'ONL_REG': {}, 'ONL_HUB': {}})
                 snap_skus[sku] = {
                     "n": nm_brg,
                     "c": sub_kat,
                     "l": q_log,
                     "f": q_off,
+                    "or": q_onl_reg,
+                    "oh": q_onl_hub,
                     "o": q_onl,
                     "t": tot_stk,
                     "sf": s_off,
@@ -4703,14 +4715,15 @@ class AppState:
                     "to": tgt_onl,
                     "bl": b_det['LOG'],
                     "bf": b_det['OFF'],
-                    "bn": b_det['ONL']
+                    "bor": b_det['ONL_REG'],
+                    "boh": b_det['ONL_HUB']
                 }
 
                 # --------------------------------------------------------------
                 # 4. TAB 2: PROGRESSIVE REFILL PER BIN (ATURAN KETAT)
                 #    - LOG : HANYA dari BIN INB / INBOUND
-                #    - OFF : HANYA dari BIN AREA LOG (LOG-KL, LOG-RAK, RSN, dll.)
-                #    - ONL : HANYA dari BIN AREA LOG (LOG-KL, LOG-RAK, RSN, dll.)
+                #    - OFF : HANYA dari BIN AREA LOG (RSN, LOG-KL, LOG-RAK, dll.)
+                #    - ONL : HANYA dari BIN AREA LOG (RSN, LOG-KL, LOG-RAK, dll.)
                 # --------------------------------------------------------------
                 rem_log = need_log if need_log > 0 else "NO REFILL"
                 rem_off = need_off if need_off > 0 else "NO REFILL"
@@ -4735,23 +4748,20 @@ class AppState:
                         alloc_onl = "NO REFILL" if rem_onl == "NO REFILL" else 0
 
                         is_inb_src = (b_area == 'INB')
-                        is_log_src = (b_area == 'LOG')  # mencakup RSN, LOG-KL, LOG-RAK, dll.
+                        is_log_src = (b_area == 'LOG')
 
-                        # 1. Alokasi ke OFFLINE: HANYA dari AREA LOG (tidak pernah dari ONL, OFF, atau INB)
                         if is_log_src and isinstance(rem_off, (int, float)) and rem_off > 0 and avail_qty > 0:
                             take = min(avail_qty, rem_off)
                             alloc_off = take
                             avail_qty -= take
                             rem_off -= take
 
-                        # 2. Alokasi ke ONLINE: HANYA dari AREA LOG (tidak pernah dari OFF, ONL, atau INB)
                         if is_log_src and isinstance(rem_onl, (int, float)) and rem_onl > 0 and avail_qty > 0:
                             take = min(avail_qty, rem_onl)
                             alloc_onl = take
                             avail_qty -= take
                             rem_onl -= take
 
-                        # 3. Alokasi ke LOGISTIK: HANYA dari INB / INBOUND (tidak pernah dari OFF, ONL, atau LOG)
                         if is_inb_src and isinstance(rem_log, (int, float)) and rem_log > 0 and avail_qty > 0:
                             take = min(avail_qty, rem_log)
                             alloc_log = take
@@ -4787,7 +4797,6 @@ class AppState:
             self._raw_df_bs_alloc_base = df_tab1.copy()
             self._raw_df_bs_refill_base = df_tab2.copy()
 
-            # Sinkronisasi & Rotasi Snapshot untuk Tab 3 Analisa
             curr_snapshot = {
                 "ts": sync_ts or datetime.now(WIB).strftime("%Y-%m-%d %H:%M:%S"),
                 "skus": snap_skus
@@ -4802,46 +4811,8 @@ class AppState:
             traceback.print_exc()
             return False, f"Terjadi kesalahan saat kalkulasi: {str(e)}"
 
-    def apply_bs_category_filter(self, selected_cats):
-        """Jika selected_cats kosong / None, set ke [] (artinya SEMUA KATEGORI)"""
-        if not selected_cats or selected_cats is None:
-            self.bs_selected_categories.set([])
-        else:
-            clean_list = [str(x).strip().upper() for x in selected_cats if str(x).strip().upper() not in ["", "SEMUA", "ALL"]]
-            self.bs_selected_categories.set(clean_list)
-
-        self._apply_combined_bs_filters()
-
-    def apply_bs_area_filter(self, selected_area):
-        """Memfilter Tab 2 berdasarkan Area (OFFLINE, ONLINE, LOGISTIK)"""
-        self.bs_selected_area.set(selected_area if selected_area else "SEMUA AREA")
-        self._apply_combined_bs_filters()
-
-    def apply_bs_analysis_filter(self, filter_mode: str):
-        """Memfilter Tab 3 berdasarkan jenis perubahan stok/penjualan"""
-        self.bs_analysis_filter.set(filter_mode if filter_mode else "SEMUA")
-        self._apply_tab3_display_filter()
-
-    def _apply_tab3_display_filter(self):
-        if self._raw_df_bs_analysis_base.empty:
-            self._raw_df_bs_analysis = pd.DataFrame()
-            self.df_bs_analysis_headers.set([])
-            self.df_bs_analysis_rows.set([])
-            return
-
-        df_base = self._raw_df_bs_analysis_base.copy()
-        flt = self.bs_analysis_filter()
-
-        if flt != "SEMUA" and "_TAGS" in df_base.columns:
-            df_base = df_base[df_base["_TAGS"].str.contains(flt, na=False)].copy()
-
-        df_disp = df_base.drop(columns=["_TAGS", "_ABS_MOVE"], errors="ignore")
-        self._raw_df_bs_analysis = df_disp.copy()
-        self.df_bs_analysis_headers.set(df_disp.columns.tolist() if not df_disp.empty else [])
-        self.df_bs_analysis_rows.set(df_disp.fillna("").astype(str).values.tolist() if not df_disp.empty else [])
-
     def _compute_tab3_analysis(self, selected_cats: list):
-        """Menghitung analisa peningkatan & penurunan untuk Tab 3 beserta penyebab detail per area BIN (LOG/OFF/ONL) & Penjualan"""
+        """Analisa detail Tab 3 terpisah untuk LOG, OFF, ONL_REG, dan ONL_HUB"""
         curr_snap = self._curr_bs_snapshot
         prev_snap = self._prev_bs_snapshot
         if not curr_snap or "skus" not in curr_snap:
@@ -4858,7 +4829,7 @@ class AppState:
             )
         else:
             self.bs_analysis_period_label.set(
-                f"Baseline Awal Disimpan ({curr_snap.get('ts', '-')}) — Perubahan Before vs After akan muncul otomatis pada sync/update berikutnya."
+                f"Baseline Awal Tersimpan ({curr_snap.get('ts', '-')}) — Menampilkan analisa pemicu ketidakseimbangan stok & penjualan saat ini."
             )
 
         selected_clean = [str(x).strip().upper() for x in (selected_cats or []) if str(x).strip() != ""]
@@ -4869,49 +4840,60 @@ class AppState:
             return str(s_info.get("c", "")).upper() in selected_clean
 
         all_sku_keys = set(curr_skus.keys()) | set(prev_skus.keys())
-        filtered_keys = []
-        for k in all_sku_keys:
-            c_info = curr_skus.get(k)
-            p_info = prev_skus.get(k)
-            if (c_info and in_cat(c_info)) or (p_info and in_cat(p_info)):
-                filtered_keys.append(k)
+        filtered_keys = [
+            k for k in all_sku_keys
+            if (k in curr_skus and in_cat(curr_skus[k])) or (k in prev_skus and in_cat(prev_skus[k]))
+        ]
 
-        # Hitung Summary per Area (LOG, OFF, ONL)
         area_acc = {
-            "LOG": {"prev_qty": 0, "curr_qty": 0, "prev_tgt": 0, "curr_tgt": 0, "stock_in": 0, "stock_out": 0, "sales_inc": 0, "in_skus": 0, "out_skus": 0},
-            "OFF": {"prev_qty": 0, "curr_qty": 0, "prev_tgt": 0, "curr_tgt": 0, "stock_in": 0, "stock_out": 0, "sales_inc": 0, "in_skus": 0, "out_skus": 0},
-            "ONL": {"prev_qty": 0, "curr_qty": 0, "prev_tgt": 0, "curr_tgt": 0, "stock_in": 0, "stock_out": 0, "sales_inc": 0, "in_skus": 0, "out_skus": 0},
+            ak: {"prev_qty": 0, "curr_qty": 0, "prev_tgt": 0, "curr_tgt": 0, "stock_in": 0, "stock_out": 0, "sales_inc": 0, "in_skus": 0, "out_skus": 0, "total_sales": 0}
+            for ak in ("LOG", "OFF", "ONL_REG", "ONL_HUB")
         }
 
         detail_records = []
 
         for sku in filtered_keys:
-            c = curr_skus.get(sku, {"n": "-", "c": "-", "l": 0, "f": 0, "o": 0, "t": 0, "sf": 0, "so": 0, "tl": 0, "tf": 0, "to": 0, "bl": {}, "bf": {}, "bn": {}})
-            p = prev_skus.get(sku, {"n": c["n"], "c": c["c"], "l": 0, "f": 0, "o": 0, "t": 0, "sf": 0, "so": 0, "tl": 0, "tf": 0, "to": 0, "bl": {}, "bf": {}, "bn": {}})
+            empty_rec = {"n": "-", "c": "-", "l": 0, "f": 0, "or": 0, "oh": 0, "o": 0, "t": 0, "sf": 0, "so": 0, "tl": 0, "tf": 0, "to": 0, "bl": {}, "bf": {}, "bor": {}, "boh": {}}
+            c = {**empty_rec, **curr_skus.get(sku, {})}
+            p = {**empty_rec, **prev_skus.get(sku, {})}
 
-            nm = c.get("n") if c.get("n") and c.get("n") != "-" else p.get("n", "-")
-            sub = c.get("c") if c.get("c") and c.get("c") != "-" else p.get("c", "-")
+            nm = c["n"] if c["n"] and c["n"] != "-" else p["n"]
+            sub = c["c"] if c["c"] and c["c"] != "-" else p["c"]
 
-            # Akumulasi metrik area
+            c_or = c.get("or", 0)
+            c_oh = c.get("oh", 0)
+            p_or = p.get("or", 0)
+            p_oh = p.get("oh", 0)
+
             area_acc["LOG"]["curr_qty"] += c["l"]
             area_acc["LOG"]["prev_qty"] += p["l"]
             area_acc["LOG"]["curr_tgt"] += c["tl"]
             area_acc["LOG"]["prev_tgt"] += p["tl"]
+            area_acc["LOG"]["total_sales"] += (c["sf"] + c["so"])
 
             area_acc["OFF"]["curr_qty"] += c["f"]
             area_acc["OFF"]["prev_qty"] += p["f"]
             area_acc["OFF"]["curr_tgt"] += c["tf"]
             area_acc["OFF"]["prev_tgt"] += p["tf"]
+            area_acc["OFF"]["total_sales"] += c["sf"]
 
-            area_acc["ONL"]["curr_qty"] += c["o"]
-            area_acc["ONL"]["prev_qty"] += p["o"]
-            area_acc["ONL"]["curr_tgt"] += c["to"]
-            area_acc["ONL"]["prev_tgt"] += p["to"]
+            area_acc["ONL_REG"]["curr_qty"] += c_or
+            area_acc["ONL_REG"]["prev_qty"] += p_or
+            area_acc["ONL_REG"]["curr_tgt"] += c["to"]
+            area_acc["ONL_REG"]["prev_tgt"] += p["to"]
+            area_acc["ONL_REG"]["total_sales"] += c["so"]
+
+            area_acc["ONL_HUB"]["curr_qty"] += c_oh
+            area_acc["ONL_HUB"]["prev_qty"] += p_oh
+            area_acc["ONL_HUB"]["curr_tgt"] += c["to"]
+            area_acc["ONL_HUB"]["prev_tgt"] += p["to"]
+            area_acc["ONL_HUB"]["total_sales"] += c["so"]
 
             if has_prev:
                 d_log = c["l"] - p["l"]
                 d_off = c["f"] - p["f"]
-                d_onl = c["o"] - p["o"]
+                d_or = c_or - p_or
+                d_oh = c_oh - p_oh
                 d_tot = c["t"] - p["t"]
                 d_s_off = c["sf"] - p["sf"]
                 d_s_onl = c["so"] - p["so"]
@@ -4921,112 +4903,77 @@ class AppState:
                     area_acc["OFF"]["sales_inc"] += d_s_off
                     area_acc["LOG"]["sales_inc"] += d_s_off
                 if d_s_onl > 0:
-                    area_acc["ONL"]["sales_inc"] += d_s_onl
+                    area_acc["ONL_REG"]["sales_inc"] += d_s_onl
+                    area_acc["ONL_HUB"]["sales_inc"] += d_s_onl
                     area_acc["LOG"]["sales_inc"] += d_s_onl
 
-                # Hitung perubahan detail per BIN (LOG, OFF, ONL)
                 def diff_bins(prev_b: dict, curr_b: dict):
                     ins, outs = [], []
                     for bn in (set(prev_b.keys()) | set(curr_b.keys())):
                         dv = int(curr_b.get(bn, 0)) - int(prev_b.get(bn, 0))
-                        if dv > 0:
-                            ins.append((bn, dv))
-                        elif dv < 0:
-                            outs.append((bn, abs(dv)))
+                        if dv > 0: ins.append((bn, dv))
+                        elif dv < 0: outs.append((bn, abs(dv)))
                     return ins, outs
 
                 in_log, out_log = diff_bins(p.get("bl", {}), c.get("bl", {}))
                 in_off, out_off = diff_bins(p.get("bf", {}), c.get("bf", {}))
-                in_onl, out_onl = diff_bins(p.get("bn", {}), c.get("bn", {}))
+                in_or, out_or   = diff_bins(p.get("bor", {}), c.get("bor", {}))
+                in_oh, out_oh   = diff_bins(p.get("boh", {}), c.get("boh", {}))
 
-                sum_in_log = sum(q for _, q in in_log)
-                sum_out_log = sum(q for _, q in out_log)
-                sum_in_off = sum(q for _, q in in_off)
-                sum_out_off = sum(q for _, q in out_off)
-                sum_in_onl = sum(q for _, q in in_onl)
-                sum_out_onl = sum(q for _, q in out_onl)
+                for ak, ins_l, outs_l in [
+                    ("LOG", in_log, out_log), ("OFF", in_off, out_off),
+                    ("ONL_REG", in_or, out_or), ("ONL_HUB", in_oh, out_oh)
+                ]:
+                    s_in = sum(q for _, q in ins_l)
+                    s_out = sum(q for _, q in outs_l)
+                    if s_in > 0:
+                        area_acc[ak]["stock_in"] += s_in
+                        area_acc[ak]["in_skus"] += 1
+                    if s_out > 0:
+                        area_acc[ak]["stock_out"] += s_out
+                        area_acc[ak]["out_skus"] += 1
 
-                if sum_in_log > 0:
-                    area_acc["LOG"]["stock_in"] += sum_in_log
-                    area_acc["LOG"]["in_skus"] += 1
-                if sum_out_log > 0:
-                    area_acc["LOG"]["stock_out"] += sum_out_log
-                    area_acc["LOG"]["out_skus"] += 1
-                if sum_in_off > 0:
-                    area_acc["OFF"]["stock_in"] += sum_in_off
-                    area_acc["OFF"]["in_skus"] += 1
-                if sum_out_off > 0:
-                    area_acc["OFF"]["stock_out"] += sum_out_off
-                    area_acc["OFF"]["out_skus"] += 1
-                if sum_in_onl > 0:
-                    area_acc["ONL"]["stock_in"] += sum_in_onl
-                    area_acc["ONL"]["in_skus"] += 1
-                if sum_out_onl > 0:
-                    area_acc["ONL"]["stock_out"] += sum_out_onl
-                    area_acc["ONL"]["out_skus"] += 1
-
-                if d_log == 0 and d_off == 0 and d_onl == 0 and d_s_off == 0 and d_s_onl == 0:
+                if d_log == 0 and d_off == 0 and d_or == 0 and d_oh == 0 and d_s_off == 0 and d_s_onl == 0:
                     continue
 
-                # Susun Detail BIN Berubah
                 bin_notes = []
                 if in_log: bin_notes.append("LOG Masuk: " + ", ".join([f"{b}(+{q})" for b, q in in_log]))
                 if out_log: bin_notes.append("LOG Keluar: " + ", ".join([f"{b}(-{q})" for b, q in out_log]))
                 if in_off: bin_notes.append("OFF Masuk: " + ", ".join([f"{b}(+{q})" for b, q in in_off]))
                 if out_off: bin_notes.append("OFF Keluar: " + ", ".join([f"{b}(-{q})" for b, q in out_off]))
-                if in_onl: bin_notes.append("ONL Masuk: " + ", ".join([f"{b}(+{q})" for b, q in in_onl]))
-                if out_onl: bin_notes.append("ONL Keluar: " + ", ".join([f"{b}(-{q})" for b, q in out_onl]))
+                if in_or: bin_notes.append("ONL Reg Masuk: " + ", ".join([f"{b}(+{q})" for b, q in in_or]))
+                if out_or: bin_notes.append("ONL Reg Keluar: " + ", ".join([f"{b}(-{q})" for b, q in out_or]))
+                if in_oh: bin_notes.append("HUB ONL Masuk: " + ", ".join([f"{b}(+{q})" for b, q in in_oh]))
+                if out_oh: bin_notes.append("HUB ONL Keluar: " + ", ".join([f"{b}(-{q})" for b, q in out_oh]))
 
-                # Susun Analisa Penyebab & Tags
-                reasons = []
-                tags = set()
-
-                if sum_in_log > 0:
-                    reasons.append(f"Ada stock masuk di BIN LOG (+{sum_in_log} pcs)")
-                    tags.add("STOCK_MASUK")
-                if sum_in_off > 0:
-                    reasons.append(f"Ada stock masuk di BIN OFF (+{sum_in_off} pcs)")
-                    tags.add("STOCK_MASUK")
-                if sum_in_onl > 0:
-                    reasons.append(f"Ada stock masuk di BIN ONL (+{sum_in_onl} pcs)")
-                    tags.add("STOCK_MASUK")
+                reasons, tags = [], set()
+                for lbl_a, ins_l in [("LOG", in_log), ("OFF", in_off), ("ONL REGULER", in_or), ("HUB ONLINE", in_oh)]:
+                    tot_in = sum(q for _, q in ins_l)
+                    if tot_in > 0:
+                        reasons.append(f"Ada stock masuk di BIN {lbl_a} (+{tot_in} pcs)")
+                        tags.add("STOCK_MASUK")
 
                 if d_s_off > 0:
-                    if d_off < 0:
-                        reasons.append(f"Stok BIN OFF menurun ({d_off} pcs) karena ada penjualan Offline (+{d_s_off} pcs terjual)")
-                    else:
-                        reasons.append(f"Ada kenaikan penjualan Offline (+{d_s_off} pcs)")
+                    reasons.append(f"Penjualan Offline (+{d_s_off} pcs)" + (f" membuat BIN OFF turun ({d_off} pcs)" if d_off < 0 else ""))
                     tags.add("TURUN_SALES")
                 if d_s_onl > 0:
-                    if d_onl < 0:
-                        reasons.append(f"Stok BIN ONL menurun ({d_onl} pcs) karena ada penjualan Online (+{d_s_onl} pcs terjual)")
-                    else:
-                        reasons.append(f"Ada kenaikan penjualan Online (+{d_s_onl} pcs)")
+                    reasons.append(f"Penjualan Online (+{d_s_onl} pcs)" + (f" (ONL Reg {d_or:+d}, HUB ONL {d_oh:+d})" if (d_or < 0 or d_oh < 0) else ""))
                     tags.add("TURUN_SALES")
 
                 if d_tot < 0 and d_s_tot <= 0:
                     areas_down = []
                     if d_log < 0: areas_down.append(f"LOG({d_log})")
                     if d_off < 0: areas_down.append(f"OFF({d_off})")
-                    if d_onl < 0: areas_down.append(f"ONL({d_onl})")
-                    if c["sf"] > 0 or c["so"] > 0:
-                        reasons.append(f"Stok menurun di {', '.join(areas_down)} (penjualan aktif: OFF {c['sf']}, ONL {c['so']} atau mutasi keluar)")
-                    else:
-                        reasons.append(f"Stok menurun di {', '.join(areas_down)} tanpa penjualan baru (mutasi keluar / pindah BIN non-operasional)")
+                    if d_or < 0: areas_down.append(f"ONL_REG({d_or})")
+                    if d_oh < 0: areas_down.append(f"HUB_ONL({d_oh})")
+                    reasons.append(f"Stok menurun di {', '.join(areas_down)} tanpa penjualan baru (mutasi keluar / pindah BIN)")
                     tags.add("TURUN_NON_SALES")
 
-                if d_tot == 0 and (d_log != 0 or d_off != 0 or d_onl != 0):
+                if d_tot == 0 and (d_log != 0 or d_off != 0 or d_or != 0 or d_oh != 0):
                     tags.add("GESER_AREA")
                     reasons.append("Pergeseran stok antar area BIN (total stok tetap)")
 
-                if d_tot > 0:
-                    arah = f"📈 MENINGKAT (+{d_tot})"
-                elif d_tot < 0:
-                    arah = f"📉 MENURUN ({d_tot})"
-                elif d_log != 0 or d_off != 0 or d_onl != 0:
-                    arah = "🔄 GESER AREA"
-                else:
-                    arah = "🛒 UPDATE SALES"
+                arah = f"📈 MENINGKAT (+{d_tot})" if d_tot > 0 else (f"📉 MENURUN ({d_tot})" if d_tot < 0 else ("🔄 GESER AREA" if (d_log != 0 or d_off != 0 or d_or != 0 or d_oh != 0) else "🛒 UPDATE SALES"))
 
                 detail_records.append({
                     "SKU": sku,
@@ -5035,60 +4982,70 @@ class AppState:
                     "ARAH PERUBAHAN": arah,
                     "LOG (PREV ➔ NOW)": f"{p['l']} ➔ {c['l']} ({d_log:+d})",
                     "OFF (PREV ➔ NOW)": f"{p['f']} ➔ {c['f']} ({d_off:+d})",
-                    "ONL (PREV ➔ NOW)": f"{p['o']} ➔ {c['o']} ({d_onl:+d})",
+                    "ONL REG (PREV ➔ NOW)": f"{p_or} ➔ {c_or} ({d_or:+d})",
+                    "HUB ONL (PREV ➔ NOW)": f"{p_oh} ➔ {c_oh} ({d_oh:+d})",
                     "SALES OFF": f"{p['sf']} ➔ {c['sf']} ({d_s_off:+d})",
                     "SALES ONL": f"{p['so']} ➔ {c['so']} ({d_s_onl:+d})",
                     "DETAIL BIN BERUBAH": " | ".join(bin_notes) if bin_notes else "-",
                     "ANALISA PENYEBAB": "; ".join(reasons) if reasons else "-",
                     "_TAGS": ",".join(sorted(tags)),
-                    "_ABS_MOVE": abs(d_tot) + abs(d_log) + abs(d_off) + abs(d_onl) + abs(d_s_tot)
+                    "_ABS_MOVE": abs(d_tot) + abs(d_log) + abs(d_off) + abs(d_or) + abs(d_oh) + abs(d_s_tot)
                 })
             else:
-                # Baseline Awal: Analisa pemicu defisit / kelebihan stok saat ini
                 diff_l = c["l"] - c["tl"]
                 diff_f = c["f"] - c["tf"]
-                diff_o = c["o"] - c["to"]
-                if diff_l == 0 and diff_f == 0 and diff_o == 0:
+                diff_o = (c_or + c_oh) - c["to"]
+                if diff_l == 0 and diff_f == 0 and diff_o == 0 and c_or == 0 and c_oh == 0:
                     continue
 
-                reasons = []
-                tags = set()
+                reasons, tags = [], set()
                 if diff_f < 0:
                     tags.add("TURUN_SALES" if c["sf"] > 0 else "TURUN_NON_SALES")
-                    reasons.append(f"Area OFF defisit {diff_f} pcs (Target {c['tf']} vs Stok {c['f']}, Sales OFF: {c['sf']} pcs)")
+                    reasons.append(f"BIN OFF kurang {abs(diff_f)} pcs (Stok {c['f']} vs Target {c['tf']}, Sales OFF: {c['sf']} pcs)")
+                elif diff_f > 0:
+                    tags.add("STOCK_MASUK")
+                    reasons.append(f"BIN OFF surplus +{diff_f} pcs di atas target")
+
                 if diff_o < 0:
                     tags.add("TURUN_SALES" if c["so"] > 0 else "TURUN_NON_SALES")
-                    reasons.append(f"Area ONL defisit {diff_o} pcs (Target {c['to']} vs Stok {c['o']}, Sales ONL: {c['so']} pcs)")
+                    reasons.append(f"Online (Reg {c_or} + HUB {c_oh}) kurang {abs(diff_o)} pcs dari Target {c['to']}")
+                elif diff_o > 0:
+                    tags.add("STOCK_MASUK")
+                    reasons.append(f"Online surplus +{diff_o} pcs (ONL Reg: {c_or}, HUB ONL: {c_oh} vs Target {c['to']})")
+
                 if diff_l < 0:
                     tags.add("STOCK_MASUK")
-                    reasons.append(f"Area LOG defisit {diff_l} pcs (Target {c['tl']} vs Stok {c['l']})")
-                if diff_l > 0 or diff_f > 0 or diff_o > 0:
+                    reasons.append(f"BIN LOG kurang {abs(diff_l)} pcs (Stok {c['l']} vs Target {c['tl']})")
+                elif diff_l > 0:
                     tags.add("GESER_AREA")
+                    reasons.append(f"BIN LOG surplus +{diff_l} pcs (siap refill)")
 
                 bins_now = []
-                if c.get("bl"): bins_now.append("LOG: " + ", ".join([f"{b}({q})" for b, q in list(c["bl"].items())[:3]]))
-                if c.get("bf"): bins_now.append("OFF: " + ", ".join([f"{b}({q})" for b, q in list(c["bf"].items())[:3]]))
-                if c.get("bn"): bins_now.append("ONL: " + ", ".join([f"{b}({q})" for b, q in list(c["bn"].items())[:3]]))
+                if c.get("bl"): bins_now.append("LOG: " + ", ".join([f"{b}({q})" for b, q in list(c["bl"].items())[:2]]))
+                if c.get("bf"): bins_now.append("OFF: " + ", ".join([f"{b}({q})" for b, q in list(c["bf"].items())[:2]]))
+                if c.get("bor"): bins_now.append("ONL REG: " + ", ".join([f"{b}({q})" for b, q in list(c["bor"].items())[:2]]))
+                if c.get("boh"): bins_now.append("HUB ONL: " + ", ".join([f"{b}({q})" for b, q in list(c["boh"].items())[:2]]))
 
                 detail_records.append({
                     "SKU": sku,
                     "NAMA BARANG": nm,
                     "SUB KATEGORI": sub,
-                    "ARAH PERUBAHAN": "⚠️ PERLU BALANCING" if (diff_f < 0 or diff_o < 0 or diff_l < 0) else "📦 STOK BUFFER",
+                    "ARAH PERUBAHAN": "⚠️ DEFISIT AREA" if (diff_f < 0 or diff_o < 0 or diff_l < 0) else "📦 SURPLUS AREA",
                     "LOG (STOK / TGT)": f"{c['l']} / {c['tl']} ({diff_l:+d})",
                     "OFF (STOK / TGT)": f"{c['f']} / {c['tf']} ({diff_f:+d})",
-                    "ONL (STOK / TGT)": f"{c['o']} / {c['to']} ({diff_o:+d})",
+                    "ONL REG": str(c_or),
+                    "HUB ONL": str(c_oh),
+                    "TGT ONL": str(c["to"]),
                     "SALES OFF": str(c["sf"]),
                     "SALES ONL": str(c["so"]),
                     "POSISI BIN SAAT INI": " | ".join(bins_now) if bins_now else "-",
-                    "ANALISA KONDISI": "; ".join(reasons) if reasons else "Stok berlebih di area lain",
+                    "ANALISA PENYEBAB": "; ".join(reasons) if reasons else "-",
                     "_TAGS": ",".join(sorted(tags)),
                     "_ABS_MOVE": abs(diff_l) + abs(diff_f) + abs(diff_o) + c["sf"] + c["so"]
                 })
 
-        # Finalisasi Summary Area
         area_summary = {}
-        for ak in ("LOG", "OFF", "ONL"):
+        for ak in ("LOG", "OFF", "ONL_REG", "ONL_HUB"):
             st = area_acc[ak]
             curr_pct = round((st["curr_qty"] / st["curr_tgt"] * 100.0), 1) if st["curr_tgt"] > 0 else 0.0
             prev_pct = round((st["prev_qty"] / st["prev_tgt"] * 100.0), 1) if (has_prev and st["prev_tgt"] > 0) else curr_pct
@@ -5146,20 +5103,25 @@ class AppState:
         tot_sku = len(df_alloc)
         tot_stk = int(df_alloc["TOTAL STOK"].sum()) if not df_alloc.empty else 0
 
-        tot_qty_off = int(df_alloc["QTY OFF"].sum()) if not df_alloc.empty else 0
-        tot_qty_onl = int(df_alloc["QTY ONL"].sum()) if not df_alloc.empty else 0
-        tot_qty_log = int(df_alloc["QTY LOG"].sum()) if not df_alloc.empty else 0
+        tot_qty_off     = int(df_alloc["QTY OFF"].sum()) if not df_alloc.empty else 0
+        tot_qty_onl_reg = int(df_alloc["QTY ONL REG"].sum()) if (not df_alloc.empty and "QTY ONL REG" in df_alloc.columns) else 0
+        tot_qty_onl_hub = int(df_alloc["QTY HUB ONL"].sum()) if (not df_alloc.empty and "QTY HUB ONL" in df_alloc.columns) else 0
+        tot_qty_onl     = tot_qty_onl_reg + tot_qty_onl_hub
+        tot_qty_log     = int(df_alloc["QTY LOG"].sum()) if not df_alloc.empty else 0
 
         tot_tgt_off = int(df_alloc["TARGET OFF"].sum()) if not df_alloc.empty else 0
         tot_tgt_onl = int(df_alloc["TARGET ONL"].sum()) if not df_alloc.empty else 0
         tot_tgt_log = int(df_alloc["TARGET LOG"].sum()) if not df_alloc.empty else 0
 
-        perc_off = round((tot_qty_off / tot_tgt_off * 100.0), 1) if tot_tgt_off > 0 else 0.0
-        perc_on  = round((tot_qty_onl / tot_tgt_onl * 100.0), 1) if tot_tgt_onl > 0 else 0.0
-        perc_log = round((tot_qty_log / tot_tgt_log * 100.0), 1) if tot_tgt_log > 0 else 0.0
+        perc_off     = round((tot_qty_off / tot_tgt_off * 100.0), 1) if tot_tgt_off > 0 else 0.0
+        perc_on_reg  = round((tot_qty_onl_reg / tot_tgt_onl * 100.0), 1) if tot_tgt_onl > 0 else 0.0
+        perc_on_hub  = round((tot_qty_onl_hub / tot_tgt_onl * 100.0), 1) if tot_tgt_onl > 0 else 0.0
+        perc_on      = round((tot_qty_onl / tot_tgt_onl * 100.0), 1) if tot_tgt_onl > 0 else 0.0
+        perc_log     = round((tot_qty_log / tot_tgt_log * 100.0), 1) if tot_tgt_log > 0 else 0.0
 
+        col_onl_tot = "QTY ONL TOTAL" if "QTY ONL TOTAL" in df_alloc.columns else "QTY ONL"
         defisit_off = sum(1 for _, r in df_alloc.iterrows() if r["TARGET OFF"] > r["QTY OFF"])
-        defisit_onl = sum(1 for _, r in df_alloc.iterrows() if r["TARGET ONL"] > r["QTY ONL"])
+        defisit_onl = sum(1 for _, r in df_alloc.iterrows() if r["TARGET ONL"] > r[col_onl_tot])
         defisit_log = sum(1 for _, r in df_alloc.iterrows() if r["TARGET LOG"] > r["QTY LOG"])
 
         self.bs_total_sku.set(tot_sku)
@@ -5169,10 +5131,13 @@ class AppState:
         self.bs_sku_need_log.set(defisit_log)
         self.bs_perc_offline.set(perc_off)
         self.bs_perc_online.set(perc_on)
+        self.bs_perc_online_reg.set(perc_on_reg)
+        self.bs_perc_online_hub.set(perc_on_hub)
+        self.bs_qty_online_reg.set(tot_qty_onl_reg)
+        self.bs_qty_online_hub.set(tot_qty_onl_hub)
         self.bs_perc_logistik.set(perc_log)
         self.bs_qty_refill_total.set(len(df_refill))
 
-        # Hitung Tab 3 Analisa & gunakan hasil snapshot sebelumnya untuk Delta Box Atas
         self._compute_tab3_analysis(selected_cats)
 
         prev_snap = self._prev_bs_snapshot
@@ -5184,15 +5149,20 @@ class AppState:
                 if not selected_clean or str(v.get("c", "")).upper() in selected_clean
             ]
             p_q_off = sum(v.get("f", 0) for v in p_vals)
+            p_q_onl_reg = sum(v.get("or", 0) for v in p_vals)
+            p_q_onl_hub = sum(v.get("oh", 0) for v in p_vals)
             p_q_onl = sum(v.get("o", 0) for v in p_vals)
             p_q_log = sum(v.get("l", 0) for v in p_vals)
+
             p_t_off = sum(v.get("tf", 0) for v in p_vals)
             p_t_onl = sum(v.get("to", 0) for v in p_vals)
             p_t_log = sum(v.get("tl", 0) for v in p_vals)
 
-            p_perc_off = round((p_q_off / p_t_off * 100.0), 1) if p_t_off > 0 else 0.0
-            p_perc_onl = round((p_q_onl / p_t_onl * 100.0), 1) if p_t_onl > 0 else 0.0
-            p_perc_log = round((p_q_log / p_t_log * 100.0), 1) if p_t_log > 0 else 0.0
+            p_perc_off     = round((p_q_off / p_t_off * 100.0), 1) if p_t_off > 0 else 0.0
+            p_perc_onl_reg = round((p_q_onl_reg / p_t_onl * 100.0), 1) if p_t_onl > 0 else 0.0
+            p_perc_onl_hub = round((p_q_onl_hub / p_t_onl * 100.0), 1) if p_t_onl > 0 else 0.0
+            p_perc_onl     = round((p_q_onl / p_t_onl * 100.0), 1) if p_t_onl > 0 else 0.0
+            p_perc_log     = round((p_q_log / p_t_log * 100.0), 1) if p_t_log > 0 else 0.0
 
             p_def_off = sum(1 for v in p_vals if v.get("tf", 0) > v.get("f", 0))
             p_def_onl = sum(1 for v in p_vals if v.get("to", 0) > v.get("o", 0))
@@ -5200,6 +5170,8 @@ class AppState:
 
             self.bs_delta_offline.set(round(perc_off - p_perc_off, 1))
             self.bs_delta_online.set(round(perc_on - p_perc_onl, 1))
+            self.bs_delta_online_reg.set(round(perc_on_reg - p_perc_onl_reg, 1))
+            self.bs_delta_online_hub.set(round(perc_on_hub - p_perc_onl_hub, 1))
             self.bs_delta_logistik.set(round(perc_log - p_perc_log, 1))
             self.bs_delta_need_off.set(int(defisit_off - p_def_off))
             self.bs_delta_need_on.set(int(defisit_onl - p_def_onl))
@@ -5208,6 +5180,8 @@ class AppState:
         else:
             self.bs_delta_offline.set(0.0)
             self.bs_delta_online.set(0.0)
+            self.bs_delta_online_reg.set(0.0)
+            self.bs_delta_online_hub.set(0.0)
             self.bs_delta_logistik.set(0.0)
             self.bs_delta_need_off.set(0)
             self.bs_delta_need_on.set(0)

@@ -3418,24 +3418,26 @@ def server(input: Inputs, output: Outputs, session: Session):
             elif pct >= 70.0: return "#DD6B20"
             return "#E53E3E"
 
-        c_log = get_balance_color(state.bs_perc_logistik())
-        c_off = get_balance_color(state.bs_perc_offline())
-        c_on = get_balance_color(state.bs_perc_online())
+        c_log    = get_balance_color(state.bs_perc_logistik())
+        c_off    = get_balance_color(state.bs_perc_offline())
+        c_on_reg = "#38BDF8"
+        c_on_hub = "#818CF8"
 
         return ui.div(
-            # BARIS 1: PERSENTASE KESEIMBANGAN DENGAN ANAK PANAH
+            # BARIS 1: 4 CARD BALANCE AREA (LOGISTIK | OFFLINE | ONLINE REGULER | HUB ONLINE)
             ui.div(
                 dark_metric_box_with_delta("📦 BALANCE AREA LOGISTIK", f"{state.bs_perc_logistik():.1f}%", state.bs_delta_logistik(), "%", c_log),
                 dark_metric_box_with_delta("🏪 BALANCE AREA OFFLINE", f"{state.bs_perc_offline():.1f}%", state.bs_delta_offline(), "%", c_off),
-                dark_metric_box_with_delta("🌐 BALANCE AREA ONLINE", f"{state.bs_perc_online():.1f}%", state.bs_delta_online(), "%", c_on),
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
+                dark_metric_box_with_delta(f"🌐 BALANCE ONLINE REGULER ({state.bs_qty_online_reg():,} PCS)", f"{state.bs_perc_online_reg():.1f}%", state.bs_delta_online_reg(), "%", c_on_reg),
+                dark_metric_box_with_delta(f"🏢 BALANCE HUB ONLINE ({state.bs_qty_online_hub():,} PCS)", f"{state.bs_perc_online_hub():.1f}%", state.bs_delta_online_hub(), "%", c_on_hub),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
             ),
-            # BARIS 2: DEFISIT SKU & VOLUME DENGAN ANAK PANAH (Invert color: Turun = Hijau)
+            # BARIS 2: DEFISIT SKU & VOLUME
             ui.div(
                 dark_metric_box("📦 TOTAL UNIQUE SKU", f"{state.bs_total_sku():,} SKU", "#3182CE"),
                 dark_metric_box("🔢 TOTAL QTY STOCK", f"{state.bs_total_stock():,} PCS", "#C5A059"),
                 dark_metric_box_with_delta("🏪 DEFISIT OFFLINE", f"{state.bs_sku_need_off():,} SKU", state.bs_delta_need_off(), " SKU", "#DD6B20", invert_color=True),
-                dark_metric_box_with_delta("💻 DEFISIT ONLINE", f"{state.bs_sku_need_on():,} SKU", state.bs_delta_need_on(), " SKU", "#3182CE", invert_color=True),
+                dark_metric_box_with_delta("💻 DEFISIT ONLINE (TOTAL)", f"{state.bs_sku_need_on():,} SKU", state.bs_delta_need_on(), " SKU", "#3182CE", invert_color=True),
                 dark_metric_box_with_delta("🚚 DEFISIT LOGISTIK", f"{state.bs_sku_need_log():,} SKU", state.bs_delta_need_log(), " SKU", "#805AD5", invert_color=True),
                 style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
             )
@@ -3624,8 +3626,9 @@ def server(input: Inputs, output: Outputs, session: Session):
         area_cards = ui.div(
             render_area_card("LOG", "AREA LOGISTIK (LOG & RSN)", "📦", "#C5A059"),
             render_area_card("OFF", "AREA OFFLINE (BIN OFF)", "🏪", "#DD6B20"),
-            render_area_card("ONL", "AREA ONLINE (BIN ONL & HUB)", "🌐", "#3182CE"),
-            style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%; margin-bottom: 1.25rem;"
+            render_area_card("ONL_REG", "ONLINE REGULER (BIN ONL)", "🌐", "#38BDF8"),
+            render_area_card("ONL_HUB", "HUB ONLINE (ONLINE HUB SBY)", "🏢", "#818CF8"),
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
         )
 
         filter_opts = [
