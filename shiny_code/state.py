@@ -480,14 +480,17 @@ class AppState:
         self.bs_sku_need_on = reactive.Value(0)
         self.bs_sku_need_log = reactive.Value(0)
         self.bs_qty_refill_total = reactive.Value(0)
-        self.bs_perc_offline = reactive.Value(0.0)
-        self.bs_perc_online = reactive.Value(0.0)
-
-        self.bs_perc_overall = reactive.Value(0.0)
         self.bs_perc_logistik = reactive.Value(0.0)
         self.bs_perc_offline = reactive.Value(0.0)
         self.bs_perc_online = reactive.Value(0.0)
+        self.bs_perc_overall = reactive.Value(0.0)
 
+        # 🌟 TAMBAHKAN INI (Variabel Online Reguler & Hub Online yang sebelumnya hilang):
+        self.bs_perc_online_reg = reactive.Value(0.0)
+        self.bs_perc_online_hub = reactive.Value(0.0)
+        self.bs_qty_online_reg = reactive.Value(0)
+        self.bs_qty_online_hub = reactive.Value(0)
+        
         self.bs_category_list = reactive.Value([])     
         self.bs_selected_categories = reactive.Value([])
         self.bs_selected_area = reactive.Value("SEMUA AREA")
@@ -745,11 +748,15 @@ class AppState:
         self.bs_delta_logistik = reactive.Value(0.0)
         self.bs_delta_offline = reactive.Value(0.0)
         self.bs_delta_online = reactive.Value(0.0)
+        
+        # 🌟 TAMBAHKAN INI (Delta Online Reguler & Hub Online):
+        self.bs_delta_online_reg = reactive.Value(0.0)
+        self.bs_delta_online_hub = reactive.Value(0.0)
+        
         self.bs_delta_need_off = reactive.Value(0)
         self.bs_delta_need_on = reactive.Value(0)
         self.bs_delta_need_log = reactive.Value(0)
         self.bs_delta_total_refill = reactive.Value(0)
-
         # Cache snapshot metrik sebelumnya di memory
         self._prev_bs_metrics = {}
 
