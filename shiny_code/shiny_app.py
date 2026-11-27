@@ -3368,29 +3368,17 @@ def server(input: Inputs, output: Outputs, session: Session):
             # Jika user mengosongkan (None atau tuple kosong ()), kirim [] agar menampilkan SEMUA
             cats = list(sel) if sel else []
             state.apply_bs_category_filter(cats)
-    
+    @reactive.Effect
+    @reactive.event(input.change_bs_filter_area)
+    def _on_bs_area_filter_change():
+        val = input.change_bs_filter_area()
+        state.apply_bs_area_filter(val)
+
     @reactive.Effect
     @reactive.event(input.change_bs_analysis_filter)
     def _on_bs_analysis_filter_change():
         val = input.change_bs_analysis_filter()
         state.apply_bs_analysis_filter(val)
-
-    @render.ui
-    def balancing_stock_results_container():
-        if not state.bs_processed():
-            return ui.div()
-
-        return ui.div(
-            ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
-            ui.output_ui("bs_metrics_container_ui"),
-            ui.navset_card_tab(
-                ui.nav_panel("1. COMPARE STOK & SALES (UNIQUE SKU)", ui.output_ui("bs_tab1_content_ui")),
-                ui.nav_panel("2. LIST REFILL PROGRESIF", ui.output_ui("bs_tab2_content_ui")),
-                ui.nav_panel("3. ANALISA PENINGKATAN & PENURUNAN", ui.output_ui("bs_tab3_content_ui")),
-                id="bs_navset_tab"
-            ),
-            style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
-        )
 
     # ==========================================================================
     # BALANCING STOCK: WADAH TAB STATIS (ANTI-RESET / ANTI-LONCAT KE TAB 1)
@@ -3409,6 +3397,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             ui.navset_card_tab(
                 ui.nav_panel("1. COMPARE STOK & SALES (UNIQUE SKU)", ui.output_ui("bs_tab1_content_ui")),
                 ui.nav_panel("2. LIST REFILL PROGRESIF", ui.output_ui("bs_tab2_content_ui")),
+                ui.nav_panel("3. ANALISA PENINGKATAN & PENURUNAN", ui.output_ui("bs_tab3_content_ui")),
                 id="bs_navset_tab"
             ),
             style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"

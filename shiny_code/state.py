@@ -755,7 +755,7 @@ class AppState:
 
         # --- TAB 3 BALANCING STOCK: ANALISA PENINGKATAN & PENURUNAN ---
         self.bs_analysis_filter = reactive.Value("SEMUA")
-        self.bs_analysis_period_label = reactive.Value("Menunggu pembanding sync berikutnya (Baseline tersimpan)")
+        self.bs_analysis_period_label = reactive.Value("Baseline awal tersimpan (menunggu update data berikutnya)")
         self.bs_analysis_has_prev = reactive.Value(False)
         self.bs_area_analysis_summary = reactive.Value({})
         self.df_bs_analysis_headers = reactive.Value([])
@@ -4274,14 +4274,18 @@ class AppState:
 
     def _sync_bs_snapshots(self, curr_snapshot: dict):
         """
-        Menyimpan dan merotasi snapshot Balancing Stock (Latest vs Prev) di balancing_stock_cache
-        agar analisa Tab 3 tetap tersedia bahkan setelah refresh browser, dan hanya berotasi
-        ketika benar-benar ada perubahan stok/penjualan.
+        Menyimpan & merotasi snapshot Balancing Stock (Latest vs Prev) secara hybrid:
+        1. File cache lokal di temp folder (selalu berhasil, tahan refresh)
+        2. Supabase balancing_stock_cache (jika diizinkan write)
         """
         import json
+        import os
+        import tempfile
+
+        cache_file = os.path.join(tempfile.gettempdir(), "zkn_bs_snapshots_sby.json")
 
         def snapshots_equal(s1_skus: dict, s2_skus: dict) -> bool:
-            if len(s1_skus) != len(s2_skus):
+            if not s1_skus or not s2_skus or len(s1_skus) != len(s2_skus):
                 return False
             for k, v1 in s1_skus.items():
                 v2 = s2_skus.get(k)
@@ -4294,59 +4298,94 @@ class AppState:
                     return False
             return True
 
-        prev_to_compare = self._prev_bs_snapshot
         latest_saved = self._curr_bs_snapshot
         prev_saved = self._prev_bs_snapshot
 
+        if os.path.exists(cache_file):
+            try:
+                with open(cache_file, "r", encoding="utf-8") as fp:
+                    local_data = json.load(fp)
+                    if isinstance(local_data, dict):
+                        if local_data.get("latest") and "skus" in local_data["latest"]:
+                            latest_saved = local_data["latest"]
+                        if local_data.get("prev") and "skus" in local_data["prev"]:
+                            prev_saved = local_data["prev"]
+            except Exception:
+                pass
+
+        if latest_saved is None:
+            try:
+                client = get_supabase()
+                if client:
+                    res_snaps = client.table("balancing_stock_cache") \
+                                      .select("*") \
+                                      .in_("id", ["SURABAYA_BALANCING_LATEST_SNAP", "SURABAYA_BALANCING_PREV_SNAP"]) \
+                                      .execute()
+                    for r in (res_snaps.data or []):
+                        r_id = r.get("id")
+                        raw_sd = r.get("stock_data") or r.get("data")
+                        if isinstance(raw_sd, str):
+                            try:
+                                raw_sd = json.loads(raw_sd)
+                            except Exception:
+                                raw_sd = None
+                        if isinstance(raw_sd, dict) and "skus" in raw_sd:
+                            if r_id == "SURABAYA_BALANCING_LATEST_SNAP":
+                                latest_saved = raw_sd
+                            elif r_id == "SURABAYA_BALANCING_PREV_SNAP":
+                                prev_saved = raw_sd
+            except Exception as e:
+                print("Read snapshot Supabase (non-fatal):", e)
+
+        if latest_saved is None:
+            new_latest = curr_snapshot
+            new_prev = None
+        elif not snapshots_equal(curr_snapshot["skus"], latest_saved["skus"]):
+            new_prev = latest_saved
+            new_latest = curr_snapshot
+        else:
+            new_latest = latest_saved
+            new_prev = prev_saved
+
         try:
-            client = get_supabase()
-            if client:
-                res_snaps = client.table("balancing_stock_cache") \
-                                  .select("id, stock_data, updated_at") \
-                                  .in_("id", ["SURABAYA_BALANCING_LATEST_SNAP", "SURABAYA_BALANCING_PREV_SNAP"]) \
-                                  .execute()
-                for r in (res_snaps.data or []):
-                    r_id = r.get("id")
-                    raw_sd = r.get("stock_data")
-                    if isinstance(raw_sd, str):
-                        try:
-                            raw_sd = json.loads(raw_sd)
-                        except Exception:
-                            raw_sd = None
-                    if isinstance(raw_sd, dict) and "skus" in raw_sd:
-                        if r_id == "SURABAYA_BALANCING_LATEST_SNAP":
-                            latest_saved = raw_sd
-                        elif r_id == "SURABAYA_BALANCING_PREV_SNAP":
-                            prev_saved = raw_sd
-
-                def save_snap_db(snap_id: str, snap_obj: dict):
-                    try:
-                        client.table("balancing_stock_cache").delete().eq("id", snap_id).execute()
-                    except Exception:
-                        pass
-                    client.table("balancing_stock_cache").insert({
-                        "id": snap_id,
-                        "stock_data": snap_obj,
-                        "updated_at": datetime.now(WIB).isoformat()
-                    }).execute()
-
-                if latest_saved is None:
-                    save_snap_db("SURABAYA_BALANCING_LATEST_SNAP", curr_snapshot)
-                    prev_to_compare = None
-                elif not snapshots_equal(curr_snapshot["skus"], latest_saved["skus"]):
-                    prev_to_compare = latest_saved
-                    save_snap_db("SURABAYA_BALANCING_PREV_SNAP", latest_saved)
-                    save_snap_db("SURABAYA_BALANCING_LATEST_SNAP", curr_snapshot)
-                else:
-                    prev_to_compare = prev_saved
+            with open(cache_file, "w", encoding="utf-8") as fp:
+                json.dump({"latest": new_latest, "prev": new_prev}, fp)
         except Exception as e:
-            print("Snapshot Supabase fallback ke memory (non-fatal):", e)
-            if latest_saved is not None and not snapshots_equal(curr_snapshot["skus"], latest_saved["skus"]):
-                prev_to_compare = latest_saved
+            print("Write local snapshot error (non-fatal):", e)
 
-        self._curr_bs_snapshot = curr_snapshot
-        self._prev_bs_snapshot = prev_to_compare
-        return prev_to_compare
+        if latest_saved is None or (new_prev is not None and new_latest is curr_snapshot):
+            try:
+                client = get_supabase()
+                if client:
+                    def save_snap_db(snap_id: str, snap_obj: dict):
+                        if not snap_obj:
+                            return
+                        try:
+                            client.table("balancing_stock_cache").delete().eq("id", snap_id).execute()
+                        except Exception:
+                            pass
+                        try:
+                            client.table("balancing_stock_cache").insert({
+                                "id": snap_id,
+                                "stock_data": snap_obj,
+                                "updated_at": datetime.now(WIB).isoformat()
+                            }).execute()
+                        except Exception:
+                            client.table("balancing_stock_cache").insert({
+                                "id": snap_id,
+                                "data": snap_obj,
+                                "updated_at": datetime.now(WIB).isoformat()
+                            }).execute()
+
+                    save_snap_db("SURABAYA_BALANCING_LATEST_SNAP", new_latest)
+                    if new_prev is not None:
+                        save_snap_db("SURABAYA_BALANCING_PREV_SNAP", new_prev)
+            except Exception as e:
+                print("Write snapshot Supabase (non-fatal):", e)
+
+        self._curr_bs_snapshot = new_latest
+        self._prev_bs_snapshot = new_prev
+        return new_prev
 
     def _compute_balancing_stock(self, df_stk_raw, df_sls_raw, source_label="", sync_ts=""):
         try:
