@@ -3150,10 +3150,48 @@ def target_progress_view(state: AppState):
         style="width: 100%; padding: 1rem;"
     )
 
+def classify_storage_area(bin_str: str) -> str:
+    """Mengelompokkan storage area berdasarkan aturan penamaan BIN Tujuan."""
+    import re
+    b = str(bin_str).strip().upper()
+    
+    # Kriteria GL1 - GL4 (tidak mengandung KL, DAU, KOLI, CTN, RSN, RAK)
+    has_excl = any(k in b for k in ["KL", "DAU", "KOLI", "CTN", "RSN", "RAK"])
+    
+    if "GL1" in b and not has_excl:
+        return "Gudang LT.1"
+    if "GL2" in b and not has_excl:
+        return "Gudang LT.2"
+    if "GL3" in b and not has_excl:
+        return "Gudang LT.3"
+    if "GL4" in b and not has_excl:
+        return "Gudang LT.4"
+        
+    if "TOKO" in b:
+        return "Toko"
+    if "KL" in b or "KOLI" in b:
+        return "Area Koli"
+    if "CTN" in b or "RAK" in b:
+        return "Area Container"
+    if "RSN" in b or re.search(r'(^|[^A-Z0-9])R(\d+|-|$)', b):
+        return "Area Rak Susun / Lemari"
+    if "DAU" in b:
+        return "Area Dau"
+        
+    return "Default Area"
+
+
 def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict):
     # Cek apakah menu yang aktif adalah Stock Opname atau Cycle Count
     is_so = "STOCK OPNAME" in str(title_menu).upper()
 
+    # --- [BARU DITAMBAHKAN] DATA SCAN & STOCK SYSTEM ---
+    scan_bin_count = metrics.get("scan_bin_count", 0)
+    scan_sku_count = metrics.get("scan_sku_count", 0)
+    scan_qty_total = metrics.get("scan_qty_total", 0)
+    sys_qty_total = metrics.get("sys_qty_total", 0)
+
+    # --- [LAMA/ASLI] METRIK SELISIH & RESOLUSI ---
     q_real_init = metrics.get("q_real_init", 0)
     q_sys_init = metrics.get("q_sys_init", 0)
     q_miss_loc = metrics.get("q_miss_loc", 0)
@@ -3163,7 +3201,7 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
     q_karantina = metrics.get("q_karantina", 0)
     sku_karantina = metrics.get("sku_karantina", 0)
 
-    # METRIK FINANSIAL KHUSUS STOCK OPNAME
+    # METRIK FINANSIAL KHUSUS STOCK OPNAME (LAMA/ASLI)
     val_adj_p = metrics.get("val_adj_p", 0)
     val_adj_m = abs(metrics.get("val_adj_m", 0))
     val_adj_net = metrics.get("val_adj_net", val_adj_p - val_adj_m)
@@ -3175,11 +3213,75 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
     pct_karan = (q_karantina / tot_resolusi * 100) if tot_resolusi > 0 else 0.0
     pct_adj = (q_need_adj / tot_resolusi * 100) if tot_resolusi > 0 else 0.0
 
-    # 1. Subtitle Kartu 3 & Kartu 4 (Tampilkan Rupiah hanya di Stock Opname)
+    # 1. Subtitle Kartu 3 & Kartu 4 (LAMA/ASLI)
     sub_card_need_adj = f"🏷️ {sku_need_adj:,} SKU • Valuasi: Rp {val_adj_p:,}" if is_so else f"🏷️ {sku_need_adj:,} SKU • Perlu Tindak Lanjut"
     sub_card_karantina = f"☣️ {sku_karantina:,} SKU • Valuasi: Rp {val_adj_m:,}" if is_so else f"☣️ {sku_karantina:,} SKU • Not Found"
 
-    # 2. Kotak 3 Pilar Finansial (Hanya muncul jika Stock Opname)
+    # --- [BARU DITAMBAHKAN] SECTION STORAGE AREA BREAKDOWN DARI SET UP REAL + ---
+    df_setup = metrics.get("df_setup_real", pd.DataFrame())
+    storage_area_cards = []
+
+    if df_setup is not None and isinstance(df_setup, pd.DataFrame) and not df_setup.empty:
+        col_bin = df_setup.columns[1] if df_setup.shape[1] > 1 else 'BIN TUJUAN'
+        col_sku = df_setup.columns[2] if df_setup.shape[1] > 2 else 'SKU'
+        col_qty = df_setup.columns[3] if df_setup.shape[1] > 3 else 'QUANTITY'
+
+        area_agg = {}
+        for _, row in df_setup.iterrows():
+            b_tgt = str(row[col_bin] if col_bin in row else row.iloc[1]).strip().upper()
+            s_val = str(row[col_sku] if col_sku in row else row.iloc[2]).strip().upper()
+            q_val = safe_int(row[col_qty] if col_qty in row else row.iloc[3], 0)
+
+            if q_val <= 0:
+                continue
+
+            area_name = classify_storage_area(b_tgt)
+            if area_name not in area_agg:
+                area_agg[area_name] = {"total_qty": 0, "skus": set()}
+            area_agg[area_name]["total_qty"] += q_val
+            if s_val:
+                area_agg[area_name]["skus"].add(s_val)
+
+        # Hanya munculkan area yang hasilnya > 0
+        for area_name, data in sorted(area_agg.items(), key=lambda x: x[1]["total_qty"], reverse=True):
+            if data["total_qty"] > 0:
+                storage_area_cards.append(
+                    ui.div(
+                        ui.div(
+                            ui.span(area_name, style="font-size: 11px; font-weight: 800; color: #A0AEC0; letter-spacing: 0.5px; text-transform: uppercase;"),
+                            ui.tags.i(class_="fa-solid fa-location-dot", style="color: #38BDF8; font-size: 13px;"),
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;"
+                        ),
+                        ui.div(
+                            ui.span(f"{data['total_qty']:,}", style="color: #FFFFFF; font-size: 20px; font-weight: 900; line-height: 1.1;"),
+                            ui.span(" PCS", style="color: #38BDF8; font-size: 12px; font-weight: 700;"),
+                            style="margin-bottom: 4px;"
+                        ),
+                        ui.span(f"📦 {len(data['skus']):,} Unique SKU", style="color: #718096; font-size: 11px; font-weight: 600; display: block;"),
+                        style="background: #1A1D24; padding: 0.85rem 1rem; border-radius: 8px; border: 1px solid #2D3748; border-left: 3.5px solid #38BDF8;"
+                    )
+                )
+
+    storage_area_section = ui.div()
+    if storage_area_cards:
+        storage_area_section = ui.div(
+            ui.div(
+                ui.div(
+                    ui.tags.i(class_="fa-solid fa-map-location-dot", style="color: #38BDF8; font-size: 15px; margin-right: 8px;"),
+                    ui.h4("Breakdown Miss Location per Storage Area (BIN Tujuan)", style="font-size: 13.5px; font-weight: 800; color: #FFFFFF; margin: 0;"),
+                    style="display: flex; align-items: center;"
+                ),
+                ui.span(f"{len(storage_area_cards)} Area Ditemukan", style="background: rgba(56, 189, 248, 0.15); color: #38BDF8; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(56, 189, 248, 0.3);"),
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;"
+            ),
+            ui.div(
+                *storage_area_cards,
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; width: 100%;"
+            ),
+            style="background: #161920; border: 1px solid #2D3748; padding: 1.15rem 1.25rem; border-radius: 12px; margin-bottom: 1.25rem;"
+        )
+
+    # 2. Kotak 3 Pilar Finansial (Hanya muncul jika Stock Opname) (LAMA/ASLI)
     financial_section = ui.div()
     if is_so:
         financial_section = ui.div(
@@ -3204,11 +3306,11 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
             style="margin-bottom: 1.5rem;"
         )
 
-    # 3. Label Rincian Legend Distribusi
+    # 3. Label Rincian Legend Distribusi (LAMA/ASLI)
     legend_need_adj = f"{q_need_adj:,} PCS (Rp {val_adj_p:,})" if is_so else f"{q_need_adj:,} PCS"
     legend_karantina = f"{q_karantina:,} PCS (Rp {val_adj_m:,})" if is_so else f"{q_karantina:,} PCS"
 
-    # 4. Teks Insight Kesimpulan
+    # 4. Teks Insight Kesimpulan (LAMA/ASLI 100% PERSIS)
     if is_so:
         insight_title = "Executive Insight & Financial Impact (Stock Opname):"
         insight_desc = (
@@ -3226,7 +3328,7 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
         )
 
     return ui.div(
-        # --- HEADER EXECUTIVE ---
+        # --- HEADER EXECUTIVE (LAMA/ASLI) ---
         ui.div(
             ui.div(
                 ui.span("EXECUTIVE AUDIT SUMMARY", style="font-size: 11px; font-weight: 900; letter-spacing: 2px; color: #C5A059; text-transform: uppercase; display: block; margin-bottom: 2px;"),
@@ -3241,7 +3343,55 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
             style="display: flex; justify-content: space-between; align-items: center; background: #1A1D24; padding: 1.25rem 1.5rem; border-radius: 12px; border: 1px solid #2D3748; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 10px;"
         ),
 
-        # --- 4 PILAR UTAMA KPI CARDS (FISIK/KUANTITAS) ---
+        # --- 🌟 [BARU DITAMBAHKAN] BLOK 4 KARTU METRIK SCAN & SYSTEM ---
+        ui.div(
+            ui.div(
+                ui.div(
+                    ui.span("TOTAL BIN DI-SCAN", style="font-size: 11px; font-weight: 800; color: #A0AEC0; letter-spacing: 0.5px;"),
+                    ui.tags.i(class_="fa-solid fa-boxes-stacked", style="color: #38BDF8; font-size: 15px;"),
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;"
+                ),
+                ui.span(f"{scan_bin_count:,} BIN", style="color: #38BDF8; font-size: 22px; font-weight: 900; line-height: 1.1; display: block;"),
+                ui.span("Unique BIN Data Scan (Kolom A)", style="color: #718096; font-size: 11px; margin-top: 4px; display: block;"),
+                style="background: #161920; padding: 0.9rem 1.1rem; border-radius: 10px; border-left: 4px solid #38BDF8; border-top: 1px solid #2D3748; border-right: 1px solid #2D3748; border-bottom: 1px solid #2D3748;"
+            ),
+            ui.div(
+                ui.div(
+                    ui.span("UNIQUE SKU SCAN", style="font-size: 11px; font-weight: 800; color: #A0AEC0; letter-spacing: 0.5px;"),
+                    ui.tags.i(class_="fa-solid fa-barcode", style="color: #C5A059; font-size: 15px;"),
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;"
+                ),
+                ui.span(f"{scan_sku_count:,} SKU", style="color: #C5A059; font-size: 22px; font-weight: 900; line-height: 1.1; display: block;"),
+                ui.span("Unique SKU Data Scan (Kolom B)", style="color: #718096; font-size: 11px; margin-top: 4px; display: block;"),
+                style="background: #161920; padding: 0.9rem 1.1rem; border-radius: 10px; border-left: 4px solid #C5A059; border-top: 1px solid #2D3748; border-right: 1px solid #2D3748; border-bottom: 1px solid #2D3748;"
+            ),
+            ui.div(
+                ui.div(
+                    ui.span("TOTAL QTY SCAN", style="font-size: 11px; font-weight: 800; color: #A0AEC0; letter-spacing: 0.5px;"),
+                    ui.tags.i(class_="fa-solid fa-clipboard-check", style="color: #10B981; font-size: 15px;"),
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;"
+                ),
+                ui.span(f"{scan_qty_total:,} PCS", style="color: #10B981; font-size: 22px; font-weight: 900; line-height: 1.1; display: block;"),
+                ui.span("Total Qty Fisik Scan (Kolom C)", style="color: #718096; font-size: 11px; margin-top: 4px; display: block;"),
+                style="background: #161920; padding: 0.9rem 1.1rem; border-radius: 10px; border-left: 4px solid #10B981; border-top: 1px solid #2D3748; border-right: 1px solid #2D3748; border-bottom: 1px solid #2D3748;"
+            ),
+            ui.div(
+                ui.div(
+                    ui.span("TOTAL QTY SYSTEM", style="font-size: 11px; font-weight: 800; color: #A0AEC0; letter-spacing: 0.5px;"),
+                    ui.tags.i(class_="fa-solid fa-desktop", style="color: #818CF8; font-size: 15px;"),
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;"
+                ),
+                ui.span(f"{sys_qty_total:,} PCS", style="color: #818CF8; font-size: 22px; font-weight: 900; line-height: 1.1; display: block;"),
+                ui.span("Total Qty System (Kolom J)", style="color: #718096; font-size: 11px; margin-top: 4px; display: block;"),
+                style="background: #161920; padding: 0.9rem 1.1rem; border-radius: 10px; border-left: 4px solid #818CF8; border-top: 1px solid #2D3748; border-right: 1px solid #2D3748; border-bottom: 1px solid #2D3748;"
+            ),
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+        ),
+
+        # --- 🌟 [BARU DITAMBAHKAN] BREAKDOWN STORAGE AREA MISS LOCATION ---
+        storage_area_section,
+
+        # --- 4 PILAR UTAMA KPI CARDS (LAMA/ASLI TETAP ADA) ---
         ui.div(
             # Card 1: Selisih Awal
             ui.div(
@@ -3305,10 +3455,10 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
             style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
         ),
 
-        # --- PILAR VALUASI FINANSIAL ADJUSTMENT (RP) (HANYA STOCK OPNAME) ---
+        # --- PILAR VALUASI FINANSIAL ADJUSTMENT (RP) (HANYA STOCK OPNAME) (LAMA/ASLI) ---
         financial_section,
 
-        # --- VISUAL BREAKDOWN & PROPORTION BAR ---
+        # --- VISUAL BREAKDOWN & PROPORTION BAR (LAMA/ASLI) ---
         ui.div(
             ui.div(
                 ui.h4("📊 Distribusi Chart Bar Case to Case", style="font-size: 14px; font-weight: 800; color: #FFFFFF; margin: 0 0 6px 0;"),
@@ -3344,7 +3494,7 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
             style="background: #161920; border: 1px solid #2D3748; padding: 1.25rem 1.5rem; border-radius: 12px; margin-bottom: 1.25rem;"
         ),
 
-        # --- INSIGHT KESIMPULAN AUDITOR ---
+        # --- INSIGHT KESIMPULAN AUDITOR (LAMA/ASLI) ---
         ui.div(
             ui.div(
                 ui.tags.i(class_="fa-solid fa-lightbulb", style="color: #C5A059; font-size: 18px; margin-right: 10px;"),

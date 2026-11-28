@@ -6891,7 +6891,8 @@ def server(input: Inputs, output: Outputs, session: Session):
     def _open_cca_overview():
         from views import render_executive_overview_modal
         
-        # ✅ Ambil Qty Miss Location Murni dari Setup Real+ (Rak ke Rak)
+        # [KODE ASLI ANDA] Ambil Qty Miss Location Murni dari Setup Real+ (Rak ke Rak)
+        df_setup = getattr(state, '_raw_df_cca_setup_real', pd.DataFrame())
         if hasattr(state, '_raw_df_cca_setup_real') and not state._raw_df_cca_setup_real.empty and 'QUANTITY' in state._raw_df_cca_setup_real.columns:
             q_miss = int(state._raw_df_cca_setup_real['QUANTITY'].sum())
             sku_miss = state._raw_df_cca_setup_real['SKU'].nunique()
@@ -6899,7 +6900,32 @@ def server(input: Inputs, output: Outputs, session: Session):
             q_miss = state.cca_qty_miss_loc()
             sku_miss = state.cca_sku_miss_loc()
 
+        # [DITAMBAHKAN] Poin 1 & 2: Hitung Total Unique BIN, Unique SKU, dan Total QTY Scan
+        df_scan = getattr(state, '_raw_df_cca_scan', pd.DataFrame())
+        scan_bin_count = 0
+        scan_sku_count = 0
+        scan_qty_total = 0
+        if not df_scan.empty:
+            col_b = df_scan.columns[0]
+            col_s = df_scan.columns[1] if df_scan.shape[1] > 1 else df_scan.columns[0]
+            col_q = 'QTY_SCAN' if 'QTY_SCAN' in df_scan.columns else (df_scan.columns[2] if df_scan.shape[1] > 2 else None)
+            scan_bin_count = df_scan[col_b].nunique()
+            scan_sku_count = df_scan[col_s].nunique()
+            if col_q:
+                scan_qty_total = int(pd.to_numeric(df_scan[col_q], errors='coerce').fillna(0).sum())
+
+        # [DITAMBAHKAN] Poin 2: Total QTY System dari file Stock System (kolom J / index 9)
+        df_stock = getattr(state, '_raw_df_cca_stock', pd.DataFrame())
+        sys_qty_total = 0
+        if not df_stock.empty:
+            col_q_sys = next((c for c in df_stock.columns if any(k in str(c).upper() for k in ['QTY SYSTEM', 'QTY SYS', 'SYSTEM QTY'])), None)
+            if col_q_sys is None and df_stock.shape[1] > 9:
+                col_q_sys = df_stock.columns[9]
+            if col_q_sys:
+                sys_qty_total = int(pd.to_numeric(df_stock[col_q_sys], errors='coerce').fillna(0).sum())
+
         data_m = {
+            # --- Key Asli Anda Tetap Utuh ---
             "q_real_init": state.cca_qty_real_plus(),
             "q_sys_init": state.cca_qty_sys_plus(),
             "q_miss_loc": q_miss,                   # <-- Murni Rak ke Rak
@@ -6908,6 +6934,12 @@ def server(input: Inputs, output: Outputs, session: Session):
             "sku_need_adj": state.cca_sku_need_adj(),
             "q_karantina": state.cca_qty_karantina(),
             "sku_karantina": state.cca_sku_karantina(),
+            # --- Tambahan Baru ---
+            "scan_bin_count": scan_bin_count,
+            "scan_sku_count": scan_sku_count,
+            "scan_qty_total": scan_qty_total,
+            "sys_qty_total": sys_qty_total,
+            "df_setup_real": df_setup
         }
         modal_content = render_executive_overview_modal("Cycle Count", state.cca_branch_selected() or "SURABAYA", data_m)
         ui.modal_show(ui.modal(
@@ -6922,15 +6954,14 @@ def server(input: Inputs, output: Outputs, session: Session):
     def _open_so_overview():
         from views import render_executive_overview_modal
         
+        # [KODE ASLI ANDA]
         q_need_so = int(state._raw_df_so_mult['QTY SO'].sum()) if hasattr(state, '_raw_df_so_mult') and not state._raw_df_so_mult.empty and 'QTY SO' in state._raw_df_so_mult.columns else 0
         sku_need_so = state._raw_df_so_mult.shape[0] if hasattr(state, '_raw_df_so_mult') and not state._raw_df_so_mult.empty else 0
 
-        # Ambil nilai finansial langsung dari metrik Stock Opname Step 6B
         val_adj_p = int(round(state.so_adj_val_p()))
         val_adj_m = int(round(abs(state.so_adj_val_m())))
         val_adj_net = int(round(state.so_adj_val_net()))
 
-        # Fallback perhitungan otomatis jika Step 6B belum di-generate secara manual
         if val_adj_p == 0 and not state._raw_df_so_mult.empty:
             col_hb = next((c for c in state._raw_df_so_mult.columns if any(k in str(c).upper() for k in ['HARGA BELI', 'COGS', 'BELI'])), None)
             col_q = next((c for c in state._raw_df_so_mult.columns if 'QTY' in str(c).upper()), None)
@@ -6940,7 +6971,37 @@ def server(input: Inputs, output: Outputs, session: Session):
         if val_adj_net == 0 and (val_adj_p > 0 or val_adj_m > 0):
             val_adj_net = val_adj_p - val_adj_m
 
+        # [DITAMBAHKAN] Poin 1 & 2: Hitung Total Unique BIN, Unique SKU, dan Total QTY Scan SO
+        df_scan = getattr(state, '_raw_df_so_scan', pd.DataFrame())
+        scan_bin_count = 0
+        scan_sku_count = 0
+        scan_qty_total = 0
+        if not df_scan.empty:
+            col_b = df_scan.columns[0]
+            col_s = df_scan.columns[1] if df_scan.shape[1] > 1 else df_scan.columns[0]
+            col_q = 'QTY_SCAN' if 'QTY_SCAN' in df_scan.columns else (df_scan.columns[2] if df_scan.shape[1] > 2 else None)
+            scan_bin_count = df_scan[col_b].nunique()
+            scan_sku_count = df_scan[col_s].nunique()
+            if col_q:
+                scan_qty_total = int(pd.to_numeric(df_scan[col_q], errors='coerce').fillna(0).sum())
+
+        # [DITAMBAHKAN] Poin 2: Total QTY System dari file Stock System SO
+        df_stock = getattr(state, '_raw_df_so_stock', pd.DataFrame())
+        sys_qty_total = 0
+        if not df_stock.empty:
+            col_q_sys = next((c for c in df_stock.columns if any(k in str(c).upper() for k in ['QTY SYSTEM', 'QTY SYS', 'SYSTEM QTY'])), None)
+            if col_q_sys is None and df_stock.shape[1] > 9:
+                col_q_sys = df_stock.columns[9]
+            if col_q_sys:
+                sys_qty_total = int(pd.to_numeric(df_stock[col_q_sys], errors='coerce').fillna(0).sum())
+
+        # [DITAMBAHKAN] Poin 3: Ambil Setup Real + (Step 2)
+        df_setup = getattr(state, '_raw_df_so_setup_real', pd.DataFrame())
+        if df_setup.empty and hasattr(state, '_raw_df_so_setup4'):
+            df_setup = getattr(state, '_raw_df_so_setup4', pd.DataFrame())
+
         data_m = {
+            # --- Key Asli Anda Tetap Utuh ---
             "q_real_init": state.so_qty_real_plus(),
             "q_sys_init": state.so_qty_sys_plus(),
             "q_miss_loc": state.so_qty_miss_loc(),
@@ -6952,9 +7013,14 @@ def server(input: Inputs, output: Outputs, session: Session):
             "val_adj_p": val_adj_p,
             "val_adj_m": val_adj_m,
             "val_adj_net": val_adj_net,
+            # --- Tambahan Baru ---
+            "scan_bin_count": scan_bin_count,
+            "scan_sku_count": scan_sku_count,
+            "scan_qty_total": scan_qty_total,
+            "sys_qty_total": sys_qty_total,
+            "df_setup_real": df_setup
         }
 
-        # Panggil modal executive overview khusus Stock Opname
         modal_content = render_executive_overview_modal("Stock Opname", input.so_branch() if "so_branch" in input else "SURABAYA", data_m)
         ui.modal_show(ui.modal(
             modal_content,
