@@ -587,7 +587,20 @@ def fetch_staging_data(session):
     return all_staging_records
 
 # --- B. TRANSFER STOK (ALL STORE) ---
-def fetch_all_items_for_single_tf(session, tf_id, tf_code, detail_href, status_txt, now_wib, debug_first=False):
+def inspect_transfer_js_from_page(session):
+    """Membaca cuplikan JS asli di halaman transfer_stok untuk mengetahui parameter persis DataTables"""
+    try:
+        r = session.get("https://jezpro.id/transfer_stok", timeout=20)
+        if r.status_code == 200:
+            matches = re.findall(r'.{0,250}(?:in_transfer_bin_datatables|transfer_bin_datatables).{0,500}', r.text, re.DOTALL)
+            for idx, m in enumerate(matches[:3], start=1):
+                clean_js = " ".join(m.split())
+                print(f"      [JS JEZPRO #{idx}] {clean_js}")
+    except Exception as e:
+        print(f"      [JS INSPECT ERROR] {e}")
+
+
+def fetch_all_items_for_single_tf(session, tf_id, tf_code, st_id_start, st_id_end, status_txt, now_wib, debug_first=False):
     all_items = []
     headers_det = {
         "Accept": "application/json, text/javascript, */*; q=0.01",
@@ -595,52 +608,64 @@ def fetch_all_items_for_single_tf(session, tf_id, tf_code, detail_href, status_t
         "Referer": "https://jezpro.id/transfer_stok"
     }
 
-    # Bersihkan kode TF murni jika ada teks tambahan
     m_tf = re.search(r'(TF[A-Z0-9\-/]+)', tf_code.upper())
     pure_tf_code = m_tf.group(1) if m_tf else tf_code
 
     candidate_urls = [
         "https://jezpro.id/in_transfer_bin_datatables",
         "https://jezpro.id/transfer_bin_datatables",
-        "https://jezpro.id/transfer_detail_datatables",
-        "https://jezpro.id/transfer_stok_detail_datatables"
     ]
 
-    # 1. COBA ENDPOINT DATATABLES (GET dengan stf_id + stf_code)
-    start_item = 0
-    chunk_size = 250
-    matched_endpoint = None
-
-    while True:
-        params_det = {
+    # Dua varian payload:
+    # Varian 1: Tanpa 'search' string & tanpa 'order[0][column]' (cegah SQL Unknown column 'article')
+    # Varian 2: Payload minimal (hanya stf_id, stf_code, st_id_start, st_id_end)
+    def build_params(start_item, chunk_size, minimal=False):
+        base = {
             "draw": "1",
-            "columns[0][data]": "article", "columns[0][name]": "article",
-            "columns[1][data]": "pl_code", "columns[1][name]": "pl_code",
-            "columns[2][data]": "stfd_qty", "columns[2][name]": "stfd_qty",
-            "columns[3][data]": "pls_qty", "columns[3][name]": "pls_qty",
-            "columns[4][data]": "st_start", "columns[4][name]": "st_start",
-            "columns[5][data]": "st_end", "columns[5][name]": "st_end",
-            "columns[6][data]": "status", "columns[6][name]": "status",
-            "order[0][column]": "0", "order[0][dir]": "desc",
             "start": str(start_item),
             "length": str(chunk_size),
             "search[value]": "",
-            "search": "",
-            "stf_code": pure_tf_code,
+            "search[regex]": "false",
             "stf_id": str(tf_id) if tf_id else "",
+            "stf_code": pure_tf_code,
+            "st_id_start": str(st_id_start) if st_id_start else "",
+            "st_id_end": str(st_id_end) if st_id_end else "",
+            "st_start": str(st_id_start) if st_id_start else "",
+            "st_end": str(st_id_end) if st_id_end else "",
             "_": int(time.time() * 1000)
         }
+        if not minimal:
+            base.update({
+                "columns[0][data]": "article", "columns[0][name]": "article", "columns[0][searchable]": "true", "columns[0][orderable]": "false",
+                "columns[1][data]": "pl_code", "columns[1][name]": "pl_code", "columns[1][searchable]": "true", "columns[1][orderable]": "false",
+                "columns[2][data]": "stfd_qty", "columns[2][name]": "stfd_qty", "columns[2][searchable]": "false", "columns[2][orderable]": "false",
+                "columns[3][data]": "pls_qty", "columns[3][name]": "pls_qty", "columns[3][searchable]": "false", "columns[3][orderable]": "false",
+                "columns[4][data]": "st_start", "columns[4][name]": "st_start", "columns[4][searchable]": "false", "columns[4][orderable]": "false",
+                "columns[5][data]": "st_end", "columns[5][name]": "st_end", "columns[5][searchable]": "false", "columns[5][orderable]": "false",
+                "columns[6][data]": "status", "columns[6][name]": "status", "columns[6][searchable]": "false", "columns[6][orderable]": "false",
+            })
+        return base
 
+    start_item = 0
+    chunk_size = 250
+    matched_url = None
+    matched_minimal = False
+
+    while True:
         raw_chunk = []
         data_json = {}
-        urls_to_try = [matched_endpoint] if matched_endpoint else candidate_urls
 
-        for url in urls_to_try:
+        attempts = [(matched_url, matched_minimal)] if matched_url else [
+            (u, m) for m in (False, True) for u in candidate_urls
+        ]
+
+        for url, is_min in attempts:
             try:
-                res_det = session.get(url, params=params_det, headers=headers_det, timeout=20)
+                p = build_params(start_item, chunk_size, minimal=is_min)
+                res_det = session.get(url, params=p, headers=headers_det, timeout=20)
                 if res_det.status_code in [401, 419] or "login" in res_det.url:
                     if relogin_jezpro(session):
-                        res_det = session.get(url, params=params_det, headers=headers_det, timeout=20)
+                        res_det = session.get(url, params=p, headers=headers_det, timeout=20)
 
                 if res_det.status_code == 200:
                     j_tmp = res_det.json()
@@ -648,15 +673,16 @@ def fetch_all_items_for_single_tf(session, tf_id, tf_code, detail_href, status_t
                     if chunk_tmp:
                         raw_chunk = chunk_tmp
                         data_json = j_tmp
-                        matched_endpoint = url
+                        matched_url = url
+                        matched_minimal = is_min
                         break
                     elif debug_first and start_item == 0:
-                        print(f"      [DEBUG TF {pure_tf_code}] GET {url} -> HTTP 200 tapi data=[] (recordsTotal={j_tmp.get('recordsTotal')})")
+                        print(f"      [DEBUG TF {pure_tf_code}] {url} (min={is_min}) -> 200 tapi data=[]")
                 elif debug_first and start_item == 0:
-                    print(f"      [DEBUG TF {pure_tf_code}] GET {url} -> HTTP {res_det.status_code}")
+                    print(f"      [DEBUG TF {pure_tf_code}] {url} (min={is_min}) -> HTTP {res_det.status_code}: {res_det.text[:250]}")
             except Exception as e:
                 if debug_first and start_item == 0:
-                    print(f"      [DEBUG TF {pure_tf_code}] GET {url} error: {e}")
+                    print(f"      [DEBUG TF {pure_tf_code}] {url} error: {e}")
 
         if not raw_chunk:
             break
@@ -697,53 +723,8 @@ def fetch_all_items_for_single_tf(session, tf_id, tf_code, detail_href, status_t
             break
         time.sleep(0.04)
 
-    # 2. FALLBACK: SCRAPE HALAMAN DETAIL HTML JIKA ENDPOINT DATATABLES KOSONG
-    if not all_items:
-        html_candidates = []
-        if detail_href:
-            full_href = detail_href if detail_href.startswith("http") else f"https://jezpro.id/{detail_href.lstrip('/')}"
-            html_candidates.append(full_href)
-        if tf_id:
-            html_candidates.extend([
-                f"https://jezpro.id/transfer_stok_detail/{tf_id}",
-                f"https://jezpro.id/transfer_stok/detail/{tf_id}",
-                f"https://jezpro.id/in_transfer_stok/detail/{tf_id}",
-            ])
-
-        for h_url in html_candidates:
-            try:
-                r_html = session.get(h_url, headers={"Referer": "https://jezpro.id/transfer_stok"}, timeout=20)
-                if r_html.status_code == 200 and "<table" in r_html.text.lower():
-                    # Cek jika di dalam halaman detail HTML ada endpoint datatables asli yang dipanggil JS
-                    if debug_first:
-                        m_ajax = re.findall(r'https?://jezpro\.id/[a-zA-Z0-9_]*datatable[a-zA-Z0-9_/]*|/[a-zA-Z0-9_]*datatable[a-zA-Z0-9_/]*', r_html.text)
-                        if m_ajax:
-                            print(f"      [DEBUG TF {pure_tf_code}] Ditemukan URL AJAX di halaman detail ({h_url}): {set(m_ajax)}")
-
-                    soup = BeautifulSoup(r_html.text, "html.parser")
-                    for tr in soup.select("table tbody tr"):
-                        tds = [strip_html(td.get_text(" ", strip=True)) for td in tr.find_all("td")]
-                        if len(tds) >= 3 and not any("no data" in c.lower() for c in tds):
-                            art_val = tds[1] if tds[0].isdigit() and len(tds) > 1 else tds[0]
-                            bin_val = tds[2] if tds[0].isdigit() and len(tds) > 2 else tds[1]
-                            qty_val = safe_int_val(tds[3] if tds[0].isdigit() and len(tds) > 3 else tds[2], 1)
-                            if art_val and art_val != "-":
-                                all_items.append({
-                                    "stf_code": tf_code,
-                                    "article_name": art_val,
-                                    "bin_asal": bin_val or "-",
-                                    "qty_tf": qty_val,
-                                    "qty_in_bin": 0,
-                                    "start_store": "-",
-                                    "end_store": "-",
-                                    "status": status_txt,
-                                    "synced_at": now_wib.isoformat()
-                                })
-                    if all_items:
-                        break
-            except Exception as e:
-                if debug_first:
-                    print(f"      [DEBUG TF {pure_tf_code}] HTML {h_url} error: {e}")
+    if debug_first and not all_items:
+        inspect_transfer_js_from_page(session)
 
     return all_items
 
@@ -794,30 +775,18 @@ def fetch_transfer_data(session):
     now_wib = datetime.now(WIB).replace(tzinfo=None)
     cutoff_dt = now_wib - timedelta(days=90)
 
-    for idx_tf, row in enumerate(raw_history):
+    for row in raw_history:
         status_txt = strip_html(row.get("stf_status") or row.get("status") or "").upper()
         if status_txt not in ["DRAFT", "IN PROGRESS"]:
             continue
 
-        raw_code_html = str(row.get("stf_code") or row.get("kode") or "")
-        raw_action_html = str(row.get("action") or "")
-
-        raw_code = strip_html(raw_code_html)
+        raw_code = strip_html(row.get("stf_code") or row.get("kode") or "")
         tf_code = " ".join(raw_code.split()).strip()
         if not tf_code: continue
 
-        # Ekstrak href link detail jika ada di kolom stf_code atau action
-        detail_href = ""
-        m_href = re.search(r'href=["\']([^"\']+)["\']', raw_code_html + " " + raw_action_html)
-        if m_href:
-            detail_href = m_href.group(1)
-
-        # Ekstrak stf_id dari field atau dari URL/onclick di HTML
         tf_id = safe_int_val(row.get("stf_id") or row.get("id"))
-        if not tf_id:
-            m_id = re.search(r'(?:detail|transfer_stok|stf_id)[/?=](\d+)', raw_code_html + " " + raw_action_html)
-            if m_id:
-                tf_id = int(m_id.group(1))
+        st_id_start = safe_int_val(row.get("st_id_start"))
+        st_id_end = safe_int_val(row.get("st_id_end"))
 
         tgl_str = strip_html(row.get("stf_created") or row.get("tanggal") or "")
         aging_jam = 0.0
@@ -832,7 +801,6 @@ def fetch_transfer_data(session):
                     break
                 except Exception: pass
 
-        # Abaikan dokumen yang lebih tua dari 90 hari
         if dt_tf and dt_tf < cutoff_dt:
             continue
 
@@ -852,9 +820,9 @@ def fetch_transfer_data(session):
         })
 
         is_first = (len(open_headers) == 1)
-        doc_items = fetch_all_items_for_single_tf(session, tf_id, tf_code, detail_href, status_txt, now_wib, debug_first=is_first)
-        if is_first and not doc_items:
-            print(f"      [DEBUG HEADER ROW] keys={list(row.keys())} | stf_code_raw={raw_code_html[:120]} | action_raw={raw_action_html[:120]}")
+        doc_items = fetch_all_items_for_single_tf(
+            session, tf_id, tf_code, st_id_start, st_id_end, status_txt, now_wib, debug_first=is_first
+        )
         open_items.extend(doc_items)
 
     print(f"   -> Ditemukan {len(open_headers)} Surat Jalan TF Aktif & {len(open_items)} Rincian Item.")
