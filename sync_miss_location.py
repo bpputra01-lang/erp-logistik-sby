@@ -7,7 +7,7 @@ import pandas as pd
 import requests
 
 # ==============================================================================
-# 🔑 KREDENSIAL & KONFIGURASI PUSAT
+# 🔑 KREDENSIAL & KONFIGURASI PUSAT (KHUSUS SURABAYA)
 # ==============================================================================
 SUPABASE_URL = os.environ.get(
     "SUPABASE_URL", "https://fanzsmghhbefhhaicrok.supabase.co"
@@ -21,20 +21,8 @@ JEZPRO_EMAIL = os.environ.get("JEZPRO_EMAIL", "fajarbintang786@jez.co.id")
 JEZPRO_PASSWORD = os.environ.get("JEZPRO_PASSWORD", "131199")
 
 STORE_ID_SURABAYA = 3
+BRANCH_NAME_SURABAYA = "JEZ SURABAYA"
 WIB = timezone(timedelta(hours=7))
-
-# Mapping Semua Cabang Resmi Jezpro
-BRANCH_MAP = {
-    "JEZ SURABAYA": 3,
-    "JEZ SEMARANG": 53,
-    "JEZ SIDOARJO": 8,
-    "JEZ KEDIRI": 5,
-    "JEZ MALANG": 2,
-    "JEZ JEMBER": 40,
-    "HUB JAKARTA": 55,
-    "ONLINE HUB SURABAYA": 30,
-    "ONLINE HUB MALANG": 20,
-}
 
 HEADERS_SB = {
     "apikey": SUPABASE_KEY,
@@ -42,8 +30,6 @@ HEADERS_SB = {
     "Content-Type": "application/json",
     "Prefer": "resolution=merge-duplicates",
 }
-
-PATTERN_MISS_LOC = re.compile(r"mis+[\s\-_]*loc", re.IGNORECASE)
 
 
 # ==============================================================================
@@ -151,9 +137,9 @@ def relogin_jezpro(session):
 
 
 # ==============================================================================
-# MODUL 1: SINKRONISASI MUTASI SETUP (ALL CABANG MISS LOC + SURABAYA ALL)
+# MODUL 1: SINKRONISASI SEMUA MUTASI SETUP KHUSUS SURABAYA (TANPA FILTER)
 # ==============================================================================
-def execute_sync_mutasi(session, days_back: int = 90, batch_upload_size: int = 500):
+def execute_sync_mutasi_surabaya(session, days_back: int = 90, batch_upload_size: int = 500):
     today = date.today()
     date_list = [
         (today - timedelta(days=i)).strftime("%Y-%m-%d")
@@ -162,11 +148,10 @@ def execute_sync_mutasi(session, days_back: int = 90, batch_upload_size: int = 5
 
     print("=" * 85)
     print(
-        f"🚀 [MODUL 1] SINKRONISASI MUTASI SETUP ({days_back} HARI: {date_list[-1]} s/d"
-        f" {date_list[0]})"
+        f"🚀 [MODUL 1] SINKRONISASI SEMUA MUTASI SETUP KHUSUS SURABAYA ({days_back} HARI)"
     )
-    print("   -> Cabang Lain      : HANYA Miss Location (Bukan Karantina)")
-    print("   -> Khusus SURABAYA  : SEMUA MUTASI SETUP DITARIK TANPA FILTER")
+    print(f"   -> Periode : {date_list[-1]} s/d {date_list[0]}")
+    print("   -> Filter  : TANPA FILTER APAPUN (SEMUA MUTASI DITARIK)")
     print("=" * 85)
 
     url_history = "https://jezpro.id/bin_history_datatables"
@@ -176,172 +161,129 @@ def execute_sync_mutasi(session, days_back: int = 90, batch_upload_size: int = 5
         "Referer": "https://jezpro.id/setup_lokasi_stok_v2",
     }
 
-    all_matched_records = []
-    start_time_all = time.time()
-    count_surabaya_all = 0
-    count_cabang_missloc = 0
+    surabaya_records = []
+    start_time = time.time()
 
-    for b_idx, (branch_name, st_id) in enumerate(BRANCH_MAP.items(), start=1):
-        is_surabaya = st_id == STORE_ID_SURABAYA
-        mode_desc = "SEMUA MUTASI (TANPA FILTER)" if is_surabaya else "Miss Location Only"
-        print(
-            f"\n🏢 [{b_idx}/{len(BRANCH_MAP)}] Memeriksa: {branch_name} (ID:"
-            f" {st_id}) [{mode_desc}]"
-        )
-        branch_found = 0
+    for d_idx, target_date in enumerate(date_list, start=1):
+        params = {
+            "draw": str(d_idx),
+            "columns[0][data]": "DT_RowIndex",
+            "columns[0][name]": "pmt_id",
+            "columns[0][orderable]": "true",
+            "columns[1][data]": "u_name",
+            "columns[1][name]": "u_name",
+            "columns[1][orderable]": "true",
+            "columns[2][data]": "article",
+            "columns[2][name]": "article",
+            "columns[2][orderable]": "false",
+            "columns[3][data]": "ps_barcode",
+            "columns[3][name]": "ps_barcode",
+            "columns[3][orderable]": "false",
+            "columns[4][data]": "st_name",
+            "columns[4][name]": "st_name",
+            "columns[4][orderable]": "true",
+            "columns[5][data]": "start_bin",
+            "columns[5][name]": "start_bin",
+            "columns[5][orderable]": "false",
+            "columns[6][data]": "pmt_old_qty",
+            "columns[6][name]": "pmt_old_qty",
+            "columns[6][orderable]": "false",
+            "columns[7][data]": "pmt_qty",
+            "columns[7][name]": "pmt_qty",
+            "columns[7][orderable]": "false",
+            "columns[8][data]": "pmt_old_qty_new",
+            "columns[8][name]": "pmt_old_qty_new",
+            "columns[8][orderable]": "false",
+            "columns[9][data]": "end_bin",
+            "columns[9][name]": "end_bin",
+            "columns[9][orderable]": "false",
+            "columns[10][data]": "notes",
+            "columns[10][name]": "notes",
+            "columns[10][orderable]": "false",
+            "columns[11][data]": "pm_created_at",
+            "columns[11][name]": "pm_created_at",
+            "columns[11][orderable]": "false",
+            "order[0][column]": "0",
+            "order[0][dir]": "desc",
+            "start": "0",
+            "length": "2000",
+            "search[value]": "",
+            "search": "",
+            "st_id": str(STORE_ID_SURABAYA),
+            "date": target_date,
+            "history_bin_start": "",
+            "history_bin_end": "",
+            "_": int(time.time() * 1000),
+        }
 
-        for d_idx, target_date in enumerate(date_list, start=1):
-            params = {
-                "draw": str(d_idx),
-                "columns[0][data]": "DT_RowIndex",
-                "columns[0][name]": "pmt_id",
-                "columns[0][orderable]": "true",
-                "columns[1][data]": "u_name",
-                "columns[1][name]": "u_name",
-                "columns[1][orderable]": "true",
-                "columns[2][data]": "article",
-                "columns[2][name]": "article",
-                "columns[2][orderable]": "false",
-                "columns[3][data]": "ps_barcode",
-                "columns[3][name]": "ps_barcode",
-                "columns[3][orderable]": "false",
-                "columns[4][data]": "st_name",
-                "columns[4][name]": "st_name",
-                "columns[4][orderable]": "true",
-                "columns[5][data]": "start_bin",
-                "columns[5][name]": "start_bin",
-                "columns[5][orderable]": "false",
-                "columns[6][data]": "pmt_old_qty",
-                "columns[6][name]": "pmt_old_qty",
-                "columns[6][orderable]": "false",
-                "columns[7][data]": "pmt_qty",
-                "columns[7][name]": "pmt_qty",
-                "columns[7][orderable]": "false",
-                "columns[8][data]": "pmt_old_qty_new",
-                "columns[8][name]": "pmt_old_qty_new",
-                "columns[8][orderable]": "false",
-                "columns[9][data]": "end_bin",
-                "columns[9][name]": "end_bin",
-                "columns[9][orderable]": "false",
-                "columns[10][data]": "notes",
-                "columns[10][name]": "notes",
-                "columns[10][orderable]": "false",
-                "columns[11][data]": "pm_created_at",
-                "columns[11][name]": "pm_created_at",
-                "columns[11][orderable]": "false",
-                "order[0][column]": "0",
-                "order[0][dir]": "desc",
-                "start": "0",
-                "length": "1000",
-                "search[value]": "",
-                "search": "",
-                "st_id": str(st_id),
-                "date": target_date,
-                "history_bin_start": "",
-                "history_bin_end": "",
-                "_": int(time.time() * 1000),
-            }
+        try:
+            resp = session.get(url_history, headers=headers_req, params=params, timeout=25)
 
-            try:
-                resp = session.get(
-                    url_history, headers=headers_req, params=params, timeout=25
-                )
+            if resp.status_code in [401, 419] or "login" in resp.url:
+                if relogin_jezpro(session):
+                    resp = session.get(url_history, headers=headers_req, params=params, timeout=25)
 
-                if resp.status_code in [401, 419] or "login" in resp.url:
-                    if relogin_jezpro(session):
-                        resp = session.get(
-                            url_history,
-                            headers=headers_req,
-                            params=params,
-                            timeout=25,
-                        )
-
-                if resp.status_code != 200:
-                    continue
-
-                raw_json = resp.json().get("data", [])
-
-                for item in raw_json:
-                    note_text = strip_html(item.get("notes") or "")
-                    start_bin = strip_html(item.get("start_bin") or "").upper()
-                    end_bin = strip_html(item.get("end_bin") or "").upper()
-
-                    # Filter Aturan:
-                    # Surabaya = Ambil SEMUA mutasi tanpa filter catatan apa pun
-                    # Cabang lain = Hanya miss location & bukan karantina
-                    if is_surabaya:
-                        is_matched = True
-                        count_surabaya_all += 1
-                    else:
-                        is_miss_loc = bool(PATTERN_MISS_LOC.search(note_text))
-                        is_karantina = "KARANTINA" in end_bin
-                        is_matched = is_miss_loc and (not is_karantina)
-                        if is_matched:
-                            count_cabang_missloc += 1
-
-                    if is_matched:
-                        clean_dt = parse_datetime(item.get("pm_created_at"))
-                        try:
-                            q_val = int(item.get("pmt_qty", 1))
-                        except Exception:
-                            q_val = 1
-
-                        pmt_id_raw = item.get("pmt_id") or item.get("id")
-                        try:
-                            pmt_id_val = int(pmt_id_raw) if pmt_id_raw else None
-                        except Exception:
-                            pmt_id_val = None
-
-                        all_matched_records.append({
-                            "pmt_id": pmt_id_val,
-                            "tanggal": clean_dt,
-                            "cabang": branch_name,
-                            "user_name": strip_html(item.get("u_name", "-")),
-                            "sku": (
-                                strip_html(item.get("ps_barcode", "-"))
-                                .split(".")[0]
-                                .upper()
-                            ),
-                            "artikel": strip_html(item.get("article", "-")),
-                            "bin_awal": start_bin,
-                            "qty_mutasi": q_val,
-                            "bin_tujuan": end_bin,
-                            "catatan": note_text,
-                        })
-                        branch_found += 1
-
-                pct_date = int((d_idx / len(date_list)) * 100)
-                print(
-                    f"\r   ➔ [{pct_date:02d}%] Tgl {target_date} (Ditemukan:"
-                    f" {branch_found} baris)",
-                    end="",
-                    flush=True,
-                )
-                time.sleep(0.02)
-
-            except Exception:
+            if resp.status_code != 200:
                 continue
 
-        print(f"\n   ✅ Selesai {branch_name}: Total {branch_found} baris tertangkap.")
+            raw_json = resp.json().get("data", [])
 
-    total_scraped = len(all_matched_records)
-    durasi = int(time.time() - start_time_all)
-    print(f"\n📊 Rangkuman Sesi Mutasi Setup ({durasi} detik):")
-    print(f"   -> Mutasi All Surabaya      : {count_surabaya_all:,} baris")
-    print(f"   -> Miss Location Cabang Lain : {count_cabang_missloc:,} baris")
-    print(f"   -> TOTAL DATA MUTASI TERKUMPUL: {total_scraped:,} baris\n")
+            for item in raw_json:
+                note_text = strip_html(item.get("notes") or "")
+                start_bin = strip_html(item.get("start_bin") or "").upper()
+                end_bin = strip_html(item.get("end_bin") or "").upper()
+
+                clean_dt = parse_datetime(item.get("pm_created_at"))
+                try:
+                    q_val = int(item.get("pmt_qty", 1))
+                except Exception:
+                    q_val = 1
+
+                pmt_id_raw = item.get("pmt_id") or item.get("id")
+                try:
+                    pmt_id_val = int(pmt_id_raw) if pmt_id_raw else None
+                except Exception:
+                    pmt_id_val = None
+
+                surabaya_records.append({
+                    "pmt_id": pmt_id_val,
+                    "tanggal": clean_dt,
+                    "cabang": BRANCH_NAME_SURABAYA,
+                    "user_name": strip_html(item.get("u_name", "-")),
+                    "sku": strip_html(item.get("ps_barcode", "-")).split(".")[0].upper(),
+                    "artikel": strip_html(item.get("article", "-")),
+                    "bin_awal": start_bin,
+                    "qty_mutasi": q_val,
+                    "bin_tujuan": end_bin,
+                    "catatan": note_text,
+                })
+
+            pct_date = int((d_idx / len(date_list)) * 100)
+            print(
+                f"\r   ➔ [{pct_date:02d}%] Tgl {target_date} (Ditemukan: {len(surabaya_records):,} baris)",
+                end="",
+                flush=True,
+            )
+            time.sleep(0.02)
+
+        except Exception:
+            continue
+
+    total_scraped = len(surabaya_records)
+    durasi = int(time.time() - start_time)
+    print(f"\n\n📊 Selesai! Terkumpul {total_scraped:,} baris Mutasi Setup Surabaya ({durasi} detik).")
 
     if total_scraped == 0:
-        print("ℹ️ Tidak ada data mutasi yang perlu diunggah.")
+        print("ℹ️ Tidak ada data mutasi yang ditemukan.")
         return
 
-    # Bersihkan duplikat lokal sebelum upload
-    df_upload = pd.DataFrame(all_matched_records).drop_duplicates(
+    # Hapus duplikat lokal
+    df_upload = pd.DataFrame(surabaya_records).drop_duplicates(
         subset=["tanggal", "sku", "bin_awal", "bin_tujuan", "qty_mutasi"]
     )
     records_to_upload = df_upload.to_dict(orient="records")
 
-    print("🗑️ Menghapus data lama di Supabase 'jezpro_miss_location_logs'...")
+    print("🗑️ Mengosongkan data lama di Supabase 'jezpro_miss_location_logs'...")
     try:
         requests.delete(
             f"{SUPABASE_URL}/rest/v1/jezpro_miss_location_logs?id=gt.0",
@@ -349,9 +291,9 @@ def execute_sync_mutasi(session, days_back: int = 90, batch_upload_size: int = 5
             timeout=30,
         )
     except Exception as e:
-        print(f"   ⚠️ Gagal clear data lama: {e}")
+        print(f"   ⚠️ Info delete: {e}")
 
-    print("📤 Mengunggah data terbaru ke 'jezpro_miss_location_logs'...")
+    print(f"📤 Mengunggah {len(records_to_upload):,} baris mutasi ke Supabase...")
     inserted_count = 0
     upsert_url = f"{SUPABASE_URL}/rest/v1/jezpro_miss_location_logs?on_conflict=tanggal,sku,bin_awal,bin_tujuan,qty_mutasi"
 
@@ -362,11 +304,11 @@ def execute_sync_mutasi(session, days_back: int = 90, batch_upload_size: int = 5
             if res_up.status_code in [200, 201, 204]:
                 inserted_count += len(chunk)
             else:
-                print(f"   ⚠️ Gagal batch {i}: {res_up.status_code}")
+                print(f"   ⚠️ Upload batch gagal ({res_up.status_code}): {res_up.text}")
         except Exception as e:
             print(f"   ⚠️ Kendala upload: {e}")
 
-    print(f"🎉 Sukses mengunggah {inserted_count:,} baris Mutasi Setup ke Supabase!\n")
+    print(f"🎉 Sukses mengunggah {inserted_count:,} baris Mutasi Surabaya ke Supabase!\n")
 
 
 # ==============================================================================
@@ -381,7 +323,7 @@ def execute_sync_surabaya_instock(session, days_back: int = 90, batch_upload_siz
 
     print("=" * 85)
     print(f"📦 [MODUL 2] SCRAPING STOCK TRACKING SURABAYA (STATUS INSTOCK)")
-    print(f"   -> Periode: {p_start} s/d {p_end} (90 Hari Terakhir)")
+    print(f"   -> Periode : {p_start} s/d {p_end} ({days_back} Hari Terakhir)")
     print("=" * 85)
 
     url_dt = "https://jezpro.id/stock_tracking_datatables"
@@ -425,7 +367,7 @@ def execute_sync_surabaya_instock(session, days_back: int = 90, batch_upload_siz
                     res = session.get(url_dt, params=params, headers=headers_dt, timeout=35)
 
             if res.status_code != 200:
-                print(f"   ⚠️ Stock tracking gagal HTTP {res.status_code} pada start={start_row}")
+                print(f"   ⚠️ Datatables stock tracking gagal HTTP {res.status_code} pada start={start_row}")
                 break
 
             j_data = res.json()
@@ -467,7 +409,7 @@ def execute_sync_surabaya_instock(session, days_back: int = 90, batch_upload_siz
                     raw_loc = strip_html(item[7])
                     status_raw = strip_html(item[8]).upper()
 
-                # Filter Note / Status: Hanya ambil INSTOCK & bukan WAITING
+                # Filter Note / Status: Pastikan INSTOCK dan BUKAN WAITING
                 is_instock = ("INSTOCK" in status_raw) and ("WAITING" not in status_raw)
                 if not is_instock:
                     continue
@@ -489,7 +431,7 @@ def execute_sync_surabaya_instock(session, days_back: int = 90, batch_upload_siz
                 instock_records.append({
                     "plst_id": p_id_int,
                     "datetime": parse_datetime(raw_dt),
-                    "cabang": "JEZ SURABAYA",
+                    "cabang": BRANCH_NAME_SURABAYA,
                     "barcode_sku": sku_clean,
                     "article": clean_article_name(raw_art),
                     "invoice": inv_val or "-",
@@ -519,14 +461,14 @@ def execute_sync_surabaya_instock(session, days_back: int = 90, batch_upload_siz
     if not instock_records:
         return
 
-    # Bersihkan duplikat lokal
+    # Hapus duplikat lokal
     df_instock = pd.DataFrame(instock_records).drop_duplicates(
         subset=["datetime", "barcode_sku", "product_location", "status", "qty"]
     )
     records_to_upload = df_instock.to_dict(orient="records")
 
     target_table = "jezpro_surabaya_instock_tracking"
-    print(f"🗑️ Membersihkan data lama di tabel Supabase '{target_table}'...")
+    print(f"🗑️ Membersihkan data lama di Supabase '{target_table}'...")
     try:
         requests.delete(f"{SUPABASE_URL}/rest/v1/{target_table}?id=gt.0", headers=HEADERS_SB, timeout=30)
     except Exception as e:
@@ -550,24 +492,23 @@ def execute_sync_surabaya_instock(session, days_back: int = 90, batch_upload_siz
 # MAIN LOOP: BERJALAN OTOMATIS TIAP 2 JAM SEKALI
 # ==============================================================================
 if __name__ == "__main__":
-    INTERVAL_DETIK = 7200  # 2 jam = 7200 detik
+    INTERVAL_DETIK = 7200  # 2 jam
 
     print("=" * 85)
-    print("🔄 DAEMON SINKRONISASI JEZPRO INTEGRATED")
-    print("   1. Modul Mutasi Setup : Surabaya (Semua) + Cabang Lain (Miss Location Only)")
-    print("   2. Modul Stock Tracking : Khusus Surabaya (Status INSTOCK)")
-    print("   Periode Rentang       : 90 Hari (3 Bulan Terakhir)")
-    print("   Jadwal Interval       : Tiap 2 Jam Sekali")
+    print("🔄 DAEMON SINKRONISASI KHUSUS JEZ SURABAYA")
+    print("   1. Modul Mutasi Setup   : SEMUA Mutasi Surabaya (3 Bulan / 90 Hari)")
+    print("   2. Modul Stock Tracking : SEMUA Stock Tracking INSTOCK (3 Bulan / 90 Hari)")
+    print("   Cabang Luar Kota        : DILEWATI (TIDAK DITARIK)")
     print("=" * 85)
 
     jez = create_jezpro_session()
 
     while True:
         try:
-            # 1. Jalankan Modul Mutasi Setup
-            execute_sync_mutasi(jez, days_back=90)
+            # 1. Jalankan sinkronisasi seluruh Mutasi Surabaya
+            execute_sync_mutasi_surabaya(jez, days_back=90)
 
-            # 2. Jalankan Modul Stock Tracking Surabaya Instock
+            # 2. Jalankan sinkronisasi Stock Tracking Instock Surabaya
             execute_sync_surabaya_instock(jez, days_back=90)
 
         except Exception as e_main:
