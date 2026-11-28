@@ -587,23 +587,29 @@ def fetch_staging_data(session):
     return all_staging_records
 
 # --- B. TRANSFER STOK (ALL STORE) ---
-def fetch_all_items_for_single_tf(session, tf_code, status_txt, now_wib):
+def fetch_all_items_for_single_tf(session, tf_id, tf_code, detail_href, status_txt, now_wib, debug_first=False):
     all_items = []
-    start_item = 0
-    chunk_size = 250
-
-    # Pastikan header khusus XMLHttpRequest dan referer transfer sesuai
     headers_det = {
         "Accept": "application/json, text/javascript, */*; q=0.01",
         "X-Requested-With": "XMLHttpRequest",
         "Referer": "https://jezpro.id/transfer_stok"
     }
 
-    # Dua kemungkinan endpoint rincian item transfer di Jezpro
+    # Bersihkan kode TF murni jika ada teks tambahan
+    m_tf = re.search(r'(TF[A-Z0-9\-/]+)', tf_code.upper())
+    pure_tf_code = m_tf.group(1) if m_tf else tf_code
+
     candidate_urls = [
+        "https://jezpro.id/in_transfer_bin_datatables",
         "https://jezpro.id/transfer_bin_datatables",
-        "https://jezpro.id/in_transfer_bin_datatables"
+        "https://jezpro.id/transfer_detail_datatables",
+        "https://jezpro.id/transfer_stok_detail_datatables"
     ]
+
+    # 1. COBA ENDPOINT DATATABLES (GET dengan stf_id + stf_code)
+    start_item = 0
+    chunk_size = 250
+    matched_endpoint = None
 
     while True:
         params_det = {
@@ -616,24 +622,25 @@ def fetch_all_items_for_single_tf(session, tf_code, status_txt, now_wib):
             "columns[5][data]": "st_end", "columns[5][name]": "st_end",
             "columns[6][data]": "status", "columns[6][name]": "status",
             "order[0][column]": "0", "order[0][dir]": "desc",
-            "start": str(start_item), "length": str(chunk_size),
+            "start": str(start_item),
+            "length": str(chunk_size),
             "search[value]": "",
             "search": "",
-            "stf_code": tf_code,
+            "stf_code": pure_tf_code,
+            "stf_id": str(tf_id) if tf_id else "",
             "_": int(time.time() * 1000)
         }
 
         raw_chunk = []
         data_json = {}
+        urls_to_try = [matched_endpoint] if matched_endpoint else candidate_urls
 
-        for url in candidate_urls:
+        for url in urls_to_try:
             try:
-                res_det = session.get(url, params=params_det, headers=headers_det, timeout=25)
-                
-                # Tangani jika sesi terputus saat looping item
+                res_det = session.get(url, params=params_det, headers=headers_det, timeout=20)
                 if res_det.status_code in [401, 419] or "login" in res_det.url:
                     if relogin_jezpro(session):
-                        res_det = session.get(url, params=params_det, headers=headers_det, timeout=25)
+                        res_det = session.get(url, params=params_det, headers=headers_det, timeout=20)
 
                 if res_det.status_code == 200:
                     j_tmp = res_det.json()
@@ -641,37 +648,105 @@ def fetch_all_items_for_single_tf(session, tf_code, status_txt, now_wib):
                     if chunk_tmp:
                         raw_chunk = chunk_tmp
                         data_json = j_tmp
+                        matched_endpoint = url
                         break
-                    else:
-                        data_json = j_tmp
-            except Exception:
-                continue
+                    elif debug_first and start_item == 0:
+                        print(f"      [DEBUG TF {pure_tf_code}] GET {url} -> HTTP 200 tapi data=[] (recordsTotal={j_tmp.get('recordsTotal')})")
+                elif debug_first and start_item == 0:
+                    print(f"      [DEBUG TF {pure_tf_code}] GET {url} -> HTTP {res_det.status_code}")
+            except Exception as e:
+                if debug_first and start_item == 0:
+                    print(f"      [DEBUG TF {pure_tf_code}] GET {url} error: {e}")
 
         if not raw_chunk:
             break
 
         for it in raw_chunk:
-            art_str = strip_html(it.get("article") or it.get("p_name") or "-")
+            if isinstance(it, dict):
+                art_str = strip_html(it.get("article") or it.get("p_name") or it.get("item_name") or "-")
+                bin_asal = strip_html(it.get("pl_code") or it.get("bin") or it.get("start_bin") or "-")
+                q_tf = safe_int_val(it.get("stfd_qty") or it.get("qty") or it.get("qty_send"), 1)
+                q_bin = safe_int_val(it.get("pls_qty") or it.get("qty_bin") or it.get("current_qty"), 0)
+                st_start = strip_html(it.get("st_start") or it.get("start_store") or "-")
+                st_end = strip_html(it.get("st_end") or it.get("end_store") or "-")
+            elif isinstance(it, list):
+                art_str = strip_html(it[0] if len(it) > 0 else "-")
+                bin_asal = strip_html(it[1] if len(it) > 1 else "-")
+                q_tf = safe_int_val(it[2] if len(it) > 2 else 1, 1)
+                q_bin = safe_int_val(it[3] if len(it) > 3 else 0, 0)
+                st_start = strip_html(it[4] if len(it) > 4 else "-")
+                st_end = strip_html(it[5] if len(it) > 5 else "-")
+            else:
+                continue
+
             all_items.append({
                 "stf_code": tf_code,
                 "article_name": art_str,
-                "bin_asal": strip_html(it.get("pl_code") or it.get("bin") or "-"),
-                "qty_tf": safe_int_val(it.get("stfd_qty") or it.get("qty"), 1),
-                "qty_in_bin": safe_int_val(it.get("pls_qty") or it.get("qty_bin"), 0),
-                "start_store": strip_html(it.get("st_start") or it.get("start_store") or "-"),
-                "end_store": strip_html(it.get("st_end") or it.get("end_store") or "-"),
+                "bin_asal": bin_asal,
+                "qty_tf": q_tf,
+                "qty_in_bin": q_bin,
+                "start_store": st_start,
+                "end_store": st_end,
                 "status": status_txt,
                 "synced_at": now_wib.isoformat()
             })
 
         total_records_in_doc = safe_int_val(data_json.get("recordsFiltered") or data_json.get("recordsTotal"), 0)
         start_item += len(raw_chunk)
-
         if (total_records_in_doc > 0 and start_item >= total_records_in_doc) or len(raw_chunk) < chunk_size:
             break
         time.sleep(0.04)
 
+    # 2. FALLBACK: SCRAPE HALAMAN DETAIL HTML JIKA ENDPOINT DATATABLES KOSONG
+    if not all_items:
+        html_candidates = []
+        if detail_href:
+            full_href = detail_href if detail_href.startswith("http") else f"https://jezpro.id/{detail_href.lstrip('/')}"
+            html_candidates.append(full_href)
+        if tf_id:
+            html_candidates.extend([
+                f"https://jezpro.id/transfer_stok_detail/{tf_id}",
+                f"https://jezpro.id/transfer_stok/detail/{tf_id}",
+                f"https://jezpro.id/in_transfer_stok/detail/{tf_id}",
+            ])
+
+        for h_url in html_candidates:
+            try:
+                r_html = session.get(h_url, headers={"Referer": "https://jezpro.id/transfer_stok"}, timeout=20)
+                if r_html.status_code == 200 and "<table" in r_html.text.lower():
+                    # Cek jika di dalam halaman detail HTML ada endpoint datatables asli yang dipanggil JS
+                    if debug_first:
+                        m_ajax = re.findall(r'https?://jezpro\.id/[a-zA-Z0-9_]*datatable[a-zA-Z0-9_/]*|/[a-zA-Z0-9_]*datatable[a-zA-Z0-9_/]*', r_html.text)
+                        if m_ajax:
+                            print(f"      [DEBUG TF {pure_tf_code}] Ditemukan URL AJAX di halaman detail ({h_url}): {set(m_ajax)}")
+
+                    soup = BeautifulSoup(r_html.text, "html.parser")
+                    for tr in soup.select("table tbody tr"):
+                        tds = [strip_html(td.get_text(" ", strip=True)) for td in tr.find_all("td")]
+                        if len(tds) >= 3 and not any("no data" in c.lower() for c in tds):
+                            art_val = tds[1] if tds[0].isdigit() and len(tds) > 1 else tds[0]
+                            bin_val = tds[2] if tds[0].isdigit() and len(tds) > 2 else tds[1]
+                            qty_val = safe_int_val(tds[3] if tds[0].isdigit() and len(tds) > 3 else tds[2], 1)
+                            if art_val and art_val != "-":
+                                all_items.append({
+                                    "stf_code": tf_code,
+                                    "article_name": art_val,
+                                    "bin_asal": bin_val or "-",
+                                    "qty_tf": qty_val,
+                                    "qty_in_bin": 0,
+                                    "start_store": "-",
+                                    "end_store": "-",
+                                    "status": status_txt,
+                                    "synced_at": now_wib.isoformat()
+                                })
+                    if all_items:
+                        break
+            except Exception as e:
+                if debug_first:
+                    print(f"      [DEBUG TF {pure_tf_code}] HTML {h_url} error: {e}")
+
     return all_items
+
 
 def fetch_transfer_data(session):
     print(f"   ⏳ [MONITOR 2/4] Menarik Seluruh Riwayat Transfer Stok (All Store - 3 Bulan Terakhir)...")
@@ -719,15 +794,30 @@ def fetch_transfer_data(session):
     now_wib = datetime.now(WIB).replace(tzinfo=None)
     cutoff_dt = now_wib - timedelta(days=90)
 
-    for row in raw_history:
+    for idx_tf, row in enumerate(raw_history):
         status_txt = strip_html(row.get("stf_status") or row.get("status") or "").upper()
         if status_txt not in ["DRAFT", "IN PROGRESS"]:
             continue
 
-        # ✅ KODE BARU (Ambil nomor dokumen asli tanpa memotong karakter khusus):
-        raw_code = strip_html(row.get("stf_code") or row.get("kode") or "")
+        raw_code_html = str(row.get("stf_code") or row.get("kode") or "")
+        raw_action_html = str(row.get("action") or "")
+
+        raw_code = strip_html(raw_code_html)
         tf_code = " ".join(raw_code.split()).strip()
         if not tf_code: continue
+
+        # Ekstrak href link detail jika ada di kolom stf_code atau action
+        detail_href = ""
+        m_href = re.search(r'href=["\']([^"\']+)["\']', raw_code_html + " " + raw_action_html)
+        if m_href:
+            detail_href = m_href.group(1)
+
+        # Ekstrak stf_id dari field atau dari URL/onclick di HTML
+        tf_id = safe_int_val(row.get("stf_id") or row.get("id"))
+        if not tf_id:
+            m_id = re.search(r'(?:detail|transfer_stok|stf_id)[/?=](\d+)', raw_code_html + " " + raw_action_html)
+            if m_id:
+                tf_id = int(m_id.group(1))
 
         tgl_str = strip_html(row.get("stf_created") or row.get("tanggal") or "")
         aging_jam = 0.0
@@ -761,7 +851,10 @@ def fetch_transfer_data(session):
             "synced_at": now_wib.isoformat()
         })
 
-        doc_items = fetch_all_items_for_single_tf(session, tf_code, status_txt, now_wib)
+        is_first = (len(open_headers) == 1)
+        doc_items = fetch_all_items_for_single_tf(session, tf_id, tf_code, detail_href, status_txt, now_wib, debug_first=is_first)
+        if is_first and not doc_items:
+            print(f"      [DEBUG HEADER ROW] keys={list(row.keys())} | stf_code_raw={raw_code_html[:120]} | action_raw={raw_action_html[:120]}")
         open_items.extend(doc_items)
 
     print(f"   -> Ditemukan {len(open_headers)} Surat Jalan TF Aktif & {len(open_items)} Rincian Item.")
