@@ -587,10 +587,23 @@ def fetch_staging_data(session):
     return all_staging_records
 
 # --- B. TRANSFER STOK (ALL STORE) ---
-def fetch_all_items_for_single_tf(session, tf_code, status_txt, headers, now_wib):
+def fetch_all_items_for_single_tf(session, tf_code, status_txt, now_wib):
     all_items = []
     start_item = 0
     chunk_size = 250
+
+    # Pastikan header khusus XMLHttpRequest dan referer transfer sesuai
+    headers_det = {
+        "Accept": "application/json, text/javascript, */*; q=0.01",
+        "X-Requested-With": "XMLHttpRequest",
+        "Referer": "https://jezpro.id/transfer_stok"
+    }
+
+    # Dua kemungkinan endpoint rincian item transfer di Jezpro
+    candidate_urls = [
+        "https://jezpro.id/transfer_bin_datatables",
+        "https://jezpro.id/in_transfer_bin_datatables"
+    ]
 
     while True:
         params_det = {
@@ -603,24 +616,42 @@ def fetch_all_items_for_single_tf(session, tf_code, status_txt, headers, now_wib
             "columns[5][data]": "st_end", "columns[5][name]": "st_end",
             "columns[6][data]": "status", "columns[6][name]": "status",
             "order[0][column]": "0", "order[0][dir]": "desc",
-            "start": str(start_item), "length": str(chunk_size), "search": "",
-            "stf_code": tf_code
+            "start": str(start_item), "length": str(chunk_size),
+            "search[value]": "",
+            "search": "",
+            "stf_code": tf_code,
+            "_": int(time.time() * 1000)
         }
 
-        res_det = session.get("https://jezpro.id/in_transfer_bin_datatables", params=params_det, headers=headers, timeout=25)
-        data_json = res_det.json() if res_det.status_code == 200 else {}
-        raw_chunk = data_json.get("data", [])
+        raw_chunk = []
+        data_json = {}
 
-        if not raw_chunk and start_item == 0:
-            res_det2 = session.get("https://jezpro.id/transfer_bin_datatables", params=params_det, headers=headers, timeout=25)
-            data_json = res_det2.json() if res_det2.status_code == 200 else {}
-            raw_chunk = data_json.get("data", [])
+        for url in candidate_urls:
+            try:
+                res_det = session.get(url, params=params_det, headers=headers_det, timeout=25)
+                
+                # Tangani jika sesi terputus saat looping item
+                if res_det.status_code in [401, 419] or "login" in res_det.url:
+                    if relogin_jezpro(session):
+                        res_det = session.get(url, params=params_det, headers=headers_det, timeout=25)
+
+                if res_det.status_code == 200:
+                    j_tmp = res_det.json()
+                    chunk_tmp = j_tmp.get("data", [])
+                    if chunk_tmp:
+                        raw_chunk = chunk_tmp
+                        data_json = j_tmp
+                        break
+                    else:
+                        data_json = j_tmp
+            except Exception:
+                continue
 
         if not raw_chunk:
             break
 
         for it in raw_chunk:
-            art_str = strip_html(it.get("article", "-"))
+            art_str = strip_html(it.get("article") or it.get("p_name") or "-")
             all_items.append({
                 "stf_code": tf_code,
                 "article_name": art_str,
@@ -633,12 +664,12 @@ def fetch_all_items_for_single_tf(session, tf_code, status_txt, headers, now_wib
                 "synced_at": now_wib.isoformat()
             })
 
-        total_records_in_doc = data_json.get("recordsTotal", 0)
+        total_records_in_doc = safe_int_val(data_json.get("recordsFiltered") or data_json.get("recordsTotal"), 0)
         start_item += len(raw_chunk)
 
         if (total_records_in_doc > 0 and start_item >= total_records_in_doc) or len(raw_chunk) < chunk_size:
             break
-        time.sleep(0.05)
+        time.sleep(0.04)
 
     return all_items
 
@@ -693,9 +724,9 @@ def fetch_transfer_data(session):
         if status_txt not in ["DRAFT", "IN PROGRESS"]:
             continue
 
-        raw_code = str(row.get("stf_code") or row.get("kode") or "")
-        m_code = re.search(r'TF\d+', raw_code)
-        tf_code = m_code.group(0) if m_code else strip_html(raw_code).strip()
+        # ✅ KODE BARU (Ambil nomor dokumen asli tanpa memotong karakter khusus):
+        raw_code = strip_html(row.get("stf_code") or row.get("kode") or "")
+        tf_code = " ".join(raw_code.split()).strip()
         if not tf_code: continue
 
         tgl_str = strip_html(row.get("stf_created") or row.get("tanggal") or "")
@@ -730,7 +761,7 @@ def fetch_transfer_data(session):
             "synced_at": now_wib.isoformat()
         })
 
-        doc_items = fetch_all_items_for_single_tf(session, tf_code, status_txt, headers, now_wib)
+        doc_items = fetch_all_items_for_single_tf(session, tf_code, status_txt, now_wib)
         open_items.extend(doc_items)
 
     print(f"   -> Ditemukan {len(open_headers)} Surat Jalan TF Aktif & {len(open_items)} Rincian Item.")
