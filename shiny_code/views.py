@@ -3328,7 +3328,7 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
         )
 
     return ui.div(
-        # --- HEADER EXECUTIVE (LAMA/ASLI) ---
+        # 1. --- HEADER EXECUTIVE ---
         ui.div(
             ui.div(
                 ui.span("EXECUTIVE AUDIT SUMMARY", style="font-size: 11px; font-weight: 900; letter-spacing: 2px; color: #C5A059; text-transform: uppercase; display: block; margin-bottom: 2px;"),
@@ -3343,7 +3343,7 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
             style="display: flex; justify-content: space-between; align-items: center; background: #1A1D24; padding: 1.25rem 1.5rem; border-radius: 12px; border: 1px solid #2D3748; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 10px;"
         ),
 
-        # --- 🌟 [BARU DITAMBAHKAN] BLOK 4 KARTU METRIK SCAN & SYSTEM ---
+        # 2. --- 4 KARTU METRIK SCAN & SYSTEM (TOTAL BIN, SKU, QTY SCAN & QTY SYS) ---
         ui.div(
             ui.div(
                 ui.div(
@@ -3388,12 +3388,9 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
             style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
         ),
 
-        # --- 🌟 [BARU DITAMBAHKAN] BREAKDOWN STORAGE AREA MISS LOCATION ---
-        storage_area_section,
-
-        # --- 4 PILAR UTAMA KPI CARDS (LAMA/ASLI TETAP ADA) ---
+        # 3. --- 4 PILAR UTAMA KPI CARDS (SELISIH AWAL REAL+/SYS+, MISS LOC, NEED ADJ, KARANTINA) ---
         ui.div(
-            # Card 1: Selisih Awal
+            # Card 1: Selisih Awal (Real + & System +)
             ui.div(
                 ui.div(
                     ui.span("1. SELISIH AWAL", style="font-size: 11px; font-weight: 800; color: #A0AEC0; letter-spacing: 0.5px;"),
@@ -3416,7 +3413,6 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
                 ),
                 style="background: #161920; padding: 1rem 1.25rem; border-radius: 10px; border-left: 4px solid #38BDF8; border-top: 1px solid #2D3748; border-right: 1px solid #2D3748; border-bottom: 1px solid #2D3748;"
             ),
-
             # Card 2: Miss Lokasi Antar BIN
             ui.div(
                 ui.div(
@@ -3428,7 +3424,6 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
                 ui.span(f"📦 Total {sku_miss_loc:,} SKU • Mutasi antar rak (No Adj)", style="color: #718096; font-size: 11.5px; margin-top: 4px; display: block;"),
                 style="background: #161920; padding: 1rem 1.25rem; border-radius: 10px; border-left: 4px solid #10B981; border-top: 1px solid #2D3748; border-right: 1px solid #2D3748; border-bottom: 1px solid #2D3748;"
             ),
-
             # Card 3: Real + Need Adjustment
             ui.div(
                 ui.div(
@@ -3440,7 +3435,6 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
                 ui.span(sub_card_need_adj, style="color: #718096; font-size: 11.5px; margin-top: 4px; display: block;"),
                 style="background: #161920; padding: 1rem 1.25rem; border-radius: 10px; border-left: 4px solid #F59E0B; border-top: 1px solid #2D3748; border-right: 1px solid #2D3748; border-bottom: 1px solid #2D3748;"
             ),
-
             # Card 4: Mutasi Karantina
             ui.div(
                 ui.div(
@@ -3455,10 +3449,13 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
             style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
         ),
 
-        # --- PILAR VALUASI FINANSIAL ADJUSTMENT (RP) (HANYA STOCK OPNAME) (LAMA/ASLI) ---
+        # 4. --- 📍 BREAKDOWN STORAGE AREA MISS LOCATION (SEKARANG BERADA TEPAT DI BAWAH KARTU SELISIH AWAL) ---
+        storage_area_section,
+
+        # 5. --- PILAR VALUASI FINANSIAL ADJUSTMENT (RP) (HANYA STOCK OPNAME) ---
         financial_section,
 
-        # --- VISUAL BREAKDOWN & PROPORTION BAR (LAMA/ASLI) ---
+        # 6. --- VISUAL BREAKDOWN & PROPORTION BAR ---
         ui.div(
             ui.div(
                 ui.h4("📊 Distribusi Chart Bar Case to Case", style="font-size: 14px; font-weight: 800; color: #FFFFFF; margin: 0 0 6px 0;"),
@@ -3494,7 +3491,7 @@ def render_executive_overview_modal(title_menu: str, branch: str, metrics: dict)
             style="background: #161920; border: 1px solid #2D3748; padding: 1.25rem 1.5rem; border-radius: 12px; margin-bottom: 1.25rem;"
         ),
 
-        # --- INSIGHT KESIMPULAN AUDITOR (LAMA/ASLI) ---
+        # 7. --- INSIGHT KESIMPULAN AUDITOR ---
         ui.div(
             ui.div(
                 ui.tags.i(class_="fa-solid fa-lightbulb", style="color: #C5A059; font-size: 18px; margin-right: 10px;"),
