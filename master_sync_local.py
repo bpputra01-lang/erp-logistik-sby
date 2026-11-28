@@ -588,20 +588,20 @@ def fetch_staging_data(session):
 
 # --- B. TRANSFER STOK (ALL STORE) ---
 def inspect_transfer_js_from_page(session):
-    """Membaca cuplikan JS asli di halaman transfer_stok untuk mengetahui parameter persis DataTables"""
+    """Membaca cuplikan JS lengkap di sekitar in_transfer_bin_datatables jika masih butuh cek kolom"""
     try:
         r = session.get("https://jezpro.id/transfer_stok", timeout=20)
         if r.status_code == 200:
-            matches = re.findall(r'.{0,250}(?:in_transfer_bin_datatables|transfer_bin_datatables).{0,500}', r.text, re.DOTALL)
-            for idx, m in enumerate(matches[:3], start=1):
-                clean_js = " ".join(m.split())
-                print(f"      [JS JEZPRO #{idx}] {clean_js}")
+            matches = re.findall(r'.{0,150}in_transfer_bin_datatables.{0,1200}', r.text, re.DOTALL)
+            for idx, m in enumerate(matches[:2], start=1):
+                print(f"      [JS IN_TF #{idx}] {' '.join(m.split())}")
     except Exception as e:
         print(f"      [JS INSPECT ERROR] {e}")
 
 
 def fetch_all_items_for_single_tf(session, tf_id, tf_code, st_id_start, st_id_end, status_txt, now_wib, debug_first=False):
     all_items = []
+    url = "https://jezpro.id/in_transfer_bin_datatables"
     headers_det = {
         "Accept": "application/json, text/javascript, */*; q=0.01",
         "X-Requested-With": "XMLHttpRequest",
@@ -611,30 +611,17 @@ def fetch_all_items_for_single_tf(session, tf_id, tf_code, st_id_start, st_id_en
     m_tf = re.search(r'(TF[A-Z0-9\-/]+)', tf_code.upper())
     pure_tf_code = m_tf.group(1) if m_tf else tf_code
 
-    candidate_urls = [
-        "https://jezpro.id/in_transfer_bin_datatables",
-        "https://jezpro.id/transfer_bin_datatables",
-    ]
-
-    # Dua varian payload:
-    # Varian 1: Tanpa 'search' string & tanpa 'order[0][column]' (cegah SQL Unknown column 'article')
-    # Varian 2: Payload minimal (hanya stf_id, stf_code, st_id_start, st_id_end)
-    def build_params(start_item, chunk_size, minimal=False):
+    def build_params(start_item, chunk_size, mode="exact_js"):
+        # WAJIB: 'search' berupa string kosong "", JANGAN kirim search[value]
         base = {
             "draw": "1",
             "start": str(start_item),
             "length": str(chunk_size),
-            "search[value]": "",
-            "search[regex]": "false",
-            "stf_id": str(tf_id) if tf_id else "",
+            "search": "",
             "stf_code": pure_tf_code,
-            "st_id_start": str(st_id_start) if st_id_start else "",
-            "st_id_end": str(st_id_end) if st_id_end else "",
-            "st_start": str(st_id_start) if st_id_start else "",
-            "st_end": str(st_id_end) if st_id_end else "",
             "_": int(time.time() * 1000)
         }
-        if not minimal:
+        if mode == "exact_js":
             base.update({
                 "columns[0][data]": "article", "columns[0][name]": "article", "columns[0][searchable]": "true", "columns[0][orderable]": "false",
                 "columns[1][data]": "pl_code", "columns[1][name]": "pl_code", "columns[1][searchable]": "true", "columns[1][orderable]": "false",
@@ -644,24 +631,32 @@ def fetch_all_items_for_single_tf(session, tf_id, tf_code, st_id_start, st_id_en
                 "columns[5][data]": "st_end", "columns[5][name]": "st_end", "columns[5][searchable]": "false", "columns[5][orderable]": "false",
                 "columns[6][data]": "status", "columns[6][name]": "status", "columns[6][searchable]": "false", "columns[6][orderable]": "false",
             })
+        elif mode == "order_col2":
+            base.update({
+                "columns[0][data]": "article", "columns[0][name]": "article", "columns[0][orderable]": "false",
+                "columns[1][data]": "pl_code", "columns[1][name]": "pl_code", "columns[1][orderable]": "false",
+                "columns[2][data]": "stfd_qty", "columns[2][name]": "stfd_qty", "columns[2][orderable]": "true",
+                "columns[3][data]": "pls_qty", "columns[3][name]": "pls_qty", "columns[3][orderable]": "false",
+                "columns[4][data]": "st_start", "columns[4][name]": "st_start", "columns[4][orderable]": "false",
+                "columns[5][data]": "st_end", "columns[5][name]": "st_end", "columns[5][orderable]": "false",
+                "columns[6][data]": "status", "columns[6][name]": "status", "columns[6][orderable]": "false",
+                "order[0][column]": "2", "order[0][dir]": "desc",
+            })
         return base
 
     start_item = 0
     chunk_size = 250
-    matched_url = None
-    matched_minimal = False
+    matched_mode = None
 
     while True:
         raw_chunk = []
         data_json = {}
 
-        attempts = [(matched_url, matched_minimal)] if matched_url else [
-            (u, m) for m in (False, True) for u in candidate_urls
-        ]
+        modes_to_try = [matched_mode] if matched_mode else ["exact_js", "minimal", "order_col2"]
 
-        for url, is_min in attempts:
+        for mode in modes_to_try:
             try:
-                p = build_params(start_item, chunk_size, minimal=is_min)
+                p = build_params(start_item, chunk_size, mode=mode)
                 res_det = session.get(url, params=p, headers=headers_det, timeout=20)
                 if res_det.status_code in [401, 419] or "login" in res_det.url:
                     if relogin_jezpro(session):
@@ -673,16 +668,15 @@ def fetch_all_items_for_single_tf(session, tf_id, tf_code, st_id_start, st_id_en
                     if chunk_tmp:
                         raw_chunk = chunk_tmp
                         data_json = j_tmp
-                        matched_url = url
-                        matched_minimal = is_min
+                        matched_mode = mode
                         break
                     elif debug_first and start_item == 0:
-                        print(f"      [DEBUG TF {pure_tf_code}] {url} (min={is_min}) -> 200 tapi data=[]")
+                        print(f"      [DEBUG TF {pure_tf_code}] mode={mode} -> 200 tapi data=[]")
                 elif debug_first and start_item == 0:
-                    print(f"      [DEBUG TF {pure_tf_code}] {url} (min={is_min}) -> HTTP {res_det.status_code}: {res_det.text[:250]}")
+                    print(f"      [DEBUG TF {pure_tf_code}] mode={mode} -> HTTP {res_det.status_code}")
             except Exception as e:
                 if debug_first and start_item == 0:
-                    print(f"      [DEBUG TF {pure_tf_code}] {url} error: {e}")
+                    print(f"      [DEBUG TF {pure_tf_code}] mode={mode} error: {e}")
 
         if not raw_chunk:
             break
